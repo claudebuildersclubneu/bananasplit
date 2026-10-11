@@ -116,7 +116,8 @@ Every theme is printed like a two-ink risograph zine: the org's **primary** and
 The look lives in `src/app/globals.css` (after the token blocks) and never names
 a colour: utilities mix the tokens where they paint, so the scoped previews on
 Settings > Theme restyle them too. Only palette-free values sit on `:root` (the
-paper grain, the highlighter's strength per mode, the motion curve).
+highlighter's strength per mode, the motion curve). Surfaces are flat: no
+grain on the page and no drop shadow under cards.
 
 - **Type** (`src/app/layout.tsx`, all variable): **Anybody** for headings and
   figures, pushed to the ends of its width (50-150%) and weight (100-900) axes;
@@ -126,8 +127,7 @@ paper grain, the highlighter's strength per mode, the motion curve).
   `heading` (card, dialog and sheet titles), `eyebrow` (mono caps labels),
   `numeral` (thin, condensed big figures), `figure` (mono tabular money in
   text), `ink-mark` (highlight inline words), `misregister` (the accent ink
-  printed off register), `paper` (grain over an element's background), `sheet` (a card lifted off the
-  page), `ink-edge` (a primary button's darker bottom edge) and `crop-marks`
+  printed off register), `ink-edge` (a primary button's darker bottom edge) and `crop-marks`
   (printer's marks outside an element's corners; not on an `overflow-hidden`
   element, which would clip them).
 - **Motion.** `reveal` staggers its children in on mount; the app's `<main>`
@@ -145,8 +145,7 @@ paper grain, the highlighter's strength per mode, the motion curve).
   pages. The fixed-colour files are in `public/brand/` (the mark, which follows
   the viewer's light or dark mode; the app icon; the lockup for light and dark
   backgrounds, with Anybody embedded). `src/app/icon.svg`, `apple-icon.png` and
-  `favicon.ico` are the app icon. The paper grain's alpha is sparse on purpose: a denser
-  grain would darken the page under the text and undo the measured contrast.
+  `favicon.ico` are the app icon.
 
 ## Converted colours
 

@@ -83,8 +83,8 @@ export function AppShell({
           Skip to content
         </a>
 
-        {/* The zine's spine: grained paper, with a second rule inside the fold. */}
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border paper hidden flex-col gap-4 border-r p-4 shadow-[inset_-4px_0_0_var(--sidebar),inset_-5px_0_0_var(--sidebar-border)] md:sticky md:top-0 md:flex md:h-screen">
+        {/* The zine's spine: a second rule inside the fold. */}
+        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-4 border-r p-4 shadow-[inset_-4px_0_0_var(--sidebar),inset_-5px_0_0_var(--sidebar-border)] md:sticky md:top-0 md:flex md:h-screen">
           {brand}
           <OrgSwitcher orgs={orgs} activeSlug={orgSlug} />
           <SidebarNav sections={sections} settings={settings} orgId={orgId} pins={pins} />
@@ -105,7 +105,7 @@ export function AppShell({
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="bg-sidebar text-sidebar-foreground paper flex w-72 flex-col p-4"
+                className="bg-sidebar text-sidebar-foreground flex w-72 flex-col p-4"
               >
                 <SheetHeader className="gap-3 p-0">
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
