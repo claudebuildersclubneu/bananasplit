@@ -205,7 +205,9 @@ owns every table, so it bypasses RLS and the app never connects as it).
    up/down.
 8. **Background jobs** — mail, reminders, syncs and maintenance run from the
    job outbox (`/api/cron/jobs`, fail-closed on `CRON_SECRET`). `vercel.json`
-   has a daily backstop cron (Hobby allows only daily crons). Then either:
+   has a daily backstop cron (Hobby allows only daily crons) at 14:00 UTC,
+   after 09:00 US Eastern in both EDT and EST, so the morning due-date
+   reminders still go out the same day when nothing else drains. Then either:
    - **Pro**: change the `/api/cron/jobs` schedule in `vercel.json` to
      `*/5 * * * *`; or
    - **Hobby**: set the repository secrets `JOBS_DRAIN_URL`

@@ -7,7 +7,7 @@ import { isEmailEnabled } from "@/lib/notification-preferences";
 import { authDb } from "@/server/db/clients";
 import { withSystemOrgTx } from "@/server/db/context";
 import type { EMAIL_JOB_TEMPLATES } from "@/server/jobs/registry";
-import { PermanentJobError, type JobHandler } from "@/server/jobs/types";
+import { PermanentJobError, type JobHandler, type JobOutcome } from "@/server/jobs/types";
 import { renderTaskNotificationEmail } from "@/server/tasks/email";
 
 import { getOrgMailer, getPlatformMailer } from "./mailer";
@@ -31,6 +31,18 @@ import {
 function requireOrg(orgId: string | null): string {
   if (!orgId) throw new PermanentJobError("org job without an organizationId");
   return orgId;
+}
+
+/**
+ * The outcome when the org gets in-app notifications only. CANCELLED with
+ * the reason, not DONE: a job that sent nothing must not look like a
+ * delivered email in the Job table, and the log line says what to change.
+ */
+function noSender(orgId: string, kind: string): JobOutcome {
+  console.warn(
+    `[email] ${kind} not sent: org ${orgId} has no email sender (connect one under Settings > Integrations > Email sender, or turn on the platform fallback there)`,
+  );
+  return { status: "CANCELLED", error: "no email sender for this org (in-app only)" };
 }
 
 /** notify-email:{notificationId} — the email copy of a Notification. */
@@ -57,15 +69,17 @@ export const notifyEmailJob: JobHandler<{ notificationId: string }> = async (run
     }),
   );
   if (!n || n.emailSentAt) return; // gone, or already sent
-  if (!isEmailEnabled(n.user.emailPreferences, n.type)) return;
+  if (!isEmailEnabled(n.user.emailPreferences, n.type)) {
+    return { status: "CANCELLED", error: "the recipient turned this email off" };
+  }
 
   // Task notifications (Phase 6) render their own templates: title, who
   // assigned it, due date, a direct link. "skip" means it no longer applies.
   const taskEmail = await renderTaskNotificationEmail(orgId, n);
-  if (taskEmail === "skip") return;
+  if (taskEmail === "skip") return { status: "CANCELLED", error: "no longer applies" };
 
   const mailer = await getOrgMailer(orgId);
-  if (!mailer) return; // in-app only for this org
+  if (!mailer) return noSender(orgId, "notify-email");
 
   // Claim the send (at most once), then send outside any transaction; a
   // failed send releases the claim so the retry can send.
@@ -170,7 +184,7 @@ export const reimbursementEmailJob: JobHandler<{
   if (!t || t.status !== status) return;
 
   const mailer = await getOrgMailer(orgId);
-  if (!mailer) return;
+  if (!mailer) return noSender(orgId, "reimbursement-email");
   await mailer.send(
     {
       to: t.submittedBy.email,
@@ -208,7 +222,7 @@ async function sendTreasurerDigest(
   userId: string,
   signal: AbortSignal,
   dedupeKey: string,
-): Promise<void> {
+): Promise<JobOutcome | void> {
   const data = await withSystemOrgTx(orgId, async ({ db }) => {
     const recipient = await db.membership.findFirst({
       where: { organizationId: orgId, userId, role: { in: [Role.OWNER, Role.TREASURER] } },
@@ -235,7 +249,7 @@ async function sendTreasurerDigest(
   if (!data || data.pending.length === 0) return;
 
   const mailer = await getOrgMailer(orgId);
-  if (!mailer) return;
+  if (!mailer) return noSender(orgId, "treasurer-digest");
   const org = data.recipient.organization;
   await mailer.send(
     {

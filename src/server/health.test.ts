@@ -139,6 +139,15 @@ describe("health checks", () => {
     expect(failing(ok)).toEqual([]);
   });
 
+  it("passes with EMAIL_DELIVERY=off but says the mail is held", async () => {
+    const report = await runHealthChecks(probes(), { VERCEL_ENV: "production", EMAIL_DELIVERY: "off" });
+    expect(report.checks.find((c) => c.name === "production:email")).toEqual({
+      name: "production:email",
+      ok: true,
+      detail: "EMAIL_DELIVERY=off: email is queued, not sent",
+    });
+  });
+
   describe("production:auth_secret", () => {
     const check = async (env: Record<string, string>) =>
       (await runHealthChecks(probes(), { VERCEL_ENV: "production", ...env })).checks.find(

@@ -138,7 +138,15 @@ export const JOB_KINDS = {
 
   // ---- Tasks (Phase 6; handlers owned by B6) ----
   "task-reminder": kind({
-    payload: z.object({ taskId: id, userId: id, dueDate: isoDate }).strict(),
+    payload: z
+      .object({
+        taskId: id,
+        userId: id,
+        dueDate: isoDate,
+        // Absent on jobs enqueued before the due-today and overdue stages: "upcoming".
+        stage: z.enum(["upcoming", "today", "overdue"]).optional(),
+      })
+      .strict(),
     scope: "org",
     maxRuntimeMs: 20_000,
     leaseSeconds: 60,
@@ -146,7 +154,8 @@ export const JOB_KINDS = {
     afterEligible: true,
     sendsEmail: true,
     handler: () => import("@/server/tasks/jobs").then((m) => m.taskReminderJob),
-    description: "Due-date reminder; key task-reminder:{taskId}:{dueDate}:{userId}. Runs once due.",
+    description:
+      "Due-date reminder (upcoming, due today, overdue); key task-reminder:{taskId}:{dueDate}:{userId}[:{stage}]. Runs once due.",
   }),
   "task-digest": kind({
     payload: z.object({ userId: id, localDate: isoDate }).strict(),

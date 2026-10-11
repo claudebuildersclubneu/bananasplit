@@ -93,6 +93,17 @@ describe("task email templates", () => {
       url,
     });
     expect(reminder.subject).toBe("Due tomorrow: Rooms");
+    const overdue = taskReminderEmail({
+      orgName: "CBC",
+      when: "yesterday (overdue)",
+      overdue: true,
+      role: "collaborator",
+      task: { title: "Rooms", dueLabel: "Fri, Oct 2" },
+      url,
+    });
+    expect(overdue.subject).toBe("Overdue: Rooms");
+    expect(overdue.text).toContain("A task you're involved in is overdue.");
+    expect(overdue.text).toContain("Due: Fri, Oct 2");
     const digest = taskDigestEmail({
       orgName: "CBC",
       dateLabel: "Thu, Oct 1",

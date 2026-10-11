@@ -229,8 +229,17 @@ describe.skipIf(!seeded)("tasks against the local database (seeded CBC)", () => 
         orderBy: { dedupeKey: "asc" },
       }),
     );
-    // Nothing was cancelled from the user path: both keys are still pending.
-    expect(jobs.map((j) => j.status)).toEqual(["PENDING", "PENDING"]);
+    // Nothing was cancelled from the user path: both dates' reminders (the
+    // lead one, due today and overdue) are still pending.
+    expect(jobs.map((j) => j.dedupeKey.slice(`task-reminder:${id}:`.length))).toEqual([
+      `${due(10)}:${p.alex.id}`,
+      `${due(10)}:${p.alex.id}:overdue`,
+      `${due(10)}:${p.alex.id}:today`,
+      `${due(11)}:${p.alex.id}`,
+      `${due(11)}:${p.alex.id}:overdue`,
+      `${due(11)}:${p.alex.id}:today`,
+    ]);
+    expect(jobs.every((j) => j.status === "PENDING")).toBe(true);
 
     // The superseded date's job no-ops when it runs.
     const stale = await taskReminderJob(run({ taskId: id, userId: p.alex.id, dueDate: due(10) }));

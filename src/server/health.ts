@@ -224,7 +224,11 @@ const AUTH_SECRET_VARS = [
 function productionChecks(env: Env): HealthCheck[] {
   const checks: HealthCheck[] = [];
   const email = emailConfigProblems(env);
-  checks.push({ name: "production:email", ok: email.length === 0, detail: email.join("; ") || undefined });
+  // Off is a deliberate setting (Fix 17), so it passes, but it must not be
+  // invisible: every email job waits unsent until it is switched back on.
+  const held =
+    emailDelivery(env) === "off" ? "EMAIL_DELIVERY=off: email is queued, not sent" : undefined;
+  checks.push({ name: "production:email", ok: email.length === 0, detail: email.join("; ") || held });
   checks.push({
     name: "production:cron_secret",
     ok: Boolean(env.CRON_SECRET),

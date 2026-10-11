@@ -366,6 +366,9 @@ enum NotificationType {
   // Phase 7 (optional notices to attendees)
   EVENT_UPDATED
   EVENT_CANCELLED
+  // Due-date reminders on the day and the day after (src/server/tasks/reminders.ts)
+  TASK_DUE_TODAY
+  TASK_OVERDUE
 }
 
 model Notification {

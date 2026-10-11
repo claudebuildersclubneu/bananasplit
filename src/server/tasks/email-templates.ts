@@ -181,16 +181,18 @@ export function taskReminderEmail(input: {
   orgName: string;
   /** "tomorrow", "today", "in 3 days". */
   when: string;
+  /** The morning-after reminder: the due date has passed. */
+  overdue?: boolean;
   role: "owner" | "collaborator";
   task: TaskFacts;
   url: string;
 }): RenderedEmail {
-  const lead =
-    input.role === "owner"
-      ? `Reminder: a task you own is due ${input.when}.`
-      : `Reminder: a task you're involved in is due ${input.when}.`;
+  const which = input.role === "owner" ? "a task you own" : "a task you're involved in";
+  const lead = input.overdue
+    ? `${which.charAt(0).toUpperCase()}${which.slice(1)} is overdue.`
+    : `Reminder: ${which} is due ${input.when}.`;
   return layout({
-    subject: `Due ${input.when}: ${input.task.title}`,
+    subject: input.overdue ? `Overdue: ${input.task.title}` : `Due ${input.when}: ${input.task.title}`,
     eyebrow: input.orgName,
     bodyHtml: paragraph(lead) + factsHtml(input.task),
     bodyText: [lead, factsText(input.task)].join("\n\n"),

@@ -17,6 +17,7 @@ import { notifyUsers } from "@/server/notifications";
 import { loadDigest } from "./digest";
 import { dueWhen } from "./email";
 import { digestItemCount } from "./email-templates";
+import { stageApplies, type ReminderStage } from "./reminders";
 import { expectedPosters } from "./weekly";
 
 /**
@@ -46,19 +47,52 @@ async function isMember(db: TxClient, organizationId: string, userId: string): P
   return m !== null;
 }
 
+const REMINDER_NOTICE: Record<
+  ReminderStage,
+  {
+    type: NotificationType;
+    title: (when: string, title: string) => string;
+    body: (dueLabel: string) => string;
+    dedupe: string;
+  }
+> = {
+  upcoming: {
+    type: NotificationType.TASK_DUE_REMINDER,
+    title: (when, title) => `Due ${when}: ${title}`,
+    body: (dueLabel) => `Due ${dueLabel}`,
+    dedupe: "reminder",
+  },
+  today: {
+    type: NotificationType.TASK_DUE_TODAY,
+    title: (_when, title) => `Due today: ${title}`,
+    body: (dueLabel) => `Due ${dueLabel}`,
+    dedupe: "due-today",
+  },
+  overdue: {
+    type: NotificationType.TASK_OVERDUE,
+    title: (_when, title) => `Overdue: ${title}`,
+    body: (dueLabel) => `Was due ${dueLabel}`,
+    dedupe: "overdue",
+  },
+};
+
 /**
- * task-reminder:{taskId}:{dueDate}:{userId}. Sends only when the task is
- * still open, its due date still equals the key's date, and the recipient is
- * still its owner (or an assignee who opted in). The user path never cancels
- * a reminder; a superseded one ends here as CANCELLED.
+ * task-reminder:{taskId}:{dueDate}:{userId}[:{stage}]. Sends only when the
+ * task is still open, its due date still equals the key's date, the
+ * recipient is still its owner (or an assignee who opted in), and the stage
+ * still fits the recipient's local date (./reminders.ts stageApplies). The
+ * user path never cancels a reminder; a superseded one ends here as
+ * CANCELLED.
  */
 export const taskReminderJob: JobHandler<{
   taskId: string;
   userId: string;
   dueDate: string;
+  stage?: ReminderStage;
 }> = async (run) => {
   const orgId = requireOrg(run.organizationId);
   const { taskId, userId, dueDate } = run.payload;
+  const stage = run.payload.stage ?? "upcoming";
   return withSystemOrgTx(orgId, async ({ db }) => {
     const task = await db.task.findFirst({
       where: { id: taskId, organizationId: orgId },
@@ -90,13 +124,15 @@ export const taskReminderJob: JobHandler<{
     }
     const tz = effectiveTimezone(user, task.organization);
     const today = localDateKey(new Date(), tz);
+    if (!stageApplies(stage, dueDate, today)) return cancelled(`too late for the ${stage} reminder`);
+    const notice = REMINDER_NOTICE[stage];
     await notifyUsers(db, orgId, [userId], {
-      type: NotificationType.TASK_DUE_REMINDER,
-      title: `Due ${dueWhen(today, dueDate)}: "${task.title.slice(0, 120)}"`,
-      body: `Due ${formatDueKey(dueDate, today)}${isOwner ? "" : " (you're involved)"}`,
+      type: notice.type,
+      title: notice.title(dueWhen(today, dueDate), `"${task.title.slice(0, 120)}"`),
+      body: `${notice.body(formatDueKey(dueDate, today))}${isOwner ? "" : " (you're involved)"}`,
       linkUrl: `/app/${task.organization.slug}/tasks/${task.id}`,
       taskId: task.id,
-      dedupeKey: `reminder:${task.id}:${dueDate}`,
+      dedupeKey: `${notice.dedupe}:${task.id}:${dueDate}`,
     });
   });
 };
