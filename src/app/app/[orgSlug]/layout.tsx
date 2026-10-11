@@ -8,13 +8,14 @@ import { OrgBrand } from "@/components/theme/org-brand";
 import { OrgThemeRoot } from "@/components/theme/org-theme-root";
 import { CALLBACK_HEADER } from "@/lib/auth/callback-url";
 import { can } from "@/lib/auth/permissions";
-import { requireUser } from "@/lib/auth/session";
+import { getSession, requireUser } from "@/lib/auth/session";
 import { resolveSidebar, visibleSidebar } from "@/lib/nav/sidebar";
 import { orgLogoUrl } from "@/lib/org-logo";
 import { applyPersonalTheme, parsePersonalTheme } from "@/lib/theme/personal";
 import { resolveTheme } from "@/lib/theme/resolve";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listPins } from "@/server/pins";
+import { guestPollRedirect } from "@/server/polls/guest-redirect";
 import { getShellUser, getViewerPrefs } from "@/server/profiles/queries";
 import { findPendingDeletionOrg } from "@/server/settings/deletion";
 
@@ -59,6 +60,12 @@ function isNotFound(error: unknown): boolean {
 
 export default async function OrgLayout({ params, children }: LayoutProps<"/app/[orgSlug]">) {
   const { orgSlug } = await params;
+  // Someone outside the club with an availability poll's in-app link
+  // answers on its guest page instead of signing up.
+  if (!(await getSession())) {
+    const guestPage = await guestPollRedirect(orgSlug);
+    if (guestPage) redirect(guestPage);
+  }
   const user = await requireUser();
 
   let ctx: Awaited<ReturnType<typeof getOrgContextBySlug>>;
@@ -70,6 +77,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
     const deep = await deepRedirectTarget(error, orgSlug);
     if (deep) redirect(deep);
     if (isNotFound(error)) {
+      const guestPage = await guestPollRedirect(orgSlug);
+      if (guestPage) redirect(guestPage);
       const pending = await findPendingDeletionOrg(user.id, orgSlug);
       if (pending) return <OrgPendingDeletion org={pending} />;
     }

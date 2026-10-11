@@ -1,10 +1,24 @@
 "use client";
 
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink, UserPlus } from "lucide-react";
 import { useState } from "react";
 
+import { copyGuestPollLink } from "@/components/polls/copy-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+/**
+ * The header's one-click invite: copies the guest link, which is all a
+ * guest needs (they type a name on it, no account and no onboarding).
+ */
+export function InviteGuestsButton({ pollId }: { pollId: string }) {
+  return (
+    <Button type="button" variant="outline" onClick={() => copyGuestPollLink(pollId)}>
+      <UserPlus aria-hidden className="size-4" />
+      Invite guests
+    </Button>
+  );
+}
 
 /**
  * The public link, for people outside the org: they answer as guests with
@@ -29,15 +43,17 @@ export function SharePollLink({ url }: { url: string }) {
   return (
     <section className="bg-muted/40 space-y-2 rounded-lg border p-3" aria-labelledby="poll-share">
       <h2 id="poll-share" className="text-sm font-medium">
-        Share this poll
+        Invite guests
       </h2>
       <p className="text-muted-foreground text-xs">
-        Anyone with the link can answer, no account needed. Members answer as themselves.
+        Send this link to anyone outside the club. They type their name and mark when they&apos;re
+        free: no account, no sign-up. Their answers show up here for everyone. Members who open it
+        answer as themselves.
       </p>
       <Input
         value={url}
         readOnly
-        aria-label="Poll link"
+        aria-label="Guest link"
         onFocus={(e) => e.currentTarget.select()}
         className="h-8 text-xs"
       />
@@ -48,7 +64,7 @@ export function SharePollLink({ url }: { url: string }) {
           ) : (
             <Copy aria-hidden className="size-3.5" />
           )}
-          {copied ? "Copied" : "Copy link"}
+          {copied ? "Copied" : "Copy guest link"}
         </Button>
         <a
           href={url}

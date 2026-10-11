@@ -3,12 +3,12 @@ import type { PollAvailability } from "@/generated/prisma/enums";
 /**
  * The poll as a respondent sees it (0A Fix 6). The public /poll/[pollId]
  * page is reachable by anyone with the link, so this DTO carries no user
- * ids, no emails, no member names and no guest keys: each respondent is an
- * opaque key ("r1", "r2", ...) with a display label. Guests show the name
- * they typed (a duplicate gets a " (2)" suffix); members show as "Member".
- * Inside the app, where every viewer is a member of the org and already sees
- * the others' names, the page may pass `memberNames` so members show by
- * name; it is ignored for a guest viewer.
+ * ids, no emails and no guest keys: each respondent is an opaque key ("r1",
+ * "r2", ...) with a display label. Guests show the name they typed (a
+ * duplicate gets a " (2)" suffix). Members show by the display name in
+ * `memberNames` (current members only, loaded by both poll pages), so a
+ * guest can see who they're meeting, like any group-scheduling link; a
+ * member with no name, or one who has left the org, shows as "Member".
  *
  * A time someone can't make is one they left unmarked: stored NO answers
  * (from before the grid dropped its "unavailable" mark) read as unmarked.
@@ -93,12 +93,12 @@ function sourceKey(r: PollSource["responses"][number]): string {
 }
 
 export interface PollViewOptions {
-  /** Members' display names by user id (in-app only; ignored for guests). */
+  /** Current members' display names by user id. */
   memberNames?: ReadonlyMap<string, string>;
 }
 
 export function buildPollView(poll: PollSource, viewer: PollViewer, options: PollViewOptions = {}): PollView {
-  const memberNames = viewer.kind === "member" ? options.memberNames : undefined;
+  const { memberNames } = options;
   const opaque = new Map<string, { key: string; label: string; isGuest: boolean }>();
   const nameCounts = new Map<string, number>();
   const answers = poll.responses.filter(

@@ -12,9 +12,9 @@ import { buildQuestionPollView } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadQuestionPollSource } from "@/server/polls/question-polls";
 
-import { getPollSource } from "../../queries";
+import { getPollMemberNames, getPollSource } from "../../queries";
 import { DeletePollButton } from "./poll-actions";
-import { SharePollLink } from "./share-poll-link";
+import { InviteGuestsButton, SharePollLink } from "./share-poll-link";
 
 /**
  * One poll, of either kind: an availability poll (find a time) when the id
@@ -36,19 +36,10 @@ export default async function PollDetailPage({
       });
       return { kind: "question" as const, question, me };
     }
-    // Members see each other by name inside the app (they already do on
-    // event pages); only current members, and never on the public link.
-    const userIds = [...new Set(poll.responses.flatMap((r) => (r.userId ? [r.userId] : [])))];
-    const members = userIds.length
-      ? await db.membership.findMany({
-          where: { organizationId: org.id, userId: { in: userIds } },
-          select: { user: { select: { id: true, name: true } } },
-        })
-      : [];
     return {
       kind: "availability" as const,
       poll,
-      memberNames: new Map(members.map((m) => [m.user.id, m.user.name ?? ""])),
+      memberNames: await getPollMemberNames(db, org.id, poll),
     };
   });
   if (!loaded) notFound();
@@ -102,14 +93,19 @@ export default async function PollDetailPage({
         orgSlug={orgSlug}
         canFinalize={canFinalize}
         actions={
-          canDelete ? (
-            <DeletePollButton
-              orgId={org.id}
-              orgSlug={orgSlug}
-              pollId={poll.id}
-              title={poll.title}
-              scheduled={Boolean(poll.finalizedEventId)}
-            />
+          isOpen || canDelete ? (
+            <>
+              {isOpen && <InviteGuestsButton pollId={poll.id} />}
+              {canDelete && (
+                <DeletePollButton
+                  orgId={org.id}
+                  orgSlug={orgSlug}
+                  pollId={poll.id}
+                  title={poll.title}
+                  scheduled={Boolean(poll.finalizedEventId)}
+                />
+              )}
+            </>
           ) : undefined
         }
         aside={isOpen ? <SharePollLink url={appUrl(`/poll/${poll.id}`)} /> : undefined}

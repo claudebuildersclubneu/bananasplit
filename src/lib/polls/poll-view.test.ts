@@ -97,15 +97,23 @@ describe("buildPollView — the public poll DTO (0A Fix 6)", () => {
     expect(view.finalizedEventId).toBe("event_secret");
   });
 
-  it("names members only for a member viewer given the org's names, never for a guest", () => {
+  it("names members for any viewer given the org's names, and nothing more", () => {
     const memberNames = new Map([["user_member_1", "Alice Nguyen"]]);
+    const labelsOf = (view: ReturnType<typeof buildPollView>) => [
+      ...new Map(view.responses.map((r) => [r.respondentKey, r.label])).values(),
+    ];
 
     const inApp = buildPollView(poll, { kind: "member", userId: "someone_else" }, { memberNames });
-    const labels = [...new Map(inApp.responses.map((r) => [r.respondentKey, r.label])).values()];
-    expect(labels).toEqual(["Alice Nguyen", "Alex", "alex (2)", "Sam"]);
+    expect(labelsOf(inApp)).toEqual(["Alice Nguyen", "Alex", "alex (2)", "Sam"]);
 
     const asGuest = buildPollView(poll, { kind: "guest", guestKeyHash: null }, { memberNames });
-    expect(JSON.stringify(asGuest)).not.toContain("Alice");
+    expect(labelsOf(asGuest)).toEqual(["Alice Nguyen", "Alex", "alex (2)", "Sam"]);
+    expect(JSON.stringify(asGuest)).not.toContain("user_member_1");
+  });
+
+  it("shows a member without a known name as Member", () => {
+    const view = buildPollView(poll, { kind: "guest", guestKeyHash: null }, { memberNames: new Map() });
+    expect(view.responses.find((r) => !r.isGuest)?.label).toBe("Member");
   });
 
   it("gives the viewer their own respondent key, and the scheduled time to members only", () => {

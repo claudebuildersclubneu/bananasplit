@@ -352,7 +352,7 @@ export function RespondentList({
 }: {
   respondents: { key: string; name: string; isGuest: boolean }[];
 }) {
-  // On the public link members aren't named (poll-view.ts): one chip, not a row of "Member".
+  // Members without a name, or who have left (poll-view.ts): one chip, not a row of "Member".
   const anonymousMembers = respondents.filter((r) => !r.isGuest && r.name === "Member").length;
   const named = respondents.filter((r) => r.isGuest || r.name !== "Member");
   return (

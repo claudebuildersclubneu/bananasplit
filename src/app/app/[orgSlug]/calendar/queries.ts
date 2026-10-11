@@ -261,3 +261,23 @@ export function getPollSource(db: TxClient, organizationId: string, pollId: stri
     },
   });
 }
+
+/**
+ * Display names of the poll's respondents who are current members, for
+ * buildPollView: both poll pages show members by name, the public one
+ * included (names only, never ids or emails). Someone who has left the org
+ * gets no name and shows as "Member".
+ */
+export async function getPollMemberNames(
+  db: TxClient,
+  organizationId: string,
+  poll: { responses: { userId: string | null }[] },
+): Promise<Map<string, string>> {
+  const userIds = [...new Set(poll.responses.flatMap((r) => (r.userId ? [r.userId] : [])))];
+  if (userIds.length === 0) return new Map();
+  const members = await db.membership.findMany({
+    where: { organizationId, userId: { in: userIds } },
+    select: { user: { select: { id: true, name: true } } },
+  });
+  return new Map(members.map((m) => [m.user.id, m.user.name ?? ""]));
+}
