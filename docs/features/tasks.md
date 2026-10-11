@@ -294,30 +294,34 @@ timezone.
 | Assigned               | You became a task's owner or collaborator (self-assignment sends nothing). One message lists every task of a bulk assignment. |
 | Mentioned              | Someone @mentioned you in a description or comment.                                                                           |
 | Commented              | Someone commented on a task you own or are on (off by default).                                                               |
-| Due reminder           | The lead time before the due date, at 09:00 your time.                                                                        |
+| Due reminder           | The lead time before the due date, at 09:00 your time (none when your lead is "on the due date": Due today covers it).        |
+| Due today              | 09:00 your time on the due date.                                                                                              |
+| Overdue                | 09:00 your time the day after the due date, once, if the task is still open.                                                  |
 | Daily digest           | Your chosen hour (08:00 by default), if you turn it on.                                                                       |
 | Sunday update reminder | Sunday 18:00, if you're a lead who hasn't posted.                                                                             |
 
 Each person controls these in their profile's notification settings (older
 accounts are upgraded to the new shape as they are read). Collaborators only
-get due-date reminders if they opt in; the owner always does.
+get due-date reminders (due soon, due today, overdue) if they opt in; the
+owner always does.
 
 Reminders are never cancelled when a task changes. Moving a due date,
 changing the owner or completing the task simply makes the old reminder do
 nothing when it comes due: the worker re-checks that the task is still open,
 that its due date is unchanged and that the recipient is still its owner (or
-an opted-in collaborator). Moving a date away and back re-uses the same
-pending reminder, so nobody gets two.
+an opted-in collaborator). A reminder that would arrive too late to be true
+(a "due today" after midnight) is dropped too. Moving a date away and back
+re-uses the same pending reminder, so nobody gets two.
 
 ## For the platform operator
 
-| What                                  | Where                                                                                                                                                                                                |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reminders, digests, Sunday reminders  | Job kinds `task-reminder`, `task-digest` and `weekly-update-reminder`, drained by `/api/cron/jobs`                                                                                                   |
-| Digest and Sunday-reminder scheduling | `GET /api/cron/task-digest` with `CRON_SECRET`, hourly (Vercel Pro cron, or the `Jobs pinger` GitHub workflow on Hobby, which calls it every 15 minutes)                                             |
-| Daily fallback                        | `GET /api/cron/task-digest?mode=daily` (in `vercel.json`) schedules the next 24 hours at each person's local hour, so a daily-cron-only deployment still sends on time                               |
-| Deep links                            | `NEXT_PUBLIC_APP_URL` must be the app's real origin: it builds every link in task email                                                                                                              |
-| The visibility predicate              | `app.can_read_task(taskId)` (migration `20260924140000_c4_task_visibility`). Jobs run as app_service, which sees the whole org on purpose and filters in code — see `src/server/tasks/visibility.ts` |
+| What                                  | Where                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reminders, digests, Sunday reminders  | Job kinds `task-reminder`, `task-digest` and `weekly-update-reminder`, drained by `/api/cron/jobs`                                                                                                                                                                     |
+| Digest and Sunday-reminder scheduling | `GET /api/cron/task-digest` with `CRON_SECRET`, hourly (Vercel Pro cron, or the `Jobs pinger` GitHub workflow on Hobby, which calls it every 15 minutes). It also enqueues the due-today and overdue reminders of tasks that haven't changed since they were scheduled |
+| Daily fallback                        | `GET /api/cron/task-digest?mode=daily` (in `vercel.json`) schedules the next 24 hours at each person's local hour, so a daily-cron-only deployment still sends on time                                                                                                 |
+| Deep links                            | `NEXT_PUBLIC_APP_URL` must be the app's real origin: it builds every link in task email                                                                                                                                                                                |
+| The visibility predicate              | `app.can_read_task(taskId)` (migration `20260924140000_c4_task_visibility`). Jobs run as app_service, which sees the whole org on purpose and filters in code — see `src/server/tasks/visibility.ts`                                                                   |
 
 Both trigger modes are idempotent (one key per person per local date or
 week) and can run side by side. The crons only enqueue; nothing is sent

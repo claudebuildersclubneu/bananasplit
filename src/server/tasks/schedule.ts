@@ -1,7 +1,10 @@
+import { TaskStatus } from "@/generated/prisma/client";
 import { parseNotificationPrefs } from "@/lib/notification-prefs";
 import {
   addDaysToKey,
+  dueDateKey,
   effectiveTimezone,
+  fromDateKey,
   localDateKey,
   localHour,
   weekStartKey,
@@ -11,25 +14,28 @@ import {
 import { withSystemOrgTx } from "@/server/db/context";
 import { enqueueJob } from "@/server/jobs/enqueue";
 
+import { enqueueReminder, REMINDER_HOUR_LOCAL, type ReminderStage } from "./reminders";
 import { expectedPosters } from "./weekly";
 
 /**
- * Scheduling for the daily digest and the Sunday-update reminder, called
- * per org by /api/cron/task-digest. It only enqueues (once=true keys); the
- * jobs do the work.
+ * Scheduling for the daily digest, the Sunday-update reminder and the
+ * due-today and overdue reminders, called per org by /api/cron/task-digest.
+ * It only enqueues (once=true keys); the jobs do the work.
  *
  * Two trigger modes, both idempotent, so they can run side by side:
  *
  * - hourly (Vercel Pro cron, or the GitHub Actions pinger on Hobby): enqueue
  *   a digest for each opted-in member whose local hour equals their
- *   digest.hourLocal, due now; and on Sunday at 18:00 local, a reminder to
- *   each lead who hasn't posted.
+ *   digest.hourLocal, due now; on Sunday at 18:00 local, a reminder to each
+ *   lead who hasn't posted; and at 09:00 local, the due-today and overdue
+ *   reminders for that member's open tasks.
  * - daily (the Hobby daily-cron fallback): enqueue the NEXT occurrence of
  *   each within the coming 24 hours, with runAt at that local time, so the
  *   job drain sends it on time even when nothing calls this hourly.
  *
- * Keys: task-digest:{userId}:{localDate} and
- * weekly-update-reminder:{userId}:{weekStart}.
+ * Keys: task-digest:{userId}:{localDate},
+ * weekly-update-reminder:{userId}:{weekStart} and the reminder keys of
+ * ./reminders.ts (shared with the change-time enqueue, so they coalesce).
  */
 
 export type TriggerMode = "hourly" | "daily";
@@ -70,6 +76,17 @@ export function nextOccurrence(
 export interface ScheduleSummary {
   digests: number;
   weeklyReminders: number;
+  dueReminders: number;
+}
+
+/**
+ * The reminder a task due on `dueKey` gets on a recipient's local date
+ * `dateKey`: due-today on the due date, overdue the day after, else none.
+ */
+export function sweepStage(dueKey: string, dateKey: string): ReminderStage | null {
+  if (dateKey === dueKey) return "today";
+  if (dateKey === addDaysToKey(dueKey, 1)) return "overdue";
+  return null;
 }
 
 export async function scheduleOrgTaskJobs(
@@ -82,7 +99,7 @@ export async function scheduleOrgTaskJobs(
       where: { id: organizationId },
       select: { timezone: true, deletedAt: true },
     });
-    if (!org || org.deletedAt) return { digests: 0, weeklyReminders: 0 };
+    if (!org || org.deletedAt) return { digests: 0, weeklyReminders: 0, dueReminders: 0 };
 
     const members = await db.membership.findMany({
       where: { organizationId },
@@ -143,6 +160,58 @@ export async function scheduleOrgTaskJobs(
       });
       if (id) weeklyReminders += 1;
     }
-    return { digests, weeklyReminders };
+
+    // Due-today and overdue reminders. Changing a task already enqueues
+    // them (./reminders.ts); this catches every open task that hasn't
+    // changed since, so nobody's reminder depends on an edit. Recipients are
+    // the owner and the assignees who opted into collaborator reminders, as
+    // in the job itself.
+    let dueReminders = 0;
+    const reminderAt = new Map<string, { dateKey: string; runAt: Date }>();
+    const collaborators = new Set<string>();
+    for (const m of members) {
+      const at = nextOccurrence(now, effectiveTimezone(m.user, org), REMINDER_HOUR_LOCAL, mode);
+      if (at) reminderAt.set(m.userId, at);
+      if (parseNotificationPrefs(m.user.emailPreferences).collaboratorReminders) {
+        collaborators.add(m.userId);
+      }
+    }
+    const dueKeys = new Set<string>();
+    for (const { dateKey } of reminderAt.values()) {
+      dueKeys.add(dateKey);
+      dueKeys.add(addDaysToKey(dateKey, -1));
+    }
+    const due =
+      dueKeys.size === 0
+        ? []
+        : await db.task.findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              status: { not: TaskStatus.COMPLETED },
+              dueDate: { in: [...dueKeys].map(fromDateKey) },
+            },
+            select: { id: true, dueDate: true, ownerId: true, assignees: { select: { userId: true } } },
+          });
+    for (const task of due) {
+      const dueKey = dueDateKey(task.dueDate!);
+      const recipients = new Set([
+        ...(task.ownerId ? [task.ownerId] : []),
+        ...task.assignees.map((a) => a.userId).filter((id) => collaborators.has(id)),
+      ]);
+      for (const userId of recipients) {
+        const at = reminderAt.get(userId); // absent: not a member, or not their hour
+        const stage = at ? sweepStage(dueKey, at.dateKey) : null;
+        if (!at || !stage) continue;
+        const id = await enqueueReminder(
+          db,
+          organizationId,
+          { taskId: task.id, dueKey, userId, stage, runAt: at.runAt },
+          { noKick: true },
+        );
+        if (id) dueReminders += 1;
+      }
+    }
+    return { digests, weeklyReminders, dueReminders };
   });
 }

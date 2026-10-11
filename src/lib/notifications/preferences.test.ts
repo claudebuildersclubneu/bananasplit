@@ -142,6 +142,13 @@ describe("preference patches", () => {
     expect(ok({ v: 2 })).toBe(false);
   });
 
+  it("emails the due-today and overdue reminders unless turned off", () => {
+    const prefs = defaultNotificationPreferences();
+    expect(emailEnabledFor(prefs, "TASK_DUE_TODAY")).toBe(true);
+    expect(emailEnabledFor(prefs, "TASK_OVERDUE")).toBe(true);
+    expect(emailEnabledFor({ ...prefs, types: { TASK_OVERDUE: false } }, "TASK_OVERDUE")).toBe(false);
+  });
+
   it("labels every type except the digest, which has its own control", () => {
     const labelled = Object.keys(NOTIFICATION_TYPE_META).sort();
     expect(labelled).toEqual(NOTIFICATION_TYPES.filter((t) => t !== "TASK_DIGEST").sort());

@@ -350,6 +350,8 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
           "WEEKLY_UPDATE_REMINDER",
           "EVENT_UPDATED",
           "EVENT_CANCELLED",
+          "TASK_DUE_TODAY",
+          "TASK_OVERDUE",
         ],
         task_status: ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "COMPLETED"],
         indexes: [

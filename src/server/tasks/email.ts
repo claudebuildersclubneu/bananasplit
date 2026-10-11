@@ -25,6 +25,7 @@ import {
   weeklyUpdateReminderEmail,
   type TaskFacts,
 } from "./email-templates";
+import { stageApplies, type ReminderStage } from "./reminders";
 import { isOrgAdmin } from "./visibility";
 import { getWeeklySummary } from "./weekly";
 
@@ -48,9 +49,17 @@ export const TASK_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
   NotificationType.TASK_MENTIONED,
   NotificationType.TASK_COMMENTED,
   NotificationType.TASK_DUE_REMINDER,
+  NotificationType.TASK_DUE_TODAY,
+  NotificationType.TASK_OVERDUE,
   NotificationType.TASK_DIGEST,
   NotificationType.WEEKLY_UPDATE_REMINDER,
 ]);
+
+const REMINDER_STAGE_OF: Partial<Record<NotificationType, ReminderStage>> = {
+  [NotificationType.TASK_DUE_REMINDER]: "upcoming",
+  [NotificationType.TASK_DUE_TODAY]: "today",
+  [NotificationType.TASK_OVERDUE]: "overdue",
+};
 
 export interface TaskNotificationInput {
   userId: string;
@@ -252,11 +261,18 @@ export async function renderTaskNotificationEmail(
           task: facts,
           url,
         });
-      case NotificationType.TASK_DUE_REMINDER: {
+      case NotificationType.TASK_DUE_REMINDER:
+      case NotificationType.TASK_DUE_TODAY:
+      case NotificationType.TASK_OVERDUE: {
+        const stage = REMINDER_STAGE_OF[n.type] ?? "upcoming";
         if (task.status === TaskStatus.COMPLETED || !dueKey) return "skip";
+        // Mail held back (EMAIL_DELIVERY=off, a long outage) must not say
+        // "due tomorrow" about a task that is now overdue.
+        if (!stageApplies(stage, dueKey, todayKey)) return "skip";
         return taskReminderEmail({
           orgName: org.name,
           when: dueWhen(todayKey, dueKey),
+          overdue: stage === "overdue",
           role: task.ownerId === n.userId ? "owner" : "collaborator",
           task: { ...facts, status: STATUS_LABELS[task.status], blockedReason: task.blockedReason },
           url,
