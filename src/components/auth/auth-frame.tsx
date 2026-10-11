@@ -12,7 +12,7 @@ import { RegistrationMark, SplitWordmark } from "@/components/print-marks";
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid flex-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <aside className="bg-primary text-primary-foreground paper relative isolate hidden flex-col justify-between gap-10 overflow-hidden p-10 lg:flex">
+      <aside className="bg-primary text-primary-foreground relative isolate hidden flex-col justify-between gap-10 overflow-hidden p-10 lg:flex">
         <div className="flex items-start justify-between gap-4">
           {/* On the primary ink, the app icon's inking: an accent banana, a paper split. */}
           <BananasplitMark className="size-16 [--mark-top:var(--brand-accent)] [--mark-under:var(--primary-foreground)]" />

@@ -75,7 +75,7 @@ function Big({ value, sub, tone }: { value: ReactNode; sub?: ReactNode; tone?: "
     <div className="min-w-0 space-y-1">
       <p
         className={cn(
-          "numeral text-[2.5rem] break-all",
+          "text-2xl font-semibold break-all tabular-nums",
           tone === "good" && "text-success",
           tone === "bad" && "text-destructive",
         )}

@@ -21,8 +21,8 @@ export function StatCard({
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <CardDescription className="text-foreground text-2xl font-semibold">
+        <CardTitle className="font-sans text-sm font-medium">{title}</CardTitle>
+        <CardDescription className="text-foreground text-2xl font-semibold tabular-nums">
           {value}
         </CardDescription>
         {children}
@@ -83,7 +83,7 @@ export function RunwaySection({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">When the money runs out</CardTitle>
+            <CardTitle className="font-sans text-sm font-medium">When the money runs out</CardTitle>
             <RunwayStatusLabel runway={runway} periodEndsOn={period.endsOn} className="text-base" />
             <CardDescription>{detail}</CardDescription>
             {withExpected && <CardDescription>{withExpected}</CardDescription>}

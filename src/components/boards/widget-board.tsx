@@ -326,7 +326,7 @@ export function WidgetBoard({
                 data-dragging={dragId === w.id || undefined}
                 className={cn(
                   SPAN[w.w] ?? SPAN[1],
-                  "group/widget bg-card text-card-foreground sheet relative flex min-w-0 flex-col overflow-hidden rounded-xl border transition-shadow",
+                  "group/widget bg-card text-card-foreground relative flex min-w-0 flex-col overflow-hidden rounded-xl border transition-shadow",
                   editing && "ring-primary/25 ring-2",
                   dragId === w.id && "opacity-40",
                   overId === w.id && dragId !== w.id && "ring-primary ring-2",
