@@ -83,9 +83,13 @@ question polls (1c); **New poll > Find a time** starts one.
   length, how finely people mark their time, and optionally when it stops
   taking answers. The form shows how many slots that makes before you create
   it.
-- **Sharing:** the poll page has the link for people outside the club. They
-  answer as guests under a name they type, with no account. Members answer as
-  themselves, in the app or on the link.
+- **Inviting guests:** *Invite guests* on an open poll's page (or *Copy guest
+  link* in the Polls list) copies the link for people outside the club. They
+  type a name and mark their times: no account, no sign-up and no
+  onboarding. Members answer as themselves, in the app or on the link (a
+  member who isn't signed in can sign in from it). The poll's in-app address
+  works too: anyone who isn't a member of the club, signed in or not, is
+  sent to the guest page instead of sign-in.
 - **Answering** (*Your availability*): pick *Available*, *If needed* or
   *Unavailable*, then click a time or drag a rectangle across several (mouse
   or touch; on a phone, drag the time column to scroll). Starting on a time
@@ -95,9 +99,9 @@ question polls (1c); **New poll > Find a time** starts one.
 - **Reading it** (*Everyone*): each time shows how many people can make it,
   shaded one colour from few to many, with a corner mark where some of them
   said "if needed". Point at a time, tab to it or tap it to see who is
-  available, who only if needed, who can't and who hasn't answered. Inside
-  the app members are shown by name; on the public link members show as
-  "Member" and guests by the name they typed.
+  available, who only if needed, who can't and who hasn't answered. Members
+  are shown by name, in the app and on the guest link, and guests by the
+  name they typed.
 - **Times** are shown in your own time zone, which the page names, with a
   switch to the poll's.
 - **Best times** lists up to five non-overlapping windows of the meeting's

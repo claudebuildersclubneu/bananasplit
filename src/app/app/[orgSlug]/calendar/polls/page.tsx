@@ -159,6 +159,7 @@ function availabilityItem(
     kind: "availability",
     title: poll.title,
     href: `${base}/${poll.id}`,
+    takesGuests: status.tone === "open",
     status,
     meta: [
       dateSpan(poll),

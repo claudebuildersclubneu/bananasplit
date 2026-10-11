@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, ExternalLink, Link2, Trash2, Vote } from "lucide-react";
+import { CalendarRange, ExternalLink, Link2, Trash2, UserPlus, Vote } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 
-import { copyPollLink } from "./copy-link";
+import { copyGuestPollLink, copyPollLink } from "./copy-link";
 
 /**
  * The polls page's list: both kinds of poll in one list, open ones first.
@@ -28,6 +28,8 @@ export interface PollListItem {
   kind: PollKind;
   title: string;
   href: string;
+  /** An open availability poll takes guests' answers on its public page. */
+  takesGuests?: boolean;
   status: { tone: "open" | "closed" | "scheduled"; label: string };
   /** "3 options · Anonymous · 12 people voted" */
   meta: string;
@@ -154,6 +156,11 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
           label={`Actions for ${poll.title}`}
           items={[
             { label: "Open", icon: ExternalLink, href: poll.href },
+            poll.takesGuests && {
+              label: "Copy guest link",
+              icon: UserPlus,
+              onSelect: () => copyGuestPollLink(poll.id),
+            },
             { label: "Copy link", icon: Link2, onSelect: () => copyPollLink(poll.href) },
             poll.canDelete && {
               label: "Delete",

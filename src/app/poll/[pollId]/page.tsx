@@ -1,10 +1,12 @@
 import { CalendarX2, Info } from "lucide-react";
 import { cookies } from "next/headers";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 
-import { getPollSource } from "@/app/app/[orgSlug]/calendar/queries";
+import { getPollMemberNames, getPollSource } from "@/app/app/[orgSlug]/calendar/queries";
 import { PollResponder } from "@/components/calendar/poll-responder";
+import { signInPath } from "@/lib/auth/callback-url";
 import { getSession } from "@/lib/auth/session";
 import { guestCookieName, hashGuestKey, isWellFormedGuestKey } from "@/lib/polls/guest-key";
 import { buildPollView, type PollViewer } from "@/lib/polls/poll-view";
@@ -39,10 +41,13 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
   const userId = session?.user.id ?? null;
   const loaded = await withSystemOrgTx(organizationId, async ({ db }) => {
     const poll = await getPollSource(db, organizationId, pollId);
+    if (!poll) return { poll, isMember: false, memberNames: new Map<string, string>() };
     const isMember = userId ? (await db.membership.count({ where: { organizationId, userId } })) > 0 : false;
-    return { poll, isMember };
+    // Guests see who they're meeting: members by name, as in the app.
+    const memberNames = await getPollMemberNames(db, organizationId, poll);
+    return { poll, isMember, memberNames };
   });
-  const { poll, isMember } = loaded;
+  const { poll, isMember, memberNames } = loaded;
   if (!poll) return <Missing />;
 
   // Members of the poll's org answer as themselves; everyone else, signed in
@@ -58,7 +63,8 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
     };
   }
 
-  const view = buildPollView(poll, viewer);
+  const view = buildPollView(poll, viewer, { memberNames });
+  const isOpen = !poll.finalizedEventId && !(poll.closesAt && poll.closesAt < new Date());
 
   return (
     <div className="mx-auto w-full max-w-5xl flex-1 p-6">
@@ -75,6 +81,19 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
                 you&apos;ll answer as a guest.
               </p>
             </div>
+          ) : !session && isOpen ? (
+            // Guests need nothing but a name. A member who isn't signed in
+            // (an in-app link sends them here too) can sign in instead.
+            <p className="text-muted-foreground text-sm">
+              No account needed: add your name and mark when you&apos;re free.{" "}
+              <Link
+                href={signInPath(`/poll/${poll.id}`)}
+                className="text-foreground underline-offset-4 hover:underline"
+              >
+                In this club? Sign in
+              </Link>{" "}
+              to answer as yourself.
+            </p>
           ) : undefined
         }
       />
