@@ -12,9 +12,10 @@ const NAV = [
 /**
  * The sticky bar: translucent cream, blurred over whatever scrolls beneath.
  * Below md the section links drop out, and on the narrowest phones the
- * name, so the mark, Log in and the call to action fit on one line.
+ * name, so the mark, Log in and the call to action fit on one line. Signed
+ * in, the call to action is "Open your club" (the app) and Log in goes.
  */
-export function SiteHeader() {
+export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <header className="border-ink/8 bg-cream/82 sticky top-0 z-20 border-b backdrop-blur-[14px] backdrop-saturate-[1.4]">
       <div className="mx-auto flex max-w-[1240px] items-center gap-4 px-6 py-3 md:gap-8">
@@ -29,15 +30,26 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-[18px]">
-          <Link href="/sign-in" className="text-[14px] font-medium whitespace-nowrap">
-            Log in
-          </Link>
-          <a
-            href="#pricing"
-            className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
-          >
-            Create your club
-          </a>
+          {signedIn ? (
+            <Link
+              href="/app"
+              className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
+            >
+              Open your club
+            </Link>
+          ) : (
+            <>
+              <Link href="/sign-in" className="text-[14px] font-medium whitespace-nowrap">
+                Log in
+              </Link>
+              <a
+                href="#pricing"
+                className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
+              >
+                Create your club
+              </a>
+            </>
+          )}
         </div>
       </div>
     </header>

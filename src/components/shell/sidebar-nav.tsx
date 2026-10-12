@@ -230,11 +230,16 @@ export function SidebarNav({
         <PinnedList pins={pins} orgId={orgId} pathname={pathname} onNavigate={onNavigate} />
       </div>
       <div className="border-sidebar-border mt-3 border-t pt-3">
-        {/* The platform's signature, under the club's own nav: quiet, not a link. */}
-        <p className="text-sidebar-foreground/70 flex items-center gap-2.5 px-3">
+        {/* The platform's signature, under the club's own nav: quiet, and the way back to the home page. */}
+        <Link
+          href="/"
+          onClick={onNavigate}
+          title="Bananasplit home page"
+          className="text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:ring-ring/50 flex items-center gap-2.5 rounded-md px-3 py-1 transition-colors outline-none focus-visible:ring-3"
+        >
           <BananasplitMark className="size-[18px]" />
           <span className="font-heading text-[14px] tracking-[-0.01em]">bananasplit</span>
-        </p>
+        </Link>
       </div>
     </nav>
   );

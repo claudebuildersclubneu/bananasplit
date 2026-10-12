@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { BrandRoot } from "@/components/brand/brand-root";
 import { Faq } from "@/components/marketing/faq";
@@ -20,21 +19,19 @@ export const metadata: Metadata = {
 };
 
 /**
- * The marketing home page (the design handoff's "Bananasplit Home").
- * Signed-in visitors go straight to the app.
+ * The marketing home page (the design handoff's "Bananasplit Home"). It is
+ * the home page for everyone, signed in or not; signed-in visitors get an
+ * "Open your club" way into the app (/app) instead of Log in.
  *
  * `overflow-x-clip` keeps wide decoration from scrolling the page sideways
  * without breaking the sticky header, as `hidden` would.
  */
 export default async function Home() {
-  const session = await getSession();
-  if (session) {
-    redirect("/app");
-  }
+  const signedIn = Boolean(await getSession());
 
   return (
     <BrandRoot className="overflow-x-clip">
-      <SiteHeader />
+      <SiteHeader signedIn={signedIn} />
       <main id="top">
         <Hero />
         <FeatureBoard />
@@ -44,7 +41,7 @@ export default async function Home() {
         <Faq />
         <FinalCta />
       </main>
-      <SiteFooter />
+      <SiteFooter signedIn={signedIn} />
     </BrandRoot>
   );
 }
