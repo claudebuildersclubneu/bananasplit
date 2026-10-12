@@ -41,6 +41,9 @@ export function SortableTaskCard({
       }}
       {...attributes}
       {...listeners}
+      // Read as the task's title, not every word on the card (and not the
+      // "…" menu's label inside it).
+      aria-label={task.title}
     >
       <TaskCard task={task} todayKey={todayKey} />
       {/* The menu keeps its own clicks and drags (ItemMenu stops them). */}
@@ -48,7 +51,7 @@ export function SortableTaskCard({
         task={{ id: task.id, title: task.title, subtaskCount: task.subtasks.length }}
         editable={canEditTask(actor, accessSubjectOf(task))}
         onOpen={() => onOpen(task.id)}
-        className="bg-card absolute top-1.5 right-1.5 border opacity-0 shadow-xs group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+        className="bg-card absolute top-1.5 right-1.5 border opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
       />
     </div>
   );

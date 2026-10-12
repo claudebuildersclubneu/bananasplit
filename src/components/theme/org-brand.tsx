@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * - LOGO_ONLY: the logo alone, larger (for wordmarks); falls back to
  *   LOGO_AND_NAME without a logo;
  * - NAME_ONLY: the name alone, or nothing where the name already shows
- *   (`hideNameOnly`, the app sidebar, whose org switcher carries the name).
+ *   (`hideNameOnly`).
  *
  * Server- and client-safe (no hooks). Logos are public, re-encoded WebP
  * variants (src/server/images); plain <img> like UserAvatar, no next/image.
@@ -66,10 +66,10 @@ export function OrgBrand({
             decoding="async"
           />
         ) : (
-          // A two-ink monogram: initials in the primary, the accent off register.
+          // A monogram: the initials on the primary.
           <span
             aria-hidden="true"
-            className="bg-primary text-primary-foreground misregister font-heading flex size-8 shrink-0 items-center justify-center rounded-md text-[0.8rem] font-black font-stretch-[125%]"
+            className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md font-sans text-[0.8rem] font-extrabold"
           >
             {orgInitials(name)}
           </span>

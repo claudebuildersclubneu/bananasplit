@@ -1,8 +1,7 @@
 import { Download } from "lucide-react";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { NewTransactionButton, TransactionTable } from "@/components/finance/transaction-table";
+import { TransactionTable } from "@/components/finance/transaction-table";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -60,44 +59,21 @@ export default async function TransactionsPage({
     email: m.user.email,
   }));
 
-  const toggleDeleted = new URLSearchParams(
-    Object.entries(query).filter(([k, v]) => typeof v === "string" && k !== "deleted") as [string, string][],
-  );
-  if (filters.deleted !== "show") toggleDeleted.set("deleted", "show");
-  const toggleDeletedQuery = toggleDeleted.toString();
-
   const exportQuery = new URLSearchParams(
     Object.entries(query).filter(([, v]) => typeof v === "string") as [string, string][],
   ).toString();
 
+  // Add transaction is in the Finance header; Show deleted is one of the filters.
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <TransactionFiltersBar periods={periods} categories={categories} members={members} />
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <a href={`/app/${orgSlug}/finance/transactions/export?${exportQuery}`}>
-              <Download className="size-4" />
-              Export CSV
-            </a>
-          </Button>
-          <NewTransactionButton
-            orgId={org.id}
-            periods={periods}
-            categories={categories}
-            isFinance
-            currentUserId={user.id}
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Link
-          href={`/app/${orgSlug}/finance/transactions?${toggleDeletedQuery}`}
-          className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
-        >
-          {filters.deleted === "show" ? "Hide deleted transactions" : "Show deleted transactions"}
-        </Link>
+        <Button variant="outline" size="sm" asChild>
+          <a href={`/app/${orgSlug}/finance/transactions/export?${exportQuery}`}>
+            <Download className="size-4" aria-hidden="true" />
+            Export CSV
+          </a>
+        </Button>
       </div>
 
       <TransactionTable

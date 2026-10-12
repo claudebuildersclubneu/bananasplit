@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import { TransactionKind } from "@/generated/prisma/enums";
 import {
   inferKind,
@@ -52,7 +53,8 @@ const KINDS = Object.keys(KIND_LABEL) as TransactionKind[];
 
 type Filter = "all" | "import" | "skipped" | "duplicates";
 
-const dupKey = (r: Pick<ImportRow, "date" | "amountCents" | "direction">) => `${r.date}|${r.amountCents}|${r.direction}`;
+const dupKey = (r: Pick<ImportRow, "date" | "amountCents" | "direction">) =>
+  `${r.date}|${r.amountCents}|${r.direction}`;
 
 function newBatchId(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 24);
@@ -64,7 +66,7 @@ const dollars = (cents: number | null) =>
 function Notes({ readBy, notes }: { readBy: string | null; notes: string[] }) {
   if (!readBy && notes.length === 0) return null;
   return (
-    <div className="bg-muted/40 space-y-1 rounded-lg border p-3 text-xs">
+    <div className="bg-muted/40 space-y-1 rounded-xl border p-3 text-xs">
       {readBy && <p className="font-medium">Read by {readBy}</p>}
       {notes.map((n, i) => (
         <p key={i} className="text-muted-foreground flex items-start gap-1.5">
@@ -135,10 +137,16 @@ export function ImportReview({
 
   const chosen = rows.filter((r) => r.include && isImportable(r));
   const totals = chosen.reduce(
-    (t, r) => (r.direction === "IN" ? { ...t, in: t.in + r.amountCents! } : { ...t, out: t.out + r.amountCents! }),
+    (t, r) =>
+      r.direction === "IN"
+        ? { ...t, in: t.in + r.amountCents! }
+        : { ...t, out: t.out + r.amountCents! },
     { in: 0, out: 0 },
   );
-  const plan = planPeriods(periods, chosen.map((r) => r.date!));
+  const plan = planPeriods(
+    periods,
+    chosen.map((r) => r.date!),
+  );
   const periodLabel = (date: string | null) => {
     if (!date) return null;
     const target = plan.targets.get(date);
@@ -165,7 +173,12 @@ export function ImportReview({
     return m;
   }, [categories]);
   const categoryNames = useMemo(
-    () => [...new Set([...categories.map((c) => c.name), ...rows.map((r) => r.category ?? "")].filter(Boolean))].sort(),
+    () =>
+      [
+        ...new Set(
+          [...categories.map((c) => c.name), ...rows.map((r) => r.category ?? "")].filter(Boolean),
+        ),
+      ].sort(),
     [categories, rows],
   );
   const isNewCategory = (r: ImportRow) => {
@@ -211,7 +224,11 @@ export function ImportReview({
     };
     for (let at = 0; at < records.length; at += CHUNK) {
       const part = records.slice(at, at + CHUNK);
-      setBusy(records.length > CHUNK ? `Importing ${Math.min(at + CHUNK, records.length).toLocaleString()} of ${records.length.toLocaleString()}…` : "Importing…");
+      setBusy(
+        records.length > CHUNK
+          ? `Importing ${Math.min(at + CHUNK, records.length).toLocaleString()} of ${records.length.toLocaleString()}…`
+          : "Importing…",
+      );
       try {
         const res = await importFinanceRecords(orgId, {
           batch,
@@ -221,7 +238,8 @@ export function ImportReview({
           createCategories,
           reconciled,
         });
-        if (res.error || !res.outcome) throw new Error(res.error ?? "The import stopped. Try again.");
+        if (res.error || !res.outcome)
+          throw new Error(res.error ?? "The import stopped. Try again.");
         const o = res.outcome;
         summary.created += o.created;
         summary.skipped.push(...o.skipped.map((s) => ({ ...s, index: s.index + at })));
@@ -230,7 +248,8 @@ export function ImportReview({
           if (same) same.count += p.count;
           else summary.periods.push({ ...p });
         }
-        for (const c of o.categoriesCreated) if (!summary.categoriesCreated.includes(c)) summary.categoriesCreated.push(c);
+        for (const c of o.categoriesCreated)
+          if (!summary.categoriesCreated.includes(c)) summary.categoriesCreated.push(c);
       } catch (e) {
         setBusy(null);
         setError(
@@ -262,7 +281,13 @@ export function ImportReview({
     { id: "import", label: "Importing", count: chosen.length },
     { id: "skipped", label: "Left out", count: skippedCount },
     ...(duplicates.size > 0
-      ? [{ id: "duplicates" as const, label: "Already recorded", count: rows.filter((r) => duplicates.has(dupKey(r))).length }]
+      ? [
+          {
+            id: "duplicates" as const,
+            label: "Already recorded",
+            count: rows.filter((r) => duplicates.has(dupKey(r))).length,
+          },
+        ]
       : []),
   ];
 
@@ -270,21 +295,22 @@ export function ImportReview({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Check the rows</h2>
+          <h2 className="heading text-lg">Check the rows</h2>
           <p className="text-muted-foreground text-sm">
-            Nothing is saved until you import. Untick anything that shouldn&apos;t go in, and fix what looks wrong.
+            Nothing is saved until you import. Untick anything that shouldn&apos;t go in, and fix
+            what looks wrong.
           </p>
         </div>
         <dl className="flex flex-wrap gap-2 text-sm">
-          <div className="rounded-lg border px-3 py-1.5">
+          <div className="rounded-xl border px-3 py-1.5">
             <dt className="text-muted-foreground text-xs">Importing</dt>
             <dd className="font-semibold tabular-nums">{chosen.length.toLocaleString()}</dd>
           </div>
-          <div className="rounded-lg border px-3 py-1.5">
+          <div className="rounded-xl border px-3 py-1.5">
             <dt className="text-muted-foreground text-xs">Money in</dt>
             <dd className="text-success font-semibold tabular-nums">{formatCents(totals.in)}</dd>
           </div>
-          <div className="rounded-lg border px-3 py-1.5">
+          <div className="rounded-xl border px-3 py-1.5">
             <dt className="text-muted-foreground text-xs">Money out</dt>
             <dd className="font-semibold tabular-nums">{formatCents(totals.out)}</dd>
           </div>
@@ -311,26 +337,26 @@ export function ImportReview({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="bg-muted inline-flex flex-wrap gap-1 rounded-lg p-1" role="tablist" aria-label="Show rows">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={filter === f.id}
-              onClick={() => {
-                setFilter(f.id);
-                setPage(0);
-              }}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium",
-                filter === f.id ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {f.label} <span className="tabular-nums">{f.count.toLocaleString()}</span>
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Show rows"
+          className="max-w-full overflow-x-auto"
+          value={filter}
+          onSelect={(v) => {
+            setFilter(v as Filter);
+            setPage(0);
+          }}
+          options={FILTERS.map((f) => ({
+            value: f.id,
+            label: (
+              <>
+                {f.label}{" "}
+                <span className="text-muted-foreground tabular-nums">
+                  {f.count.toLocaleString()}
+                </span>
+              </>
+            ),
+          }))}
+        />
         <div className="flex items-center gap-2">
           <Input
             value={bulkCategory}
@@ -340,7 +366,13 @@ export function ImportReview({
             list="import-categories"
             className="h-8 w-56 text-xs"
           />
-          <Button type="button" size="sm" variant="outline" onClick={applyBulkCategory} disabled={!bulkCategory.trim()}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={applyBulkCategory}
+            disabled={!bulkCategory.trim()}
+          >
             Apply
           </Button>
         </div>
@@ -372,7 +404,13 @@ export function ImportReview({
               const problems = rowProblems(r);
               const dup = duplicates.has(dupKey(r));
               return (
-                <tr key={r.key} className={cn("border-t align-top", !r.include && "bg-muted/30 text-muted-foreground")}>
+                <tr
+                  key={r.key}
+                  className={cn(
+                    "border-t align-top",
+                    !r.include && "bg-muted/30 text-muted-foreground",
+                  )}
+                >
                   <td className="p-2">
                     <Checkbox
                       checked={r.include}
@@ -398,7 +436,11 @@ export function ImportReview({
                     />
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       <span className="text-muted-foreground text-[11px]">{r.source}</span>
-                      {r.counterparty && <span className="text-muted-foreground text-[11px]">· {r.counterparty}</span>}
+                      {r.counterparty && (
+                        <span className="text-muted-foreground text-[11px]">
+                          · {r.counterparty}
+                        </span>
+                      )}
                       {dup && (
                         <Badge variant="secondary" className="gap-1 text-[10px]">
                           <Copy className="size-3" aria-hidden="true" />
@@ -406,7 +448,11 @@ export function ImportReview({
                         </Badge>
                       )}
                       {problems.map((p) => (
-                        <Badge key={p} variant="outline" className="border-warning/40 text-warning text-[10px]">
+                        <Badge
+                          key={p}
+                          variant="outline"
+                          className="border-warning/40 text-warning text-[10px]"
+                        >
                           {p}
                         </Badge>
                       ))}
@@ -430,12 +476,17 @@ export function ImportReview({
                       type="button"
                       size="sm"
                       variant="outline"
-                      className={cn("h-8 w-20 gap-1 text-xs", r.direction === "IN" && "text-success")}
+                      className={cn(
+                        "h-8 w-20 gap-1 text-xs",
+                        r.direction === "IN" && "text-success",
+                      )}
                       onClick={() => {
                         const direction: Direction = r.direction === "IN" ? "OUT" : "IN";
                         patch(r.key, {
                           direction,
-                          kind: kindFits(r.kind, direction) ? r.kind : inferKind(direction, `${r.description} ${r.category ?? ""}`),
+                          kind: kindFits(r.kind, direction)
+                            ? r.kind
+                            : inferKind(direction, `${r.description} ${r.category ?? ""}`),
                         });
                       }}
                       aria-label={`${r.direction === "IN" ? "Money in" : r.direction === "OUT" ? "Money out" : "Not set"}, ${r.source}. Switch.`}
@@ -450,7 +501,7 @@ export function ImportReview({
                   </td>
                   <td className="p-2">
                     <select
-                      className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                      className="border-input bg-background h-8 rounded-lg border px-2 text-xs"
                       value={r.kind}
                       onChange={(e) => patch(r.key, { kind: e.target.value as TransactionKind })}
                       aria-label={`Type, ${r.source}`}
@@ -493,13 +544,25 @@ export function ImportReview({
 
       {pages > 1 && (
         <div className="flex items-center justify-end gap-2 text-xs">
-          <Button type="button" size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
             Previous
           </Button>
           <span className="text-muted-foreground tabular-nums">
             Page {page + 1} of {pages}
           </span>
-          <Button type="button" size="sm" variant="ghost" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={page >= pages - 1}
+            onClick={() => setPage((p) => p + 1)}
+          >
             Next
           </Button>
         </div>
@@ -508,7 +571,11 @@ export function ImportReview({
       <fieldset className="space-y-2 rounded-xl border p-4">
         <legend className="px-1 text-sm font-medium">When importing</legend>
         <label className="flex items-start gap-2 text-sm">
-          <Checkbox checked={createPeriods} onCheckedChange={(v) => setCreatePeriods(v === true)} className="mt-0.5" />
+          <Checkbox
+            checked={createPeriods}
+            onCheckedChange={(v) => setCreatePeriods(v === true)}
+            className="mt-0.5"
+          />
           <span>
             Add budget years for dates outside your budget periods
             <span className="text-muted-foreground block text-xs">
@@ -517,18 +584,29 @@ export function ImportReview({
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
-          <Checkbox checked={createCategories} onCheckedChange={(v) => setCreateCategories(v === true)} className="mt-0.5" />
+          <Checkbox
+            checked={createCategories}
+            onCheckedChange={(v) => setCreateCategories(v === true)}
+            className="mt-0.5"
+          />
           <span>
             Add categories that don&apos;t exist yet (at $0 budgeted)
-            <span className="text-muted-foreground block text-xs">Otherwise those rows go in uncategorized.</span>
+            <span className="text-muted-foreground block text-xs">
+              Otherwise those rows go in uncategorized.
+            </span>
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
-          <Checkbox checked={reconciled} onCheckedChange={(v) => setReconciled(v === true)} className="mt-0.5" />
+          <Checkbox
+            checked={reconciled}
+            onCheckedChange={(v) => setReconciled(v === true)}
+            className="mt-0.5"
+          />
           <span>
             These match the bank: mark them reconciled
             <span className="text-muted-foreground block text-xs">
-              Reconciled rows are locked against edits. Leave this off if you might still fix things.
+              Reconciled rows are locked against edits. Leave this off if you might still fix
+              things.
             </span>
           </span>
         </label>
@@ -536,7 +614,8 @@ export function ImportReview({
 
       {needsDraft && (
         <p className="text-warning text-sm">
-          Some dates aren&apos;t in any budget period, so those rows will be left out. Tick &ldquo;Add budget years&rdquo; to keep them.
+          Some dates aren&apos;t in any budget period, so those rows will be left out. Tick
+          &ldquo;Add budget years&rdquo; to keep them.
         </p>
       )}
       {error && (
@@ -550,9 +629,18 @@ export function ImportReview({
           <ArrowLeft className="size-4" aria-hidden="true" />
           Back
         </Button>
-        <Button type="button" onClick={() => void runImport()} disabled={busy !== null || chosen.length === 0}>
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Upload className="size-4" aria-hidden="true" />}
-          {busy ?? `Import ${chosen.length.toLocaleString()} transaction${chosen.length === 1 ? "" : "s"}`}
+        <Button
+          type="button"
+          onClick={() => void runImport()}
+          disabled={busy !== null || chosen.length === 0}
+        >
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Upload className="size-4" aria-hidden="true" />
+          )}
+          {busy ??
+            `Import ${chosen.length.toLocaleString()} transaction${chosen.length === 1 ? "" : "s"}`}
         </Button>
       </div>
     </div>
@@ -592,7 +680,10 @@ export function BudgetReview({
     setError(null);
     const res = await importFinanceBudget(orgId, {
       periodId: periodId || null,
-      lines: chosen.map((l) => ({ name: l.name.trim().slice(0, 100), allocatedCents: l.allocatedCents ?? 0 })),
+      lines: chosen.map((l) => ({
+        name: l.name.trim().slice(0, 100),
+        allocatedCents: l.allocatedCents ?? 0,
+      })),
     });
     setBusy(false);
     if (res.error) {
@@ -600,19 +691,26 @@ export function BudgetReview({
       return;
     }
     router.refresh();
-    onDone({ kind: "budget", periodLabel: res.periodLabel ?? "", updated: res.updated ?? 0, created: res.created ?? 0, totalCents: total });
+    onDone({
+      kind: "budget",
+      periodLabel: res.periodLabel ?? "",
+      updated: res.updated ?? 0,
+      created: res.created ?? 0,
+      totalCents: total,
+    });
   }
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">A budget: check the lines</h2>
+          <h2 className="heading text-lg">A budget: check the lines</h2>
           <p className="text-muted-foreground text-sm">
-            Each line becomes a budget category with that amount. Lines with the same name as a category update it.
+            Each line becomes a budget category with that amount. Lines with the same name as a
+            category update it.
           </p>
         </div>
-        <div className="rounded-lg border px-3 py-1.5 text-sm">
+        <div className="rounded-xl border px-3 py-1.5 text-sm">
           <p className="text-muted-foreground text-xs">Total budgeted</p>
           <p className="font-semibold tabular-nums">{formatCents(total)}</p>
         </div>
@@ -621,7 +719,7 @@ export function BudgetReview({
       <label className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted-foreground">Put it in</span>
         <select
-          className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+          className="border-input bg-background h-8 rounded-lg border px-2 text-sm"
           value={periodId}
           onChange={(e) => setPeriodId(e.target.value)}
         >
@@ -636,8 +734,18 @@ export function BudgetReview({
       </label>
       <ul className="divide-y rounded-xl border">
         {lines.map((l) => (
-          <li key={l.key} className={cn("flex flex-wrap items-center gap-3 p-2.5", !l.include && "text-muted-foreground")}>
-            <Checkbox checked={l.include} onCheckedChange={(v) => patch(l.key, { include: v === true })} aria-label={`Include ${l.name}`} />
+          <li
+            key={l.key}
+            className={cn(
+              "flex flex-wrap items-center gap-3 p-2.5",
+              !l.include && "text-muted-foreground",
+            )}
+          >
+            <Checkbox
+              checked={l.include}
+              onCheckedChange={(v) => patch(l.key, { include: v === true })}
+              aria-label={`Include ${l.name}`}
+            />
             <Input
               value={l.name}
               onChange={(e) => patch(l.key, { name: e.target.value })}
@@ -669,7 +777,11 @@ export function BudgetReview({
           Back
         </Button>
         <Button type="button" onClick={() => void save()} disabled={busy || chosen.length === 0}>
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Upload className="size-4" aria-hidden="true" />}
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Upload className="size-4" aria-hidden="true" />
+          )}
           Save {chosen.length} budget line{chosen.length === 1 ? "" : "s"}
         </Button>
       </div>

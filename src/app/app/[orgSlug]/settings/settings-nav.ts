@@ -2,8 +2,10 @@ import type { Role } from "@/generated/prisma/enums";
 import { can, type Permission } from "@/lib/auth/permissions";
 
 /**
- * The Settings sub-navigation. Each item is shown only to roles holding its
- * permission (the pages re-check on the server; hiding is a convenience).
+ * The Admin panel's navigation (the club's settings; the URL is still
+ * /settings). Each item is shown only to roles holding its permission (the
+ * pages re-check on the server; hiding is a convenience). A member's own
+ * settings (notifications, calendar feed) are on their profile, not here.
  */
 export interface SettingsNavItem {
   label: string;
@@ -15,7 +17,7 @@ export interface SettingsNavItem {
   alsoActiveOn?: string[];
 }
 
-export const SETTINGS_GROUPS = ["Organization", "People & access", "Connections", "You", "Admin"] as const;
+export const SETTINGS_GROUPS = ["Club", "People & access", "Connections", "Records"] as const;
 export type SettingsGroup = (typeof SETTINGS_GROUPS)[number];
 
 export interface SettingsSection {
@@ -35,7 +37,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     segment: "general",
     description: "Club picture, name, URL and timezone.",
     icon: "Building2",
-    group: "Organization",
+    group: "Club",
     permission: "settings.view",
   },
   {
@@ -43,7 +45,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     segment: "sidebar",
     description: "Which sections your club uses, their order and names.",
     icon: "PanelLeft",
-    group: "Organization",
+    group: "Club",
     permission: "settings.view",
   },
   {
@@ -51,7 +53,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     segment: "theme",
     description: "Colors, logo and the light or dark default.",
     icon: "Palette",
-    group: "Organization",
+    group: "Club",
     permission: "theme.write",
   },
   {
@@ -59,7 +61,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     segment: "labels",
     description: "The shared label palette for tasks.",
     icon: "Tags",
-    group: "Organization",
+    group: "Club",
     permission: "labels.write",
   },
   {
@@ -87,25 +89,11 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     permission: "integrations.view",
   },
   {
-    label: "Notifications",
-    segment: "notifications",
-    description: "Which notifications also email you.",
-    icon: "Bell",
-    group: "You",
-  },
-  {
-    label: "Calendar feed",
-    segment: "calendar",
-    description: "Your personal .ics subscription link.",
-    icon: "CalendarSync",
-    group: "You",
-  },
-  {
     label: "Audit log",
     segment: "audit",
     description: "Every settings change: who made it and when.",
     icon: "ScrollText",
-    group: "Admin",
+    group: "Records",
     permission: "audit.view",
   },
   {
@@ -113,7 +101,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     segment: "danger",
     description: "Export all data, or delete the organization.",
     icon: "TriangleAlert",
-    group: "Admin",
+    group: "Records",
     permission: "org.delete",
   },
 ];

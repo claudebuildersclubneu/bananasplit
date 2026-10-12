@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { TransactionStatus } from "@/generated/prisma/enums";
 
-const STATUS_LABELS: Record<TransactionStatus, string> = {
+export const STATUS_LABELS: Record<TransactionStatus, string> = {
   DRAFT: "Draft",
   SUBMITTED: "Submitted",
   APPROVED: "Approved",

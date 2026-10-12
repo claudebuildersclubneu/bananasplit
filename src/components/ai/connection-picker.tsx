@@ -53,7 +53,11 @@ export function ConnectionPicker({
   sendsRoster?: boolean;
 }) {
   if (failed) {
-    return <p className="text-destructive text-xs">Couldn&apos;t check which AI models are connected. Try again.</p>;
+    return (
+      <p className="text-destructive text-xs">
+        Couldn&apos;t check which AI models are connected. Try again.
+      </p>
+    );
   }
   if (!list) {
     return (
@@ -69,8 +73,11 @@ export function ConnectionPicker({
         <p className="font-medium">No AI model is connected yet.</p>
         <p className="text-muted-foreground mt-0.5 text-xs">
           An owner or admin can connect Claude, OpenAI, Gemini or another model in{" "}
-          <Link href={`/app/${orgSlug}/settings/integrations`} className="text-primary underline underline-offset-2">
-            Settings › Integrations
+          <Link
+            href={`/app/${orgSlug}/settings/integrations`}
+            className="text-primary underline underline-offset-2"
+          >
+            Admin panel › Integrations
           </Link>
           . The club&apos;s own key pays for it.
         </p>
@@ -84,7 +91,7 @@ export function ConnectionPicker({
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Read with</span>
             <select
-              className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+              className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
               value={selected?.id}
               onChange={(e) => onChoose(e.target.value as AiConnectionId)}
             >
@@ -107,8 +114,8 @@ export function ConnectionPicker({
         <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
         <span>
           {what[0].toUpperCase() + what.slice(1)} goes to {selected?.sentTo} to be read
-          {sendsRoster ? ", with members' names and titles so it can suggest owners" : ""}. Nothing is saved until you
-          add it, and Bananasplit doesn&apos;t keep a copy.
+          {sendsRoster ? ", with members' names and titles so it can suggest owners" : ""}. Nothing
+          is saved until you add it, and Bananasplit doesn&apos;t keep a copy.
         </span>
       </p>
     </div>

@@ -9,9 +9,9 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
  * in different shapes; the other two are pieces of work you do (compose the
  * week's update, run the request queue).
  *
- * So the workspace is now one filtered question asked five ways:
+ * So the workspace is now one filtered question asked three ways:
  *
- *   LAYOUT  week · board · table · calendar · team   (how it is drawn)
+ *   LAYOUT  board · week · table                     (how it is drawn)
  *   SCOPE   mine · team · all                        (whose work)
  *   FILTERS project, status, label, search, due range, flagged, blockers,
  *           visibility                               (which tasks)
@@ -21,21 +21,26 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
  * looking at. Requests and the Sunday update moved out of the row of tabs
  * and became their own destinations in the header.
  *
+ * The board is the default. The calendar layout became the main calendar's
+ * Tasks layer (due dates beside the events, one calendar for everything),
+ * and the team layout is gone: ?view=calendar now opens the Calendar, and
+ * ?view=team the board.
+ *
  * `?view=` keeps its old name and every old value, so the links other
  * sections already publish keep working exactly as documented:
  *
  *   ?view=table&owner={id}&status=open   that person's open tasks
  *   ?view=table&assignee={id}            tasks involving that person
  *   ?view=mine                           now the Week layout, scope mine
- *   ?view=board | calendar | team | updates | intake
+ *   ?view=board | updates | intake
+ *   ?view=calendar                       the Calendar, tasks shown
+ *   ?view=team                           the board
  */
 
 export const TASK_LAYOUTS = [
-  { value: "week", label: "Week", hint: "What is due, by when" },
   { value: "board", label: "Board", hint: "Move work along" },
+  { value: "week", label: "Week", hint: "What is due, by when" },
   { value: "table", label: "Table", hint: "Filter and bulk-edit" },
-  { value: "calendar", label: "Calendar", hint: "Due dates on a month" },
-  { value: "team", label: "Team", hint: "A lane per person" },
 ] as const;
 
 export type TaskLayout = (typeof TASK_LAYOUTS)[number]["value"];
@@ -56,11 +61,8 @@ export type TaskScope = (typeof TASK_SCOPES)[number]["value"];
 
 export const TASKS_VIEW_COOKIE = "cbc-tasks-view";
 
-/**
- * The week is the first-visit default: a club board opens this page to find
- * out what it owes, not to look at a kanban.
- */
-export const DEFAULT_TASK_LAYOUT: TaskLayout = "week";
+/** The board is the first-visit default: the club's work, moving along. */
+export const DEFAULT_TASK_LAYOUT: TaskLayout = "board";
 
 export function isLayout(value: unknown): value is TaskLayout {
   return TASK_LAYOUTS.some((l) => l.value === value);
@@ -70,9 +72,14 @@ export function isDestination(value: unknown): value is TaskDestination {
   return TASK_DESTINATIONS.includes(value as TaskDestination);
 }
 
-/** `view=mine` is the old name for "the week, just my work". */
+/**
+ * `view=mine` is the old name for "the week, just my work"; the retired
+ * team layout (and a remembered calendar one) open the board. A requested
+ * ?view=calendar is sent to the Calendar by the page before this runs.
+ */
 export function parseTaskView(value: unknown): TaskView | null {
   if (value === "mine") return "week";
+  if (value === "team" || value === "calendar") return "board";
   if (isLayout(value) || isDestination(value)) return value;
   return null;
 }

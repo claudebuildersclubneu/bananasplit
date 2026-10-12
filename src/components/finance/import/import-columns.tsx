@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { ConnectionPicker, type useAiConnections } from "@/components/ai/connection-picker";
 import { Button } from "@/components/ui/button";
+import { Segmented } from "@/components/ui/segmented";
 import type { AiLabel, SheetRead } from "@/lib/ai/finance-sheet";
 import {
   AMOUNT_SIGN_LABEL,
@@ -31,10 +32,17 @@ import { cn } from "@/lib/utils";
 
 const PREVIEW_ROWS = 8;
 
-const selectClass = "border-input bg-background h-8 w-full min-w-28 rounded-md border px-2 text-xs";
+const selectClass = "border-input bg-background h-8 w-full min-w-28 rounded-lg border px-2 text-xs";
 
 const TRANSACTION_ROLES = COLUMN_ROLES.filter((r) => r !== "allocated");
-const BUDGET_ROLES: readonly ColumnRole[] = ["category", "description", "allocated", "amount", "notes", "ignore"];
+const BUDGET_ROLES: readonly ColumnRole[] = [
+  "category",
+  "description",
+  "allocated",
+  "amount",
+  "notes",
+  "ignore",
+];
 
 const norm = (s: string) =>
   s
@@ -70,25 +78,48 @@ export function ImportColumns({
   ai: ReturnType<typeof useAiConnections>;
   readBy: string | null;
   notes: string[];
-  onRead: (mapping: SheetMapping | null, labels: AiLabel[], readBy: string, notes: string[]) => void;
-  onChange: (next: { sheetIndex?: number; mapping?: SheetMapping; labels?: Map<string, ValueLabel> }) => void;
+  onRead: (
+    mapping: SheetMapping | null,
+    labels: AiLabel[],
+    readBy: string,
+    notes: string[],
+  ) => void;
+  onChange: (next: {
+    sheetIndex?: number;
+    mapping?: SheetMapping;
+    labels?: Map<string, ValueLabel>;
+  }) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sheet = sheets[sheetIndex];
-  const width = Math.min(60, sheet.rows.reduce((w, r) => Math.max(w, r.length), 0));
+  const width = Math.min(
+    60,
+    sheet.rows.reduce((w, r) => Math.max(w, r.length), 0),
+  );
   const columns = Array.from({ length: width }, (_, c) => c);
   const header = mapping.headerRow >= 0 ? sheet.rows[mapping.headerRow] : null;
   const preview = sheet.rows.slice(mapping.headerRow + 1, mapping.headerRow + 1 + PREVIEW_ROWS);
   const dataRows = sheet.rows.length - (mapping.headerRow + 1);
   const has = (role: ColumnRole) => mapping.roles.includes(role);
-  const money = has("amount") || has("moneyIn") || has("moneyOut") || (mapping.kind === "budget" && has("allocated"));
+  const money =
+    has("amount") ||
+    has("moneyIn") ||
+    has("moneyOut") ||
+    (mapping.kind === "budget" && has("allocated"));
   const typeCol = mapping.roles.indexOf("type");
   const typeValues =
     typeCol >= 0
-      ? [...new Set(sheet.rows.slice(mapping.headerRow + 1).map((r) => norm(r[typeCol] ?? "")).filter(Boolean))].slice(0, 24)
+      ? [
+          ...new Set(
+            sheet.rows
+              .slice(mapping.headerRow + 1)
+              .map((r) => norm(r[typeCol] ?? ""))
+              .filter(Boolean),
+          ),
+        ].slice(0, 24)
       : [];
   const roles = mapping.kind === "budget" ? BUDGET_ROLES : TRANSACTION_ROLES;
   const set = (patch: Partial<SheetMapping>) => onChange({ mapping: { ...mapping, ...patch } });
@@ -104,15 +135,20 @@ export function ImportColumns({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "sheet", sample, connection: ai.selected.id }),
       });
-      const json = (await res.json().catch(() => null)) as (SheetRead & { readBy?: string; error?: string }) | null;
-      if (!res.ok || !json) throw new Error(json?.error ?? "The sheet couldn't be read. Try again.");
+      const json = (await res.json().catch(() => null)) as
+        (SheetRead & { readBy?: string; error?: string }) | null;
+      if (!res.ok || !json)
+        throw new Error(json?.error ?? "The sheet couldn't be read. Try again.");
       onRead(
         json.mapping,
         json.labels ?? [],
         json.readBy ?? ai.selected.label,
         json.mapping
           ? json.notes
-          : [...json.notes, "The model couldn't find money records in this sheet, so the columns were left as they were."],
+          : [
+              ...json.notes,
+              "The model couldn't find money records in this sheet, so the columns were left as they were.",
+            ],
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "The sheet couldn't be read. Try again.");
@@ -139,31 +175,24 @@ export function ImportColumns({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Which column is which?</h2>
+          <h2 className="heading text-lg">Which column is which?</h2>
           <p className="text-muted-foreground text-sm">
             {fileName} · {dataRows.toLocaleString()} row{dataRows === 1 ? "" : "s"}
-            {sheet.truncated ? " (only the first 20,000 are read)" : ""}. Check the guess, or let AI read it.
+            {sheet.truncated ? " (only the first 20,000 are read)" : ""}. Check the guess, or let AI
+            read it.
           </p>
         </div>
         {sheets.length > 1 && (
-          <div className="bg-muted inline-flex max-w-full flex-wrap gap-1 rounded-lg p-1" role="tablist" aria-label="Sheets">
-            {sheets.map((s, i) => (
-              <button
-                key={`${s.name}-${i}`}
-                type="button"
-                role="tab"
-                aria-selected={i === sheetIndex}
-                onClick={() => pickSheet(i)}
-                className={cn(
-                  "rounded-md px-2.5 py-1 text-xs font-medium",
-                  i === sheetIndex ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {s.name}
-                {s.hidden ? " (hidden)" : ""}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Sheets"
+            className="max-w-full overflow-x-auto"
+            value={String(sheetIndex)}
+            onSelect={(v) => pickSheet(Number(v))}
+            options={sheets.map((s, i) => ({
+              value: String(i),
+              label: `${s.name}${s.hidden ? " (hidden)" : ""}`,
+            }))}
+          />
         )}
       </div>
 
@@ -178,9 +207,18 @@ export function ImportColumns({
             what="the first rows and each text column's values"
           />
           {ai.selected && (
-            <Button type="button" onClick={() => void readWithAi()} disabled={reading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void readWithAi()}
+              disabled={reading}
+            >
               {reading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-              {reading ? "Reading…" : readBy ? "Read it again" : `Read it with ${ai.selected.label}`}
+              {reading
+                ? "Reading…"
+                : readBy
+                  ? "Read it again"
+                  : `Read it with ${ai.selected.label}`}
             </Button>
           )}
         </div>
@@ -188,7 +226,9 @@ export function ImportColumns({
           <p className="text-success flex items-center gap-1.5 text-sm">
             <CheckCircle2 className="size-4" aria-hidden="true" />
             Read by {readBy}
-            {categorized > 0 ? ` · ${categorized} value${categorized === 1 ? "" : "s"} sorted into categories` : ""}
+            {categorized > 0
+              ? ` · ${categorized} value${categorized === 1 ? "" : "s"} sorted into categories`
+              : ""}
           </p>
         )}
         {notes.length > 0 && (
@@ -235,22 +275,25 @@ export function ImportColumns({
             ))}
           </select>
         </label>
-        {mapping.kind === "transactions" && has("amount") && !has("moneyIn") && !has("moneyOut") && (
-          <label className="space-y-1 text-xs">
-            <span className="text-muted-foreground font-medium">Money in or out</span>
-            <select
-              className={selectClass}
-              value={mapping.amountSign}
-              onChange={(e) => set({ amountSign: e.target.value as AmountSign })}
-            >
-              {AMOUNT_SIGNS.filter((s) => s !== "by-type" || typeCol >= 0).map((s) => (
-                <option key={s} value={s}>
-                  {AMOUNT_SIGN_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        {mapping.kind === "transactions" &&
+          has("amount") &&
+          !has("moneyIn") &&
+          !has("moneyOut") && (
+            <label className="space-y-1 text-xs">
+              <span className="text-muted-foreground font-medium">Money in or out</span>
+              <select
+                className={selectClass}
+                value={mapping.amountSign}
+                onChange={(e) => set({ amountSign: e.target.value as AmountSign })}
+              >
+                {AMOUNT_SIGNS.filter((s) => s !== "by-type" || typeCol >= 0).map((s) => (
+                  <option key={s} value={s}>
+                    {AMOUNT_SIGN_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         {mapping.kind === "transactions" && has("date") && (
           <label className="space-y-1 text-xs">
             <span className="text-muted-foreground font-medium">Dates are written</span>
@@ -267,31 +310,40 @@ export function ImportColumns({
         )}
       </div>
 
-      {mapping.kind === "transactions" && mapping.amountSign === "by-type" && typeValues.length > 0 && (
-        <div className="space-y-2 rounded-lg border p-3">
-          <p className="text-sm font-medium">What does each type mean?</p>
-          <ul className="flex flex-wrap gap-2">
-            {typeValues.map((v) => {
-              const way = mapping.typeIn.map(norm).includes(v) ? "in" : mapping.typeOut.map(norm).includes(v) ? "out" : "none";
-              return (
-                <li key={v} className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
-                  <span className="font-medium">{v}</span>
-                  <select
-                    aria-label={`${v} means`}
-                    className="border-input bg-background h-7 rounded border px-1 text-xs"
-                    value={way}
-                    onChange={(e) => setTypeValue(v, e.target.value as "in" | "out" | "none")}
+      {mapping.kind === "transactions" &&
+        mapping.amountSign === "by-type" &&
+        typeValues.length > 0 && (
+          <div className="space-y-2 rounded-xl border p-3">
+            <p className="text-sm font-medium">What does each type mean?</p>
+            <ul className="flex flex-wrap gap-2">
+              {typeValues.map((v) => {
+                const way = mapping.typeIn.map(norm).includes(v)
+                  ? "in"
+                  : mapping.typeOut.map(norm).includes(v)
+                    ? "out"
+                    : "none";
+                return (
+                  <li
+                    key={v}
+                    className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
                   >
-                    <option value="in">Money in</option>
-                    <option value="out">Money out</option>
-                    <option value="none">Not sure</option>
-                  </select>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+                    <span className="font-medium">{v}</span>
+                    <select
+                      aria-label={`${v} means`}
+                      className="border-input bg-background h-7 rounded-md border px-1 text-xs"
+                      value={way}
+                      onChange={(e) => setTypeValue(v, e.target.value as "in" | "out" | "none")}
+                    >
+                      <option value="in">Money in</option>
+                      <option value="out">Money out</option>
+                      <option value="none">Not sure</option>
+                    </select>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full min-w-max text-xs">
@@ -301,9 +353,14 @@ export function ImportColumns({
                 <th key={c} className="p-2 text-left align-top font-normal">
                   <select
                     aria-label={`Column ${c + 1}${header?.[c] ? ` (${header[c]})` : ""}`}
-                    className={cn(selectClass, mapping.roles[c] !== "ignore" && "border-primary/50 bg-primary/5")}
+                    className={cn(
+                      selectClass,
+                      mapping.roles[c] !== "ignore" && "border-primary/50 bg-primary/5",
+                    )}
                     value={mapping.roles[c] ?? "ignore"}
-                    onChange={(e) => onChange({ mapping: setColumnRole(mapping, c, e.target.value as ColumnRole) })}
+                    onChange={(e) =>
+                      onChange({ mapping: setColumnRole(mapping, c, e.target.value as ColumnRole) })
+                    }
                   >
                     {roles.map((r) => (
                       <option key={r} value={r}>
@@ -351,7 +408,10 @@ export function ImportColumns({
           Choose another file
         </Button>
         <Button type="button" onClick={onContinue} disabled={!money || dataRows <= 0}>
-          Review {mapping.kind === "budget" ? "the budget" : `${dataRows.toLocaleString()} row${dataRows === 1 ? "" : "s"}`}
+          Review{" "}
+          {mapping.kind === "budget"
+            ? "the budget"
+            : `${dataRows.toLocaleString()} row${dataRows === 1 ? "" : "s"}`}
           <ArrowRight className="size-4" aria-hidden="true" />
         </Button>
       </div>

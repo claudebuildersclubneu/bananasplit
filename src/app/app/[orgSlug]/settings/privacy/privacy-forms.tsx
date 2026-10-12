@@ -139,7 +139,7 @@ export function PrivacyForm({
       >
         <select
           id="contact-emails"
-          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
           value={value.contactEmailVisibility}
           disabled={!canEdit}
           onChange={(e) =>
@@ -200,7 +200,7 @@ export function BallotVisibilityForm({
       <div className="flex flex-wrap gap-2">
         <select
           id="ballot-visibility"
-          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
           value={value}
           disabled={!canEdit}
           onChange={(e) => setValue(e.target.value)}
@@ -259,7 +259,7 @@ export function DatabaseVisibilityRow({
       <div className="flex items-center gap-2">
         <select
           id={`db-${id}`}
-          className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
           defaultValue={initial}
           disabled={!canEdit || isPending}
           onChange={(e) => {

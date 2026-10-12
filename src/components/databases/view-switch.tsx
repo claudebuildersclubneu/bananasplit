@@ -1,10 +1,17 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { Segmented } from "@/components/ui/segmented";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { useViewParams } from "./view-params";
 
-/** Tabs that set ?view= (and optionally the poll filter) on the current URL. */
+/** The view switch (Segmented) that sets ?view= on the current URL; the first view is the default. */
 export function ViewSwitch({
   views,
   current,
@@ -14,32 +21,24 @@ export function ViewSwitch({
 }) {
   const view = useViewParams();
   return (
-    <div role="tablist" className="bg-muted inline-flex rounded-lg p-0.5 text-sm">
-      {views.map((v) => (
-        <button
-          key={v.key}
-          role="tab"
-          type="button"
-          aria-selected={current === v.key}
-          onClick={() =>
-            view.update((p) => {
-              p.delete("sort");
-              p.delete("cols");
-              if (v.key === views[0].key) p.delete("view");
-              else p.set("view", v.key);
-            })
-          }
-          className={cn(
-            "rounded-md px-3 py-1",
-            current === v.key ? "bg-background font-medium shadow-sm" : "text-muted-foreground",
-          )}
-        >
-          {v.label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label="View"
+      value={current}
+      options={views.map((v) => ({ value: v.key, label: v.label }))}
+      onSelect={(key) =>
+        view.update((p) => {
+          p.delete("sort");
+          p.delete("cols");
+          if (key === views[0].key) p.delete("view");
+          else p.set("view", key);
+        })
+      }
+    />
   );
 }
+
+/** Radix Select has no empty value; this stands for "All polls". */
+const ALL = "__all";
 
 /** Picks the poll: writes f=ballotDefinitionId:eq:<id> (the report deep-link grammar). */
 export function PollPicker({
@@ -53,26 +52,31 @@ export function PollPicker({
 }) {
   const view = useViewParams();
   return (
-    <select
-      aria-label="Poll"
-      value={current ?? ""}
-      onChange={(e) =>
+    <Select
+      value={current ?? (allowAll ? ALL : undefined)}
+      onValueChange={(value) =>
         view.update((p) => {
-          const rest = p.getAll("f").filter((f) => !/^(ballotDefinitionId|poll|definition|pollSlug|slug):/.test(f));
+          const rest = p
+            .getAll("f")
+            .filter((f) => !/^(ballotDefinitionId|poll|definition|pollSlug|slug):/.test(f));
           p.delete("f");
           for (const f of rest) p.append("f", f);
-          if (e.target.value) p.append("f", `ballotDefinitionId:eq:${e.target.value}`);
+          if (value !== ALL) p.append("f", `ballotDefinitionId:eq:${value}`);
         })
       }
-      className="border-input bg-background h-8 rounded-md border px-2 text-sm"
     >
-      {allowAll && <option value="">All polls</option>}
-      {polls.map((poll) => (
-        <option key={poll.id} value={poll.id}>
-          {poll.title}
-          {poll.isTest ? " (test)" : ""}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger size="sm" aria-label="Poll" className="max-w-64">
+        <SelectValue placeholder="Choose a poll" />
+      </SelectTrigger>
+      <SelectContent>
+        {allowAll && <SelectItem value={ALL}>All polls</SelectItem>}
+        {polls.map((poll) => (
+          <SelectItem key={poll.id} value={poll.id}>
+            {poll.title}
+            {poll.isTest ? " (test)" : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

@@ -13,12 +13,18 @@ export function OverviewBoard({
   initialLayout,
   customized,
   bodies,
+  intro,
+  notice,
 }: {
   orgId: string;
   types: WidgetMeta[];
   initialLayout: BoardWidget[];
   customized: boolean;
   bodies: Record<string, ReactNode>;
+  /** The page's greeting, on the Customize button's row. */
+  intro?: ReactNode;
+  /** The admin's setup prompt or the new club's invite card, above the widgets. */
+  notice?: ReactNode;
 }) {
   return (
     <WidgetBoard
@@ -26,7 +32,8 @@ export function OverviewBoard({
       initialLayout={initialLayout}
       customized={customized}
       bodies={bodies}
-      intro="Your Overview. Customize it however you like."
+      intro={intro}
+      notice={notice}
       onSave={(layout) => saveBoardAction(orgId, "overview", layout)}
     />
   );

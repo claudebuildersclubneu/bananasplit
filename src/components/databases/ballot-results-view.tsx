@@ -9,14 +9,14 @@ import type { PollResults } from "@/server/databases/ballot-results";
 export function BallotResultsView({ results }: { results: PollResults }) {
   if (results.hidden) {
     return (
-      <p className="text-muted-foreground rounded-lg border p-6 text-center text-sm">
-        Results of this poll are visible to owners and admins only (Settings &gt; Privacy).
+      <p className="text-muted-foreground rounded-xl border p-6 text-center text-sm">
+        Results of this poll are visible to owners and admins only (Admin panel › Privacy).
       </p>
     );
   }
   if (results.questions.length === 0) {
     return (
-      <p className="text-muted-foreground rounded-lg border p-6 text-center text-sm">
+      <p className="text-muted-foreground rounded-xl border p-6 text-center text-sm">
         No counted ballots for this poll yet.
       </p>
     );
@@ -42,7 +42,7 @@ export function BallotResultsView({ results }: { results: PollResults }) {
             {q.ballots === 0 ? (
               <p className="text-muted-foreground text-sm">No answers yet.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="overflow-x-auto rounded-xl border">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40 text-muted-foreground text-left text-xs">
                     <tr>

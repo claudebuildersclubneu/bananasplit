@@ -18,9 +18,9 @@ import {
   Underline as UnderlineIcon,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { NOTE_FIELD, type CollabUser } from "@/lib/collab/protocol";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
-import { cn } from "@/lib/utils";
 import { renderCaret, renderSelection } from "./carets";
 import { EditorToolbar, NoteOutline } from "./editor-toolbar";
 import { SlashCommand } from "./slash-command-extension";
@@ -113,7 +113,7 @@ export function NoteEditor({
         )}
         {linkOpen && (
           <form
-            className="flex items-center gap-2 rounded-lg border p-2"
+            className="flex items-center gap-2 rounded-xl border p-2"
             onSubmit={(e) => {
               e.preventDefault();
               const url = linkValue.trim();
@@ -138,7 +138,7 @@ export function NoteEditor({
         )}
         <BubbleMenu
           editor={editor}
-          className="bg-popover flex items-center gap-1 rounded-md border p-1 shadow-md"
+          className="bg-popover flex items-center gap-0.5 rounded-lg border p-1 shadow-md"
         >
           <BubbleMenuContent editor={editor} />
         </BubbleMenu>
@@ -178,7 +178,7 @@ function BubbleMenuContent({ editor }: { editor: NonNullable<ReturnType<typeof u
           value={linkValue}
           onChange={(e) => setLinkValue(e.target.value)}
           placeholder="https://…"
-          className="bg-background w-48 rounded border px-2 py-1 text-xs outline-none"
+          className="bg-background w-48 rounded-md border px-2 py-1 text-xs outline-none"
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               setLinkInputOpen(false);
@@ -253,17 +253,16 @@ function ToolbarButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-sm"
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={cn(
-        "hover:bg-accent hover:text-accent-foreground flex size-7 items-center justify-center rounded-sm",
-        active && "bg-accent text-accent-foreground",
-      )}
+      className="aria-pressed:bg-muted aria-pressed:text-foreground"
     >
       {children}
-    </button>
+    </Button>
   );
 }

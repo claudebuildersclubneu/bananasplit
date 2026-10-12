@@ -90,15 +90,15 @@ export type RequestResult = { ok: true; queued?: number } | { ok: false; error: 
 
 function usable(status: IntegrationStatus): string | null {
   if (status === IntegrationStatus.CONNECTED || status === IntegrationStatus.ERROR) return null;
-  if (status === IntegrationStatus.NEEDS_REAUTH) return "Reconnect Google Calendar in Settings > Integrations first.";
-  return "Connect Google Calendar in Settings > Integrations first.";
+  if (status === IntegrationStatus.NEEDS_REAUTH) return "Reconnect Google Calendar in Admin panel › Integrations first.";
+  return "Connect Google Calendar in Admin panel › Integrations first.";
 }
 
 /** "Sync now": retry failed and pending mirrors and push anything missing. ADMIN+. */
 export async function requestGoogleSync(ctx: RequestContext): Promise<RequestResult> {
   requirePermission(ctx, "integrations.write");
   const integration = await loadGoogleIntegration(ctx.db, ctx.organizationId);
-  if (!integration) return { ok: false, error: "Connect Google Calendar in Settings > Integrations first." };
+  if (!integration) return { ok: false, error: "Connect Google Calendar in Admin panel › Integrations first." };
   const blocked = usable(integration.status);
   if (blocked) return { ok: false, error: blocked };
   const queued = await enqueueGoogleBackfill(ctx.db, ctx.organizationId, integration.config);
@@ -120,7 +120,7 @@ export async function requestGoogleImport(
 ): Promise<RequestResult> {
   requirePermission(ctx, "integrations.write");
   const integration = await loadGoogleIntegration(ctx.db, ctx.organizationId);
-  if (!integration) return { ok: false, error: "Connect Google Calendar in Settings > Integrations first." };
+  if (!integration) return { ok: false, error: "Connect Google Calendar in Admin panel › Integrations first." };
   const blocked = usable(integration.status);
   if (blocked) return { ok: false, error: blocked };
   if (mode === "apply") {

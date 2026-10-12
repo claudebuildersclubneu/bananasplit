@@ -1,13 +1,16 @@
+import { CalendarSync } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
-import { CalendarShotButton } from "@/components/ai/calendar-shot-button";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
-import { allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
+import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
+import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
+import { getCalendarTasks } from "@/server/tasks/queries";
 
 import { getEventsInRange, getViewerRsvps } from "./queries";
 
@@ -17,21 +20,44 @@ import { getEventsInRange, getViewerRsvps } from "./queries";
  * visibility filters, and hands the grid a small summary per event. Editing
  * (create, drag, edit, delete) is offered only to OWNER/ADMIN; members see
  * the calendar and RSVP.
+ *
+ * Tasks' due dates show on their days too (the Tasks filter turns them off,
+ * ?tasks=0): this is the one calendar, for meetings and for work. Each is
+ * a task the viewer can see, and opens it.
  */
-export default async function CalendarPage({ params, searchParams }: PageProps<"/app/[orgSlug]/calendar">) {
+export default async function CalendarPage({
+  params,
+  searchParams,
+}: PageProps<"/app/[orgSlug]/calendar">) {
   const { orgSlug } = await params;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
 
-  const { events, rsvps } = await withOrgTx(org.id, async ({ db }) => {
+  const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
       from: range.from,
       to: range.to,
       kinds: range.kinds,
       visibility: range.visibility,
     });
-    return { events: found, rsvps: await getViewerRsvps(db, org.id, user.id, found.map((e) => e.id)) };
+    return {
+      events: found,
+      rsvps: await getViewerRsvps(
+        db,
+        org.id,
+        user.id,
+        found.map((e) => e.id),
+      ),
+      // A kind filter is about events; tasks stay out while one is on.
+      tasks:
+        range.tasks && range.kinds.length === 0
+          ? await getCalendarTasks(db, org.id, {
+              dueFrom: fromDateKey(range.fromKey),
+              dueTo: fromDateKey(addDaysToKey(range.toKey, -1)),
+            })
+          : [],
+    };
   });
   const members = canManage ? await getOrgMembersForPicker(org.id) : [];
 
@@ -50,31 +76,62 @@ export default async function CalendarPage({ params, searchParams }: PageProps<"
       const span = allDaySpan(e.startsAt, e.endsAt, org.timezone);
       return { ...shared, start: span.start, end: span.endExclusive, allDay: true };
     }
-    return { ...shared, start: e.startsAt.toISOString(), end: e.endsAt.toISOString(), allDay: false };
+    return {
+      ...shared,
+      start: e.startsAt.toISOString(),
+      end: e.endsAt.toISOString(),
+      allDay: false,
+    };
   });
+  for (const t of tasks) {
+    if (!t.dueDate) continue;
+    const day = dueDateKey(t.dueDate);
+    items.push({
+      id: t.id,
+      title: t.title,
+      start: day,
+      end: addDaysToKey(day, 1),
+      allDay: true,
+      kind: "OTHER",
+      visibility: "INTERNAL",
+      location: null,
+      syncState: "NOT_APPLICABLE",
+      needsReview: false,
+      rsvp: null,
+      task: { done: t.status === "COMPLETED" },
+    });
+  }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="page-title">Calendar</h1>
-        <div className="flex flex-wrap gap-2">
-          {can({ role }, "events.write") && <CalendarShotButton orgId={org.id} orgSlug={orgSlug} />}
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/app/${orgSlug}/calendar/polls`}>Polls</Link>
-          </Button>
-          {can({ role }, "integrations.view") && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/app/${orgSlug}/calendar/sync`}>Sync and website feed</Link>
+      <PageHeader
+        title="Calendar"
+        actions={
+          can({ role }, "integrations.view") && (
+            <Button variant="ghost" size="icon-sm" asChild>
+              <Link
+                href={`/app/${orgSlug}/calendar/sync`}
+                aria-label="Google Calendar sync and website feed"
+                title="Google Calendar sync and website feed"
+              >
+                <CalendarSync className="size-4" aria-hidden="true" />
+              </Link>
             </Button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
       <EventCalendar
         orgId={org.id}
         orgSlug={orgSlug}
         timeZone={org.timezone}
         items={items}
-        members={members.map((m) => ({ id: m.id, name: m.name, image: m.image, avatar: m.avatar, title: m.title }))}
+        members={members.map((m) => ({
+          id: m.id,
+          name: m.name,
+          image: m.image,
+          avatar: m.avatar,
+          title: m.title,
+        }))}
         canManage={canManage}
         orgTodayKey={zonedDateKey(new Date(), safeTimeZone(org.timezone))}
         window={{
@@ -83,6 +140,7 @@ export default async function CalendarPage({ params, searchParams }: PageProps<"
           view: range.view,
           kinds: range.kinds,
           visibility: range.visibility,
+          tasks: range.tasks,
         }}
       />
     </div>

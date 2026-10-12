@@ -40,7 +40,7 @@ function requireOrg(orgId: string | null): string {
  */
 function noSender(orgId: string, kind: string): JobOutcome {
   console.warn(
-    `[email] ${kind} not sent: org ${orgId} has no email sender (connect one under Settings > Integrations > Email sender, or turn on the platform fallback there)`,
+    `[email] ${kind} not sent: org ${orgId} has no email sender (connect one under Admin panel › Integrations › Email sender, or turn on the platform fallback there)`,
   );
   return { status: "CANCELLED", error: "no email sender for this org (in-app only)" };
 }

@@ -9,6 +9,7 @@ import { addDaysToKey, parseDateKey, safeTimeZone, zonedDateKey, zonedMidnight }
  *   &view=dayGridMonth|timeGridWeek|timeGridDay|listMonth
  *   &kind=WORKSHOP,SOCIAL            optional filters
  *   &vis=PUBLIC|INTERNAL
+ *   &tasks=0                         hide tasks (their due dates show by default)
  *
  * Days are read in the org timezone; the window is padded by a day on each
  * side so viewers in other timezones never miss an edge event. A missing or
@@ -37,6 +38,8 @@ export interface CalendarRange {
   view: CalendarView;
   kinds: EventKindValue[];
   visibility: EventVisibilityValue | null;
+  /** Tasks' due dates on the grid, beside the events. */
+  tasks: boolean;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -92,6 +95,7 @@ export function parseCalendarRange(params: Params, timeZoneRaw: string, now: Dat
     view,
     kinds: [...new Set(kinds)],
     visibility,
+    tasks: first(params.tasks) !== "0",
   };
 }
 
@@ -102,9 +106,11 @@ export function calendarSearch(r: {
   view: CalendarView;
   kinds: readonly string[];
   visibility: string | null;
+  tasks?: boolean;
 }): string {
   const q = new URLSearchParams({ from: r.fromKey, to: r.toKey, view: r.view });
   if (r.kinds.length > 0) q.set("kind", r.kinds.join(","));
   if (r.visibility) q.set("vis", r.visibility);
+  if (r.tasks === false) q.set("tasks", "0");
   return q.toString();
 }

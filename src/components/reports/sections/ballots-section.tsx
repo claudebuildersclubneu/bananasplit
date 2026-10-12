@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EyeOff } from "lucide-react";
+import { ArrowUpRight, EyeOff } from "lucide-react";
 
 import { reportLinks } from "@/server/reports/links";
 import type { BallotQuestionResult, BallotResult } from "@/server/reports/types";
@@ -53,7 +53,7 @@ function Question({ q, k }: { q: BallotQuestionResult; k: number }) {
 
 function Ballot({ ballot, ctx, k }: { ballot: BallotResult; ctx: ReportViewContext; k: number }) {
   return (
-    <section className="flex flex-col gap-4 rounded-lg border p-4" aria-label={ballot.title}>
+    <section className="flex flex-col gap-4 rounded-xl border p-4" aria-label={ballot.title}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-medium">{ballot.title}</h3>
@@ -65,17 +65,18 @@ function Ballot({ ballot, ctx, k }: { ballot: BallotResult; ctx: ReportViewConte
               <span title="No linked session with check-ins to compare with">n/a</span>
             ) : (
               <>
-                {formatPct(ballot.turnoutPct)} of {formatCount(ballot.linkedSession?.checkIns ?? 0)} at{" "}
-                {ballot.linkedSession?.title}
+                {formatPct(ballot.turnoutPct)} of {formatCount(ballot.linkedSession?.checkIns ?? 0)}{" "}
+                at {ballot.linkedSession?.title}
               </>
             )}
           </p>
         </div>
         <Link
           href={reportLinks.ballot(ctx.slug, ballot.id)}
-          className="text-muted-foreground hover:text-foreground text-xs font-medium whitespace-nowrap"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 rounded-md text-xs font-medium whitespace-nowrap outline-none focus-visible:ring-3"
         >
           View ballot data
+          <ArrowUpRight className="size-3.5" aria-hidden="true" />
         </Link>
       </div>
       {ballot.ballots === 0 ? (
@@ -88,7 +89,9 @@ function Ballot({ ballot, ctx, k }: { ballot: BallotResult; ctx: ReportViewConte
         </div>
       )}
       {ballot.freeTextQuestions > 0 ? (
-        <p className="text-muted-foreground text-xs">Free-text answers are never included in reports.</p>
+        <p className="text-muted-foreground text-xs">
+          Free-text answers are never included in reports.
+        </p>
       ) : null}
     </section>
   );
@@ -123,8 +126,8 @@ export async function BallotsSection({ ctx }: { ctx: ReportViewContext }) {
         <>
           {!r.fullCounts ? (
             <p className="text-muted-foreground text-xs">
-              Totals only. Options with fewer than {r.minCellSize} votes show as &lt;{r.minCellSize} so no one&apos;s
-              vote can be singled out.
+              Totals only. Options with fewer than {r.minCellSize} votes show as &lt;{r.minCellSize}{" "}
+              so no one&apos;s vote can be singled out.
             </p>
           ) : null}
           <div className="flex flex-col gap-4">

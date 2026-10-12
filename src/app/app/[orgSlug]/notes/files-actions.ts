@@ -7,7 +7,7 @@ import { removeNoteFile, restoreNoteFile } from "@/server/notes/files";
 import { getBlob } from "@/server/storage";
 
 /**
- * Notes page files: the uploader, or an owner or admin (RLS decides which
+ * Uploaded files in Files: the uploader, or an owner or admin (RLS decides which
  * rows the update may touch). Removing moves a file to "Recently deleted";
  * its bytes stay until the maintenance job clears files deleted more than
  * NOTE_TRASH_DAYS ago, so a restore brings it back whole.
@@ -15,7 +15,8 @@ import { getBlob } from "@/server/storage";
 export const removeNoteFileAction = withOrgAction(
   async (ctx, fileId: string): Promise<{ error?: string }> => {
     const key = await removeNoteFile(ctx.db, ctx.organizationId, z.string().max(64).parse(fileId));
-    if (!key) return { error: "Only the person who uploaded it, or an admin, can delete this file." };
+    if (!key)
+      return { error: "Only the person who uploaded it, or an admin, can delete this file." };
     return {};
   },
 );
@@ -39,7 +40,10 @@ const restoreRow = withOrgAction(async (ctx, fileId: string): Promise<{ error?: 
  * them at once, and a row without its bytes would only be a broken link).
  * Blob reads stay outside the transaction, so this is three short steps.
  */
-export async function restoreNoteFileAction(orgId: string, fileId: string): Promise<{ error?: string }> {
+export async function restoreNoteFileAction(
+  orgId: string,
+  fileId: string,
+): Promise<{ error?: string }> {
   const id = z.string().max(64).parse(fileId);
   const key = await deletedFileKey(orgId, id);
   if (!key) return { error: "That file can't be restored any more." };

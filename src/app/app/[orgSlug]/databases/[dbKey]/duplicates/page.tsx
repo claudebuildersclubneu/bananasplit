@@ -1,9 +1,10 @@
-import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActionButton } from "@/components/databases/action-button";
+import { BackLink } from "@/components/back-link";
 import { MergeSessionPicker } from "@/components/databases/merge-session-picker";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { dismissReviewAction } from "@/app/app/[orgSlug]/databases/actions";
 import { NotFoundError } from "@/lib/auth/errors";
@@ -18,7 +19,9 @@ import { findDuplicatePairs } from "@/server/events/match";
  * sessions on the same local day, within 90 minutes, with matching titles.
  * Merging keeps the chosen session and moves everything from the other.
  */
-export default async function DuplicatesPage({ params }: PageProps<"/app/[orgSlug]/databases/[dbKey]/duplicates">) {
+export default async function DuplicatesPage({
+  params,
+}: PageProps<"/app/[orgSlug]/databases/[dbKey]/duplicates">) {
   const { orgSlug, dbKey } = await params;
   const { organization } = await getOrgContextBySlug(orgSlug);
   const tz = organization.timezone;
@@ -58,7 +61,10 @@ export default async function DuplicatesPage({ params }: PageProps<"/app/[orgSlu
 
   const Row = ({ e }: { e: (typeof data.events)[number] }) => (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <Link className="font-medium underline-offset-4 hover:underline" href={`/app/${orgSlug}/databases/${dbKey}?row=${e.id}`}>
+      <Link
+        className="font-medium underline-offset-4 hover:underline"
+        href={`/app/${orgSlug}/databases/${dbKey}?row=${e.id}`}
+      >
         {e.title}
       </Link>
       <span className="text-muted-foreground">{fmtDateTime(e.startsAt, tz)}</span>
@@ -72,19 +78,11 @@ export default async function DuplicatesPage({ params }: PageProps<"/app/[orgSlu
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Link
-          href={`/app/${orgSlug}/databases/${dbKey}`}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-        >
-          <ChevronLeft className="size-3" aria-hidden="true" />
-          {data.database.name}
-        </Link>
-        <h1 className="page-title">Possible duplicates</h1>
-        <p className="text-muted-foreground text-sm">
-          A session that exists twice (for example once from the website and once on the calendar) splits its
-          check-ins. Merge keeps one and moves check-ins, RSVPs, notes, expenses and the website link to it. It
-          cannot be undone; the audit log records what moved.
-        </p>
+        <BackLink href={`/app/${orgSlug}/databases/${dbKey}`} label={data.database.name} />
+        <PageHeader
+          title="Possible duplicates"
+          description="A session that exists twice (for example once from the website and once on the calendar) splits its check-ins. Merge keeps one and moves check-ins, RSVPs, notes, expenses and the website link to it. It cannot be undone; the audit log records what moved."
+        />
       </div>
 
       <section className="space-y-3">
@@ -94,10 +92,12 @@ export default async function DuplicatesPage({ params }: PageProps<"/app/[orgSlu
         ) : (
           flagged.map((e) => {
             const nearby = data.events.filter(
-              (o) => o.id !== e.id && Math.abs(o.startsAt.getTime() - e.startsAt.getTime()) <= 3 * 86400000,
+              (o) =>
+                o.id !== e.id &&
+                Math.abs(o.startsAt.getTime() - e.startsAt.getTime()) <= 3 * 86400000,
             );
             return (
-              <div key={e.id} className="space-y-2 rounded-lg border p-4">
+              <div key={e.id} className="space-y-2 rounded-xl border p-4">
                 <Row e={e} />
                 <div className="flex flex-wrap items-start gap-2">
                   <ActionButton action={dismissReviewAction} args={[organization.id, e.id]}>
@@ -133,8 +133,10 @@ export default async function DuplicatesPage({ params }: PageProps<"/app/[orgSlu
             const keep = keepA ? ea : eb;
             const drop = keepA ? eb : ea;
             return (
-              <div key={`${a}-${b}`} className="space-y-2 rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs">Title similarity {Math.round(score * 100)}%</p>
+              <div key={`${a}-${b}`} className="space-y-2 rounded-xl border p-4">
+                <p className="text-muted-foreground text-xs">
+                  Title similarity {Math.round(score * 100)}%
+                </p>
                 <Row e={keep} />
                 <Row e={drop} />
                 <MergeSessionPicker

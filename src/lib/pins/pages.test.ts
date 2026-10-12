@@ -6,7 +6,7 @@ describe("describePath", () => {
   it("names fixed pages and sub-pages", () => {
     expect(describePath("cbc", "/app/cbc/tasks")).toMatchObject({ kind: "page", label: "Tasks" });
     expect(describePath("cbc", "/app/cbc/finance/budget")).toMatchObject({ label: "Budget" });
-    expect(describePath("cbc", "/app/cbc/settings/members")).toMatchObject({ label: "Settings · Members" });
+    expect(describePath("cbc", "/app/cbc/settings/members")).toMatchObject({ label: "Admin panel · Members" });
     expect(describePath("cbc", "/app/cbc/")).toMatchObject({ label: "Overview", skipRecent: true });
   });
 
@@ -42,9 +42,9 @@ describe("describePath", () => {
       kind: "folder",
       label: "Folder",
       lookup: { type: "folder", id: "f_1" },
-      suffix: " · Files",
+      suffix: " · Uploads",
     });
-    expect(describePath("cbc", "/app/cbc/notes?tab=files")).toMatchObject({ label: "Notes · Files" });
+    expect(describePath("cbc", "/app/cbc/notes?tab=files")).toMatchObject({ label: "Files · Uploads" });
     expect(describePath("cbc", "/app/cbc/tasks?scope=mine&view=board")).toMatchObject({
       href: "/app/cbc/tasks?view=board&scope=mine",
       label: "Tasks · Board · Mine",

@@ -49,7 +49,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
 
   // --- member submits an expense with a receipt ---
   await page.goto(`/app/${orgSlug}/finance/my-reimbursements`);
-  await page.getByRole("button", { name: "Add transaction" }).click();
+  await page.getByRole("button", { name: "Request a reimbursement" }).click();
   await page.getByLabel("Description").fill(expenseDescription);
   await page.getByLabel("Amount").fill("42.50");
   await page.getByRole("button", { name: "Create", exact: true }).click();

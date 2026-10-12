@@ -55,7 +55,7 @@ export function LabelForm({ orgId }: { orgId: string }) {
             aria-pressed={color === c}
             onClick={() => setColor(c)}
             className={cn(
-              "size-6 rounded-full ring-offset-2 outline-none",
+              "size-6 rounded-md ring-offset-2 outline-none",
               color === c && "ring-ring ring-2",
             )}
             style={{ backgroundColor: c }}

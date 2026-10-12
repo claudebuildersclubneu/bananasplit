@@ -1,10 +1,8 @@
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 
 import { PollResponder } from "@/components/calendar/poll-responder";
 import { QuestionPoll } from "@/components/calendar/question-poll-view";
-import { appUrl } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { buildPollView } from "@/lib/polls/poll-view";
@@ -13,8 +11,7 @@ import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadQuestionPollSource } from "@/server/polls/question-polls";
 
 import { getPollMemberNames, getPollSource } from "../../queries";
-import { DeletePollButton } from "./poll-actions";
-import { InviteGuestsButton, SharePollLink } from "./share-poll-link";
+import { AvailabilityPollActions } from "./poll-actions";
 
 /**
  * One poll, of either kind: an availability poll (find a time) when the id
@@ -44,15 +41,7 @@ export default async function PollDetailPage({
   });
   if (!loaded) notFound();
 
-  const backLink = (
-    <Link
-      href={`/app/${orgSlug}/calendar/polls`}
-      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
-    >
-      <ArrowLeft aria-hidden className="size-4" />
-      Polls
-    </Link>
-  );
+  const backLink = <BackLink href={`/app/${orgSlug}/calendar/polls`} label="Polls" />;
 
   if (loaded.kind === "question") {
     const view = buildQuestionPollView(
@@ -93,22 +82,16 @@ export default async function PollDetailPage({
         orgSlug={orgSlug}
         canFinalize={canFinalize}
         actions={
-          isOpen || canDelete ? (
-            <>
-              {isOpen && <InviteGuestsButton pollId={poll.id} />}
-              {canDelete && (
-                <DeletePollButton
-                  orgId={org.id}
-                  orgSlug={orgSlug}
-                  pollId={poll.id}
-                  title={poll.title}
-                  scheduled={Boolean(poll.finalizedEventId)}
-                />
-              )}
-            </>
-          ) : undefined
+          <AvailabilityPollActions
+            orgId={org.id}
+            orgSlug={orgSlug}
+            pollId={poll.id}
+            title={poll.title}
+            isOpen={isOpen}
+            canDelete={canDelete}
+            scheduled={Boolean(poll.finalizedEventId)}
+          />
         }
-        aside={isOpen ? <SharePollLink url={appUrl(`/poll/${poll.id}`)} /> : undefined}
       />
     </div>
   );

@@ -1,8 +1,10 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
+import { ItemMenu, type ItemMenuEntry } from "@/components/item-menu";
 import { Button } from "@/components/ui/button";
 
 type Variant = "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
@@ -62,6 +64,75 @@ export function ActionButton<A extends AnyAction>({
       >
         {children}
       </Button>
+      {error && (
+        <span role="alert" className="text-destructive text-xs">
+          {error}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export interface ActionMenuItem {
+  label: string;
+  action: AnyAction;
+  args?: unknown[];
+  confirm?: string;
+  destructive?: boolean;
+}
+
+/**
+ * The row drawer's "…" menu (the shared ItemMenu) for the Server Actions
+ * that are not the row's everyday one: Suppress, Not a duplicate, Delete.
+ * Each runs like an ActionButton (confirm first, the error beside the
+ * menu, refresh on success). Client parents add their own entries with
+ * `extra` (one that opens a form); destructive entries always come last.
+ */
+export function ActionMenu({
+  label,
+  items,
+  extra = [],
+}: {
+  label: string;
+  items: ActionMenuItem[];
+  extra?: ItemMenuEntry[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const run = (item: ActionMenuItem) => {
+    if (item.confirm && !window.confirm(item.confirm)) return;
+    setError(null);
+    start(async () => {
+      const result = await item.action(...(item.args ?? []));
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+  const entry = (item: ActionMenuItem): ItemMenuEntry => ({
+    label: item.label,
+    destructive: item.destructive,
+    disabled: pending,
+    onSelect: () => run(item),
+  });
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <ItemMenu
+        label={label}
+        items={[
+          ...items.filter((i) => !i.destructive).map(entry),
+          ...extra,
+          ...items.filter((i) => i.destructive).map(entry),
+        ]}
+      />
+      {pending && (
+        <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Working" />
+      )}
       {error && (
         <span role="alert" className="text-destructive text-xs">
           {error}

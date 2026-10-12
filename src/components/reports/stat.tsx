@@ -28,14 +28,14 @@ export function Stat({
       {detail ? <span className="text-muted-foreground text-xs">{detail}</span> : null}
     </>
   );
-  const base = "flex min-w-0 flex-col gap-0.5 rounded-lg bg-muted/50 px-3 py-2.5";
+  const base = "flex min-w-0 flex-col gap-0.5 rounded-xl bg-muted/50 px-3 py-2.5";
   if (href) {
     return (
       <Link
         href={href}
         className={cn(
           base,
-          "hover:bg-muted focus-visible:ring-ring/50 outline-none transition-colors focus-visible:ring-3",
+          "hover:bg-muted focus-visible:ring-ring/50 transition-colors outline-none focus-visible:ring-3",
           className,
         )}
       >

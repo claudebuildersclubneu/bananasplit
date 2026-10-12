@@ -30,6 +30,7 @@ import {
 import { ItemMenu } from "@/components/item-menu";
 import { PinToggle } from "@/components/pins/pins-context";
 import { copyPollLink } from "@/components/polls/copy-link";
+import { PollStatusBadge } from "@/components/polls/poll-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -217,7 +218,8 @@ export function QuestionPoll({
       {confirmElement}
 
       {/* ------------------------------------------------------------ header */}
-      <header className="bg-card space-y-4 rounded-xl border p-5 shadow-xs sm:p-6">
+      {/* Laid out like the find-a-time poll's header: title left, pin and "…" right. */}
+      <header className="space-y-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-2">
             <p className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-xs font-medium">
@@ -238,26 +240,20 @@ export function QuestionPoll({
               </p>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1.5">
             <PinToggle href={href} label={poll.question} />
             <ItemMenu
               label="Poll actions"
               items={[
                 { label: "Copy link", icon: Link2, onSelect: () => copyPollLink(href) },
+                // A closed poll's Reopen sits in the notice under the header, not here too.
                 poll.canManage &&
-                  (poll.isOpen
-                    ? {
-                        label: "Close poll",
-                        icon: Lock,
-                        onSelect: () => setClosed(true),
-                        disabled: isClosing,
-                      }
-                    : {
-                        label: "Reopen poll",
-                        icon: LockOpen,
-                        onSelect: () => setClosed(false),
-                        disabled: isClosing,
-                      }),
+                  poll.isOpen && {
+                    label: "Close poll",
+                    icon: Lock,
+                    onSelect: () => setClosed(true),
+                    disabled: isClosing,
+                  },
                 poll.canManage && {
                   label: "Delete",
                   icon: Trash2,
@@ -270,17 +266,9 @@ export function QuestionPoll({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {poll.isOpen ? (
-            <Badge variant="outline" className="gap-1.5">
-              <span aria-hidden className="bg-success size-1.5 rounded-full" />
-              Open
-            </Badge>
-          ) : (
-            <Badge variant="secondary">
-              <Lock aria-hidden />
-              Closed
-            </Badge>
-          )}
+          <PollStatusBadge tone={poll.isOpen ? "open" : "closed"}>
+            {poll.isOpen ? "Open" : "Closed"}
+          </PollStatusBadge>
           {poll.isOpen && poll.closesAt && (
             <span className="text-muted-foreground text-xs">
               Closes {moment(poll.closesAt, zone)}
@@ -468,7 +456,8 @@ function OptionRow({
         <span
           aria-hidden
           className={cn(
-            "mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-full",
+            "mt-0.5 grid size-[18px] shrink-0 place-items-center",
+            multiple ? "rounded-[5px]" : "rounded-full",
             selected ? "bg-primary text-primary-foreground" : "bg-muted",
           )}
         >
@@ -667,7 +656,7 @@ function AddOption({ orgId, pollId }: { orgId: string; pollId: string }) {
         <Button
           type="button"
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           aria-label="Stop adding options"
           onClick={close}
         >

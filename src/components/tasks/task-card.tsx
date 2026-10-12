@@ -52,7 +52,7 @@ export function TaskCard({ task, todayKey }: { task: TaskCardData; todayKey: str
   return (
     <div
       className={cn(
-        "bg-card w-full space-y-2 rounded-lg border p-3 text-sm shadow-sm transition-shadow duration-150 group-hover:shadow-md",
+        "bg-card group-hover:border-foreground/20 w-full space-y-2 rounded-xl border p-3 text-sm transition-colors duration-150",
         priv && "border-dashed",
         done && "opacity-70",
       )}

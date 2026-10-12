@@ -5,7 +5,7 @@ import { AlertTriangle, CalendarClock, CalendarX2, Globe, Plus } from "lucide-re
 import { bucketByDay, monthGridShape, type MonthCell } from "@/lib/calendar/grid";
 
 import { type CalendarItem, chipTime, itemLabel } from "./item";
-import { KIND_META, kindStyle, VISIBILITY_META } from "./kinds";
+import { itemStyle, KIND_META, VISIBILITY_META } from "./kinds";
 
 /**
  * The month view: a real <table>, Sunday first, one full-width chip per
@@ -138,8 +138,10 @@ function DayCell({
   chipProps?: (item: CalendarItem) => Record<string, unknown>;
   dayProps?: (dayKey: string) => Record<string, unknown>;
 }) {
-  const shown = items.length > MAX_CHIPS ? items.slice(0, MAX_CHIPS - 1) : items;
-  const hidden = items.length - shown.length;
+  // Events before tasks' due dates: tasks are a layer over the calendar.
+  const ordered = [...items.filter((i) => !i.task), ...items.filter((i) => i.task)];
+  const shown = ordered.length > MAX_CHIPS ? ordered.slice(0, MAX_CHIPS - 1) : ordered;
+  const hidden = ordered.length - shown.length;
 
   return (
     <td
@@ -209,8 +211,9 @@ function EventChip({
     <button
       type="button"
       className="cal-chip"
-      style={kindStyle(item.kind)}
-      data-internal={item.visibility === "INTERNAL" ? "true" : undefined}
+      style={itemStyle(item)}
+      data-internal={item.visibility === "INTERNAL" && !item.task ? "true" : undefined}
+      data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
       data-dragging={dragging ? "true" : undefined}
       aria-expanded={open}
       aria-label={itemLabel(item, kind.label, visibility.label)}
@@ -219,7 +222,11 @@ function EventChip({
     >
       <span className="cal-chip__line">
         <span aria-hidden className="cal-chip__dot" />
-        {!item.allDay && <span aria-hidden className="cal-chip__time">{chipTime(item)}</span>}
+        {!item.allDay && (
+          <span aria-hidden className="cal-chip__time">
+            {chipTime(item)}
+          </span>
+        )}
         <span aria-hidden className="cal-chip__title">
           {item.title}
         </span>
@@ -231,7 +238,7 @@ function EventChip({
           every chip in a 120px cell and said nothing either way.
         */}
         <span aria-hidden className="cal-chip__marks">
-          {item.visibility === "PUBLIC" && <Globe className="size-3" />}
+          {item.visibility === "PUBLIC" && !item.task && <Globe className="size-3" />}
           {showSync && item.syncState === "PENDING" && <CalendarClock className="size-3" />}
           {showSync && item.syncState === "FAILED" && <CalendarX2 className="size-3" />}
           {item.needsReview && <AlertTriangle className="size-3" />}
@@ -241,8 +248,17 @@ function EventChip({
   );
 }
 
-const monthFmt = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
-const longFmt = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+const monthFmt = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const longFmt = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
 /** "September 2026" from a "YYYY-MM" key. */
 export function monthLabel(monthKey: string): string {

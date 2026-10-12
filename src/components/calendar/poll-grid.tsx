@@ -190,7 +190,7 @@ export function PollGridFrame({
 
   return (
     <div
-      className="bg-background relative max-h-[min(70vh,44rem)] overflow-auto rounded-lg border"
+      className="bg-background relative max-h-[min(70vh,44rem)] overflow-auto rounded-xl border"
       data-slot="poll-grid"
     >
       <table

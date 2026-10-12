@@ -95,12 +95,12 @@ export async function generateStructured<S extends z.ZodObject>(
 function anthropicError(error: unknown, model: string, attachment: "image" | "pdf" | null): AiImportError {
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     return new AiImportError(
-      "Claude rejected the API key. An owner or admin can update it in Settings › Integrations.",
+      "Claude rejected the API key. An owner or admin can update it in Admin panel › Integrations.",
       502,
     );
   }
   if (error instanceof Anthropic.NotFoundError) {
-    return new AiImportError(`${model} isn't available to this API key. Pick another model in Settings.`, 502);
+    return new AiImportError(`${model} isn't available to this API key. Pick another model in the Admin panel.`, 502);
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new AiImportError("Claude is busy right now (rate limit). Try again in a minute.", 429);
@@ -287,12 +287,12 @@ async function openAiStructured<S extends z.ZodObject>(
 
   if (res.status === 401 || res.status === 403) {
     throw new AiImportError(
-      `${vendor} rejected the API key. An owner or admin can update it in Settings › Integrations.`,
+      `${vendor} rejected the API key. An owner or admin can update it in Admin panel › Integrations.`,
       502,
     );
   }
   if (res.status === 404) {
-    throw new AiImportError(`${vendor} doesn't know the model ${creds.model}. Check it in Settings › Integrations.`, 502);
+    throw new AiImportError(`${vendor} doesn't know the model ${creds.model}. Check it in Admin panel › Integrations.`, 502);
   }
   if (res.status === 429) throw new AiImportError(`${vendor} is busy right now (rate limit). Try again in a minute.`, 429);
   if (res.status === 400 || res.status === 413 || res.status === 422) {

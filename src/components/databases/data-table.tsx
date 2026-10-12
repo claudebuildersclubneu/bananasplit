@@ -7,15 +7,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns3,
-  Download,
   Filter,
   Loader2,
-  Search,
   X,
 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SearchField } from "@/components/ui/search-field";
+import { chipClass } from "@/components/ui/segmented";
 import {
   Select,
   SelectContent,
@@ -34,7 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 import { CellView } from "./cell";
@@ -46,7 +52,9 @@ import { addToList, removeFromList, useViewParams, withoutFilter } from "./view-
  * the shared grammar and the server page re-queries: sorting, filtering,
  * search, the date range, column visibility and pagination all run
  * server-side through the allowlisted query builder. No client-side
- * processing of the table.
+ * processing of the table. The toolbar is the everyday controls only;
+ * Export CSV and the admin pages live in the page header's "…" menu
+ * (DatabaseMenu).
  */
 
 export interface AppliedFilterView {
@@ -70,10 +78,6 @@ export interface DataTableProps {
   to?: string;
   /** Label of the column ?from= / ?to= filter, when the database has one. */
   dateLabel?: string;
-  /** The export route; the current view's query is appended. */
-  exportHref?: string;
-  /** Extra toolbar content (admin actions). */
-  toolbar?: ReactNode;
   emptyTitle?: string;
   selectedRowId?: string;
 }
@@ -119,11 +123,20 @@ function FilterChip({
   column?: ColumnView;
   onRemove: () => void;
 }) {
+  // The shared chip shape; a default filter keeps the outline, one you added is filled.
   return (
-    <Badge variant={filter.isDefault ? "outline" : "secondary"} className="h-6 gap-1 pr-1">
+    <span
+      className={cn(
+        chipClass(false),
+        "text-foreground hover:text-foreground gap-1 pr-1 hover:bg-transparent",
+        !filter.isDefault && "bg-muted hover:bg-muted border-transparent",
+      )}
+    >
       <span className="font-medium">{column?.label ?? filter.col}</span>
       {filter.op === "isnull" ? (
-        <span className="text-muted-foreground">{filter.value === "false" ? "is set" : "is empty"}</span>
+        <span className="text-muted-foreground">
+          {filter.value === "false" ? "is set" : "is empty"}
+        </span>
       ) : (
         <>
           <span className="text-muted-foreground">{SHORT_OPS[filter.op] ?? filter.op}</span>
@@ -134,16 +147,22 @@ function FilterChip({
       <button
         type="button"
         onClick={onRemove}
-        className="hover:bg-muted ml-0.5 rounded p-0.5"
+        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 grid size-5 place-items-center rounded-md"
         aria-label={`Remove filter ${column?.label ?? filter.col}`}
       >
-        <X className="size-3" />
+        <X className="size-3" aria-hidden="true" />
       </button>
-    </Badge>
+    </span>
   );
 }
 
-function FilterBuilder({ columns, onAdd }: { columns: ColumnView[]; onAdd: (raw: string) => void }) {
+function FilterBuilder({
+  columns,
+  onAdd,
+}: {
+  columns: ColumnView[];
+  onAdd: (raw: string) => void;
+}) {
   const filterable = columns.filter((c) => c.filterable && c.ops.length > 0);
   const [open, setOpen] = useState(false);
   const [col, setCol] = useState(filterable[0]?.key ?? "");
@@ -243,7 +262,7 @@ function FilterBuilder({ columns, onAdd }: { columns: ColumnView[]; onAdd: (raw:
               </SelectContent>
             </Select>
           ) : hasOptions && op === "in" ? (
-            <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border p-2">
+            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
               {column?.options?.map((o) => {
                 const list = value.split(",").filter(Boolean);
                 const checked = list.includes(o.value);
@@ -254,7 +273,9 @@ function FilterBuilder({ columns, onAdd }: { columns: ColumnView[]; onAdd: (raw:
                       checked={checked}
                       onChange={() =>
                         setValue(
-                          (checked ? list.filter((v) => v !== o.value) : [...list, o.value]).join(","),
+                          (checked ? list.filter((v) => v !== o.value) : [...list, o.value]).join(
+                            ",",
+                          ),
                         )
                       }
                     />
@@ -346,14 +367,6 @@ export function DataTable(props: DataTableProps) {
     });
   };
 
-  const exportQuery = (() => {
-    const p = new URLSearchParams(view.params.toString());
-    p.delete("row");
-    p.delete("page");
-    if (!p.get("cols")) p.set("cols", visible.map((c) => c.key).join(","));
-    return p.toString();
-  })();
-
   const pages = Math.max(1, Math.ceil(total / size));
   const first = total === 0 ? 0 : (page - 1) * size + 1;
   const last = Math.min(total, page * size);
@@ -361,19 +374,12 @@ export function DataTable(props: DataTableProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2"
-            aria-hidden="true"
-          />
-          <Input
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search…"
-            className="w-56 pl-8"
-            aria-label="Search this database"
-          />
-        </div>
+        <SearchField
+          value={search}
+          onValueChange={onSearch}
+          placeholder="Search…"
+          aria-label="Search this database"
+        />
         <FilterBuilder
           columns={columns}
           onAdd={(raw) =>
@@ -385,7 +391,12 @@ export function DataTable(props: DataTableProps) {
           }
         />
         {props.dateLabel && (
-          <div className="flex items-center gap-1">
+          <div
+            role="group"
+            aria-label={`${props.dateLabel} range`}
+            className="flex items-center gap-1.5"
+          >
+            <span className="text-muted-foreground text-xs">{props.dateLabel}</span>
             <Input
               type="date"
               aria-label={`${props.dateLabel} from`}
@@ -393,11 +404,15 @@ export function DataTable(props: DataTableProps) {
               defaultValue={props.from ?? ""}
               key={`from-${props.from ?? ""}`}
               onChange={(e) =>
-                view.update((p) => (e.target.value ? p.set("from", e.target.value) : p.delete("from")))
+                view.update((p) =>
+                  e.target.value ? p.set("from", e.target.value) : p.delete("from"),
+                )
               }
-              className="w-36"
+              className="h-7 w-36 text-sm"
             />
-            <span className="text-muted-foreground text-sm">–</span>
+            <span className="text-muted-foreground text-sm" aria-hidden="true">
+              –
+            </span>
             <Input
               type="date"
               aria-label={`${props.dateLabel} to`}
@@ -407,7 +422,7 @@ export function DataTable(props: DataTableProps) {
               onChange={(e) =>
                 view.update((p) => (e.target.value ? p.set("to", e.target.value) : p.delete("to")))
               }
-              className="w-36"
+              className="h-7 w-36 text-sm"
             />
           </div>
         )}
@@ -434,16 +449,9 @@ export function DataTable(props: DataTableProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        {props.exportHref && (
-          <Button variant="outline" size="sm" asChild>
-            <a href={`${props.exportHref}${exportQuery ? `?${exportQuery}` : ""}`} download>
-              <Download aria-hidden="true" />
-              Export CSV
-            </a>
-          </Button>
+        {view.pending && (
+          <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Loading" />
         )}
-        {view.pending && <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Loading" />}
-        <div className="ml-auto flex flex-wrap items-center gap-2">{props.toolbar}</div>
       </div>
 
       {(filters.length > 0 || props.q || props.from || props.to) && (
@@ -477,12 +485,15 @@ export function DataTable(props: DataTableProps) {
       )}
 
       {rejected.length > 0 && (
-        <p role="status" className="border-warning/40 bg-warning/10 rounded-md border px-3 py-2 text-xs">
+        <p
+          role="status"
+          className="border-warning/40 bg-warning/10 rounded-xl border px-3 py-2 text-xs"
+        >
           Ignored: {rejected.map((r) => `${r.part} (${r.reason})`).join("; ")}
         </p>
       )}
 
-      <div className="rounded-lg border">
+      <div className="rounded-xl border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -511,7 +522,10 @@ export function DataTable(props: DataTableProps) {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visible.length} className="text-muted-foreground h-24 text-center">
+                <TableCell
+                  colSpan={visible.length}
+                  className="text-muted-foreground h-24 text-center"
+                >
                   {props.emptyTitle ?? "No rows match this view."}
                 </TableCell>
               </TableRow>
@@ -521,10 +535,13 @@ export function DataTable(props: DataTableProps) {
                   key={r.id}
                   data-state={props.selectedRowId === r.id ? "selected" : undefined}
                   className={cn("cursor-pointer", r.dim && "opacity-60")}
-                  onClick={() => view.update((p) => p.set("row", r.id), { keepPage: true, push: true })}
+                  onClick={() =>
+                    view.update((p) => p.set("row", r.id), { keepPage: true, push: true })
+                  }
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") view.update((p) => p.set("row", r.id), { keepPage: true, push: true });
+                    if (e.key === "Enter")
+                      view.update((p) => p.set("row", r.id), { keepPage: true, push: true });
                   }}
                 >
                   {visible.map((c) => (
@@ -534,7 +551,8 @@ export function DataTable(props: DataTableProps) {
                         "max-w-72 align-top whitespace-normal",
                         c.align === "right" && "text-right",
                         (c.type === "datetime" || c.type === "date") && "whitespace-nowrap",
-                        (c.type === "text" || c.type === "person" || c.type === "relation") && "min-w-36",
+                        (c.type === "text" || c.type === "person" || c.type === "relation") &&
+                          "min-w-36",
                       )}
                     >
                       <CellView cell={r.cells[c.key] ?? null} />
@@ -549,14 +567,18 @@ export function DataTable(props: DataTableProps) {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">
-          {total === 0 ? "No rows" : `${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()}`}
+          {total === 0
+            ? "No rows"
+            : `${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()}`}
         </span>
         <div className="flex items-center gap-2">
           <Select
             value={String(size)}
-            onValueChange={(v) => view.update((p) => (v === "50" ? p.delete("size") : p.set("size", v)))}
+            onValueChange={(v) =>
+              view.update((p) => (v === "50" ? p.delete("size") : p.set("size", v)))
+            }
           >
-            <SelectTrigger className="h-8 w-28" aria-label="Rows per page">
+            <SelectTrigger size="sm" className="w-28" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -571,7 +593,12 @@ export function DataTable(props: DataTableProps) {
             variant="outline"
             size="icon-sm"
             disabled={page <= 1}
-            onClick={() => view.update((p) => (page - 1 <= 1 ? p.delete("page") : p.set("page", String(page - 1))), { keepPage: true })}
+            onClick={() =>
+              view.update(
+                (p) => (page - 1 <= 1 ? p.delete("page") : p.set("page", String(page - 1))),
+                { keepPage: true },
+              )
+            }
             aria-label="Previous page"
           >
             <ChevronLeft />

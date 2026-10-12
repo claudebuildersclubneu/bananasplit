@@ -12,7 +12,7 @@ import { notifyUsers } from "@/server/notifications";
 import { clearAccessToken } from "./token";
 
 export const REAUTH_MESSAGE =
-  "Google refused the saved authorization (invalid_grant). Reconnect Google Calendar in Settings > Integrations.";
+  "Google refused the saved authorization (invalid_grant). Reconnect Google Calendar in Admin panel › Integrations.";
 
 /**
  * invalid_grant: marks the org's Google integration NEEDS_REAUTH and alerts
@@ -55,7 +55,7 @@ export async function markNeedsReauth(organizationId: string, detail: unknown = 
         title: "Google Calendar needs to be reconnected",
         body:
           "Google stopped accepting the club's calendar connection, so event changes are not reaching Google Calendar. " +
-          "An owner or admin can reconnect it in Settings > Integrations; changes made meanwhile sync after you press Sync now.",
+          "An owner or admin can reconnect it in Admin panel › Integrations; changes made meanwhile sync after you press Sync now.",
         linkUrl: org ? `/app/${org.slug}/settings/integrations` : null,
       },
     );

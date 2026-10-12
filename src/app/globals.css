@@ -237,11 +237,6 @@
   text-shadow: 0.055em 0.045em 0 var(--brand-accent);
 }
 
-/* A primary button's bottom edge: its own ink, a shade darker, in any theme. */
-@utility ink-edge {
-  box-shadow: inset 0 -2px 0 oklch(from var(--primary) calc(l - 0.09) c h);
-}
-
 /* Printer's crop marks outside an element's corners. */
 @utility crop-marks {
   position: relative;

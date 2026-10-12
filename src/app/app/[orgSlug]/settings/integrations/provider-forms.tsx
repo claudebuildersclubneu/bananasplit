@@ -29,7 +29,7 @@ import {
 } from "./actions";
 import { FeedbackLine, SecretInput, feedbackOf, type Feedback } from "./integration-ui";
 
-const selectClass = "border-input bg-background h-9 w-full rounded-md border px-3 text-sm";
+const selectClass = "border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm";
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -98,7 +98,8 @@ export function AiModelForm({
           ))}
         </select>
         <p className="text-muted-foreground text-xs">
-          Bananasplit only ever calls the provider&apos;s official address ({vendor.baseUrl.replace("https://", "")}).
+          Bananasplit only ever calls the provider&apos;s official address (
+          {vendor.baseUrl.replace("https://", "")}).
         </p>
       </div>
       <SecretInput
@@ -122,8 +123,8 @@ export function AiModelForm({
           disabled={!canWrite}
         />
         <p className="text-muted-foreground text-xs">
-          The model id exactly as {vendor.label} lists it. Pick one that can read images if you&apos;ll import calendar
-          screenshots. Usage is billed to your {vendor.label} account.
+          The model id exactly as {vendor.label} lists it. Pick one that can read images if
+          you&apos;ll import calendar screenshots. Usage is billed to your {vendor.label} account.
         </p>
       </div>
       {canWrite && (
@@ -194,10 +195,14 @@ export function ClaudeForm({
           })}
         </select>
         <p className="text-muted-foreground text-xs">
-          {selected?.note} About {perImport !== null ? formatUsd(perImport) : "—"} per import of a chart the size
-          of a club board&apos;s ({selected ? `$${selected.inputPerMTok} in / $${selected.outputPerMTok} out per million
-          tokens` : "list price"}), billed to your Anthropic account. Most documents never reach Claude at all: the
-          portal reads them itself, for nothing.
+          {selected?.note} About {perImport !== null ? formatUsd(perImport) : "—"} per import of a
+          chart the size of a club board&apos;s (
+          {selected
+            ? `$${selected.inputPerMTok} in / $${selected.outputPerMTok} out per million
+          tokens`
+            : "list price"}
+          ), billed to your Anthropic account. Most documents never reach Claude at all: the portal
+          reads them itself, for nothing.
         </p>
       </div>
       {selected?.serverFallbacks && (

@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const creds = await resolveAiCredentials(orgId, upload.fields.connection);
   if (!creds) {
     return json(409, {
-      error: "No AI model is connected yet. An owner or admin can connect one in Settings › Integrations.",
+      error: "No AI model is connected yet. An owner or admin can connect one in Admin panel › Integrations.",
       code: "no-connection",
     });
   }

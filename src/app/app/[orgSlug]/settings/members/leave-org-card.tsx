@@ -29,7 +29,10 @@ export function LeaveOrgCard({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+    <section
+      id="leave"
+      className="flex scroll-mt-20 flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+    >
       <div>
         <h2 className="text-sm font-medium">Leave {orgName}</h2>
         <p className="text-muted-foreground text-xs">

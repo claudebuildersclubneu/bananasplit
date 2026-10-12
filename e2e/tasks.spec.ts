@@ -22,7 +22,11 @@ async function readTaskLink(to: string, title: string, timeoutMs = 30_000): Prom
   while (Date.now() < deadline) {
     let names: string[] = [];
     try {
-      names = (await readdir(MAIL_DIR)).filter((n) => n.endsWith(".json")).sort().reverse().slice(0, 50);
+      names = (await readdir(MAIL_DIR))
+        .filter((n) => n.endsWith(".json"))
+        .sort()
+        .reverse()
+        .slice(0, 50);
     } catch {
       names = [];
     }
@@ -52,14 +56,17 @@ test("a handed-down task emails a deep link that survives sign-in", async ({ pag
   await signIn(page, oliver);
   await page.goto(`/app/${ORG}/tasks?view=board`);
   await page.getByRole("button", { name: "Add a task to Not started" }).click();
-  await page.getByLabel("Title").fill(title);
-  await page.getByLabel("Owner").click();
+  await page.getByLabel("Title", { exact: true }).fill(title);
+  await page.getByLabel("Owner", { exact: true }).click();
   await page.getByRole("option", { name: /Alex Green/ }).click();
-  await page.getByLabel("Due date").fill(inDays(14));
-  await page.getByRole("button", { name: "Save" }).click();
+  // The due date menu reads a typed date (here YYYY-MM-DD) on Enter.
+  await page.getByLabel("Due date", { exact: true }).click();
+  await page.getByLabel("Type a date").fill(inDays(14));
+  await page.getByLabel("Type a date").press("Enter");
+  await page.getByRole("button", { name: "Create task" }).click();
   // (The owner popover is also a role=dialog while it animates out.)
   await expect(page.getByRole("dialog", { name: "New task" })).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByRole("button", { name: new RegExp(title) })).toBeVisible();
+  await expect(page.getByRole("button", { name: title, exact: true })).toBeVisible();
 
   const link = await readTaskLink(alex.email, title);
   await signOut(page);
@@ -71,7 +78,8 @@ test("a handed-down task emails a deep link that survives sign-in", async ({ pag
   await page.getByLabel("Password").fill(alex.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL(new RegExp(`${link}$`));
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  // The page opens straight onto the task's form; its title is the first field.
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
   await expect(page.getByText("Created by")).toBeVisible();
 
   // Alex owns it now; clean up.

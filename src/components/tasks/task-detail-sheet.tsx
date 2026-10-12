@@ -1,15 +1,7 @@
 "use client";
 
-import { PinToggle } from "@/components/pins/pins-context";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
-import { isTaskPrivate, PrivateBadge } from "./task-badges";
 import { TaskEditor, type TaskEditorDefaults } from "./task-editor";
 import type { TaskItem } from "./types";
 
@@ -23,7 +15,8 @@ import type { TaskItem } from "./types";
  *
  * It renders once, at the top of the workspace, and every layout opens it
  * through useTasks().openTask / showTask. Purely presentational: the
- * provider owns which task is shown.
+ * provider owns which task is shown, and the editor draws the panel's
+ * header, body and footer.
  */
 export function TaskDetailSheet({
   open,
@@ -40,43 +33,32 @@ export function TaskDetailSheet({
   onOpenTask: (taskId: string) => void;
   busy?: boolean;
 }) {
-  const heading = task
-    ? task.parentTaskId
-      ? "Subtask"
-      : "Task"
-    : defaults?.parentTaskId
-      ? "New subtask"
-      : "New task";
+  const heading = task ? task.title : defaults?.parentTaskId ? "New subtask" : "New task";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         aria-busy={busy}
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl"
+        showCloseButton={false}
+        className="bg-background gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[460px]"
       >
-        <SheetHeader className="bg-popover/95 sticky top-0 z-10 flex-row items-center gap-2 border-b px-4 py-3 pe-12 supports-backdrop-filter:backdrop-blur">
-          <SheetTitle className="text-sm font-medium">{heading}</SheetTitle>
-          {task && isTaskPrivate(task) && <PrivateBadge />}
-          {task && <PinToggle path={`/tasks/${task.id}`} label={task.title} className="ms-auto" />}
-          <SheetDescription className="sr-only">
-            Edit this task, its people, its subtasks, its comments and who can see it.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="px-4 py-5">
-          {open && (
-            <TaskEditor
-              key={
-                task?.id ??
-                `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.projectId ?? ""}-${defaults?.dueDate ?? ""}`
-              }
-              task={task}
-              defaults={defaults}
-              onDone={() => onOpenChange(false)}
-              onOpenTask={onOpenTask}
-            />
-          )}
-        </div>
+        <SheetTitle className="sr-only">{heading}</SheetTitle>
+        <SheetDescription className="sr-only">
+          Edit this task, its people, its subtasks, its comments and who can see it.
+        </SheetDescription>
+        {open && (
+          <TaskEditor
+            key={
+              task?.id ??
+              `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.projectId ?? ""}-${defaults?.dueDate ?? ""}`
+            }
+            task={task}
+            defaults={defaults}
+            onDone={() => onOpenChange(false)}
+            onOpenTask={onOpenTask}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );

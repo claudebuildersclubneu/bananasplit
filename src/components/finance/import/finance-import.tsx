@@ -54,12 +54,19 @@ export interface FinanceImportProps {
 type Stage =
   | { step: "source" }
   | { step: "reading"; what: string }
-  | { step: "columns"; sheets: SheetData[]; sheetIndex: number; mapping: SheetMapping; labels: Map<string, ValueLabel> }
+  | {
+      step: "columns";
+      sheets: SheetData[];
+      sheetIndex: number;
+      mapping: SheetMapping;
+      labels: Map<string, ValueLabel>;
+    }
   | { step: "review"; rows: ImportRow[]; back: Stage | null }
   | { step: "budget"; lines: BudgetLine[]; back: Stage | null }
   | { step: "done"; summary: ImportSummary };
 
-const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/csv,application/pdf,image/*";
+const ACCEPT =
+  ".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/csv,application/pdf,image/*";
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 
 const TEMPLATE = [
@@ -93,7 +100,13 @@ export function FinanceImport(props: FinanceImportProps) {
   const ai = useAiConnections(orgId, true);
 
   const toReview = useCallback(
-    (sheets: SheetData[], sheetIndex: number, mapping: SheetMapping, labels: Map<string, ValueLabel>, back: Stage) => {
+    (
+      sheets: SheetData[],
+      sheetIndex: number,
+      mapping: SheetMapping,
+      labels: Map<string, ValueLabel>,
+      back: Stage,
+    ) => {
       const sheet = sheets[sheetIndex];
       if (mapping.kind === "budget") {
         setStage({ step: "budget", lines: applyBudgetMapping(sheet, mapping), back });
@@ -107,15 +120,24 @@ export function FinanceImport(props: FinanceImportProps) {
   function openTable(sheets: SheetData[]) {
     const visible = sheets.findIndex((s) => !s.hidden);
     const first = visible >= 0 ? visible : 0;
-    const best = sheets.reduce((b, s, i) => (!s.hidden && s.rows.length > sheets[b].rows.length ? i : b), first);
-    setStage({ step: "columns", sheets, sheetIndex: best, mapping: guessMapping(sheets[best], today), labels: new Map() });
+    const best = sheets.reduce(
+      (b, s, i) => (!s.hidden && s.rows.length > sheets[b].rows.length ? i : b),
+      first,
+    );
+    setStage({
+      step: "columns",
+      sheets,
+      sheetIndex: best,
+      mapping: guessMapping(sheets[best], today),
+      labels: new Map(),
+    });
   }
 
   async function readDocument(body: FormData | { mode: "text"; text: string }, what: string) {
     if (!ai.selected) {
       setError(
         ai.list && ai.list.length === 0
-          ? "Reading PDFs, photos and pasted history needs an AI model. An owner or admin can connect one in Settings › Integrations, or export the data as CSV."
+          ? "Reading PDFs, photos and pasted history needs an AI model. An owner or admin can connect one in Admin panel › Integrations, or export the data as CSV."
           : "Still checking which AI model is connected. Try again in a moment.",
       );
       return;
@@ -126,9 +148,13 @@ export function FinanceImport(props: FinanceImportProps) {
         method: "POST",
         ...(body instanceof FormData
           ? { body }
-          : { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, connection: ai.selected.id }) }),
+          : {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...body, connection: ai.selected.id }),
+            }),
       });
-      const json = (await res.json().catch(() => null)) as (DocumentRead & { readBy?: string; error?: string }) | null;
+      const json = (await res.json().catch(() => null)) as
+        (DocumentRead & { readBy?: string; error?: string }) | null;
       if (!res.ok || !json) throw new Error(json?.error ?? "That couldn't be read. Try again.");
       setReadBy(json.readBy ?? null);
       setNotes(json.notes ?? []);
@@ -166,7 +192,11 @@ export function FinanceImport(props: FinanceImportProps) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       openTable(readTableFile(file.name, bytes));
     } catch (e) {
-      setError(e instanceof SpreadsheetError ? e.message : "That file couldn't be opened. Try CSV or .xlsx.");
+      setError(
+        e instanceof SpreadsheetError
+          ? e.message
+          : "That file couldn't be opened. Try CSV or .xlsx.",
+      );
     }
   }
 
@@ -203,7 +233,10 @@ export function FinanceImport(props: FinanceImportProps) {
   return (
     <div className="space-y-5">
       {!props.embedded && (
-        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label="Import steps">
+        <ol
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+          aria-label="Import steps"
+        >
           {STEPS.map((s, i) => (
             <li key={s} className="flex items-center gap-2">
               <span
@@ -217,7 +250,9 @@ export function FinanceImport(props: FinanceImportProps) {
               >
                 {i + 1}
               </span>
-              <span className={cn(i === current ? "font-medium" : "text-muted-foreground")}>{s}</span>
+              <span className={cn(i === current ? "font-medium" : "text-muted-foreground")}>
+                {s}
+              </span>
               {i < STEPS.length - 1 && <span className="bg-border h-px w-6" aria-hidden="true" />}
             </li>
           ))}
@@ -225,7 +260,10 @@ export function FinanceImport(props: FinanceImportProps) {
       )}
 
       {error && (
-        <p role="alert" className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-3 text-sm">
+        <p
+          role="alert"
+          className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm"
+        >
           {error}
         </p>
       )}
@@ -252,8 +290,8 @@ export function FinanceImport(props: FinanceImportProps) {
             <div className="space-y-1">
               <p className="font-medium">Drop a spreadsheet, a bank export, a PDF or a photo</p>
               <p className="text-muted-foreground text-sm">
-                CSV, Excel (.xlsx), a Venmo or bank statement, receipts, last year&apos;s budget. Anything you kept money
-                records in.
+                CSV, Excel (.xlsx), a Venmo or bank statement, receipts, last year&apos;s budget.
+                Anything you kept money records in.
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -261,7 +299,12 @@ export function FinanceImport(props: FinanceImportProps) {
                 <Upload className="size-4" aria-hidden="true" />
                 Choose a file
               </Button>
-              <Button type="button" variant="outline" onClick={() => setPasting((p) => !p)} aria-expanded={pasting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPasting((p) => !p)}
+                aria-expanded={pasting}
+              >
                 <ClipboardPaste className="size-4" aria-hidden="true" />
                 Paste rows
               </Button>
@@ -287,7 +330,9 @@ export function FinanceImport(props: FinanceImportProps) {
                 value={pasted}
                 onChange={(e) => setPasted(e.target.value)}
                 rows={8}
-                placeholder={"Copy rows from Google Sheets or Excel (with the header row) and paste them here.\nOr paste a Venmo or bank history: the AI model reads it."}
+                placeholder={
+                  "Copy rows from Google Sheets or Excel (with the header row) and paste them here.\nOr paste a Venmo or bank history: the AI model reads it."
+                }
                 aria-label="Pasted rows"
                 className="font-mono text-xs"
               />
@@ -303,15 +348,20 @@ export function FinanceImport(props: FinanceImportProps) {
             <p className="flex items-start gap-2">
               <ShieldCheck className="mt-px size-4 shrink-0" aria-hidden="true" />
               <span>
-                Spreadsheets are opened here in your browser; the file isn&apos;t uploaded. You check every row, and only
-                the ones you import are saved.
+                Spreadsheets are opened here in your browser; the file isn&apos;t uploaded. You
+                check every row, and only the ones you import are saved.
               </span>
             </p>
             <p className="flex items-start gap-2">
               <FileText className="mt-px size-4 shrink-0" aria-hidden="true" />
               <span>
-                PDFs and photos are read by your club&apos;s AI model ({ai.selected ? ai.selected.label : "when one is connected"}).{" "}
-                <button type="button" onClick={downloadTemplate} className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline">
+                PDFs and photos are read by your club&apos;s AI model (
+                {ai.selected ? ai.selected.label : "when one is connected"}).{" "}
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                >
                   <Download className="size-3" aria-hidden="true" />
                   Download a template
                 </button>
@@ -322,11 +372,15 @@ export function FinanceImport(props: FinanceImportProps) {
       )}
 
       {stage.step === "reading" && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border px-6 py-12 text-center" aria-live="polite">
+        <div
+          className="flex flex-col items-center gap-3 rounded-xl border px-6 py-12 text-center"
+          aria-live="polite"
+        >
           <Loader2 className="text-primary size-6 animate-spin" aria-hidden="true" />
           <p className="font-medium">Reading {stage.what}…</p>
           <p className="text-muted-foreground text-sm">
-            {ai.selected?.label ?? "The AI model"} is listing the money records. This can take up to a minute.
+            {ai.selected?.label ?? "The AI model"} is listing the money records. This can take up to
+            a minute.
           </p>
         </div>
       )}
@@ -355,7 +409,9 @@ export function FinanceImport(props: FinanceImportProps) {
             setReadBy(null);
             setNotes([]);
           }}
-          onContinue={() => toReview(stage.sheets, stage.sheetIndex, stage.mapping, stage.labels, stage)}
+          onContinue={() =>
+            toReview(stage.sheets, stage.sheetIndex, stage.mapping, stage.labels, stage)
+          }
         />
       )}
 
@@ -411,7 +467,15 @@ export function FinanceImport(props: FinanceImportProps) {
   );
 }
 
-function toLabelMap(labels: readonly { column: number; value: string; category: string | null; kind: ValueLabel["kind"] }[]) {
-  return new Map(labels.map((l) => [labelKey(l.column, l.value), { category: l.category, kind: l.kind }]));
+function toLabelMap(
+  labels: readonly {
+    column: number;
+    value: string;
+    category: string | null;
+    kind: ValueLabel["kind"];
+  }[],
+) {
+  return new Map(
+    labels.map((l) => [labelKey(l.column, l.value), { category: l.category, kind: l.kind }]),
+  );
 }
-

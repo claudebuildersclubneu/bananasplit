@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/shell/app-shell";
-import { navSections, settingsLink } from "@/components/shell/nav-config";
+import { navSections } from "@/components/shell/nav-config";
 import type { OrgSummary } from "@/components/shell/types";
 import { OrgBrand } from "@/components/theme/org-brand";
 import { OrgThemeRoot } from "@/components/theme/org-theme-root";
@@ -107,7 +107,10 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
   // The org's OrgTheme row rides along with the per-request org context
   // (React cache()), resolved and re-validated as strict hex before render;
   // the member's personal theme (profile setup A4) goes on top of it.
-  const theme = applyPersonalTheme(resolveTheme(ctx.theme), parsePersonalTheme(prefs.themePreference));
+  const theme = applyPersonalTheme(
+    resolveTheme(ctx.theme),
+    parsePersonalTheme(prefs.themePreference),
+  );
   const pins = await withOrgTx(ctx.organization.id, ({ db }) =>
     listPins(db, ctx.organization.id, ctx.organization.slug, ctx.user.id),
   );
@@ -121,7 +124,6 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
         user={shellUser}
         pins={pins}
         sections={navSections(ctx.organization.slug, visibleSidebar(ctx.settings?.sidebar))}
-        settings={settingsLink(ctx.organization.slug)}
         sectionPaths={resolveSidebar(ctx.settings?.sidebar)
           .flatMap((g) => g.items)
           .map((i) => ({
@@ -129,19 +131,19 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
             label: i.label,
             defaultLabel: i.defaultLabel,
             path: i.path,
+            also: i.also,
             hidden: i.hidden,
             icon: i.icon,
             description: i.description,
           }))}
         role={ctx.role}
         isAdmin={can({ role: ctx.role }, "settings.view")}
+        canInvite={can({ role: ctx.role }, "members.invite")}
         brand={
           <OrgBrand
             name={ctx.organization.name}
             logo={ctx.organization.logo}
             display={theme.logoDisplay}
-            href={`/app/${ctx.organization.slug}`}
-            hideNameOnly
           />
         }
       >

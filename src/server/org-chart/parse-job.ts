@@ -189,7 +189,7 @@ export const claudeParseJob: JobHandler<ClaudeParsePayload> = async (run): Promi
     const config = await getClaudeConfig(orgId);
     if (!config) {
       throw new ClaudeParseError(
-        "Add a Claude API key in Settings > Integrations to have Claude read this document.",
+        "Add a Claude API key in Admin panel › Integrations to have Claude read this document.",
         false,
       );
     }

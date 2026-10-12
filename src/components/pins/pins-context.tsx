@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, Loader2, Pin, Search } from "lucide-react";
+import { Check, FileText, Loader2, Pin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, useTransition } from "react";
 
@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
+import { chipClass } from "@/components/ui/segmented";
 import type { PinKind } from "@/lib/pins/pages";
 import { cn } from "@/lib/utils";
 
@@ -134,7 +135,7 @@ export function PinToggle({
       }}
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
-        "bg-background/90 hover:bg-accent text-muted-foreground grid size-7 shrink-0 place-items-center rounded-md border shadow-xs transition-opacity",
+        "bg-background/90 hover:bg-muted text-muted-foreground hover:text-foreground grid size-7 shrink-0 place-items-center rounded-lg transition-opacity",
         className,
         // A pinned item always shows its pin, even where the toggle only appears on hover.
         on && "text-primary opacity-100",
@@ -174,7 +175,11 @@ function PickerRow({ item }: { item: PinnableItem }) {
             on ? "border-primary/40 text-primary" : "text-muted-foreground",
           )}
         >
-          {on ? <Check className="size-3.5" aria-hidden="true" /> : <Pin className="size-3.5" aria-hidden="true" />}
+          {on ? (
+            <Check className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Pin className="size-3.5" aria-hidden="true" />
+          )}
           {on ? "Pinned" : "Pin"}
         </span>
       </button>
@@ -183,7 +188,13 @@ function PickerRow({ item }: { item: PinnableItem }) {
 }
 
 /** "Pin something": search notes, files, folders, tasks, events, people, pages... and pin any of them. */
-function PinPicker({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function PinPicker({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const orgId = usePins()?.orgId ?? null;
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<PinnableGroup[] | null>(null);
@@ -233,17 +244,19 @@ function PinPicker({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
           </DialogDescription>
         </DialogHeader>
         <div className="relative">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
-          <Input
+          <SearchField
             autoFocus
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             placeholder="Search everything"
             aria-label="Search everything you can pin"
-            className="pl-8"
+            className="sm:w-full"
           />
           {loading && (
-            <Loader2 className="text-muted-foreground absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin" aria-hidden="true" />
+            <Loader2
+              className="text-muted-foreground absolute top-1/2 right-8 size-4 -translate-y-1/2 animate-spin"
+              aria-hidden="true"
+            />
           )}
         </div>
         {groups && groups.length > 0 && (
@@ -254,10 +267,7 @@ function PinPicker({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
                 type="button"
                 aria-pressed={filter === g.id}
                 onClick={() => setFilter(g.id)}
-                className={cn(
-                  "shrink-0 rounded-full border px-2.5 py-1 text-xs",
-                  filter === g.id ? "bg-primary text-primary-foreground border-transparent" : "hover:bg-muted",
-                )}
+                className={chipClass(filter === g.id)}
               >
                 {g.label}
               </button>
@@ -268,11 +278,13 @@ function PinPicker({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
           {groups === null ? (
             <p className="text-muted-foreground py-8 text-center text-sm">Loading…</p>
           ) : shown.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">Nothing matches “{query}”.</p>
+            <p className="text-muted-foreground py-8 text-center text-sm">
+              Nothing matches “{query}”.
+            </p>
           ) : (
             shown.map((g) => (
               <section key={g.id} className="mb-3">
-                <h3 className="text-muted-foreground px-2.5 pb-1 text-[11px] font-semibold tracking-wide uppercase">{g.label}</h3>
+                <h3 className="eyebrow text-muted-foreground px-2.5 pb-1">{g.label}</h3>
                 <ul className="space-y-0.5">
                   {g.items.map((item) => (
                     <PickerRow key={item.href} item={item} />

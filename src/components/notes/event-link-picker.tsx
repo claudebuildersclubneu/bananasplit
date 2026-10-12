@@ -33,7 +33,7 @@ export function EventLinkPicker({
       onValueChange={(v) => onChange(v === "none" ? null : v)}
       disabled={disabled}
     >
-      <SelectTrigger className="w-56">
+      <SelectTrigger size="sm" className="w-56" aria-label="Linked event">
         <CalendarDays className="text-muted-foreground size-4" aria-hidden="true" />
         <SelectValue placeholder="Link an event" />
       </SelectTrigger>

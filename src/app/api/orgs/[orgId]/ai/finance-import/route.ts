@@ -54,7 +54,7 @@ function json(status: number, body: Record<string, unknown>): Response {
 }
 
 const NO_CONNECTION = {
-  error: "No AI model is connected yet. An owner or admin can connect one in Settings › Integrations.",
+  error: "No AI model is connected yet. An owner or admin can connect one in Admin panel › Integrations.",
   code: "no-connection",
 };
 

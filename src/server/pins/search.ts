@@ -28,8 +28,6 @@ const PAGES = [
   "/tasks?view=week&scope=mine",
   "/tasks?view=board",
   "/tasks?view=table",
-  "/tasks?view=calendar",
-  "/tasks?view=team",
   "/tasks?view=updates",
   "/tasks?view=intake",
   "/calendar",
@@ -83,7 +81,7 @@ export async function searchPinnables(
   groups.push({
     id: "folders",
     label: "Folders",
-    items: folders.map((f) => ({ href: `${base}/notes?folder=${f.id}`, label: f.name, kind: "folder" as const, detail: "Notes folder" })),
+    items: folders.map((f) => ({ href: `${base}/notes?folder=${f.id}`, label: f.name, kind: "folder" as const, detail: "Folder in Files" })),
   });
 
   const notes = await db.note.findMany({

@@ -1,0 +1,836 @@
+"use client";
+
+import {
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  Globe,
+  Lock,
+  Plus,
+  TriangleAlert,
+} from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState, type ReactNode } from "react";
+
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UserAvatar } from "@/components/user-avatar";
+import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
+import { relationFor } from "@/lib/tasks/assignment";
+import { addDaysToKey, weekdayOfKey } from "@/lib/tasks/dates";
+import { parseDueText, quickDues } from "@/lib/tasks/due-text";
+import { cn } from "@/lib/utils";
+
+import { STATUS_LABEL, STATUS_TOKEN } from "./layout-ui";
+import { useTasks } from "./tasks-context";
+import type { LabelOption, MemberOption, ProjectOption } from "./types";
+
+/**
+ * The task form's controls, drawn as the task drawer design has them: a
+ * label over each field, dropdown fields as tall rounded wells that open a
+ * menu, and the small fixed choices (status, priority, who can see it) as
+ * a row of segments. Everything takes the theme's tokens, so it follows the
+ * club's colours in light and dark.
+ */
+
+/* ------------------------------------------------------------- primitives */
+
+export function FieldLabel({
+  children,
+  htmlFor,
+  optional,
+  required,
+}: {
+  children: ReactNode;
+  htmlFor?: string;
+  optional?: boolean;
+  required?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between text-[13px] font-medium">
+      <label htmlFor={htmlFor} className="text-foreground/85">
+        {children}
+        {required && <span className="text-destructive"> *</span>}
+      </label>
+      {optional && (
+        <span className="text-muted-foreground/80 text-[11px] font-normal">Optional</span>
+      )}
+    </div>
+  );
+}
+
+/** A field: its label over its control. */
+export function Field({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("flex min-w-0 flex-col gap-2", className)}>{children}</div>;
+}
+
+/** The dropdown well's classes: open is outlined in the primary, empty reads quieter. */
+export function wellClass(open: boolean, empty = false) {
+  return cn(
+    "bg-card hover:bg-muted/60 hover:border-foreground/15 flex h-[42px] w-full min-w-0 items-center gap-2.5 overflow-hidden rounded-[11px] border px-3 text-left text-[13px] font-medium whitespace-nowrap transition-colors outline-none",
+    "focus-visible:border-primary/70 focus-visible:ring-primary/15 focus-visible:ring-3",
+    "disabled:pointer-events-none disabled:opacity-60",
+    open && "bg-muted/60 border-primary/70 ring-primary/15 ring-3",
+    empty && "text-muted-foreground font-normal",
+  );
+}
+
+const UpDown = () => (
+  <ChevronsUpDown
+    className="text-muted-foreground/70 ms-auto size-3.5 shrink-0"
+    aria-hidden="true"
+  />
+);
+
+/** A menu item's classes; the chosen one reads in the primary. */
+export function menuItemClass(on = false) {
+  return cn(
+    "hover:bg-muted focus-visible:bg-muted flex h-[34px] w-full min-w-0 items-center gap-2.5 rounded-md px-2 text-left text-[13px] font-medium outline-none",
+    on ? "text-primary" : "text-foreground/90",
+  );
+}
+
+export function MenuHeading({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-muted-foreground px-2 pt-1.5 pb-1 text-[11px] font-semibold tracking-[0.05em] uppercase">
+      {children}
+    </div>
+  );
+}
+
+const MENU = "w-[300px] gap-px rounded-[10px] p-1.5";
+
+/** The row of segments for a small fixed choice. */
+export function SegmentBox<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  disabled,
+  id,
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  options: readonly { value: T; label: ReactNode; icon?: ReactNode }[];
+  disabled?: boolean;
+  id?: string;
+}) {
+  return (
+    <div
+      id={id}
+      role="radiogroup"
+      aria-label={label}
+      className={cn("bg-card flex gap-[3px] rounded-[11px] border p-1", disabled && "opacity-60")}
+    >
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "focus-visible:ring-ring/50 inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-[5px] rounded-lg px-0.5 text-[13px] font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 disabled:pointer-events-none",
+              on
+                ? "bg-muted text-foreground dark:bg-input/70"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {o.icon}
+            <span className="truncate">{o.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------- status and priority */
+
+const STATUS_ORDER = [
+  TaskStatus.NOT_STARTED,
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.BLOCKED,
+  TaskStatus.COMPLETED,
+];
+
+export const STATUS_OPTIONS = STATUS_ORDER.map((s) => ({
+  value: s,
+  label: STATUS_LABEL[s] ?? s,
+  icon: (
+    <span
+      aria-hidden="true"
+      className="size-[7px] shrink-0 rounded-full"
+      style={{ background: STATUS_TOKEN[s] }}
+    />
+  ),
+}));
+
+export const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+};
+
+export const PRIORITY_OPTIONS = (Object.values(TaskPriority) as TaskPriority[]).map((p) => ({
+  value: p,
+  label: PRIORITY_LABEL[p],
+}));
+
+export const VISIBILITY_OPTIONS = [
+  {
+    value: TaskVisibility.ORG,
+    label: "Everyone",
+    icon: <Globe className="size-[15px]" aria-hidden="true" />,
+  },
+  {
+    value: TaskVisibility.PRIVATE,
+    label: "Private",
+    icon: <Lock className="size-[15px]" aria-hidden="true" />,
+  },
+] as const;
+
+/* ----------------------------------------------------------------- people */
+
+function firstName(m: MemberOption | undefined): string {
+  return m?.name?.trim().split(/\s+/)[0] ?? "Member";
+}
+
+const RELATION_HINT: Partial<Record<string, string>> = {
+  SELF: "You",
+  DOWN_LINE: "Your team",
+  ABOVE: "Above you",
+};
+
+function MemberHint({ member }: { member: MemberOption }) {
+  const { viewer } = useTasks();
+  const relation = relationFor(viewer.chart, member.id);
+  const hint = RELATION_HINT[relation] ?? member.title;
+  if (!hint) return null;
+  return (
+    <small
+      className={cn(
+        "ms-auto inline-flex shrink-0 items-center gap-1 text-xs font-normal",
+        relation === "ABOVE" ? "text-warning" : "text-muted-foreground",
+      )}
+    >
+      {relation === "ABOVE" && <TriangleAlert className="size-3" aria-hidden="true" />}
+      <span className="max-w-28 truncate">{hint}</span>
+    </small>
+  );
+}
+
+/** Narrows a long member list as you type (only shown when the list is long). */
+function useMemberFilter(members: MemberOption[]) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return members;
+    return members.filter((m) => `${m.name ?? ""} ${m.title ?? ""}`.toLowerCase().includes(needle));
+  }, [members, q]);
+  const input =
+    members.length > 8 ? (
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Find someone"
+        aria-label="Find someone"
+        className="bg-background border-input placeholder:text-muted-foreground mb-1 h-8 rounded-md border px-2.5 text-[13px] outline-none"
+      />
+    ) : null;
+  return { filtered, input, reset: () => setQ("") };
+}
+
+export function OwnerField({
+  id,
+  value,
+  onChange,
+  disabled,
+  allowNone = true,
+}: {
+  id?: string;
+  value: string | null;
+  onChange: (id: string | null) => void;
+  disabled?: boolean;
+  allowNone?: boolean;
+}) {
+  const { members, memberById } = useTasks();
+  const [open, setOpen] = useState(false);
+  const { filtered, input, reset } = useMemberFilter(members);
+  const owner = value ? memberById.get(value) : undefined;
+  return (
+    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-label="Owner"
+          className={wellClass(open, !owner)}
+        >
+          {owner ? (
+            <>
+              <UserAvatar user={owner} size="xs" />
+              <span className="truncate">{firstName(owner)}</span>
+            </>
+          ) : (
+            <span className="truncate">No owner</span>
+          )}
+          <UpDown />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className={MENU}>
+        {input}
+        <div
+          role="listbox"
+          aria-label="Owner"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
+          {filtered.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="option"
+              aria-selected={m.id === value}
+              className={menuItemClass(m.id === value)}
+              onClick={() => {
+                onChange(m.id);
+                setOpen(false);
+              }}
+            >
+              <UserAvatar user={m} size="xs" />
+              <span className="truncate">{m.name ?? "Member"}</span>
+              <MemberHint member={m} />
+            </button>
+          ))}
+          {allowNone && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={value === null}
+              className={cn(menuItemClass(value === null), "text-muted-foreground")}
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+            >
+              No owner
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function PeopleField({
+  id,
+  value,
+  onChange,
+  exclude,
+  disabled,
+}: {
+  id?: string;
+  value: string[];
+  onChange: (ids: string[]) => void;
+  /** The owner, who is already on the task. */
+  exclude: string | null;
+  disabled?: boolean;
+}) {
+  const { members, memberById } = useTasks();
+  const [open, setOpen] = useState(false);
+  const choices = members.filter((m) => m.id !== exclude);
+  const { filtered, input, reset } = useMemberFilter(choices);
+  const picked = value
+    .filter((v) => v !== exclude)
+    .map((v) => memberById.get(v))
+    .filter(Boolean) as MemberOption[];
+  return (
+    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-label="Involved people"
+          className={wellClass(open, picked.length === 0)}
+        >
+          {picked.length > 0 && (
+            <span className="flex shrink-0 pe-1">
+              {picked.slice(0, 3).map((m) => (
+                <UserAvatar key={m.id} user={m} size="xs" className="ring-card -me-1.5 ring-2" />
+              ))}
+            </span>
+          )}
+          <span className="truncate">
+            {picked.length === 0 ? "Nobody else" : picked.map((m) => firstName(m)).join(", ")}
+          </span>
+          <UpDown />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className={MENU}>
+        <MenuHeading>Add people</MenuHeading>
+        {input}
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          aria-label="Involved people"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
+          {filtered.map((m) => {
+            const on = value.includes(m.id);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="option"
+                aria-selected={on}
+                className={menuItemClass(on)}
+                onClick={() => onChange(on ? value.filter((v) => v !== m.id) : [...value, m.id])}
+              >
+                <UserAvatar user={m} size="xs" />
+                <span className="truncate">{m.name ?? "Member"}</span>
+                {on ? (
+                  <Check className="text-primary ms-auto size-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <MemberHint member={m} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/* --------------------------------------------------------------- due date */
+
+const shortFmt = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+const longFmt = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+const monthFmt = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+const asDate = (key: string) => new Date(`${key}T00:00:00Z`);
+const pad = (n: number) => String(n).padStart(2, "0");
+/** "Fri, Oct 16". */
+export const shortDue = (key: string) => shortFmt.format(asDate(key));
+/** "Friday, Oct 16". */
+export const longDue = (key: string) => longFmt.format(asDate(key));
+
+/** The due-date menu: type a date, pick a quick one, or pick a day on the month. */
+export function DueMenu({
+  value,
+  onPick,
+}: {
+  value: string;
+  /** "" clears the date. */
+  onPick: (key: string) => void;
+}) {
+  const { org } = useTasks();
+  const today = org.todayKey;
+  const [typed, setTyped] = useState("");
+  const [month, setMonth] = useState((value || today).slice(0, 7));
+  const parsed = parseDueText(typed, today);
+  const quick = quickDues(today);
+
+  const first = `${month}-01`;
+  const lead = weekdayOfKey(first);
+  const start = addDaysToKey(first, -lead);
+  const cells = Array.from({ length: 42 }, (_, i) => addDaysToKey(start, i));
+  const rows = cells.slice(35).every((k) => k.slice(0, 7) !== month) ? cells.slice(0, 35) : cells;
+  const shift = (by: number) => {
+    const [y, mo] = month.split("-").map(Number);
+    const d = new Date(Date.UTC(y, mo - 1 + by, 1));
+    setMonth(`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`);
+  };
+
+  return (
+    <div
+      className="flex flex-col gap-px"
+      onKeyDown={(e) => {
+        if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+        const hit = quick.find((q) => q.shortcut.toLowerCase() === e.key.toLowerCase());
+        if (hit) {
+          e.preventDefault();
+          onPick(hit.key);
+        }
+      }}
+    >
+      <label htmlFor="due-typed" className="sr-only">
+        Type a date
+      </label>
+      <input
+        id="due-typed"
+        value={typed}
+        onChange={(e) => setTyped(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && parsed) {
+            e.preventDefault();
+            onPick(parsed);
+          }
+        }}
+        placeholder="Try “next thu” or “in 3 days”"
+        className="bg-background border-input placeholder:text-muted-foreground focus-visible:border-ring mb-1 h-8 rounded-md border px-2.5 text-[13px] outline-none"
+      />
+      {typed && (
+        <button
+          type="button"
+          disabled={!parsed}
+          className={cn(menuItemClass(), !parsed && "text-muted-foreground")}
+          onClick={() => parsed && onPick(parsed)}
+        >
+          {parsed ? longDue(parsed) : "Not a date I know"}
+          {parsed && (
+            <small className="text-muted-foreground ms-auto text-xs font-normal">Enter</small>
+          )}
+        </button>
+      )}
+      {quick.map((q) => (
+        <button
+          key={q.label}
+          type="button"
+          className={menuItemClass(value === q.key)}
+          onClick={() => onPick(q.key)}
+        >
+          {q.label}
+          <small className="text-muted-foreground ms-auto inline-flex items-center gap-2 text-xs font-normal">
+            {shortDue(q.key)}
+            <kbd className="border-border rounded-[4px] border px-1 font-mono text-[10px] leading-4">
+              {q.shortcut}
+            </kbd>
+          </small>
+        </button>
+      ))}
+      <button
+        type="button"
+        className={cn(menuItemClass(), "text-muted-foreground")}
+        onClick={() => onPick("")}
+      >
+        No due date
+      </button>
+      <div className="bg-border mx-1 my-1.5 h-px" />
+      <div className="flex items-center justify-between px-1.5 pb-1.5">
+        <span className="text-foreground/90 text-xs font-semibold">
+          {monthFmt.format(asDate(first))}
+        </span>
+        <span className="flex">
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shift(-1)}
+            className="text-muted-foreground hover:bg-muted hover:text-foreground grid size-6 place-items-center rounded-md"
+          >
+            <ChevronLeft className="size-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => shift(1)}
+            className="text-muted-foreground hover:bg-muted hover:text-foreground grid size-6 place-items-center rounded-md"
+          >
+            <ChevronRight className="size-3.5" aria-hidden="true" />
+          </button>
+        </span>
+      </div>
+      <div
+        className="text-muted-foreground grid grid-cols-7 gap-0.5 pb-0.5 text-center text-[10px]"
+        aria-hidden="true"
+      >
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+          <span key={i}>{d}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {rows.map((k) => {
+          const inMonth = k.slice(0, 7) === month;
+          const selected = k === value;
+          return (
+            <button
+              key={k}
+              type="button"
+              aria-label={longDue(k)}
+              aria-pressed={selected}
+              onClick={() => onPick(k)}
+              className={cn(
+                "h-7 rounded-md text-xs font-medium transition-colors",
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : inMonth
+                    ? "text-foreground/85 hover:bg-muted"
+                    : "text-muted-foreground/50 hover:bg-muted",
+                !selected && k === today && "ring-border ring-1 ring-inset",
+              )}
+            >
+              {Number(k.slice(8))}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function DueField({
+  id,
+  value,
+  onChange,
+  disabled,
+}: {
+  id?: string;
+  value: string;
+  onChange: (key: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-label="Due date"
+          className={wellClass(open, !value)}
+        >
+          <Calendar className="text-muted-foreground size-[15px] shrink-0" aria-hidden="true" />
+          <span className="truncate">{value ? shortDue(value) : "No due date"}</span>
+          <UpDown />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className={MENU}>
+        <DueMenu
+          value={value}
+          onPick={(k) => {
+            onChange(k);
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/* --------------------------------------------------------------- projects */
+
+const PROJECT_TOKENS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
+
+/** A project's swatch: steady per project (projects carry no colour of their own). */
+export function projectColor(id: string | null): string {
+  if (!id) return "var(--muted-foreground)";
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `var(${PROJECT_TOKENS[h % PROJECT_TOKENS.length]})`;
+}
+
+export function ProjectField({
+  id,
+  value,
+  onChange,
+  disabled,
+}: {
+  id?: string;
+  value: string | null;
+  onChange: (id: string | null) => void;
+  disabled?: boolean;
+}) {
+  const { projects, projectById } = useTasks();
+  const [open, setOpen] = useState(false);
+  const project = value ? projectById.get(value) : undefined;
+  const pick = (next: string | null) => {
+    onChange(next);
+    setOpen(false);
+  };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-label="Project"
+          className={wellClass(open, !project)}
+        >
+          <span
+            aria-hidden="true"
+            className="size-[9px] shrink-0 rounded-[3px]"
+            style={{ background: projectColor(project?.id ?? null) }}
+          />
+          <span className="truncate">{project?.name ?? "No project"}</span>
+          <UpDown />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className={MENU}>
+        <div
+          role="listbox"
+          aria-label="Project"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={!value}
+            className={menuItemClass(!value)}
+            onClick={() => pick(null)}
+          >
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-[2px]"
+              style={{ background: projectColor(null) }}
+            />
+            No project
+          </button>
+          {projects.map((p: ProjectOption) => (
+            <button
+              key={p.id}
+              type="button"
+              role="option"
+              aria-selected={p.id === value}
+              className={menuItemClass(p.id === value)}
+              onClick={() => pick(p.id)}
+            >
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-[2px]"
+                style={{ background: projectColor(p.id) }}
+              />
+              <span className="truncate">{p.name}</span>
+              {p.isIntake && (
+                <small className="text-muted-foreground ms-auto text-xs font-normal">
+                  Requests
+                </small>
+              )}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/* ----------------------------------------------------------------- labels */
+
+export function LabelChip({ label }: { label: LabelOption }) {
+  return (
+    <span
+      className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium"
+      style={{
+        background: `color-mix(in oklab, ${label.color} 22%, transparent)`,
+        color: `color-mix(in oklab, ${label.color} 70%, var(--foreground))`,
+      }}
+    >
+      {label.name}
+    </span>
+  );
+}
+
+export function LabelsField({
+  id,
+  labels,
+  value,
+  onChange,
+  disabled,
+}: {
+  id?: string;
+  labels: LabelOption[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+  disabled?: boolean;
+}) {
+  const { org, viewer } = useTasks();
+  const [open, setOpen] = useState(false);
+  const picked = labels.filter((l) => value.includes(l.id));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled}
+          aria-label="Labels"
+          className={wellClass(open, picked.length === 0)}
+        >
+          {picked.length > 0 ? (
+            <span className="flex min-w-0 gap-1 overflow-hidden">
+              {picked.map((l) => (
+                <LabelChip key={l.id} label={l} />
+              ))}
+            </span>
+          ) : (
+            <span>No labels</span>
+          )}
+          <UpDown />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        side="top"
+        className={cn(MENU, "w-[var(--radix-popover-trigger-width)]")}
+      >
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          aria-label="Labels"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
+          {labels.length === 0 && (
+            <p className="text-muted-foreground px-2 py-1.5 text-[13px]">No labels yet.</p>
+          )}
+          {labels.map((l) => {
+            const on = value.includes(l.id);
+            return (
+              <button
+                key={l.id}
+                type="button"
+                role="option"
+                aria-selected={on}
+                className={menuItemClass(on)}
+                onClick={() => onChange(on ? value.filter((v) => v !== l.id) : [...value, l.id])}
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-[7px] shrink-0 rounded-full"
+                  style={{ background: l.color }}
+                />
+                <span className="truncate">{l.name}</span>
+                {on && (
+                  <Check className="text-primary ms-auto size-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {viewer.isAdmin && (
+          <>
+            <div className="bg-border mx-1 my-1 h-px" />
+            <Link
+              href={`/app/${org.slug}/settings/labels`}
+              className={cn(menuItemClass(), "text-primary")}
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              New label
+            </Link>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}

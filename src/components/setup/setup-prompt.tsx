@@ -25,7 +25,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
 
   if (broken && next) {
     return (
-      <section className="border-destructive/40 bg-destructive/5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border p-4">
+      <section className="border-destructive/40 bg-destructive/5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border p-4">
         <AlertTriangle className="text-destructive size-5 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{next.title} has stopped working.</p>
@@ -35,7 +35,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
               : "The last connection test failed. The setup page says what the service returned and what to change."}
           </p>
         </div>
-        <Button asChild>
+        <Button asChild size="sm">
           <Link href={`/app/${orgSlug}/setup/status`}>
             See what failed
             <ArrowRight className="size-4" aria-hidden="true" />
@@ -48,7 +48,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
   if (!next) return null;
 
   return (
-    <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border p-4">
+    <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border p-4">
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-sm font-medium">
           {state.connectedCount === 0
@@ -61,7 +61,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
             : `${next.unlocks[0]}. About ${next.minutes} minutes.`}
         </p>
       </div>
-      <Button asChild>
+      <Button asChild size="sm">
         <Link href={href}>
           {state.connectedCount === 0 ? "Start setup" : "Continue setup"}
           <ArrowRight className="size-4" aria-hidden="true" />

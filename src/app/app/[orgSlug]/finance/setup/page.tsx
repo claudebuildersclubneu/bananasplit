@@ -13,7 +13,9 @@ import { FinanceAccessGate } from "../finance-access-gate";
 import { getCategoriesForPeriods, getOrgMembersForPicker, getOrgPeriods } from "../queries";
 
 /** Finance › Set up: the guided setup (owners and treasurers). */
-export default async function FinanceSetupPage({ params }: PageProps<"/app/[orgSlug]/finance/setup">) {
+export default async function FinanceSetupPage({
+  params,
+}: PageProps<"/app/[orgSlug]/finance/setup">) {
   const { orgSlug } = await params;
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "finance.manage")) {
@@ -33,7 +35,7 @@ export default async function FinanceSetupPage({ params }: PageProps<"/app/[orgS
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Set up your club&apos;s finances</h2>
+        <h2 className="heading text-lg">Set up your club&apos;s finances</h2>
         <p className="text-muted-foreground text-sm">
           About five minutes. Every step saves as you go, so you can stop and come back.
         </p>
@@ -53,7 +55,10 @@ export default async function FinanceSetupPage({ params }: PageProps<"/app/[orgS
           endsOn: toDateValue(p.endsOn),
           isActive: p.isActive,
         }))}
-        allCategories={data.categories.map((c) => ({ name: c.name, budgetPeriodId: c.budgetPeriodId }))}
+        allCategories={data.categories.map((c) => ({
+          name: c.name,
+          budgetPeriodId: c.budgetPeriodId,
+        }))}
         members={data.members.map((m) => ({
           userId: m.userId,
           name: m.user.name?.trim() || m.user.email,

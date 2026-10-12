@@ -1,6 +1,6 @@
 import { format } from "date-fns";
-import { ArrowLeft, Lock, Users } from "lucide-react";
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
+import { Lock, Users } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
@@ -46,9 +46,9 @@ function parseCsv(text: string): string[][] {
 }
 
 /**
- * A Notes page file, shown in the app: PDFs in the browser's viewer (a
- * same-origin frame), images, Word documents as a read-only note, text and
- * CSV as they are. Slides and spreadsheets download.
+ * An uploaded file in Files, shown in the app: PDFs in the browser's viewer
+ * (a same-origin frame), images, Word documents as a read-only note, text
+ * and CSV as they are. Slides and spreadsheets download.
  */
 export default async function NoteFilePage({
   params,
@@ -78,19 +78,13 @@ export default async function NoteFilePage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <Link
-        href={`/app/${orgSlug}/notes?tab=files`}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        Files
-      </Link>
+      <BackLink href={`/app/${orgSlug}/notes`} label="Files" />
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <Icon className="text-muted-foreground mt-1 size-5 shrink-0" aria-hidden="true" />
           <div className="min-w-0">
-            <h1 className="heading truncate text-xl">{row.name}</h1>
+            <h1 className="heading truncate text-2xl">{row.name}</h1>
             <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-sm">
               <span>
                 {FILE_LABELS[family]} · {formatBytes(row.sizeBytes)}
@@ -98,7 +92,10 @@ export default async function NoteFilePage({
               <span>
                 {row.uploadedBy.name ?? "A member"}, {format(row.createdAt, "MMM d, yyyy")}
               </span>
-              <Badge variant={row.visibility === "PRIVATE" ? "outline" : "secondary"} className="gap-1">
+              <Badge
+                variant={row.visibility === "PRIVATE" ? "outline" : "secondary"}
+                className="gap-1"
+              >
                 {row.visibility === "PRIVATE" ? (
                   <Lock className="size-3" aria-hidden="true" />
                 ) : (
@@ -125,17 +122,25 @@ export default async function NoteFilePage({
         ) : family === "image" ? (
           <div className="bg-muted/30 grid place-items-center p-4">
             {/* eslint-disable-next-line @next/next/no-img-element -- a private, permission-checked file */}
-            <img src={src} alt={row.name} className="max-h-[75vh] max-w-full rounded-md object-contain" />
+            <img
+              src={src}
+              alt={row.name}
+              className="max-h-[75vh] max-w-full rounded-md object-contain"
+            />
           </div>
         ) : family === "word" ? (
           docHtml != null ? (
             <div className="bg-muted/50 max-h-[80vh] overflow-y-auto px-3 py-6 sm:px-8 sm:py-10">
-              <article className="bg-background mx-auto min-h-[60vh] max-w-[52rem] rounded-sm px-6 py-10 shadow-md ring-1 ring-black/5 sm:px-16 sm:py-14">
+              <article className="bg-background mx-auto min-h-[60vh] max-w-[52rem] rounded-md border px-6 py-10 sm:px-16 sm:py-14">
                 <DocumentPreview html={docHtml} />
               </article>
             </div>
           ) : (
-            <EmptyState size="compact" title="This document can't be shown" description={docError ?? undefined} />
+            <EmptyState
+              size="compact"
+              title="This document can't be shown"
+              description={docError ?? undefined}
+            />
           )
         ) : csv ? (
           <div className="max-h-[75vh] overflow-auto">
@@ -155,7 +160,7 @@ export default async function NoteFilePage({
           </div>
         ) : text != null ? (
           <div className="bg-muted/50 max-h-[80vh] overflow-y-auto px-3 py-6 sm:px-8 sm:py-10">
-            <pre className="bg-background mx-auto max-w-[52rem] rounded-sm px-6 py-8 font-sans text-sm leading-relaxed whitespace-pre-wrap shadow-md ring-1 ring-black/5 sm:px-12">
+            <pre className="bg-background mx-auto max-w-[52rem] rounded-md border px-6 py-8 font-sans text-sm leading-relaxed whitespace-pre-wrap sm:px-12">
               {text}
             </pre>
           </div>

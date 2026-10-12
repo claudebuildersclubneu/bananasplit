@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Monitor, Moon, Sun, UserRound, Users } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user-avatar";
-import { peopleHref, profileHref } from "@/lib/profile/href";
+import { profileHref } from "@/lib/profile/href";
 
 /**
  * The shell's user menu. `user` comes from the database on every request
@@ -63,13 +63,7 @@ export function UserMenu({ user }: { user: UserMenuUser }) {
             <DropdownMenuItem asChild>
               <Link href={profileHref(orgSlug)}>
                 <UserRound className="size-4" aria-hidden="true" />
-                Your profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={peopleHref(orgSlug)}>
-                <Users className="size-4" aria-hidden="true" />
-                People
+                Your profile and settings
               </Link>
             </DropdownMenuItem>
           </>

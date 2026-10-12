@@ -340,41 +340,6 @@ export function getCalendarTasks(
   });
 }
 
-/** Team view: open tasks owned by any of `ownerIds` (or unowned, when asked). */
-export function getOpenTasksByOwners(
-  db: TxClient,
-  organizationId: string,
-  ownerIds: readonly string[],
-  opts: {
-    includeUnowned?: boolean;
-    excludeOwners?: readonly string[];
-    filters?: TaskFilters;
-    today?: Date;
-  } = {},
-) {
-  const or: Prisma.TaskWhereInput[] = [];
-  if (ownerIds.length > 0) or.push({ ownerId: { in: [...ownerIds] } });
-  if (opts.excludeOwners) or.push({ ownerId: { notIn: [...opts.excludeOwners] } });
-  if (opts.includeUnowned) or.push({ ownerId: null });
-  if (or.length === 0) return Promise.resolve([]);
-  // The lanes are the structure, so the toolbar's own owner/scope filters are
-  // dropped here; everything else (project, status, label, search, due,
-  // flagged, blockers, visibility) still applies.
-  const { ownerId: _o, assigneeId: _a, peopleIds: _p, ...rest } = opts.filters ?? {};
-  return db.task.findMany({
-    where: {
-      AND: [
-        taskFilterWhere(organizationId, rest, opts.today),
-        { status: { in: [...OPEN_STATUSES] } },
-        { OR: or },
-      ],
-    },
-    select: taskListSelect,
-    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { priority: "desc" }],
-    take: 1000,
-  });
-}
-
 /** An intake queue: its open requests and those done since `completedSince`. */
 export function getIntakeTasks(
   db: TxClient,

@@ -9,6 +9,7 @@ import { useMemo, useRef, useState } from "react";
 import { createNote } from "@/app/app/[orgSlug]/notes/actions";
 import { usePins } from "@/components/pins/pins-context";
 import { CommandDialog, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { chipClass } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toaster";
 import type { Role } from "@/generated/prisma/enums";
 import { can } from "@/lib/auth/permissions";
@@ -275,12 +276,7 @@ export function CommandPalette({
                 aria-pressed={scope === s.id}
                 onClick={() => changeScope(s.id)}
                 onMouseDown={(e) => e.preventDefault()}
-                className={cn(
-                  "shrink-0 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                  scope === s.id
-                    ? "bg-primary text-primary-foreground border-transparent"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                className={chipClass(scope === s.id)}
               >
                 {s.label}
               </button>

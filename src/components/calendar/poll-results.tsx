@@ -174,7 +174,7 @@ export function SlotDetails({
   if (!slot || !summary) {
     return (
       <section
-        className={cn("bg-card rounded-lg border p-3 text-sm", className)}
+        className={cn("bg-card rounded-xl border p-3 text-sm", className)}
         aria-label="Who can make it"
       >
         <p className="text-muted-foreground">
@@ -188,7 +188,7 @@ export function SlotDetails({
   const { day, time } = intervalParts(slot.startsAt, slot.endsAt, timeZone);
   return (
     <section
-      className={cn("bg-card space-y-2 rounded-lg border p-3 text-sm", className)}
+      className={cn("bg-card space-y-2 rounded-xl border p-3 text-sm", className)}
       aria-label="Who can make it"
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -276,7 +276,7 @@ export function BestTimes({
         </p>
       </div>
       {windows.length === 0 ? (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-sm">
+        <p className="text-muted-foreground rounded-xl border border-dashed p-3 text-sm">
           {total === 0
             ? "No answers yet. The best times show up here as people respond."
             : "No time works for anyone yet."}
@@ -290,7 +290,7 @@ export function BestTimes({
               <li
                 key={w.slot.id}
                 className={cn(
-                  "bg-card flex items-center gap-2 rounded-lg border p-2 transition-colors",
+                  "bg-card flex items-center gap-2 rounded-xl border p-2 transition-colors",
                   selected && "border-foreground/40 bg-muted/50",
                 )}
               >

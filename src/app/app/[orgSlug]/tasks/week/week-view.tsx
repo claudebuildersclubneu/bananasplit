@@ -239,7 +239,9 @@ export function WeekView({
                   ? "var(--warning)"
                   : "var(--muted-foreground)"
             }
-            tone={bucket.tone === "overdue" ? "danger" : bucket.tone === "today" ? "warning" : undefined}
+            tone={
+              bucket.tone === "overdue" ? "danger" : bucket.tone === "today" ? "warning" : undefined
+            }
             description={bucket.description}
           />
           <ul className={cn("divide-border divide-y", TASK_PANEL)}>
@@ -309,7 +311,7 @@ function CountChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "focus-visible:ring-ring inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none",
+        "focus-visible:ring-ring inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none",
         tone === "overdue" && "bg-destructive/10 text-destructive hover:bg-destructive/20",
         tone === "today" && "bg-warning/15 text-warning hover:bg-warning/25",
         tone === "blocked" && "bg-destructive/10 text-destructive hover:bg-destructive/20",

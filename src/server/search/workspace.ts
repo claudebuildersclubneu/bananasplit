@@ -242,7 +242,7 @@ async function searchFolders(ctx: Ctx): Promise<SearchGroup> {
     hit("folder", f.id, {
       title: f.name,
       href: `${ctx.base}/notes?folder=${f.id}`,
-      detail: "Notes folder",
+      detail: "Folder in Files",
       meta: `${f._count.notes} ${f._count.notes === 1 ? "note" : "notes"}`,
       score: scoreFields([{ text: f.name, weight: 3 }], q),
     }),
@@ -937,9 +937,9 @@ const RECENT_KIND: Record<string, SearchKind> = {
 /** The sidebar section an address under `base` is in: the most specific one (Polls over Calendar). */
 function sectionOf(href: string, base: string): SectionId | null {
   const path = href.split(/[?#]/)[0].slice(base.length);
-  const match = SECTIONS.filter(
-    (s) => s.path && (path === s.path || path.startsWith(`${s.path}/`)),
-  ).sort((a, b) => b.path.length - a.path.length)[0];
+  const match = SECTIONS.flatMap((s) => [s.path, ...(s.also ?? [])].map((p) => ({ id: s.id, path: p })))
+    .filter((s) => s.path && (path === s.path || path.startsWith(`${s.path}/`)))
+    .sort((a, b) => b.path.length - a.path.length)[0];
   return match?.id ?? null;
 }
 

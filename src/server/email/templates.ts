@@ -71,7 +71,7 @@ export function notificationEmail(input: {
     bodyHtml: `<p style="margin:0 0 12px;font-size:16px;font-weight:600">${escapeHtml(input.title)}</p>${input.body ? paragraph(input.body) : ""}`,
     bodyText: [input.title, input.body].filter(Boolean).join("\n\n"),
     cta: input.url ? { label: "Open in Bananasplit", url: input.url } : undefined,
-    footer: "Change which notifications email you in Settings > Notifications.",
+    footer: "Change which notifications email you on your profile.",
   });
 }
 

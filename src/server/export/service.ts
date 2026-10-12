@@ -219,7 +219,7 @@ async function notifyRequester(
       : `Your data export of ${org.name} failed`,
     body: ready
       ? `Sign in as an owner to download it. The file is deleted after ${EXPORT_EXPIRY_DAYS} days.`
-      : "Try again from Settings > Danger zone.",
+      : "Try again from Admin panel › Danger zone.",
     linkUrl: `/app/${org.slug}/settings/danger/exports/${exportId}`,
   });
 }

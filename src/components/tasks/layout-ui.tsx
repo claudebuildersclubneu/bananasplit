@@ -24,7 +24,7 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 /** The surface a list of tasks sits on. */
-export const TASK_PANEL = "bg-card overflow-hidden rounded-xl border shadow-xs";
+export const TASK_PANEL = "bg-card overflow-hidden rounded-xl border";
 
 export function GroupHeader({
   id,
@@ -49,7 +49,13 @@ export function GroupHeader({
 }) {
   return (
     <div className={cn("flex min-w-0 items-center gap-2 px-1", className)}>
-      {dot && <span className="size-2 shrink-0 rounded-full" style={{ background: dot }} aria-hidden="true" />}
+      {dot && (
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: dot }}
+          aria-hidden="true"
+        />
+      )}
       <h2
         id={id}
         className={cn(
@@ -60,11 +66,13 @@ export function GroupHeader({
       >
         {title}
       </h2>
-      <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] font-medium tabular-nums">
+      <span className="bg-muted text-muted-foreground rounded-md px-1.5 text-[11px] font-medium tabular-nums">
         {count}
       </span>
       {description && (
-        <span className="text-muted-foreground hidden truncate text-xs sm:inline">{description}</span>
+        <span className="text-muted-foreground hidden truncate text-xs sm:inline">
+          {description}
+        </span>
       )}
       {children && <span className="ms-auto flex items-center gap-1">{children}</span>}
     </div>

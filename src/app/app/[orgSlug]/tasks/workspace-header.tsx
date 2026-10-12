@@ -1,13 +1,19 @@
 "use client";
 
-import { ArrowLeft, ClipboardPaste, Inbox, NotebookPen, Plus } from "lucide-react";
+import { ArrowLeft, ChevronDown, ClipboardPaste, Inbox, NotebookPen, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import { WorkspaceToolbar } from "@/components/tasks/workspace-toolbar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
 
@@ -22,6 +28,9 @@ import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
  * Inside a destination the header collapses to a back link: the filter
  * toolbar has nothing to filter there, and leaving it on screen would
  * suggest otherwise.
+ *
+ * "Paste a list" is a way of making tasks, so it sits in New task's menu
+ * rather than beside it.
  */
 export function WorkspaceHeader({
   intakeCount,
@@ -39,7 +48,7 @@ export function WorkspaceHeader({
   const [importing, setImporting] = useState(false);
   const inDestination = isDestination(ws.query.view);
 
-  // 1-5 switch layout, c starts a task. Typing in a field never triggers them.
+  // 1-3 switch layout, c starts a task. Typing in a field never triggers them.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -65,66 +74,91 @@ export function WorkspaceHeader({
 
   return (
     <div className="mb-5 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <h1 className="page-title mr-auto">Tasks</h1>
 
-        {inDestination ? (
-          <Button variant="ghost" size="sm" onClick={() => ws.setView("week")} className="gap-1.5">
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to tasks
-          </Button>
-        ) : (
-          <>
-            {showIntake && (
+        <div className="flex flex-wrap items-center gap-2">
+          {inDestination ? (
+            <Button variant="ghost" size="sm" onClick={() => ws.setView("board")}>
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Back to tasks
+            </Button>
+          ) : (
+            <>
+              {showIntake && (
+                <DestinationButton
+                  icon={Inbox}
+                  label="Requests"
+                  hint={
+                    intakeCount > 0
+                      ? `${intakeCount} request${intakeCount === 1 ? "" : "s"} waiting on triage`
+                      : "The intake queue"
+                  }
+                  count={intakeCount}
+                  onClick={() => ws.setView("intake")}
+                />
+              )}
               <DestinationButton
-                icon={Inbox}
-                label="Requests"
-                hint={
-                  intakeCount > 0
-                    ? `${intakeCount} request${intakeCount === 1 ? "" : "s"} waiting on triage`
-                    : "The intake queue"
-                }
-                count={intakeCount}
-                onClick={() => ws.setView("intake")}
+                icon={NotebookPen}
+                label="Sunday update"
+                hint={posted ? "You have posted this week" : "Draft and post this week's update"}
+                dot={!posted}
+                onClick={() => ws.setView("updates")}
               />
-            )}
-            <DestinationButton
-              icon={NotebookPen}
-              label="Sunday update"
-              hint={posted ? "You have posted this week" : "Draft and post this week's update"}
-              dot={!posted}
-              onClick={() => ws.setView("updates")}
-            />
-          </>
-        )}
+            </>
+          )}
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setImporting(true)}
-          className="gap-1.5"
-          title="Paste a to-do list or meeting notes; AI turns it into tasks and events for you to check"
-        >
-          <ClipboardPaste className="size-4" aria-hidden="true" />
-          <span className="hidden sm:inline">Paste a list</span>
-          <span className="sm:hidden">Paste</span>
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
-          className="gap-1.5"
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          New task
-          <kbd className="border-primary-foreground/30 text-primary-foreground/70 ms-0.5 hidden rounded border px-1 text-[10px] leading-4 sm:inline">
-            c
-          </kbd>
-        </Button>
+          {/* New task, with "Paste a list" in its menu. */}
+          <div className="flex">
+            <Button
+              size="sm"
+              className="rounded-r-none"
+              title="New task (c)"
+              onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              New task
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
+                  aria-label="More ways to add tasks"
+                >
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  onSelect={() => newTask({ projectId: ws.query.projectId ?? null })}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  New task
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setImporting(true)}>
+                  <ClipboardPaste className="size-4" aria-hidden="true" />
+                  <span className="flex flex-col">
+                    Paste a list
+                    <span className="text-muted-foreground text-xs">
+                      A to-do list or meeting notes, turned into tasks
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
       {!inDestination && <WorkspaceToolbar />}
       {importing && (
-        <ActionItemsImport orgId={org.id} orgSlug={org.slug} open={importing} onOpenChange={setImporting} />
+        <ActionItemsImport
+          orgId={org.id}
+          orgSlug={org.slug}
+          open={importing}
+          onOpenChange={setImporting}
+        />
       )}
     </div>
   );
@@ -147,23 +181,19 @@ function DestinationButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
       onClick={onClick}
       title={hint}
       aria-label={hint ? `${label}: ${hint}` : label}
-      className={cn(
-        "border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none",
-      )}
     >
       <Icon className="size-4" aria-hidden />
       <span className="hidden sm:inline">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="bg-foreground text-background inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold">
-          {count}
-        </span>
+        <Badge className="h-4 min-w-4 px-1 text-[10px]">{count}</Badge>
       )}
       {dot && <span className="bg-warning size-1.5 rounded-full" aria-hidden />}
-    </button>
+    </Button>
   );
 }

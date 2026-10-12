@@ -1,5 +1,3 @@
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { TaskPageEditor } from "@/components/tasks/task-page-editor";
@@ -14,7 +12,8 @@ import { getComments, getOrgLabels, getOrgProjects, getTaskDetail } from "@/serv
 /**
  * A task's own page: the target of every email link
  * (/app/{slug}/tasks/{taskId}). Signed-out visitors go through sign-in with
- * a callbackUrl back here. Subtasks show their parent as a breadcrumb.
+ * a callbackUrl back here. The editor carries the task's own title (no page
+ * heading repeating it); a subtask links its parent inside the form.
  */
 export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tasks/[taskId]">) {
   const { orgSlug, taskId } = await params;
@@ -55,44 +54,8 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
       labels={data.labels}
       projects={data.projects}
     >
-      <div className="mx-auto max-w-3xl space-y-4">
-        <nav
-          aria-label="Breadcrumb"
-          className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm"
-        >
-          <Link
-            href={`/app/${org.slug}/tasks`}
-            className="hover:text-foreground inline-flex items-center gap-1"
-          >
-            <ChevronLeft className="size-4" aria-hidden="true" /> Tasks
-          </Link>
-          {task.project && (
-            <>
-              <span aria-hidden="true">/</span>
-              <Link
-                href={`/app/${org.slug}/tasks?project=${task.project.id}`}
-                className="hover:text-foreground"
-              >
-                {task.project.name}
-              </Link>
-            </>
-          )}
-          {task.parentTask && (
-            <>
-              <span aria-hidden="true">/</span>
-              <Link
-                href={`/app/${org.slug}/tasks/${task.parentTask.id}`}
-                className="hover:text-foreground"
-              >
-                {task.parentTask.title}
-              </Link>
-            </>
-          )}
-        </nav>
-        <h1 className="page-title">{task.title}</h1>
-        <div className="rounded-lg border p-4 sm:p-6">
-          <TaskPageEditor task={task} initialComments={data.comments} />
-        </div>
+      <div className="mx-auto max-w-2xl">
+        <TaskPageEditor task={task} initialComments={data.comments} />
       </div>
     </TasksProvider>
   );

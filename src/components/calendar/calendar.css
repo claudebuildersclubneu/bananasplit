@@ -965,3 +965,46 @@
 .cal-chip[data-dragging="true"] {
   opacity: 0.35;
 }
+
+/* ------------------------------------------------------------ task chips */
+
+/* A task's due date: an empty checkbox where an event has its dot, a solid
+   border (tasks aren't public or internal), and done ones struck through. */
+.cal-chip[data-task],
+.cal-agenda__row[data-task] {
+  border-style: solid;
+}
+
+/* Quieter than an event: no tint, a faint border, the box carries the colour. */
+.cal-chip[data-task] {
+  background: transparent;
+  border-color: var(--cal-line);
+}
+
+.cal-chip[data-task]:hover {
+  background: var(--muted);
+  border-color: color-mix(in oklab, var(--kind) 45%, transparent);
+}
+
+[data-task] .cal-chip__dot {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--kind);
+}
+
+[data-task="done"] .cal-chip__dot {
+  background: var(--kind);
+}
+
+[data-task="done"] .cal-chip__title,
+[data-task="done"] .cal-agenda__title {
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+
+/* The Tasks filter: its box fills when tasks are showing. */
+.cal-filter[data-task][aria-pressed="true"] .cal-chip__dot {
+  background: var(--kind);
+}

@@ -1,13 +1,15 @@
 import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
-import { ChevronLeft } from "lucide-react";
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import type { ReactNode } from "react";
 
 import { AddAttendanceDialog, AddSignupDialog } from "@/components/databases/add-row-dialogs";
+import { BackLink } from "@/components/back-link";
 import { BallotResultsView } from "@/components/databases/ballot-results-view";
+import { DatabaseMenu } from "@/components/databases/database-menu";
 import { DataTable } from "@/components/databases/data-table";
 import {
   AttendancePanel,
@@ -18,13 +20,20 @@ import {
   type PanelContext,
 } from "@/components/databases/detail-panels";
 import { RowDrawer } from "@/components/databases/row-drawer";
-import { SessionFormDialog, type SessionFormInitial } from "@/components/databases/session-form-dialog";
+import {
+  SessionFormDialog,
+  type SessionFormInitial,
+} from "@/components/databases/session-form-dialog";
 import { PollPicker, ViewSwitch } from "@/components/databases/view-switch";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import { NotFoundError } from "@/lib/auth/errors";
 import { parseDbViewParams } from "@/lib/databases/href";
-import { listPolls, loadPollResults, type PollOption, type PollResults } from "@/server/databases/ballot-results";
+import {
+  listPolls,
+  loadPollResults,
+  type PollOption,
+  type PollResults,
+} from "@/server/databases/ballot-results";
 import {
   loadAttendanceDetail,
   loadBallotDetail,
@@ -66,6 +75,13 @@ const DATE_LABELS: Record<string, string> = {
   PEOPLE: "Last check-in",
 };
 
+/** Under the title when members can't open this database (Admin panel › Privacy decides). */
+const VISIBILITY_NOTE: Record<string, string | undefined> = {
+  ADMINS: "Visible to owners and admins",
+  OWNER: "Visible to owners only",
+  HIDDEN: "Hidden from members",
+};
+
 type Drawer =
   | { kind: "session"; title: string; description?: string; node: ReactNode }
   | { kind: "other"; title: string; description?: string; node: ReactNode };
@@ -76,7 +92,11 @@ function localInput(date: Date, timezone: string): string {
 
 function selectedPollId(sp: SearchParams, polls: PollOption[]): string | null {
   const params = parseDbViewParams(sp);
-  const f = params.filters.find((x) => ["ballotDefinitionId", "poll", "definition", "pollSlug", "slug"].includes(x.col) && x.op === "eq");
+  const f = params.filters.find(
+    (x) =>
+      ["ballotDefinitionId", "poll", "definition", "pollSlug", "slug"].includes(x.col) &&
+      x.op === "eq",
+  );
   if (f) {
     const hit = polls.find((p) => p.id === f.value || p.slug === f.value);
     if (hit) return hit.id;
@@ -106,108 +126,120 @@ export default async function DatabaseViewPage({
     after(() => syncIfStale(organization.id).catch(() => undefined));
   }
 
-  const { database, view, table, results, polls, pollId, drawer, admin, rowAccess, ballotView } = page;
-  const exportHref = `/app/${orgSlug}/databases/${database.key}/export`;
-  const toolbar: ReactNode[] = [];
-  if (admin && database.canEdit) {
-    if (database.kind === "SESSIONS") {
-      toolbar.push(
-        <Button key="dups" variant="outline" size="sm" asChild>
-          <Link href={`/app/${orgSlug}/databases/${database.key}/duplicates`}>Possible duplicates</Link>
-        </Button>,
-        <SessionFormDialog key="new" organizationId={organization.id} timezone={organization.timezone} members={admin.members} />,
-      );
-    }
-    if (database.kind === "ATTENDANCE") {
-      toolbar.push(
-        <Button key="import" variant="outline" size="sm" asChild>
-          <Link href={`/app/${orgSlug}/databases/${database.key}/import`}>Import CSV</Link>
-        </Button>,
-        <AddAttendanceDialog key="add" organizationId={organization.id} sessions={admin.sessions} />,
-      );
-    }
-    if (database.kind === "SIGNUPS") {
-      toolbar.push(
-        <Button key="import" variant="outline" size="sm" asChild>
-          <Link href={`/app/${orgSlug}/databases/${database.key}/import`}>Import CSV</Link>
-        </Button>,
-        <AddSignupDialog
-          key="add"
+  const { database, view, table, results, polls, pollId, drawer, admin, rowAccess, ballotView } =
+    page;
+  const base = `/app/${orgSlug}/databases/${database.key}`;
+  const exportHref = `${base}/export`;
+  const kind = database.kind;
+  const restricted = VISIBILITY_NOTE[database.memberVisibility];
+  const anonymous = kind === "BALLOTS" && !rowAccess;
+
+  // The one primary action: adding a row, for admins where rows can be added
+  // here. Setup pages and the export are in the "…" menu.
+  let addRow: ReactNode = null;
+  if (admin) {
+    if (kind === "SESSIONS") {
+      addRow = (
+        <SessionFormDialog
           organizationId={organization.id}
-          years={Object.entries(SIGNUP_LABELS.classYear).map(([value, label]) => ({ value, label }))}
-        />,
+          timezone={organization.timezone}
+          members={admin.members}
+        />
       );
-    }
-    if (database.kind === "BALLOTS") {
-      toolbar.push(
-        <Button key="defs" variant="outline" size="sm" asChild>
-          <Link href={`/app/${orgSlug}/databases/${database.key}/definitions`}>Poll definitions</Link>
-        </Button>,
+    } else if (kind === "ATTENDANCE") {
+      addRow = <AddAttendanceDialog organizationId={organization.id} sessions={admin.sessions} />;
+    } else if (kind === "SIGNUPS") {
+      addRow = (
+        <AddSignupDialog
+          organizationId={organization.id}
+          years={Object.entries(SIGNUP_LABELS.classYear).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+        />
       );
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link
-            href={`/app/${orgSlug}/databases`}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-          >
-            <ChevronLeft className="size-3" aria-hidden="true" />
-            Databases
-          </Link>
-          <h1 className="page-title flex items-center gap-2">
-            {database.name}
-            {database.memberVisibility !== "MEMBERS" && <Badge variant="outline">{database.memberVisibility === "ADMINS" ? "Owners and admins" : database.memberVisibility === "OWNER" ? "Owners only" : "Hidden from members"}</Badge>}
-          </h1>
-        </div>
-        {database.kind === "BALLOTS" && (
-          <div className="flex flex-wrap items-center gap-2">
-            {polls.length > 0 && (
-              <PollPicker polls={polls} current={pollId} allowAll={view !== "results"} />
-            )}
-            {rowAccess && (
-              <ViewSwitch
-                current={ballotView}
-                views={[
-                  { key: "results", label: "Results" },
-                  { key: "rows", label: "Choices" },
-                  { key: "ballots", label: "By ballot" },
-                ]}
+    <div className="space-y-6">
+      <div>
+        <BackLink href={`/app/${orgSlug}/databases`} label="Databases" />
+        <PageHeader
+          title={database.name}
+          description={
+            restricted || anonymous ? (
+              <>
+                {restricted && (
+                  <span className="inline-flex items-center gap-1">
+                    <Lock className="size-3.5" aria-hidden="true" />
+                    {restricted}.
+                  </span>
+                )}
+                {restricted && anonymous && " "}
+                {anonymous &&
+                  "Votes are anonymous. You see totals; individual ballots are visible only as Admin panel › Privacy allows."}
+              </>
+            ) : undefined
+          }
+          actions={
+            <>
+              {kind === "BALLOTS" && polls.length > 0 && (
+                <PollPicker polls={polls} current={pollId} allowAll={view !== "results"} />
+              )}
+              {kind === "BALLOTS" && rowAccess && (
+                <ViewSwitch
+                  current={ballotView}
+                  views={[
+                    { key: "results", label: "Results" },
+                    { key: "rows", label: "Choices" },
+                    { key: "ballots", label: "By ballot" },
+                  ]}
+                />
+              )}
+              {addRow}
+              <DatabaseMenu
+                name={database.name}
+                exportHref={table ? exportHref : undefined}
+                exportColumns={table?.columns.filter((c) => c.visible).map((c) => c.key)}
+                exportResultsHref={
+                  results
+                    ? `${exportHref}?view=results&f=${encodeURIComponent(`ballotDefinitionId:eq:${results.poll.id}`)}`
+                    : null
+                }
+                importHref={
+                  admin && (kind === "ATTENDANCE" || kind === "SIGNUPS")
+                    ? `${base}/import`
+                    : undefined
+                }
+                duplicatesHref={admin && kind === "SESSIONS" ? `${base}/duplicates` : undefined}
+                definitionsHref={admin && kind === "BALLOTS" ? `${base}/definitions` : undefined}
               />
-            )}
-          </div>
-        )}
+            </>
+          }
+        />
       </div>
 
-      {database.kind === "BALLOTS" && !rowAccess && (
-        <p className="text-muted-foreground text-sm">
-          Votes are anonymous. You see totals; individual ballots are visible only as Settings &gt; Privacy allows.
-        </p>
-      )}
-
       {view === "results" ? (
-        <div className="space-y-4">
-          {toolbar.length > 0 && <div className="flex flex-wrap justify-end gap-2">{toolbar}</div>}
-          {results ? (
-            <>
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`${exportHref}?view=results&f=${encodeURIComponent(`ballotDefinitionId:eq:${results.poll.id}`)}`} download>
-                    Export results CSV
-                  </a>
-                </Button>
-              </div>
-              <BallotResultsView results={results} />
-            </>
-          ) : (
-            <p className="text-muted-foreground rounded-lg border p-6 text-center text-sm">
-              No polls yet.{admin ? " Import a poll definition to see its results." : ""}
-            </p>
-          )}
-        </div>
+        results ? (
+          <BallotResultsView results={results} />
+        ) : (
+          <p className="text-muted-foreground rounded-xl border p-6 text-center text-sm">
+            No polls yet.
+            {admin && (
+              <>
+                {" "}
+                <Link
+                  href={`${base}/definitions`}
+                  className="hover:text-foreground underline underline-offset-2"
+                >
+                  Import a poll definition
+                </Link>{" "}
+                to see its results.
+              </>
+            )}
+          </p>
+        )
       ) : table ? (
         <DataTable
           columns={table.columns}
@@ -222,8 +254,6 @@ export default async function DatabaseViewPage({
           from={table.query.from}
           to={table.query.to}
           dateLabel={DATE_LABELS[database.kind]}
-          exportHref={exportHref}
-          toolbar={toolbar}
           selectedRowId={rowId}
         />
       ) : null}
@@ -276,7 +306,8 @@ async function loadPage(
   if (database.kind === "BALLOTS") {
     rowAccess = await canViewBallotRows(db, org.id, vctx.tier);
     const requested = typeof sp.view === "string" ? sp.view : "results";
-    ballotView = rowAccess && (requested === "rows" || requested === "ballots") ? requested : "results";
+    ballotView =
+      rowAccess && (requested === "rows" || requested === "ballots") ? requested : "results";
     // Test polls are for admins checking the pipeline, not results.
     polls = (await listPolls(db, org.id)).filter((p) => isAdmin || !p.isTest);
     pollId = selectedPollId(sp, polls);
@@ -356,7 +387,10 @@ async function loadPage(
               detail={detail}
               ctx={panelCtx}
               formInitial={initial}
-              mergeCandidates={nearby.map((n) => ({ id: n.id, label: `${n.title} · ${fmtDate(n.startsAt, vctx.timezone)}` }))}
+              mergeCandidates={nearby.map((n) => ({
+                id: n.id,
+                label: `${n.title} · ${fmtDate(n.startsAt, vctx.timezone)}`,
+              }))}
             />
           ),
         };
@@ -365,26 +399,48 @@ async function loadPage(
       case "ATTENDANCE": {
         const detail = await loadAttendanceDetail(db, vctx, rowId);
         if (!detail) throw new NotFoundError();
-        drawer = { kind: "other", title: "Check-in", description: detail.row.event.title, node: <AttendancePanel detail={detail} ctx={panelCtx} /> };
+        drawer = {
+          kind: "other",
+          title: "Check-in",
+          description: detail.row.event.title,
+          node: <AttendancePanel detail={detail} ctx={panelCtx} />,
+        };
         break;
       }
       case "SIGNUPS": {
         const detail = await loadSignupDetail(db, vctx, rowId);
         if (!detail) throw new NotFoundError();
-        drawer = { kind: "other", title: "Signup", node: <SignupPanel detail={detail} ctx={panelCtx} /> };
+        drawer = {
+          kind: "other",
+          title: "Signup",
+          node: <SignupPanel detail={detail} ctx={panelCtx} />,
+        };
         break;
       }
       case "PEOPLE": {
         const detail = await loadPersonDetail(db, vctx, rowId);
         if (!detail) throw new NotFoundError();
-        drawer = { kind: "other", title: "Person", node: <PersonPanel detail={detail} ctx={panelCtx} /> };
+        drawer = {
+          kind: "other",
+          title: "Person",
+          node: <PersonPanel detail={detail} ctx={panelCtx} />,
+        };
         break;
       }
       case "BALLOTS": {
         if (!rowAccess) throw new NotFoundError();
-        const detail = await loadBallotDetail(db, vctx, rowId, sourceView === "ballots" ? "ballots" : "choices");
+        const detail = await loadBallotDetail(
+          db,
+          vctx,
+          rowId,
+          sourceView === "ballots" ? "ballots" : "choices",
+        );
         if (!detail) throw new NotFoundError();
-        drawer = { kind: "other", title: "Ballot", node: <BallotPanel detail={detail} ctx={panelCtx} /> };
+        drawer = {
+          kind: "other",
+          title: "Ballot",
+          node: <BallotPanel detail={detail} ctx={panelCtx} />,
+        };
         break;
       }
       default:
@@ -397,7 +453,12 @@ async function loadPage(
     const sessions =
       database.kind === "ATTENDANCE"
         ? await db.event.findMany({
-            where: { organizationId: org.id, deletedAt: null, mergedIntoId: null, startsAt: { lte: new Date(Date.now() + 86400000) } },
+            where: {
+              organizationId: org.id,
+              deletedAt: null,
+              mergedIntoId: null,
+              startsAt: { lte: new Date(Date.now() + 86400000) },
+            },
             orderBy: { startsAt: "desc" },
             take: 60,
             select: { id: true, title: true, startsAt: true },
@@ -405,7 +466,10 @@ async function loadPage(
         : [];
     adminData = {
       members,
-      sessions: sessions.map((s) => ({ id: s.id, label: `${s.title} · ${fmtDate(s.startsAt, vctx.timezone)}` })),
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        label: `${s.title} · ${fmtDate(s.startsAt, vctx.timezone)}`,
+      })),
     };
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Check, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -15,6 +15,7 @@ import {
 } from "@/app/app/[orgSlug]/finance/periods-actions";
 import { EmptyState } from "@/components/empty-state";
 import { ItemMenu } from "@/components/item-menu";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
@@ -92,7 +93,8 @@ export function BudgetView({
   async function removePeriod(p: BudgetPeriodRow) {
     const ok = await confirm({
       title: `Delete the period “${p.label}”?`,
-      description: "Its categories go with it. A period that already has transactions or sponsorships can't be deleted.",
+      description:
+        "Its categories go with it. A period that already has transactions or sponsorships can't be deleted.",
       confirmLabel: "Delete period",
       run: async () => (await deleteBudgetPeriod(orgId, p.id)).error,
     });
@@ -129,15 +131,18 @@ export function BudgetView({
       <section className="bg-card rounded-xl border">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h2 className="font-medium">Budget periods</h2>
+            <h2 className="heading text-base">Budget periods</h2>
             <p className="text-muted-foreground text-xs">
               The stretch of time a budget covers. Money goes into the active one.
             </p>
           </div>
-          <Button size="sm" onClick={() => setEditing("new")}>
-            <Plus className="size-4" aria-hidden="true" />
-            New period
-          </Button>
+          {/* With no period yet, the empty state below carries this button. */}
+          {periods.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setEditing("new")}>
+              <Plus className="size-4" aria-hidden="true" />
+              New period
+            </Button>
+          )}
         </header>
         {periods.length === 0 ? (
           <div className="p-4">
@@ -157,41 +162,36 @@ export function BudgetView({
           <ul className="divide-y">
             {periods.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <span
-                  className={cn(
-                    "grid size-8 shrink-0 place-items-center rounded-lg",
-                    p.isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  <CalendarRange className="size-4" aria-hidden="true" />
-                </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-medium">
                     {p.label}
-                    {p.isActive && (
-                      <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                        Active
-                      </span>
-                    )}
+                    {p.isActive && <Badge variant="secondary">Active</Badge>}
                   </p>
-                  <p className="text-muted-foreground text-xs">{formatPeriodRange(p.startsOn, p.endsOn)}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {formatPeriodRange(p.startsOn, p.endsOn)}
+                  </p>
                 </div>
-                {!p.isActive && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={isPending}
-                    onClick={() => run(() => setActivePeriod(orgId, p.id), `${p.label} is now active`)}
-                  >
-                    <Star className="size-3.5" aria-hidden="true" />
-                    Make active
-                  </Button>
-                )}
                 <ItemMenu
                   label={`Actions for ${p.label}`}
                   items={[
-                    { label: "Rename or change dates", icon: Pencil, onSelect: () => setEditing(p) },
-                    { label: "Delete period", icon: Trash2, destructive: true, onSelect: () => void removePeriod(p) },
+                    !p.isActive && {
+                      label: "Make active",
+                      icon: Star,
+                      disabled: isPending,
+                      onSelect: () =>
+                        run(() => setActivePeriod(orgId, p.id), `${p.label} is now active`),
+                    },
+                    {
+                      label: "Rename or change dates",
+                      icon: Pencil,
+                      onSelect: () => setEditing(p),
+                    },
+                    {
+                      label: "Delete period",
+                      icon: Trash2,
+                      destructive: true,
+                      onSelect: () => void removePeriod(p),
+                    },
                   ]}
                 />
               </li>
@@ -210,7 +210,7 @@ export function BudgetView({
         <section className="bg-card rounded-xl border">
           <header className="flex flex-wrap items-end justify-between gap-3 border-b px-4 py-3">
             <div>
-              <h2 className="font-medium">Categories · {active.label}</h2>
+              <h2 className="heading text-base">Categories · {active.label}</h2>
               <p className="text-muted-foreground text-xs">
                 Set how much each category may spend. Type a number and click away to save.
               </p>
@@ -246,7 +246,12 @@ export function BudgetView({
           </div>
           <ul className="divide-y">
             {categories.map((c) => (
-              <CategoryRow key={c.id} orgId={orgId} category={c} onDelete={() => void removeCategory(c)} />
+              <CategoryRow
+                key={c.id}
+                orgId={orgId}
+                category={c}
+                onDelete={() => void removeCategory(c)}
+              />
             ))}
           </ul>
           <NewCategory orgId={orgId} periodId={active.id} />
@@ -259,7 +264,10 @@ export function BudgetView({
         onClose={() => setEditing(null)}
         onSaved={(label, isNew) => {
           setEditing(null);
-          toast({ title: isNew ? `${label} is set up and active` : `Saved ${label}`, tone: "success" });
+          toast({
+            title: isNew ? `${label} is set up and active` : `Saved ${label}`,
+            tone: "success",
+          });
           router.refresh();
         }}
       />
@@ -283,7 +291,8 @@ function CategoryRow({
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const left = category.allocatedCents - category.spentCents;
-  const used = category.allocatedCents > 0 ? Math.min(1, category.spentCents / category.allocatedCents) : 0;
+  const used =
+    category.allocatedCents > 0 ? Math.min(1, category.spentCents / category.allocatedCents) : 0;
 
   async function save(patch: { name?: string; allocatedCents?: number }) {
     setState("saving");
@@ -315,7 +324,7 @@ function CategoryRow({
             if (!next) setName(category.name);
             else if (next !== category.name) void save({ name: next });
           }}
-          className="h-8 border-transparent px-1.5 font-medium shadow-none hover:border-input focus-visible:border-input"
+          className="hover:border-input focus-visible:border-input h-8 border-transparent px-1.5 font-medium shadow-none"
         />
         <div className="bg-muted mt-1 h-1 overflow-hidden rounded-full" aria-hidden="true">
           <div
@@ -351,7 +360,9 @@ function CategoryRow({
           className="h-8 pl-5 tabular-nums"
         />
         <span className="absolute top-1/2 -right-5 -translate-y-1/2" aria-live="polite">
-          {state === "saving" && <Loader2 className="text-muted-foreground size-3.5 animate-spin" aria-label="Saving" />}
+          {state === "saving" && (
+            <Loader2 className="text-muted-foreground size-3.5 animate-spin" aria-label="Saving" />
+          )}
           {state === "saved" && <Check className="text-success size-3.5" aria-label="Saved" />}
         </span>
       </div>
@@ -359,7 +370,10 @@ function CategoryRow({
         {formatCents(category.spentCents)}
       </span>
       <span
-        className={cn("hidden text-right text-sm tabular-nums sm:block", left < 0 && "text-destructive font-medium")}
+        className={cn(
+          "hidden text-right text-sm tabular-nums sm:block",
+          left < 0 && "text-destructive font-medium",
+        )}
       >
         {formatCents(left)}
       </span>
@@ -389,7 +403,10 @@ function NewCategory({ orgId, periodId }: { orgId: string; periodId: string }) {
       return;
     }
     start(async () => {
-      const result = await createCategory(orgId, periodId, { name: name.trim(), allocatedCents: cents });
+      const result = await createCategory(orgId, periodId, {
+        name: name.trim(),
+        allocatedCents: cents,
+      });
       if (result.error) {
         setError(result.error);
         return;
@@ -430,7 +447,11 @@ function NewCategory({ orgId, periodId }: { orgId: string; periodId: string }) {
         />
       </div>
       <Button type="submit" size="sm" variant="outline" disabled={pending || !name.trim()}>
-        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Plus className="size-4" aria-hidden="true" />
+        )}
         Add category
       </Button>
       {error && <p className="text-destructive w-full text-xs">{error}</p>}
@@ -535,7 +556,9 @@ function PeriodForm({
                 onClick={() => setDraft(made)}
                 className={cn(
                   "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                  selected ? "border-primary bg-primary/5 ring-primary/20 ring-2" : "hover:bg-muted/60",
+                  selected
+                    ? "border-primary bg-primary/5 ring-primary/20 ring-2"
+                    : "hover:bg-muted/60",
                 )}
               >
                 <span className="block font-medium">{preset.name}</span>
@@ -584,7 +607,10 @@ function PeriodForm({
         <Button type="button" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={pending || !draft.label.trim() || !draft.startsOn || !draft.endsOn}>
+        <Button
+          type="submit"
+          disabled={pending || !draft.label.trim() || !draft.startsOn || !draft.endsOn}
+        >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
           {isNew ? "Create and make active" : "Save"}
         </Button>

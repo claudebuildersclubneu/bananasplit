@@ -1,8 +1,6 @@
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-
 import { EmptyState } from "@/components/empty-state";
-import { NewPollButtons, NewPollMenu } from "@/components/polls/new-poll-menu";
+import { PageHeader } from "@/components/page-header";
+import { NewPollMenu } from "@/components/polls/new-poll-menu";
 import { PollList, type PollListItem } from "@/components/polls/poll-list";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
@@ -52,31 +50,18 @@ export default async function PollsListPage({
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="space-y-3">
-        <Link
-          href={`/app/${orgSlug}/calendar`}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Calendar
-        </Link>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="page-title">Polls</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Ask the club a question, or find a time that works for everyone.
-            </p>
-          </div>
-          <NewPollMenu orgSlug={orgSlug} />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Polls"
+        description="Ask the club a question, or find a time that works for everyone."
+        actions={<NewPollMenu orgSlug={orgSlug} />}
+      />
 
       {all.length === 0 ? (
+        // The header's New poll is always on screen, so no second set of buttons here.
         <EmptyState
           title="No polls yet"
-          description="Ask a question and let people vote, or offer some days and hours and see when most people are free."
-          action={<NewPollButtons orgSlug={orgSlug} />}
+          description="Start one with New poll: ask a question and let people vote, or offer some days and hours and see when most people are free."
         />
       ) : (
         <PollList

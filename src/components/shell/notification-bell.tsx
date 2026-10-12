@@ -88,10 +88,15 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell className="size-5" />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+          className="relative"
+        >
+          <Bell className="size-4" aria-hidden="true" />
           {unreadCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 size-4 justify-center rounded-full p-0 text-[10px]">
+            <Badge className="absolute -top-1 -right-1 h-4 min-w-4 justify-center px-1 text-[10px]">
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}

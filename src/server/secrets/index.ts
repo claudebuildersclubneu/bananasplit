@@ -113,7 +113,7 @@ async function alertOwners(
   await notifyOrgOwners(db, orgId, {
     type: NotificationType.SECURITY_ALERT,
     title: `The ${PROVIDER_LABEL[provider]} was ${change}`,
-    body: "An integration secret changed in Settings. If you didn't expect this, review Settings > Integrations and the audit log.",
+    body: "An integration secret changed in the Admin panel. If you didn't expect this, review Admin panel › Integrations and the audit log.",
     linkUrl: org ? `/app/${org.slug}/settings/integrations` : null,
   });
 }

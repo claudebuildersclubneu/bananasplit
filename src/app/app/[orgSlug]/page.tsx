@@ -1,4 +1,4 @@
-import { CalendarDays, CheckSquare, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
@@ -59,7 +59,10 @@ function greeting(now: Date, timeZone: string): string {
  * events, pins, recent pages, notes, files, people...). Nothing about the
  * club's money is on it. The setup checklist is an admin-only widget.
  */
-export default async function OrgOverviewPage({ params, searchParams }: PageProps<"/app/[orgSlug]">) {
+export default async function OrgOverviewPage({
+  params,
+  searchParams,
+}: PageProps<"/app/[orgSlug]">) {
   const { orgSlug } = await params;
   // ?welcome=1: the end of org setup. The admin's first look at their org
   // shows the invite code and link to share (the flowchart's END).
@@ -131,7 +134,8 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
         ? {
             members: (await db.membership.count({ where: { organizationId: org.id } })) > 1,
             picture: org.logo != null,
-            event: (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+            event:
+              (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
             task: (await db.task.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
             budget: (await db.budgetPeriod.count({ where: { organizationId: org.id } })) > 0,
             note: (await db.note.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
@@ -151,8 +155,16 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
   const calendarHref = `/app/${orgSlug}/calendar`;
 
   // "This week": the next seven days in the viewer's timezone.
-  const dayFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", day: "numeric", timeZone: "UTC" });
-  const timeFmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone });
+  const dayFmt = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const timeFmt = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  });
   const week: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
     const key = addDaysToKey(todayKey, i);
     return {
@@ -161,7 +173,11 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
       isToday: i === 0,
       events: data.weekEvents
         .filter((e) => localDateKey(e.startsAt, timeZone) === key)
-        .map((e) => ({ id: e.id, title: e.title, time: e.allDay ? "All day" : timeFmt.format(e.startsAt) })),
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          time: e.allDay ? "All day" : timeFmt.format(e.startsAt),
+        })),
     };
   });
 
@@ -208,7 +224,11 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
         rsvps={data.rsvps}
         zones={zones}
         now={now}
-        empty={eventEmpty("No meetings coming up", "Team and board meetings on the calendar show here.", "Schedule a meeting")}
+        empty={eventEmpty(
+          "No meetings coming up",
+          "Team and board meetings on the calendar show here.",
+          "Schedule a meeting",
+        )}
       />
     ),
     events: (
@@ -219,7 +239,11 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
         rsvps={data.rsvps}
         zones={zones}
         now={now}
-        empty={eventEmpty("No events coming up", "Socials, workshops and everything else show here.", "Add an event")}
+        empty={eventEmpty(
+          "No events coming up",
+          "Socials, workshops and everything else show here.",
+          "Add an event",
+        )}
       />
     ),
     week: <WeekStrip orgSlug={orgSlug} days={week} />,
@@ -228,70 +252,68 @@ export default async function OrgOverviewPage({ params, searchParams }: PageProp
     files: <FileList orgSlug={orgSlug} files={data.files} />,
     people: <PeopleList orgSlug={orgSlug} people={data.people} total={data.memberCount} />,
     shortcuts: <Shortcuts links={shortcuts} />,
-    ...(data.started ? { "getting-started": <GettingStartedCard orgSlug={orgSlug} state={data.started} /> } : {}),
+    ...(data.started
+      ? { "getting-started": <GettingStartedCard orgSlug={orgSlug} state={data.started} /> }
+      : {}),
   };
+
+  const greetingBlock = (
+    <div>
+      <p className="eyebrow text-muted-foreground mb-2">{dateLine}</p>
+      <h1 className="page-title">
+        {greeting(now, timeZone)}
+        {data.firstName ? `, ${data.firstName}` : ""}
+      </h1>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="eyebrow text-muted-foreground mb-2">{dateLine}</p>
-          <h1 className="page-title">
-            {greeting(now, timeZone)}
-            {data.firstName ? `, ${data.firstName}` : ""}
-          </h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/app/${orgSlug}/tasks`}>
-              <CheckSquare className="size-4" aria-hidden="true" />
-              Tasks
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={calendarHref}>
-              <CalendarDays className="size-4" aria-hidden="true" />
-              Calendar
-            </Link>
-          </Button>
-        </div>
-      </div>
-      {data.joinCode && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader className="space-y-3">
-            <div>
-              <CardTitle>{org.name} is ready</CardTitle>
-              <CardDescription>
-                Invite your members: share this code or link. They set up their profile, enter it,
-                and see {org.name} before they join. Manage it any time in{" "}
-                <Link href={`/app/${orgSlug}/settings/members`} className="underline underline-offset-4">
-                  Settings › Members
-                </Link>
-                .
-              </CardDescription>
-            </div>
-            <JoinCodeCard
-              orgId={org.id}
-              compact
-              joinUrlBase={absoluteAppUrl("/onboarding/join")}
-              initial={{
-                code: data.joinCode.code,
-                enabled: data.joinCode.enabled,
-                allowedDomain: data.joinCode.allowedDomain,
-                useCount: data.joinCode.useCount,
-              }}
-            />
-          </CardHeader>
-        </Card>
-      )}
-      {data.setup ? <SetupPrompt orgSlug={orgSlug} state={data.setup} /> : null}
-
       <OverviewBoard
         orgId={org.id}
         types={overviewWidgetsFor(isAdmin)}
         initialLayout={resolveOverview(data.saved, isAdmin)}
         customized={data.saved !== null}
         bodies={bodies}
+        intro={greetingBlock}
+        notice={
+          data.joinCode || data.setup ? (
+            <>
+              {data.joinCode && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardHeader className="space-y-3">
+                    <div>
+                      <CardTitle>{org.name} is ready</CardTitle>
+                      <CardDescription>
+                        Invite your members: share this code or link. They set up their profile,
+                        enter it, and see {org.name} before they join. Manage it any time in{" "}
+                        <Link
+                          href={`/app/${orgSlug}/settings/members`}
+                          className="underline underline-offset-4"
+                        >
+                          Admin panel › Members
+                        </Link>
+                        .
+                      </CardDescription>
+                    </div>
+                    <JoinCodeCard
+                      orgId={org.id}
+                      compact
+                      joinUrlBase={absoluteAppUrl("/onboarding/join")}
+                      initial={{
+                        code: data.joinCode.code,
+                        enabled: data.joinCode.enabled,
+                        allowedDomain: data.joinCode.allowedDomain,
+                        useCount: data.joinCode.useCount,
+                      }}
+                    />
+                  </CardHeader>
+                </Card>
+              )}
+              {data.setup ? <SetupPrompt orgSlug={orgSlug} state={data.setup} /> : null}
+            </>
+          ) : null
+        }
       />
     </div>
   );

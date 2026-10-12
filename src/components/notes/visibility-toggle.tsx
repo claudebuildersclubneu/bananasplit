@@ -2,13 +2,15 @@
 
 import { Lock, Users } from "lucide-react";
 
+import { segmentedItem, segmentedTrack } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 
 const OPTIONS = [
-  { value: "PRIVATE" as const, label: "Private", icon: Lock },
-  { value: "ORGANIZATION" as const, label: "Organization", icon: Users },
+  { value: "PRIVATE" as const, label: "Only me", icon: Lock },
+  { value: "ORGANIZATION" as const, label: "Everyone in the club", icon: Users },
 ];
 
+/** Who can see a note: the app's segmented switch, which can be read-only. */
 export function VisibilityToggle({
   value,
   onChange,
@@ -19,21 +21,20 @@ export function VisibilityToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="bg-muted inline-flex items-center gap-1 rounded-lg p-1">
+    <div role="group" aria-label="Who can see it" className={segmentedTrack}>
       {OPTIONS.map((option) => (
         <button
           key={option.value}
           type="button"
           disabled={disabled}
+          aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-            value === option.value
-              ? "bg-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+            segmentedItem(value === option.value),
+            "disabled:cursor-not-allowed disabled:opacity-60",
           )}
         >
-          <option.icon className="size-3.5" aria-hidden="true" />
+          <option.icon aria-hidden="true" />
           {option.label}
         </button>
       ))}

@@ -1,8 +1,19 @@
 "use client";
 
+import { BackLink } from "@/components/back-link";
 import type { JSONContent } from "@tiptap/react";
 import { formatDistanceToNow } from "date-fns";
-import { Check, CloudOff, History, Link2, ListChecks, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import {
+  Check,
+  CloudOff,
+  Download,
+  History,
+  Link2,
+  ListChecks,
+  Loader2,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +28,7 @@ import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { ItemMenu } from "@/components/item-menu";
 import { PresenceBar } from "@/components/notes/collab/presence-bar";
 import { useNoteCollab, type NoteCollabState } from "@/components/notes/collab/use-note-collab";
+import { downloadNotePdf } from "@/components/notes/download-pdf-button";
 import { NoteEditor } from "@/components/notes/editor/note-editor";
 import { EventLinkPicker, type EventOption } from "@/components/notes/event-link-picker";
 import {
@@ -115,7 +127,7 @@ export function NoteEditorShell({
 
   // The autosave path: the whole note, version-checked. The snapshot is
   // kept locally until the server confirms it.
-  const { status, schedule, retry } = useAutosave<NotePayload>({
+  const { status, schedule, flush, retry } = useAutosave<NotePayload>({
     save: async (payload) => {
       writeNoteBackup(note.id, {
         title: payload.title,
@@ -135,7 +147,11 @@ export function NoteEditorShell({
   // The live path: the collaboration server saves the body, so only the
   // fields that changed are sent, and each save starts a fresh batch.
   const detailsRef = useRef<NoteDetailsInput>({});
-  const { status: detailsStatus, schedule: scheduleDetails } = useAutosave<NoteDetailsInput>({
+  const {
+    status: detailsStatus,
+    schedule: scheduleDetails,
+    flush: flushDetails,
+  } = useAutosave<NoteDetailsInput>({
     save: (patch) => {
       detailsRef.current = {};
       return updateNoteDetails(orgId, note.id, patch);
@@ -199,7 +215,7 @@ export function NoteEditorShell({
     const name = title.trim() || "Untitled note";
     const ok = await confirm({
       title: `Delete “${name}”?`,
-      description: `It moves to Recently deleted in Notes for ${NOTE_TRASH_DAYS} days, so you can bring it back.`,
+      description: `It moves to Recently deleted in Files for ${NOTE_TRASH_DAYS} days, so you can bring it back.`,
       confirmLabel: "Delete note",
       run: async () => (await deleteNote(orgId, note.id)).error,
     });
@@ -227,10 +243,29 @@ export function NoteEditorShell({
       .catch(() => toast({ title: "Couldn't copy the link", tone: "error" }));
   }
 
+  /** Saves what's pending first, so the PDF has the last edits. */
+  async function downloadPdf() {
+    const result = await downloadNotePdf(
+      `/app/${orgSlug}/notes/${note.id}/pdf`,
+      live ? flushDetails : flush,
+    );
+    if (result === "rate-limited") {
+      toast({
+        title: "Too many downloads",
+        description: "Try again in a few minutes.",
+        tone: "error",
+      });
+    } else if (result === "error") {
+      toast({ title: "Couldn't create the PDF", tone: "error" });
+    }
+  }
+
+  const backLink = <BackLink href={`/app/${orgSlug}/notes`} label="Files" />;
+
   if (session.mode === "revoked") {
     return (
       <div className="mx-auto max-w-3xl">
-        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
           <span>This note is no longer available to you.</span>
           <Button
             type="button"
@@ -238,7 +273,7 @@ export function NoteEditorShell({
             size="sm"
             onClick={() => router.push(`/app/${orgSlug}/notes`)}
           >
-            Back to notes
+            Back to Files
           </Button>
         </div>
       </div>
@@ -249,8 +284,9 @@ export function NoteEditorShell({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
+      {backLink}
       {status === "conflict" && (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
           <span>This note was updated by someone else — reload to see the latest version.</span>
           <Button
             type="button"
@@ -263,7 +299,7 @@ export function NoteEditorShell({
         </div>
       )}
       {session.mode === "interrupted" && (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
           <span>Live editing was interrupted — reload to keep editing.</span>
           <Button
             type="button"
@@ -276,11 +312,11 @@ export function NoteEditorShell({
         </div>
       )}
       {showBackup && backup && (
-        <div className="border-warning/40 bg-warning/10 flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
+        <div className="border-warning/40 bg-warning/10 flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm">
           <History className="text-warning size-4 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            Changes you made {formatDistanceToNow(backup.savedAt, { addSuffix: true })} never reached the
-            server. They&apos;re still in this browser.
+            Changes you made {formatDistanceToNow(backup.savedAt, { addSuffix: true })} never
+            reached the server. They&apos;re still in this browser.
             {backup.baseVersion < note.version &&
               " The note has changed since, so restoring them replaces the newer version."}
           </span>
@@ -310,27 +346,23 @@ export function NoteEditorShell({
             queueSave({ title: e.target.value });
           }}
           placeholder="Untitled note"
-          className="min-w-0 flex-1 border-none px-0 text-2xl font-semibold shadow-none focus-visible:ring-0"
+          aria-label="Title"
+          // Set like the page's title: no box, the heading face, and not faded when read-only.
+          className="heading h-auto min-w-0 flex-1 border-none bg-transparent px-0 py-0 text-2xl shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-2xl dark:bg-transparent"
         />
         <div className="flex shrink-0 items-center gap-2">
           {live && <PresenceBar peers={session.peers} />}
-          <SaveIndicator label={saveLabel(session, effective)} status={effective} onRetry={live ? undefined : retry} />
-          {canEdit && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => void remove()}
-              aria-label="Delete note"
-            >
-              <Trash2 className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Delete</span>
-            </Button>
-          )}
+          <SaveIndicator
+            label={saveLabel(session, effective)}
+            status={effective}
+            onRetry={live ? undefined : retry}
+          />
           <ItemMenu
             label="More note actions"
+            className="rounded-lg"
             items={[
+              { label: "Download PDF", icon: Download, onSelect: () => void downloadPdf() },
+              { label: "Copy link", icon: Link2, onSelect: copyLink },
               {
                 label: "Make tasks from this note",
                 icon: ListChecks,
@@ -342,8 +374,12 @@ export function NoteEditorShell({
                       .slice(0, 20_000),
                   ),
               },
-              { label: "Copy link", icon: Link2, onSelect: copyLink },
-              canEdit && { label: "Delete note", icon: Trash2, destructive: true, onSelect: () => void remove() },
+              canEdit && {
+                label: "Delete note",
+                icon: Trash2,
+                destructive: true,
+                onSelect: () => void remove(),
+              },
             ]}
           />
         </div>
@@ -425,7 +461,13 @@ function SaveIndicator({
 }) {
   if (!label) return null;
   const Icon =
-    status === "error" ? CloudOff : status === "saving" || status === "pending" ? Loader2 : label === "Saved" ? Check : null;
+    status === "error"
+      ? CloudOff
+      : status === "saving" || status === "pending"
+        ? Loader2
+        : label === "Saved"
+          ? Check
+          : null;
   return (
     <span
       aria-live="polite"
@@ -436,20 +478,25 @@ function SaveIndicator({
     >
       {Icon && (
         <Icon
-          className={cn("size-3.5", (status === "saving" || status === "pending") && "animate-spin")}
+          className={cn(
+            "size-3.5",
+            (status === "saving" || status === "pending") && "animate-spin",
+          )}
           aria-hidden="true"
         />
       )}
       {label}
       {status === "error" && onRetry && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={onRetry}
-          className="hover:bg-destructive/10 ms-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium underline-offset-2 hover:underline"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive ms-1"
         >
-          <RotateCcw className="size-3" aria-hidden="true" />
+          <RotateCcw aria-hidden="true" />
           Retry now
-        </button>
+        </Button>
       )}
     </span>
   );

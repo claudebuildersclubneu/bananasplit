@@ -48,7 +48,7 @@ export interface PageInfo {
 
 const SECTIONS: Record<string, string> = {
   tasks: "Tasks",
-  notes: "Notes",
+  notes: "Files",
   calendar: "Calendar",
   databases: "Databases",
   finance: "Finance",
@@ -56,14 +56,14 @@ const SECTIONS: Record<string, string> = {
   people: "People",
   profile: "Your profile",
   reports: "Reports",
-  settings: "Settings",
+  settings: "Admin panel",
   setup: "Setup",
 };
 
 const SUBPAGES: Record<string, string> = {
   "calendar/polls": "Polls",
   "calendar/polls/ask": "Ask a question",
-  "calendar/polls/new": "New poll",
+  "calendar/polls/new": "Find a time",
   "calendar/sync": "Calendar sync",
   "databases/reports": "Reports",
   "finance/budget": "Budget",
@@ -79,8 +79,6 @@ export const TASK_VIEWS: Record<string, string> = {
   week: "Week",
   board: "Board",
   table: "Table",
-  calendar: "Calendar",
-  team: "Team",
   updates: "Sunday update",
   intake: "Requests",
 };
@@ -103,7 +101,8 @@ function keptQuery(section: string, parts: string[], search: URLSearchParams): [
     const kept: [string, string][] = [];
     const folder = search.get("folder");
     if (folder && (folder === "none" || ID.test(folder))) kept.push(["folder", folder]);
-    if (search.get("tab") === "files") kept.push(["tab", "files"]);
+    const tab = search.get("tab");
+    if (tab === "files" || tab === "notes") kept.push(["tab", tab]);
     return kept;
   }
   if (section === "tasks" && parts.length === 1) {
@@ -143,18 +142,19 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
   if (!SECTIONS[section]) return null;
 
   if (section === "notes" && parts.length === 1) {
-    const files = q.tab === "files";
+    // Files holds notes and uploads; ?tab= narrows it to one kind.
+    const only = q.tab === "files" ? "Uploads" : q.tab === "notes" ? "Notes" : null;
     if (q.folder && q.folder !== "none") {
       return {
         href,
         kind: "folder",
         label: "Folder",
         lookup: { type: "folder", id: q.folder },
-        suffix: files ? " · Files" : undefined,
+        suffix: only ? ` · ${only}` : undefined,
       };
     }
-    if (q.folder === "none") return { href, kind: "page", label: files ? "Files not in a folder" : "Notes not in a folder" };
-    return { href, kind: "page", label: files ? "Notes · Files" : "Notes" };
+    if (q.folder === "none") return { href, kind: "page", label: `${only ?? "Files"} not in a folder` };
+    return { href, kind: "page", label: only ? `Files · ${only}` : "Files" };
   }
   if (section === "tasks" && parts.length === 1) {
     const bits = [q.view ? TASK_VIEWS[q.view] : null, q.scope ? TASK_SCOPES[q.scope] : null].filter(Boolean);
@@ -163,7 +163,7 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
   if (parts.length === 1) return { href, kind: "page", label: SECTIONS[section] };
 
   if (section === "settings") {
-    return { href, kind: "page", label: `Settings · ${titleCase(second)}` };
+    return { href, kind: "page", label: `Admin panel · ${titleCase(second)}` };
   }
   if (section === "notes" && second === "files" && third && parts.length === 3 && ID.test(third)) {
     return { href, kind: "file", label: "File", lookup: { type: "file", id: third } };

@@ -1,83 +1,88 @@
 "use client";
 
-import { Loader2, Trash2 } from "lucide-react";
+import { ExternalLink, Link2, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 
+import { ItemMenu } from "@/components/item-menu";
+import { PinToggle } from "@/components/pins/pins-context";
+import { copyGuestPollLink, copyPollLink } from "@/components/polls/copy-link";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { toast } from "@/components/ui/toaster";
 
 import { deletePoll } from "../actions";
 
-/** Delete, for the poll's creator or an owner/admin (deletePoll checks again). */
-export function DeletePollButton({
+/**
+ * An availability poll's header: while it's open, one click to invite
+ * guests (it copies the guest link, which is all a guest needs: they type a
+ * name on it, no account and no onboarding); then the pin, and the "…" menu
+ * for the rest. Delete is for the poll's creator or an owner/admin
+ * (deletePoll checks again).
+ */
+export function AvailabilityPollActions({
   orgId,
   orgSlug,
   pollId,
   title,
+  isOpen,
+  canDelete,
   scheduled,
 }: {
   orgId: string;
   orgSlug: string;
   pollId: string;
   title: string;
+  /** Takes answers, so guests can still be invited. */
+  isOpen: boolean;
+  canDelete: boolean;
   /** A scheduled poll's event stays on the calendar. */
   scheduled: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [confirmElement, confirm] = useConfirm();
+  const href = `/app/${orgSlug}/calendar/polls/${pollId}`;
 
-  function handleDelete() {
-    setError(null);
-    startTransition(async () => {
-      const result = await deletePoll(orgId, pollId);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.push(`/app/${orgSlug}/calendar/polls`);
+  async function remove() {
+    const deleted = await confirm({
+      title: `Delete “${title}”?`,
+      description: `Everyone's answers are deleted and the link stops working.${
+        scheduled ? " The event it scheduled stays on the calendar." : ""
+      }`,
+      confirmLabel: "Delete poll",
+      run: async () => (await deletePoll(orgId, pollId)).error,
     });
+    if (!deleted) return;
+    toast({ title: "Poll deleted", description: title });
+    router.push(`/app/${orgSlug}/calendar/polls`);
   }
 
   return (
     <>
-      <Button variant="outline" size="icon" aria-label="Delete poll" onClick={() => setOpen(true)}>
-        <Trash2 className="size-4" />
-      </Button>
-      <Dialog open={open} onOpenChange={(next) => !isPending && setOpen(next)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete &ldquo;{title}&rdquo;?</DialogTitle>
-            <DialogDescription>
-              Everyone&apos;s answers are deleted and the link stops working.
-              {scheduled && " The event it scheduled stays on the calendar."}
-            </DialogDescription>
-          </DialogHeader>
-          {error && (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
-              {isPending && <Loader2 aria-hidden className="size-4 animate-spin" />}
-              Delete poll
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmElement}
+      {isOpen && (
+        <Button type="button" variant="outline" size="sm" onClick={() => copyGuestPollLink(pollId)}>
+          <UserPlus aria-hidden className="size-4" />
+          Invite guests
+        </Button>
+      )}
+      <PinToggle href={href} label={title} />
+      <ItemMenu
+        label="Poll actions"
+        items={[
+          { label: "Copy link", icon: Link2, onSelect: () => copyPollLink(href) },
+          isOpen && {
+            label: "Open guest view",
+            icon: ExternalLink,
+            onSelect: () => window.open(`/poll/${pollId}`, "_blank", "noopener,noreferrer"),
+          },
+          canDelete && {
+            label: "Delete",
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => void remove(),
+          },
+        ]}
+      />
     </>
   );
 }

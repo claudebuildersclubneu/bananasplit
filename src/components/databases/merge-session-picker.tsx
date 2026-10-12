@@ -21,6 +21,7 @@ export function MergeSessionPicker({
   candidates,
   startOpen = false,
   openSurvivor = true,
+  onCancel,
 }: {
   organizationId: string;
   loserId: string;
@@ -30,6 +31,8 @@ export function MergeSessionPicker({
   startOpen?: boolean;
   /** After merging, open the surviving session in the drawer (Sessions page) or just refresh (queue). */
   openSurvivor?: boolean;
+  /** For a picker opened from elsewhere (a menu): Cancel hands control back. */
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const view = useViewParams();
@@ -47,7 +50,7 @@ export function MergeSessionPicker({
     );
   }
   return (
-    <div className="space-y-2 rounded-md border p-3 text-sm">
+    <div className="space-y-2 rounded-xl border p-3 text-sm">
       <p>
         Merge <strong>{loserTitle}</strong> into:
       </p>
@@ -56,7 +59,7 @@ export function MergeSessionPicker({
           value={survivor}
           onChange={(e) => setSurvivor(e.target.value)}
           aria-label="Session to keep"
-          className="border-input bg-background h-8 w-full rounded-md border px-2"
+          className="border-input bg-background h-8 w-full rounded-lg border px-2"
         >
           {candidates.map((c) => (
             <option key={c.id} value={c.id}>
@@ -70,7 +73,7 @@ export function MergeSessionPicker({
           onChange={(e) => setSurvivor(e.target.value.trim())}
           placeholder="Session id (from the Sessions table)"
           aria-label="Session id to keep"
-          className="border-input bg-background h-8 w-full rounded-md border px-2 font-mono text-xs"
+          className="border-input bg-background h-8 w-full rounded-lg border px-2 font-mono text-xs"
         />
       )}
       <div className="flex gap-2">
@@ -97,8 +100,12 @@ export function MergeSessionPicker({
         >
           Merge
         </Button>
-        {!startOpen && (
-          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        {(!startOpen || onCancel) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => (onCancel ? onCancel() : setOpen(false))}
+          >
             Cancel
           </Button>
         )}

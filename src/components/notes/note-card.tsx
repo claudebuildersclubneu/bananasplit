@@ -22,7 +22,7 @@ export function NoteCard({ note, orgSlug }: { note: NoteCardData; orgSlug: strin
   return (
     <Link
       href={`/app/${orgSlug}/notes/${note.id}`}
-      className="bg-card hover:border-foreground/20 focus-visible:ring-ring flex flex-col gap-2 rounded-md border p-4 text-sm shadow-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      className="bg-card hover:border-foreground/20 focus-visible:ring-ring flex flex-col gap-2 rounded-xl border p-4 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="line-clamp-1 font-medium">{note.title || "Untitled note"}</p>
@@ -32,7 +32,7 @@ export function NoteCard({ note, orgSlug }: { note: NoteCardData; orgSlug: strin
           ) : (
             <Users className="size-3" aria-hidden="true" />
           )}
-          {note.visibility === "PRIVATE" ? "Private" : "Org"}
+          {note.visibility === "PRIVATE" ? "Only you" : "Club"}
         </Badge>
       </div>
 

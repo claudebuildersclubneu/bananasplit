@@ -42,14 +42,20 @@ export const PositionNode = memo(function PositionNode({ data }: NodeProps<Posit
   return (
     <>
       <Handle type="target" position={Position.Top} className="!opacity-0" isConnectable={false} />
-      <Handle type="target" id="side" position={Position.Left} className="!opacity-0" isConnectable={false} />
+      <Handle
+        type="target"
+        id="side"
+        position={Position.Left}
+        className="!opacity-0"
+        isConnectable={false}
+      />
       <button
         type="button"
         aria-label={`${node.title}: ${label}${node.isAdvisor ? ", advisor" : ""}`}
         aria-pressed={selected}
         style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
         className={cn(
-          "bg-card text-card-foreground focus-visible:ring-ring flex items-center gap-3 rounded-xl border p-3 text-left shadow-xs transition-shadow outline-none hover:shadow-md focus-visible:ring-2",
+          "bg-card text-card-foreground focus-visible:ring-ring hover:border-foreground/25 flex items-center gap-3 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-2",
           variant === "placeholder" && "border-dashed",
           variant === "open" && "bg-muted/50 border-dashed",
           node.isAdvisor && "border-dashed",
@@ -68,10 +74,17 @@ export const PositionNode = memo(function PositionNode({ data }: NodeProps<Posit
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className={cn("block truncate text-sm font-semibold", variant === "open" && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "block truncate text-sm font-semibold",
+              variant === "open" && "text-muted-foreground",
+            )}
+          >
             {label}
           </span>
-          <span className="text-muted-foreground line-clamp-2 text-xs leading-snug">{node.title}</span>
+          <span className="text-muted-foreground line-clamp-2 text-xs leading-snug">
+            {node.title}
+          </span>
           <span className="mt-1 flex flex-wrap gap-1">
             {node.isAdvisor && <Tag>Advisor</Tag>}
             {variant === "open" && <Tag>Open hire</Tag>}
@@ -79,8 +92,19 @@ export const PositionNode = memo(function PositionNode({ data }: NodeProps<Posit
           </span>
         </span>
       </button>
-      <Handle type="source" position={Position.Bottom} className="!opacity-0" isConnectable={false} />
-      <Handle type="source" id="side" position={Position.Right} className="!opacity-0" isConnectable={false} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!opacity-0"
+        isConnectable={false}
+      />
+      <Handle
+        type="source"
+        id="side"
+        position={Position.Right}
+        className="!opacity-0"
+        isConnectable={false}
+      />
     </>
   );
 });

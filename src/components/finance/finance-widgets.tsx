@@ -45,7 +45,13 @@ import { RunwaySection } from "./runway-section";
  * ledger, the same numbers as the budget and transactions pages.
  */
 
-const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 
 const KIND_LABEL: Record<string, string> = {
   EXPENSE: "Expenses",
@@ -67,7 +73,11 @@ const STATUS_LABEL: Record<string, string> = { SUBMITTED: "To approve", APPROVED
 
 const money = (cents: number) => formatCents(cents).replace(/\.00$/, "");
 
-const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const shortDate = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
 function Big({ value, sub, tone }: { value: ReactNode; sub?: ReactNode; tone?: "good" | "bad" }) {
   return (
@@ -103,14 +113,13 @@ function TxList({ rows, orgSlug }: { rows: DashboardTransaction[]; orgSlug: stri
               href={`/app/${orgSlug}/finance/transactions`}
               className="hover:bg-accent/50 -mx-2 flex items-center gap-3 rounded-md px-2 py-2"
             >
-              <span
+              <Icon
                 className={cn(
-                  "grid size-7 shrink-0 place-items-center rounded-full",
-                  inbound ? "bg-success/10 text-success" : "bg-muted text-muted-foreground",
+                  "size-4 shrink-0",
+                  inbound ? "text-success" : "text-muted-foreground",
                 )}
-              >
-                <Icon className="size-3.5" aria-hidden="true" />
-              </span>
+                aria-hidden="true"
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{t.description}</span>
                 <span className="text-muted-foreground block text-xs">
@@ -130,9 +139,22 @@ function TxList({ rows, orgSlug }: { rows: DashboardTransaction[]; orgSlug: stri
   );
 }
 
-function Shortcut({ href, icon: Icon, label, detail }: { href: string; icon: LucideIcon; label: string; detail: string }) {
+function Shortcut({
+  href,
+  icon: Icon,
+  label,
+  detail,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  detail: string;
+}) {
   return (
-    <Link href={href} className="hover:bg-accent/60 flex items-center gap-3 rounded-lg border p-2.5 transition-colors">
+    <Link
+      href={href}
+      className="hover:bg-accent/60 flex items-center gap-3 rounded-lg border p-2.5 transition-colors"
+    >
       <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{label}</span>
@@ -189,7 +211,10 @@ export function WidgetBody({
         <Big
           value={formatCents(data.outstandingReimbursementsCents)}
           sub={
-            <Link href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE`} className="hover:underline">
+            <Link
+              href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE`}
+              className="hover:underline"
+            >
               Expenses not yet paid back
             </Link>
           }
@@ -216,7 +241,8 @@ export function WidgetBody({
     case "burn":
       return <BurnChart data={data.burnByMonth} />;
     case "trend":
-      if (data.balanceTrend.length === 0) return <ChartEmpty text="No transactions yet this period" />;
+      if (data.balanceTrend.length === 0)
+        return <ChartEmpty text="No transactions yet this period" />;
       return (
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={data.balanceTrend} margin={{ left: 0, right: 8, top: 8 }}>
@@ -293,7 +319,10 @@ export function WidgetBody({
       );
     }
     case "by-kind": {
-      const rows = data.spendByKind.map((k) => ({ label: KIND_LABEL[k.kind] ?? k.kind, cents: k.cents }));
+      const rows = data.spendByKind.map((k) => ({
+        label: KIND_LABEL[k.kind] ?? k.kind,
+        cents: k.cents,
+      }));
       if (rows.length === 0) return <ChartEmpty text="Nothing spent yet this period" />;
       return (
         <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
@@ -317,7 +346,10 @@ export function WidgetBody({
             size="compact"
             title="No budget categories yet"
             action={
-              <Link href={`/app/${orgSlug}/finance/budget`} className="text-primary text-sm hover:underline">
+              <Link
+                href={`/app/${orgSlug}/finance/budget`}
+                className="text-primary text-sm hover:underline"
+              >
                 Set up the budget
               </Link>
             }
@@ -328,13 +360,20 @@ export function WidgetBody({
         <div className="space-y-3">
           {data.categories.map((c) => {
             const pct =
-              c.allocatedCents > 0 ? Math.min(100, Math.round((c.spentCents / c.allocatedCents) * 100)) : 0;
+              c.allocatedCents > 0
+                ? Math.min(100, Math.round((c.spentCents / c.allocatedCents) * 100))
+                : 0;
             const over = c.spentCents > c.allocatedCents;
             return (
               <div key={c.id} className="space-y-1">
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate">{c.name}</span>
-                  <span className={cn("tabular-nums", over ? "text-destructive" : "text-muted-foreground")}>
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      over ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
                     {formatCents(c.spentCents)} / {formatCents(c.allocatedCents)}
                   </span>
                 </div>
@@ -365,20 +404,27 @@ export function WidgetBody({
         <div className="space-y-2.5 text-sm">
           <div className="flex items-center justify-between gap-2">
             <Badge variant="secondary">Committed</Badge>
-            <span className="font-medium tabular-nums">{formatCents(data.sponsorshipCommittedCents)}</span>
+            <span className="font-medium tabular-nums">
+              {formatCents(data.sponsorshipCommittedCents)}
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <Badge>Received</Badge>
-            <span className="font-medium tabular-nums">{formatCents(data.sponsorshipReceivedCents)}</span>
+            <span className="font-medium tabular-nums">
+              {formatCents(data.sponsorshipReceivedCents)}
+            </span>
           </div>
           {data.sponsorshipCreditsCents > 0 && (
             <div className="flex items-center justify-between gap-2">
               <Badge variant="outline">In credits</Badge>
-              <span className="font-medium tabular-nums">{formatCents(data.sponsorshipCreditsCents)}</span>
+              <span className="font-medium tabular-nums">
+                {formatCents(data.sponsorshipCreditsCents)}
+              </span>
             </div>
           )}
           <p className="text-muted-foreground text-xs">
-            Pledged money never counts toward the balance{data.sponsorshipCreditsCents > 0 ? ", and credits never do" : ""}.
+            Pledged money never counts toward the balance
+            {data.sponsorshipCreditsCents > 0 ? ", and credits never do" : ""}.
           </p>
         </div>
       );
@@ -402,11 +448,18 @@ export function WidgetBody({
         );
       }
       return (
-        <Big value={formatCents(left)} sub={`of ${money(data.totalAllocatedCents)} budgeted`} tone={left < 0 ? "bad" : undefined} />
+        <Big
+          value={formatCents(left)}
+          sub={`of ${money(data.totalAllocatedCents)} budgeted`}
+          tone={left < 0 ? "bad" : undefined}
+        />
       );
     }
     case "income-sources": {
-      const rows = data.incomeByKind.map((k) => ({ label: INCOME_LABEL[k.kind] ?? k.kind, cents: k.cents }));
+      const rows = data.incomeByKind.map((k) => ({
+        label: INCOME_LABEL[k.kind] ?? k.kind,
+        cents: k.cents,
+      }));
       if (rows.length === 0) return <ChartEmpty text="No money in yet this period" />;
       const total = rows.reduce((sum, r) => sum + r.cents, 0);
       return (
@@ -414,7 +467,15 @@ export function WidgetBody({
           <div className="h-40 w-40 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={rows} dataKey="cents" nameKey="label" innerRadius="58%" outerRadius="100%" paddingAngle={2} stroke="none">
+                <Pie
+                  data={rows}
+                  dataKey="cents"
+                  nameKey="label"
+                  innerRadius="58%"
+                  outerRadius="100%"
+                  paddingAngle={2}
+                  stroke="none"
+                >
                   {rows.map((r, i) => (
                     <Cell key={r.label} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
@@ -426,7 +487,10 @@ export function WidgetBody({
           <ul className="w-full min-w-0 space-y-1.5">
             {rows.map((r, i) => (
               <li key={r.label} className="flex items-center gap-2 text-sm">
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
+                />
                 <span className="min-w-0 flex-1 truncate">{r.label}</span>
                 <span className="text-muted-foreground tabular-nums">{money(r.cents)}</span>
                 <span className="text-muted-foreground w-9 text-right text-xs tabular-nums">
@@ -456,10 +520,15 @@ export function WidgetBody({
                     {t.submitter} · {shortDate.format(new Date(t.occurredAt))}
                   </span>
                 </span>
-                <Badge variant={t.status === "APPROVED" ? "default" : "secondary"} className="shrink-0 text-[10px]">
+                <Badge
+                  variant={t.status === "APPROVED" ? "default" : "secondary"}
+                  className="shrink-0 text-[10px]"
+                >
                   {STATUS_LABEL[t.status] ?? t.status}
                 </Badge>
-                <span className="text-sm font-medium tabular-nums">{formatCents(t.amountCents)}</span>
+                <span className="text-sm font-medium tabular-nums">
+                  {formatCents(t.amountCents)}
+                </span>
               </Link>
             </li>
           ))}
@@ -474,14 +543,28 @@ export function WidgetBody({
             label="Import a spreadsheet"
             detail="Bank exports, PDFs, an old sheet"
           />
-          <Shortcut href={`${base}/budget`} icon={PiggyBank} label="Budget" detail="What each category may spend" />
+          <Shortcut
+            href={`${base}/budget`}
+            icon={PiggyBank}
+            label="Budget"
+            detail="What each category may spend"
+          />
           <Shortcut
             href={`${base}/transactions?status=SUBMITTED`}
             icon={ReceiptText}
             label="Requests to review"
-            detail={data.pendingApproval.count ? `${data.pendingApproval.count} waiting` : "Nothing waiting"}
+            detail={
+              data.pendingApproval.count
+                ? `${data.pendingApproval.count} waiting`
+                : "Nothing waiting"
+            }
           />
-          <Shortcut href={`${base}/setup`} icon={ListChecks} label="Setup guide" detail="Budget year, balance, treasurers" />
+          <Shortcut
+            href={`${base}/setup`}
+            icon={ListChecks}
+            label="Setup guide"
+            detail="Budget year, balance, treasurers"
+          />
         </div>
       );
     case "setup": {
@@ -499,13 +582,19 @@ export function WidgetBody({
                   <span
                     className={cn(
                       "grid size-5 shrink-0 place-items-center rounded-full border",
-                      ok ? "bg-success border-success text-success-foreground" : "text-muted-foreground",
+                      ok
+                        ? "bg-success border-success text-success-foreground"
+                        : "text-muted-foreground",
                     )}
                   >
                     {ok && <Check className="size-3" aria-hidden="true" />}
                   </span>
-                  <span className={cn("min-w-0 flex-1 truncate", ok && "text-muted-foreground")}>{step.title}</span>
-                  {!ok && !step.core && <span className="text-muted-foreground text-xs">optional</span>}
+                  <span className={cn("min-w-0 flex-1 truncate", ok && "text-muted-foreground")}>
+                    {step.title}
+                  </span>
+                  {!ok && !step.core && (
+                    <span className="text-muted-foreground text-xs">optional</span>
+                  )}
                 </Link>
               </li>
             );

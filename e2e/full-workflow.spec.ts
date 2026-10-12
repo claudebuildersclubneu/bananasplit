@@ -59,14 +59,14 @@ test("full workspace workflow", async ({ page }) => {
   await signIn(page, owner);
 
   // --- create a task, then drag it to a different status column ---
-  await page.goto(`/app/${orgSlug}/tasks`);
+  await page.goto(`/app/${orgSlug}/tasks?view=board`);
   const taskTitle = `E2E task ${uniqueSuffix()}`;
   await page.getByRole("button", { name: "Add a task to Not started" }).click();
-  await page.getByLabel("Title").fill(taskTitle);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByLabel("Title", { exact: true }).fill(taskTitle);
+  await page.getByRole("button", { name: "Create task" }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
 
-  const card = page.getByRole("button", { name: new RegExp(taskTitle) });
+  const card = page.getByRole("button", { name: taskTitle, exact: true });
   await expect(card).toBeVisible();
   const targetColumn = page.getByTestId("kanban-column-IN_PROGRESS");
 
@@ -87,13 +87,13 @@ test("full workspace workflow", async ({ page }) => {
   // --- write and share a note ---
   await page.goto(`/app/${orgSlug}/notes`);
   await page.getByRole("button", { name: "New" }).click();
-  await page.getByRole("menuitem", { name: "Blank note" }).click();
+  await page.getByRole("menuitem", { name: "New note" }).click();
   await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}/notes/`));
   const noteTitle = `E2E note ${uniqueSuffix()}`;
   await page.getByPlaceholder("Untitled note").fill(noteTitle);
   await page.locator(".tiptap, [contenteditable='true']").first().click();
   await page.keyboard.type("Meeting notes body text.");
-  await page.getByRole("button", { name: "Organization", exact: true }).click();
+  await page.getByRole("button", { name: "Everyone in the club", exact: true }).click();
   await expect(page.getByText(/Saved|Saving/)).toBeVisible();
 
   // --- create an availability poll, respond, and finalize into an event ---

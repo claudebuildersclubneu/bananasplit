@@ -108,7 +108,7 @@ export const GROUP_SECTION: Partial<Record<SearchGroupId, SectionId>> = {
   events: "calendar",
   polls: "polls",
   people: "people",
-  roles: "org-chart",
+  roles: "people",
   databases: "databases",
   finance: "finance",
 };

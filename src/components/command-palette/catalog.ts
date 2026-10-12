@@ -35,10 +35,12 @@ export interface CatalogEntry {
 
 export interface PaletteSection {
   id: SectionId;
-  /** The org's name for it (Settings › Sidebar). */
+  /** The org's name for it (Admin panel › Sidebar). */
   label: string;
   defaultLabel: string;
   path: string;
+  /** Other paths in the same section (People's /org-chart). */
+  also?: readonly string[];
   hidden: boolean;
   icon: string;
   description: string;
@@ -89,18 +91,12 @@ const PAGES: readonly PageDef[] = [
     keywords: ["list", "spreadsheet", "bulk edit", "filter"],
   },
   {
-    path: "/tasks?view=calendar",
-    title: "Task calendar",
-    section: "tasks",
+    path: "/calendar",
+    title: "Task due dates",
+    detail: "On the calendar",
+    section: "calendar",
     icon: "CalendarDays",
-    keywords: ["due dates", "month", "deadlines"],
-  },
-  {
-    path: "/tasks?view=team",
-    title: "Team workload",
-    section: "tasks",
-    icon: "Users",
-    keywords: ["lanes", "people", "who is doing what", "team"],
+    keywords: ["task calendar", "due dates", "month", "deadlines"],
   },
   {
     path: "/tasks?view=updates",
@@ -125,13 +121,13 @@ const PAGES: readonly PageDef[] = [
     icon: "CalendarSync",
     keywords: ["google calendar", "mirror"],
   },
-  // Notes
+  // Files (notes and uploads)
   {
     path: "/notes?tab=files",
-    title: "Files",
+    title: "Uploads",
     section: "notes",
     icon: "Paperclip",
-    keywords: ["uploads", "documents", "attachments", "pdf", "docs"],
+    keywords: ["files", "documents", "attachments", "pdf", "docs"],
   },
   {
     path: "/notes?folder=trash",
@@ -155,20 +151,32 @@ const PAGES: readonly PageDef[] = [
       "major",
       "availability",
       "links",
+      "settings",
+      "notifications",
+      "email",
+      "calendar feed",
+      "ics",
     ],
   },
-  // Org chart
+  // People: the directory and the org chart
+  {
+    path: "/org-chart",
+    title: "Org chart",
+    section: "people",
+    icon: "Network",
+    keywords: ["roles", "who reports to whom", "board", "positions", "structure"],
+  },
   {
     path: "/org-chart/versions",
     title: "Org chart history",
-    section: "org-chart",
+    section: "people",
     icon: "History",
     keywords: ["versions", "past", "published"],
   },
   {
     path: "/org-chart/import",
     title: "Import org chart",
-    section: "org-chart",
+    section: "people",
     permission: "orgchart.write",
     icon: "Upload",
     keywords: ["upload", "constitution", "bylaws", "roles"],
@@ -244,12 +252,13 @@ const PAGES: readonly PageDef[] = [
     icon: "ListChecks",
     keywords: ["getting started", "progress", "checklist"],
   },
-  // Settings (the sections come from settings-nav, below)
+  // The Admin panel (the sections come from settings-nav, below)
   {
     path: "/settings",
-    title: "Settings",
-    icon: "Settings",
-    keywords: ["preferences", "configuration", "admin", "options"],
+    title: "Admin panel",
+    permission: "settings.view",
+    icon: "ShieldCheck",
+    keywords: ["settings", "preferences", "configuration", "admin", "options", "club settings"],
   },
   {
     path: "/settings/invitations",
@@ -257,7 +266,7 @@ const PAGES: readonly PageDef[] = [
     permission: "members.invite",
     icon: "MailPlus",
     keywords: ["invite", "join code", "link", "add members"],
-    detail: "Settings",
+    detail: "Admin panel",
   },
   {
     path: "/settings/integrations/email",
@@ -265,7 +274,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "Mail",
     keywords: ["resend", "domain", "mail", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
   {
     path: "/settings/integrations/claude",
@@ -273,7 +282,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "KeyRound",
     keywords: ["ai", "anthropic", "api key", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
   {
     path: "/settings/integrations/ai-model",
@@ -281,7 +290,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "Settings2",
     keywords: ["claude", "model", "ai", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
   {
     path: "/settings/integrations/google-calendar",
@@ -289,7 +298,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "CalendarSync",
     keywords: ["gcal", "sync", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
   {
     path: "/settings/integrations/website",
@@ -297,7 +306,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "Globe",
     keywords: ["build hook", "public events", "site", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
   {
     path: "/settings/integrations/data-source",
@@ -305,7 +314,7 @@ const PAGES: readonly PageDef[] = [
     permission: "integrations.view",
     icon: "DatabaseZap",
     keywords: ["supabase", "sync", "attendance", "integrations"],
-    detail: "Settings · Integrations",
+    detail: "Admin panel · Integrations",
   },
 ];
 
@@ -318,8 +327,6 @@ const SETTINGS_KEYWORDS: Record<string, readonly string[]> = {
   members: ["roster", "roles", "titles", "invite", "remove", "admins"],
   privacy: ["ballots", "emails", "visibility", "public"],
   integrations: ["connections", "api", "apps"],
-  notifications: ["email", "alerts", "digest", "unsubscribe"],
-  calendar: ["ics", "subscribe", "feed", "apple calendar", "outlook"],
   audit: ["log", "history", "changes"],
   danger: ["delete", "export", "backup", "download data"],
 };
@@ -369,7 +376,7 @@ export function buildCatalog(input: CatalogInput): CatalogEntry[] {
       key: `page:/settings/${s.segment}`,
       group: "pages",
       title: s.label,
-      detail: `Settings · ${s.description}`,
+      detail: `Admin panel · ${s.description}`,
       keywords: SETTINGS_KEYWORDS[s.segment] ?? [],
       icon: s.icon,
       command: { type: "href", href: `${base}/settings/${s.segment}` },

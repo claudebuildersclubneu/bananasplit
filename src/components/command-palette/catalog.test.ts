@@ -57,7 +57,10 @@ describe("the page catalog", () => {
   it("only lists the settings and finance pages the role can open", () => {
     expect(titles({ role: "MEMBER" }, "theme")).not.toContain("Theme");
     expect(titles({ role: "ADMIN" }, "theme")).toContain("Theme");
-    expect(titles({ role: "MEMBER" }, "notifications")).toContain("Notifications");
+    // A member's own notification settings are on their profile.
+    expect(titles({ role: "MEMBER" }, "notifications")).toContain("Your profile");
+    expect(titles({ role: "MEMBER" }, "admin")).not.toContain("Admin panel");
+    expect(titles({ role: "ADMIN" }, "admin")).toContain("Admin panel");
     expect(titles({ role: "MEMBER" }, "budget")).not.toContain("Budget");
     expect(titles({ role: "TREASURER" }, "budget")).toContain("Budget");
     expect(titles({ role: "ADMIN" }, "danger")).not.toContain("Danger zone");

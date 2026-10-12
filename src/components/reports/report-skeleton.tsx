@@ -15,7 +15,11 @@ export function ReportSkeleton({
   className?: string;
 }) {
   return (
-    <Card className={cn("min-w-0 flex-1", className)} aria-busy="true" aria-label={`${title} loading`}>
+    <Card
+      className={cn("min-w-0 flex-1", className)}
+      aria-busy="true"
+      aria-label={`${title} loading`}
+    >
       <CardHeader>
         <div className="font-heading text-base font-medium">{title}</div>
         <Skeleton className="h-4 w-2/3" />
@@ -24,7 +28,7 @@ export function ReportSkeleton({
         {stats > 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Array.from({ length: stats }).map((_, i) => (
-              <Skeleton key={i} className="h-16" />
+              <Skeleton key={i} className="h-16 rounded-xl" />
             ))}
           </div>
         ) : null}
