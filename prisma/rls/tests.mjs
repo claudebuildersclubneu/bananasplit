@@ -1364,7 +1364,10 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
     "owner",
     null,
     async (q) => ({
-      policies: await count(q, `SELECT count(*) n FROM pg_policies WHERE 'app_legacy' = ANY(roles)`),
+      policies: await count(
+        q,
+        `SELECT count(*) n FROM pg_policies WHERE 'app_legacy' = ANY(roles)`,
+      ),
       tables: await count(
         q,
         `SELECT count(*) n FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
@@ -1935,8 +1938,10 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // C4: reads "Task"/"TaskAssignee" without RLS so the task-visibility
         // policies cannot recurse into themselves. Answers only about
         // app.user_id().
+        "can_edit_database",
         "can_read_task",
         "can_view_ballot_rows",
+        "can_view_database",
         "can_view_rows",
         "cancel_job",
         "claim_jobs",
@@ -2066,6 +2071,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "AvailabilityPoll:DELETE",
         "AvailabilityPoll:INSERT",
         "AvailabilityPoll:UPDATE",
+        // Club-made database rows: app.can_edit_database is the role check.
+        "DatabaseRecord:INSERT",
+        "DatabaseRecord:UPDATE",
         "EventAttendee:DELETE",
         "EventAttendee:INSERT",
         "EventAttendee:UPDATE",
@@ -2226,6 +2234,11 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       // grant; only the table owner fires them).
       can_read_task: "us",
       task_visibility_inherit: "",
+      // Club-made databases: the per-database policy predicates (member path
+      // only), and the trigger that keeps fields and rows on CUSTOM ones.
+      can_view_database: "u",
+      can_edit_database: "u",
+      assert_custom_database: "",
       // Onboarding: "Join with invite code" (verified callers only)
       org_by_join_code: "u",
       // Another member's busy hours: never the rules, and only as the org allows

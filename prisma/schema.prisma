@@ -55,51 +55,54 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   memberships            Membership[]
-  sentInvitations        Invitation[]        @relation("InvitationInvitedBy")
-  createdTasks           Task[]              @relation("TaskCreatedBy")
+  sentInvitations        Invitation[]         @relation("InvitationInvitedBy")
+  createdTasks           Task[]               @relation("TaskCreatedBy")
   taskAssignments        TaskAssignee[]
-  authoredNotes          Note[]              @relation("NoteAuthor")
-  updatedNotes           Note[]              @relation("NoteUpdatedBy")
-  createdEvents          Event[]             @relation("EventCreatedBy")
+  authoredNotes          Note[]               @relation("NoteAuthor")
+  updatedNotes           Note[]               @relation("NoteUpdatedBy")
+  createdEvents          Event[]              @relation("EventCreatedBy")
   eventAttendances       EventAttendee[]
-  eventRegistrations     EventRegistration[] @relation("EventRegistrationUser")
-  createdPolls           AvailabilityPoll[]  @relation("PollCreatedBy")
+  eventRegistrations     EventRegistration[]  @relation("EventRegistrationUser")
+  createdDatabases       DatabaseDefinition[] @relation("DatabaseCreatedBy")
+  createdDatabaseRecords DatabaseRecord[]     @relation("DatabaseRecordCreatedBy")
+  updatedDatabaseRecords DatabaseRecord[]     @relation("DatabaseRecordUpdatedBy")
+  createdPolls           AvailabilityPoll[]   @relation("PollCreatedBy")
   pollResponses          PollResponse[]
-  createdQuestionPolls   Poll[]              @relation("QuestionPollCreatedBy")
-  addedPollOptions       PollOption[]        @relation("PollOptionAddedBy")
+  createdQuestionPolls   Poll[]               @relation("QuestionPollCreatedBy")
+  addedPollOptions       PollOption[]         @relation("PollOptionAddedBy")
   pollVotes              PollVote[]
-  submittedTransactions  Transaction[]       @relation("TransactionSubmittedBy")
-  approvedTransactions   Transaction[]       @relation("TransactionApprovedBy")
-  reconciledTransactions Transaction[]       @relation("TransactionReconciledBy")
+  submittedTransactions  Transaction[]        @relation("TransactionSubmittedBy")
+  approvedTransactions   Transaction[]        @relation("TransactionApprovedBy")
+  reconciledTransactions Transaction[]        @relation("TransactionReconciledBy")
   uploadedReceipts       Receipt[]
-  ownedSponsorships      Sponsorship[]       @relation("SponsorshipOwner")
+  ownedSponsorships      Sponsorship[]        @relation("SponsorshipOwner")
   financeAuditLogs       FinanceAuditLog[]
   notifications          Notification[]
   orgAuditLogs           OrgAuditLog[]
   memberHistory          OrgMemberHistory[]
-  connectedIntegrations  OrgIntegration[]    @relation("IntegrationConnectedBy")
-  requestedExports       OrgExport[]         @relation("OrgExportRequestedBy")
-  hostedEvents           Event[]             @relation("EventHost")
-  createdChartVersions   OrgChartVersion[]   @relation("OrgChartVersionCreatedBy")
-  publishedChartVersions OrgChartVersion[]   @relation("OrgChartVersionPublishedBy")
-  chartPositions         OrgChartPosition[]  @relation("OrgChartPositionUser")
-  contacts               Contact[]           @relation("ContactUser")
-  ownedTasks             Task[]              @relation("TaskOwner")
-  triageProjects         Project[]           @relation("ProjectTriageUser")
-  assignmentsMade        TaskAssignee[]      @relation("TaskAssignedBy")
-  taskComments           TaskComment[]       @relation("TaskCommentAuthor")
-  taskMentions           TaskMention[]       @relation("TaskMentionedUser")
-  taskMentionsMade       TaskMention[]       @relation("TaskMentionedBy")
-  taskActivity           TaskActivity[]      @relation("TaskActivityActor")
-  weeklyUpdates          WeeklyUpdate[]      @relation("WeeklyUpdateUser")
-  notificationsActed     Notification[]      @relation("NotificationActor")
-  createdJoinCodes       OrgJoinCode[]       @relation("OrgJoinCodeCreatedBy")
+  connectedIntegrations  OrgIntegration[]     @relation("IntegrationConnectedBy")
+  requestedExports       OrgExport[]          @relation("OrgExportRequestedBy")
+  hostedEvents           Event[]              @relation("EventHost")
+  createdChartVersions   OrgChartVersion[]    @relation("OrgChartVersionCreatedBy")
+  publishedChartVersions OrgChartVersion[]    @relation("OrgChartVersionPublishedBy")
+  chartPositions         OrgChartPosition[]   @relation("OrgChartPositionUser")
+  contacts               Contact[]            @relation("ContactUser")
+  ownedTasks             Task[]               @relation("TaskOwner")
+  triageProjects         Project[]            @relation("ProjectTriageUser")
+  assignmentsMade        TaskAssignee[]       @relation("TaskAssignedBy")
+  taskComments           TaskComment[]        @relation("TaskCommentAuthor")
+  taskMentions           TaskMention[]        @relation("TaskMentionedUser")
+  taskMentionsMade       TaskMention[]        @relation("TaskMentionedBy")
+  taskActivity           TaskActivity[]       @relation("TaskActivityActor")
+  weeklyUpdates          WeeklyUpdate[]       @relation("WeeklyUpdateUser")
+  notificationsActed     Notification[]       @relation("NotificationActor")
+  createdJoinCodes       OrgJoinCode[]        @relation("OrgJoinCodeCreatedBy")
   availability           UserAvailability?
   pins                   Pin[]
   recentVisits           RecentVisit[]
   memberPrefs            MemberPrefs[]
-  uploadedFiles          OrgFile[]           @relation("OrgFileUploadedBy")
-  noteFolders            NoteFolder[]        @relation("NoteFolderCreatedBy")
+  uploadedFiles          OrgFile[]            @relation("OrgFileUploadedBy")
+  noteFolders            NoteFolder[]         @relation("NoteFolderCreatedBy")
 }
 
 /// When a user can't meet (profile setup A5, the profile page). Its own
@@ -1806,6 +1809,70 @@ enum DatabaseKind {
   CUSTOM
 }
 
+/// A field (column) of a club-made database (DatabaseDefinition kind CUSTOM;
+/// docs/features/databases.md, "Your own databases"). Its id is what record
+/// values are keyed by, so renaming a field never touches the data.
+model DatabaseField {
+  id             String            @id @default(cuid())
+  organizationId String
+  databaseId     String
+  name           String
+  type           DatabaseFieldType
+  /// Per type: SELECT/MULTI_SELECT {choices: [{id, label, color}]},
+  /// NUMBER {decimals}, CURRENCY {currency}. Validated by zod
+  /// (src/lib/databases/fields.ts).
+  options        Json              @default("{}")
+  /// The field rows are named by (exactly one per database).
+  isPrimary      Boolean           @default(false)
+  sortOrder      Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  database DatabaseDefinition @relation(fields: [organizationId, databaseId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, databaseId, sortOrder])
+}
+
+/// A row of a club-made database. Its values are one JSON object keyed by
+/// field id (an absent key is an empty cell), checked against the field
+/// types on every write; a cell edit merges into it, so two people editing
+/// different cells of a row never undo each other.
+model DatabaseRecord {
+  id             String    @id @default(cuid())
+  organizationId String
+  databaseId     String
+  values         Json      @default("{}")
+  createdById    String?
+  updatedById    String?
+  /// In the trash (restorable) since then.
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  database  DatabaseDefinition @relation(fields: [organizationId, databaseId], references: [organizationId, id], onDelete: Cascade)
+  createdBy User?              @relation("DatabaseRecordCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?              @relation("DatabaseRecordUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, databaseId, deletedAt, createdAt])
+}
+
+enum DatabaseFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  CURRENCY
+  DATE
+  CHECKBOX
+  SELECT
+  MULTI_SELECT
+  MEMBER
+  EMAIL
+  PHONE
+  URL
+}
+
 /// One browsable database per row. The built-ins (sessions, attendance,
 /// signups, ballots, people) are created for every org by
 /// app.ensure_org_defaults. An empty columns array means "use the built-in
@@ -1829,12 +1896,22 @@ model DatabaseDefinition {
   sortOrder        Int              @default(0)
   /// Archive instead of delete (app_user has no DELETE).
   archivedAt       DateTime?
+  /// What it's for, under the name (club-made databases).
+  description      String?
+  /// Club-made databases: members (not just owners and admins) may add and
+  /// edit rows, if they can see the database at all.
+  memberCanEdit    Boolean          @default(false)
+  createdById      String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @default(now()) @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?            @relation("DatabaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  fields       DatabaseField[]
+  records      DatabaseRecord[]
 
   @@unique([organizationId, key])
+  @@unique([organizationId, id])
   @@index([organizationId, kind])
 }
 

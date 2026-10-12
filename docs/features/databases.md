@@ -1,19 +1,118 @@
-# Databases: setup
+# Databases
 
-Everyone in the org can browse the club's data here: the sessions, who
+Every club's data is stored in Bananasplit, in the club's own walled-off
+rows. **A club never has to set up, host or connect a database**: it makes
+its own databases here, or uses the built-in ones, and everything saves as
+it is typed. Connecting a club website (Supabase, below) is optional, for
+clubs that already keep check-ins and sign-ups there.
+
+## Your own databases
+
+Owners and admins make databases from **Databases › New database**:
+
+- from a template (Blank, Member roster, Equipment, Merch orders,
+  Sponsors and contacts, Event ideas; `src/lib/databases/templates.ts`);
+- or by importing a spreadsheet (CSV from Google Sheets or Excel). Each
+  column becomes a field and its type is guessed from the values; a value
+  that doesn't fit is left empty and counted.
+
+A database is a grid. Click a cell and type: each cell saves on its own as
+you pause typing and when you leave the cell. Checkboxes, dates, choices
+and members save the moment you pick them. The header shows "Saving…",
+then "All changes saved", or "Last change not saved" with the reason.
+
+Field types (`src/lib/databases/fields.ts`):
+
+- text, long text, number, money, date, checkbox
+- single select and multi-select, with coloured choices
+- member (someone in the club), email, phone and link
+
+Values are checked on the server on every write: an email must be an
+email, a choice must exist, a member must be in the club.
+
+Other things the grid does:
+
+- **Field menu:** sort, rename, edit choices, change type, move, delete.
+  Changing a type keeps the values that fit and clears the rest. Deleting
+  a field deletes its values.
+- **Rows:** expand a row to edit it as a form (handy on a phone), select
+  rows to move them to the trash, and restore them from **… › Trash**.
+  Only owners and admins delete rows for good.
+- **Search, sort and export:** search runs across every field, and
+  **Export CSV** downloads the current view.
+
+### How it's stored
+
+| Table                                | Holds                                                                                                                                         |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DatabaseDefinition` (kind `CUSTOM`) | the database: name, description, who sees and edits it                                                                                        |
+| `DatabaseField`                      | a column: name, type, options (select choices, decimals). Its id keys the values, so a rename never touches data                              |
+| `DatabaseRecord`                     | a row: `values`, one JSON object keyed by field id (an empty cell has no key), plus who made and last edited it and `deletedAt` for the trash |
+
+How writes and limits work:
+
+- **Cell saves:** a cell save merges one key into the row (`values ||
+{field: value}`), so two people editing different cells of the same row
+  never undo each other.
+- **Lookups:** a GIN index on `values` keeps lookups fast.
+- **Size limits:** a row is at most 64 KB (a database check); there are at
+  most 60 fields per database, 10,000 rows per database and 100 databases
+  per club.
+- **Built-ins:** the database refuses fields or rows on the built-in
+  databases. Those keep their own typed tables.
+
+### Who can see and change it
+
+Enforced by the database itself (row-level security), on every page, link,
+search and export:
+
+- **Other clubs:**
+  - every row carries the club's `organizationId`;
+  - the policies only ever show the caller's own club;
+  - the composite foreign keys keep fields and rows inside their club.
+
+  No club can read, or write into, another's.
+
+- **Who sees a database:** `app.can_view_database(id)` follows the
+  database's **Who can see it** setting:
+  - everyone in the club;
+  - owners and admins;
+  - owners only.
+
+  A member who isn't allowed gets nothing at all: not the rows, not the
+  fields, not the name in Databases or search.
+
+- **Who edits:** `app.can_edit_database(id)`.
+  - Owners and admins always can.
+  - Members can when **Members can add and edit rows** is on, and the
+    database is visible to them.
+  - New rows are always recorded as created by the person adding them.
+- **Shaping:** fields, settings, archiving and deleting rows for good are
+  owners and admins only.
+- **Archiving:** archiving hides a database everywhere and keeps its data.
+  The owner's export includes every database, its fields and rows (trash
+  included).
+
+`src/server/databases/custom.db.test.ts` checks all of this against the
+real roles and policies, and `pnpm test:rls` covers the new tables and
+functions.
+
+## The built-in databases
+
+Everyone in the org can browse the club's activity here: the sessions, who
 checked in, who signed up and what people voted for. Sessions and calendar
 events are the same records. Check-ins, signups and ballots come from the
 club website (or from CSV, or typed in by an admin).
 
-## What each database holds
+### What each built-in database holds
 
-| Database | One row is | Where the rows come from |
-|---|---|---|
-| Sessions | a workshop, social, hackathon, info session or board meeting | the calendar, the website sync, or **New session** here |
-| Attendance | one check-in, with the stamp it earned and the person's term total | the website sync, CSV import, or **Add check-in** |
-| Signups | one person's interest form for one term | the website sync, CSV import, or **Add signup** |
-| Ballots | poll results; for authorized roles, one row per answer | the website sync |
-| People | one person per term: sessions, stamps, first and last visit, lapsed | computed from attendance |
+| Database   | One row is                                                          | Where the rows come from                                |
+| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Sessions   | a workshop, social, hackathon, info session or board meeting        | the calendar, the website sync, or **New session** here |
+| Attendance | one check-in, with the stamp it earned and the person's term total  | the website sync, CSV import, or **Add check-in**       |
+| Signups    | one person's interest form for one term                             | the website sync, CSV import, or **Add signup**         |
+| Ballots    | poll results; for authorized roles, one row per answer              | the website sync                                        |
+| People     | one person per term: sessions, stamps, first and last visit, lapsed | computed from attendance                                |
 
 Stamp numbers, term totals, first visits, "lapsed", signup status and
 conversion are **computed**, not typed: they are recomputed in the same
@@ -26,13 +125,13 @@ Set this in **Settings > Privacy**; the database enforces it on every path
 (the table, the row drawer, search, a `?row=` deep link and CSV export),
 not just in the screens.
 
-| Data | Default | Setting |
-|---|---|---|
-| Sessions, Attendance, People, poll results | all members | per database, in Privacy |
-| Signups | owners and admins | per database, in Privacy |
-| Email addresses | owners and admins (members see `m***@husky.neu.edu`) | contact email visibility |
-| Individual ballots (who voted for what) | owners only | ballot visibility: owners, owners and admins, or nobody |
-| Small result groups | hidden below 3 votes, shown as `<3` | minimum group size |
+| Data                                       | Default                                              | Setting                                                 |
+| ------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------- |
+| Sessions, Attendance, People, poll results | all members                                          | per database, in Privacy                                |
+| Signups                                    | owners and admins                                    | per database, in Privacy                                |
+| Email addresses                            | owners and admins (members see `m***@husky.neu.edu`) | contact email visibility                                |
+| Individual ballots (who voted for what)    | owners only                                          | ballot visibility: owners, owners and admins, or nobody |
+| Small result groups                        | hidden below 3 votes, shown as `<3`                  | minimum group size                                      |
 
 A treasurer reads as a member. Opening a single ballot is recorded in the
 org's audit log, as is every CSV export, edit, merge and import.
@@ -43,7 +142,7 @@ given suite-side corrections (a display name, "added to list"); they cannot
 be deleted, because the next sync would bring them back. Nothing in the
 suite is ever written back to the website.
 
-## Connecting the club website (Supabase)
+## Connecting a club website (Supabase, optional)
 
 The suite keeps its own copy of the website's data and refreshes it on a
 schedule. It reads through a **fixed, read-only contract**: a login that can
@@ -70,13 +169,13 @@ alter role cbc_suite_reader with password '<a long random password>';
 
 **3. Connect it in the suite**, in Settings > Integrations > Website data:
 
-| Field | Where to find it |
-|---|---|
-| Project ref | the 20-character id in the Supabase project URL |
-| Pooler region | the project's region, e.g. `us-east-1` |
+| Field         | Where to find it                                                    |
+| ------------- | ------------------------------------------------------------------- |
+| Project ref   | the 20-character id in the Supabase project URL                     |
+| Pooler region | the project's region, e.g. `us-east-1`                              |
 | Pooler prefix | `aws-0` or `aws-1`, whichever the project's connection string shows |
-| Role name | `cbc_suite_reader` |
-| Password | the one you just set |
+| Role name     | `cbc_suite_reader`                                                  |
+| Password      | the one you just set                                                |
 
 The suite **derives** the host (`{prefix}-{region}.pooler.supabase.com`,
 port 5432) and the user (`{role}.{projectRef}`) from those fields: no

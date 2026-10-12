@@ -90,6 +90,10 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "OrgChartVersion", key: ID, omit: ["sourceBlobKey"] },
   { model: "OrgChartPosition", key: ID },
   { model: "DatabaseDefinition", key: ID },
+  // Club-made databases: the fields and every row, trash included (the
+  // export is OWNER-only and reads past the visibility settings).
+  { model: "DatabaseField", key: ID },
+  { model: "DatabaseRecord", key: ID },
   { model: "Contact", key: ID },
   { model: "ContactEmail", key: ID },
   { model: "ContactTermStats", key: ["organizationId", "contactId", "term"] },

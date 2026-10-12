@@ -97,15 +97,15 @@ finishes (the flowchart's "invite link shown on first load").
 
 ## Flow B: create an organization
 
-| Step | Page                                  | What it does                                                                                                                                                                                                                                                                                                     |
-| ---- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1   | `/onboarding/organization`            | Club basics: name, web address (checked as you type) and time zone, plus a club-creation code where the platform requires one. Creates the club, with you as owner.                                                                                                                                           |
-| B2   | `/onboarding/organization/<url>/data` | The club's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. **Continue** unlocks once one works. **Skip for now** marks the rest skipped. |
-| B3   | `.../labels`                          | The club's task labels (the same ones as Settings › Labels): keep, rename, recolour, remove or add. A new club starts with four suggestions. The preview shows the newest tasks wearing them. Database names and who can see them live in Settings › Privacy and Databases.                                     |
-| B4   | `.../finance`                         | Which sections the finance dashboard shows, and when the fiscal year starts. An owner or treasurer can start that year's budget period here, with the usual categories at $0.                                                                                                                                    |
-| B5   | `.../teams`                           | Teams, each with a lead and a regular meeting. They're published as the org chart: the first team is the top and the rest report to it. The meetings are added to the calendar for the next 12 weeks, and mirror to Google Calendar when it's connected. Also: whether members see each other's busy times.      |
-| B6   | `.../invite`                          | Invite officers by email (the same invites as Settings › Members, valid for 7 days, as Admin, Treasurer or Member) and share the club code. **Finish setup** opens the club.                                                                                                                                       |
-| End  | `/app/<url>?welcome=1`                | The club's overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                          |
+| Step | Page                                  | What it does                                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1   | `/onboarding/organization`            | Club basics: name, web address (checked as you type) and time zone, plus a club-creation code where the platform requires one. Creates the club, with you as owner.                                                                                                                                                                                                                     |
+| B2   | `/onboarding/organization/<url>/data` | The club's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. All optional: the club's data is stored in Bananasplit from the start, so **Continue** always works (with nothing connected it marks them skipped). |
+| B3   | `.../labels`                          | The club's task labels (the same ones as Settings › Labels): keep, rename, recolour, remove or add. A new club starts with four suggestions. The preview shows the newest tasks wearing them. Database names and who can see them live in Settings › Privacy and Databases.                                                                                                             |
+| B4   | `.../finance`                         | Which sections the finance dashboard shows, and when the fiscal year starts. An owner or treasurer can start that year's budget period here, with the usual categories at $0.                                                                                                                                                                                                           |
+| B5   | `.../teams`                           | Teams, each with a lead and a regular meeting. They're published as the org chart: the first team is the top and the rest report to it. The meetings are added to the calendar for the next 12 weeks, and mirror to Google Calendar when it's connected. Also: whether members see each other's busy times.                                                                             |
+| B6   | `.../invite`                          | Invite officers by email (the same invites as Settings › Members, valid for 7 days, as Admin, Treasurer or Member) and share the club code. **Finish setup** opens the club.                                                                                                                                                                                                            |
+| End  | `/app/<url>?welcome=1`                | The club's overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                                                                                                 |
 
 B2-B6 are for owners and admins. Anyone else who opens them is told so.
 Everything can be changed later in Settings, the Org Chart, Finance and
@@ -122,7 +122,7 @@ Who may create an organization is a platform setting, not code:
 
 | Setting                         | What it does                                                                                                                  |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `PLATFORM_ORG_CREATION_ENABLED` | Off (the production default): only `PLATFORM_ADMIN_EMAILS` may create orgs.                                                  |
+| `PLATFORM_ORG_CREATION_ENABLED` | Off (the production default): only `PLATFORM_ADMIN_EMAILS` may create orgs.                                                   |
 | `ORG_CREATION_MODE=open`        | Any verified account may. Limits: 3 a day per person, and in production also 1 every 30 days per person and 20 a day overall. |
 | `ORG_CREATION_MODE=invite`      | Only people holding a single-use org-creation code from a platform admin.                                                     |
 
@@ -131,15 +131,15 @@ it also decides who is responsible for other clubs' student data.
 
 ### What is shared and what stays in one org
 
-| Data                                                                                                                             | Belongs to  | Who can see it                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Account: email, password, verification                                                                                           | the person  | only the sign-in system. Email is never on people pages.                                                                             |
-| Profile: name, picture, pronouns, major, year, bio, links, time zone                                                             | the person  | the person, and members of any org they share. It's the same profile in every org.                                                   |
-| Personal theme                                                                                                                   | the person  | only changes their own view.                                                                                                         |
-| Availability rules and labels                                                                                                    | the person  | only the person (their own table).                                                                                                   |
-| Busy hours                                                                                                                       | the person  | the person; the admins of orgs they belong to; other members of an org that shares busy times. Asked per org.                         |
-| Membership: role and title                                                                                                       | one org     | that org. The title starts as the one picked in profile setup, and each org's admins can change it separately.                       |
-| Everything else: tasks, notes, calendar, polls, finance, databases, reports, org chart, invite code, integrations, settings, audit | one org     | only that org's members, with each feature's own rules (finance: owner and treasurer; invite code and integrations: owners and admins). |
+| Data                                                                                                                               | Belongs to | Who can see it                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Account: email, password, verification                                                                                             | the person | only the sign-in system. Email is never on people pages.                                                                                |
+| Profile: name, picture, pronouns, major, year, bio, links, time zone                                                               | the person | the person, and members of any org they share. It's the same profile in every org.                                                      |
+| Personal theme                                                                                                                     | the person | only changes their own view.                                                                                                            |
+| Availability rules and labels                                                                                                      | the person | only the person (their own table).                                                                                                      |
+| Busy hours                                                                                                                         | the person | the person; the admins of orgs they belong to; other members of an org that shares busy times. Asked per org.                           |
+| Membership: role and title                                                                                                         | one org    | that org. The title starts as the one picked in profile setup, and each org's admins can change it separately.                          |
+| Everything else: tasks, notes, calendar, polls, finance, databases, reports, org chart, invite code, integrations, settings, audit | one org    | only that org's members, with each feature's own rules (finance: owner and treasurer; invite code and integrations: owners and admins). |
 
 **How the database keeps orgs apart.** Every org-owned row carries its org's
 id. The app runs each request as one of four restricted database roles.
@@ -148,6 +148,7 @@ person is in right now, and only if they're a member of it. A bug in a page
 can't show another org's data, because the database won't return it.
 
 `pnpm test:rls` checks this for every table on every change:
+
 - isolation between orgs;
 - one role check per command;
 - a catalog that fails when a table is added without a reviewed policy.
@@ -157,6 +158,7 @@ whole story end to end: two founders, one member in both orgs, nothing
 crossing between them.
 
 **Leaving and deleting.**
+
 - **Leaving an org** removes only that membership. The profile, the
   availability and the other orgs are untouched.
 - **Deleting an org** removes everything it owns after a 30-day grace period.

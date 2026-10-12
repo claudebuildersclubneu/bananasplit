@@ -62,7 +62,8 @@ export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
 /** The stepper's names for B1-B6, in order. */
 export const ORG_STEP_NAMES = [
   "Club basics",
-  "Connect data",
+  // Optional: a club's data is stored in Bananasplit whether or not it connects anything.
+  "Connect tools",
   "Labels",
   "Finance",
   "Teams",
