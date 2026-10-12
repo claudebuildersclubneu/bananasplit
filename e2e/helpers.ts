@@ -37,10 +37,9 @@ function testClientIp(): string {
 export async function signUp(page: Page, user: TestUser): Promise<void> {
   await page.context().setExtraHTTPHeaders({ "x-real-ip": testClientIp() });
   await page.goto("/sign-up");
-  await page.getByLabel("Name").fill(user.name);
-  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Full name").fill(user.name);
+  await page.getByLabel("School email").fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
-  await page.getByLabel("Confirm password").fill(user.password);
   await page.getByRole("button", { name: "Create account" }).click();
 }
 
@@ -114,21 +113,21 @@ export async function completeProfileSetup(page: Page, next: "join" | "create"):
   }
   await page
     .getByRole("button", {
-      name: next === "join" ? "Join with invite code" : "Create an organization",
+      name: next === "join" ? "Join with a club code" : "Start a new club",
     })
     .click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
 }
 
 /**
- * Org setup (onboarding Flow B) with the defaults: name the org, skip the
- * connections, keep the labels, finance and starter teams, and land on the
- * new org's home as its OWNER. Returns the org's slug.
+ * Org setup (onboarding Flow B) with the defaults: name the club, skip the
+ * connections, keep the suggested labels, finance and starter teams, invite
+ * no one, and land on the new club's home as its OWNER. Returns the slug.
  */
 export async function createOrgViaOnboarding(page: Page, orgName: string): Promise<string> {
   if (!/\/onboarding\/organization$/.test(new URL(page.url()).pathname))
     await page.goto("/onboarding/organization");
-  await page.getByLabel("Organization name").fill(orgName);
+  await page.getByLabel("Club name").fill(orgName);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/onboarding\/organization\/[^/]+\/data$/);
   const slug = new URL(page.url()).pathname.split("/")[3]!;
@@ -138,6 +137,8 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.waitForURL(/\/finance$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/teams$/);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Finish setup" }).click();
   await page.waitForURL(new RegExp(`/app/${slug}\\?welcome=1$`));
   return slug;
@@ -166,7 +167,7 @@ export async function signIn(
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Log in" }).click();
   // The credentials sign-in server action redirects to /app once the session
   // cookie is set — wait for that before navigating again, or a subsequent
   // goto() can race the redirect and land pre-auth.

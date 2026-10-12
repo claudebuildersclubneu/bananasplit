@@ -27,7 +27,7 @@ test("full workspace workflow", async ({ page }) => {
   await signUp(page, owner);
   await expect(page).toHaveURL(/\/onboarding\/profile\/basics/);
   await expect(page.getByText("Check your email")).toBeVisible();
-  await expect(page.getByLabel("Organization name")).toHaveCount(0);
+  await expect(page.getByLabel("Club name")).toHaveCount(0);
 
   await verifyEmail(page, owner.email);
   await expect(page.getByText("Check your email")).toHaveCount(0);
