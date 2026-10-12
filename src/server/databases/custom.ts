@@ -295,7 +295,8 @@ export async function createDatabase(
   const template = findTemplate(input.templateId ?? "blank") ?? DATABASE_TEMPLATES[0]!;
   const def = await insertDefinition(actor, {
     name: input.name || template.defaultName,
-    description: input.description ?? null,
+    // A template's own line describes it until the club writes one.
+    description: input.description ?? (template.id === "blank" ? null : template.description),
     icon: template.icon,
   });
   await actor.db.databaseField.createMany({
