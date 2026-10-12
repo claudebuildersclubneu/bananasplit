@@ -49,7 +49,7 @@ export const taskLabelsInputSchema = z
       )
       .max(
         MAX_SETUP_LABELS,
-        `Add up to ${MAX_SETUP_LABELS} labels here. You can add more in Settings.`,
+        `Add up to ${MAX_SETUP_LABELS} labels here. You can add more in the Admin panel.`,
       ),
   })
   .strict();
