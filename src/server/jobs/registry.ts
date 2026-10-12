@@ -135,6 +135,28 @@ export const JOB_KINDS = {
     handler: () => import("@/server/email/jobs").then((m) => m.verifyEmailJob),
     description: "Sign-up email verification (platform sender), enqueued by app_auth.",
   }),
+  "password-reset-email": kind({
+    payload: z.object({ userId: id }).strict(),
+    scope: "platform",
+    maxRuntimeMs: 20_000,
+    leaseSeconds: 60,
+    tier: "fast",
+    afterEligible: true,
+    sendsEmail: true,
+    handler: () => import("@/server/email/jobs").then((m) => m.passwordResetEmailJob),
+    description: "A password-reset link (platform sender), enqueued by app_auth.",
+  }),
+  "password-changed-email": kind({
+    payload: z.object({ userId: id }).strict(),
+    scope: "platform",
+    maxRuntimeMs: 20_000,
+    leaseSeconds: 60,
+    tier: "fast",
+    afterEligible: true,
+    sendsEmail: true,
+    handler: () => import("@/server/email/jobs").then((m) => m.passwordChangedEmailJob),
+    description: "The notice after a password reset (platform sender), enqueued by app_auth.",
+  }),
 
   // ---- Tasks (Phase 6; handlers owned by B6) ----
   "task-reminder": kind({

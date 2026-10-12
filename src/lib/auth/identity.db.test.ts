@@ -125,13 +125,13 @@ describe.skipIf(!cbcId)("identity fixes against the local database", () => {
       },
     });
 
-    expect(await consumeVerificationToken(token)).toEqual({ ok: true, email: person.email });
+    expect(await consumeVerificationToken(token, person.id)).toEqual({ ok: true, email: person.email });
     const after = await authDb.user.findUniqueOrThrow({
       where: { id: person.id },
       select: { emailVerified: true },
     });
     expect(after.emailVerified).toBeInstanceOf(Date);
-    expect(await consumeVerificationToken(token)).toEqual({ ok: false, reason: "invalid" });
+    expect(await consumeVerificationToken(token, person.id)).toEqual({ ok: false, reason: "invalid" });
     expect(await authDb.verificationToken.count({ where: { identifier: person.email } })).toBe(0);
   });
 });

@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { useState } from "react";
 
-import { FieldError } from "@/components/onboarding/step-card";
+import { FieldError } from "@/components/onboarding/step-fields";
 import {
   choiceName,
   initialThemeChoice,
@@ -34,7 +34,7 @@ export function ThemeStep({ initial }: { initial: PersonalTheme | null }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 flex-col gap-4">
       <ThemePicker value={choice} onChange={setChoice} />
       <FieldError message={errors.form ?? errors.preset ?? errors.custom} />
       <StepNav

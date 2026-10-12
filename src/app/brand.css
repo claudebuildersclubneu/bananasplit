@@ -1,0 +1,273 @@
+/*
+ * Bananasplit's own look: the marketing site, sign-in and sign-up, joining a
+ * club, checkout and onboarding (the design handoff, "Bananasplit marketing
+ * site + auth, checkout and onboarding screens"). These pages belong to no
+ * club, so they never take an org theme: the palette below is fixed, the
+ * way the brand mark's colours are.
+ *
+ * Components use these as Tailwind colours (bg-ink, text-ink-muted,
+ * border-ink/10, bg-banana ...), never raw values. `.brand` (BrandRoot) also
+ * points the app's own tokens at the palette, so shared components (Input,
+ * Button, Select) inside these pages print in ink on cream.
+ */
+
+@theme {
+  /* Ink: text and primary buttons. */
+  --color-ink: #1c1810;
+  --color-ink-hover: #3a3122;
+  --color-ink-muted: #5c5444;
+  --color-ink-soft: #7a6e58;
+  --color-ink-faint: #8a8070;
+  --color-ink-ghost: #a89e88;
+  /* The dark panels (finance, "For schools") and the phone's island. */
+  --color-night: #17140e;
+  --color-void: #0b0905;
+  /* Paper. */
+  --color-cream: #f7f2e6;
+  --color-paper: #fffdf7;
+  --color-sand: #efe6d0;
+  --color-oat: #f4eedf;
+  --color-stripe: #f1eada;
+  --color-chrome: #e4dac2;
+  --color-wheat: #e8d6a8;
+  --color-straw: #e3d6b4;
+  --color-fog: #e2dccd;
+  /* Bananas, from soft to ripe. */
+  --color-butter: #f6e7b4;
+  --color-lemon: #f7d660;
+  --color-banana: #f2c230;
+  --color-gold: #e9b41c;
+  --color-ripe: #e3a90a;
+  --color-slice: #f7ebc4;
+  --color-core: #b58a00;
+  --color-stem: #6b4a1e;
+  --color-spot: #8a5a34;
+  --color-freckle: #7a5826;
+  /* Ripeness stages (the growth section). */
+  --color-stage-1: #8fa344;
+  --color-stage-2: #bebe45;
+  --color-stage-3: #e6c93a;
+  /* Text on the yellow surfaces. */
+  --color-honey: #7a5a00;
+  --color-honey-deep: #6b4e00;
+  --color-honey-dark: #5c4500;
+  --color-honey-hover: #8a6400;
+  --color-bark: #3d2f08;
+  --color-bark-soft: #4a3a10;
+  /* Text on the dark panels. */
+  --color-dusk: #c9bfa8;
+  --color-dusk-light: #e8e0cc;
+  /* The success chip ("9 weeks runway", "Found"). */
+  --color-leaf: #e7edcf;
+  --color-leaf-ink: #4a5a16;
+  /* Club theme swatches and the sample club's tile. */
+  --color-pine: #2f5d50;
+  --color-brick: #b8433a;
+  --color-navy: #3c4f8a;
+  /* Card brands on the checkout's card field. */
+  --color-card-visa: #1a1f71;
+  --color-card-mc-red: #eb001b;
+  --color-card-mc-orange: #f79e1b;
+  --color-card-amex: #2e77bc;
+
+  --shadow-card: 0 1px 2px rgb(28 24 16 / 0.04), 0 24px 48px -32px rgb(28 24 16 / 0.25);
+  --shadow-float: 0 1px 2px rgb(28 24 16 / 0.06), 0 24px 40px -20px rgb(28 24 16 / 0.35);
+  --shadow-cta: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 12px 24px -12px rgb(28 24 16 / 0.5);
+  --shadow-cta-soft: 0 12px 24px -12px rgb(28 24 16 / 0.5);
+  --shadow-featured: 0 0 0 4px rgb(242 194 48 / 0.25), 0 30px 60px -30px rgb(28 24 16 / 0.35);
+  --shadow-frame: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.35);
+  --shadow-frame-soft: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.3);
+  --shadow-segment: 0 1px 2px rgb(28 24 16 / 0.12);
+  --shadow-tile: 0 1px 2px rgb(28 24 16 / 0.06);
+  --shadow-phone: 0 40px 60px -24px rgb(28 24 16 / 0.55);
+  --shadow-browser: 0 -30px 80px -30px rgb(160 110 0 / 0.35), 0 0 0 6px rgb(255 253 247 / 0.5);
+  --shadow-widget: 0 30px 60px -30px rgb(0 0 0 / 0.6);
+  --shadow-field: 0 1px 1px rgb(28 24 16 / 0.04);
+  --shadow-ring-ink: 0 0 0 2px var(--color-cream), 0 0 0 4px var(--color-ink);
+  --shadow-divider-left: -1px 0 0 rgb(28 24 16 / 0.06);
+}
+
+/* The focus ring on inputs and code boxes: an ink border and a banana halo. */
+@utility focus-banana {
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 4px rgb(242 194 48 / 0.35);
+  }
+}
+
+/* The same ring on a field group (a prefix and its input). */
+@utility focus-within-banana {
+  &:focus-within {
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 4px rgb(242 194 48 / 0.35);
+  }
+}
+
+/* The checkout's tighter halo (Stripe-style fields). */
+@utility focus-banana-sm {
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px rgb(242 194 48 / 0.35);
+  }
+}
+
+/* Screenshot placeholders: cream and stripe at 135 degrees. */
+@utility bg-stripes {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-stripe) 0 10px,
+    var(--color-cream) 10px 20px
+  );
+}
+
+/* A receipt's ruled lines. */
+@utility bg-receipt {
+  background: repeating-linear-gradient(
+    180deg,
+    var(--color-stripe) 0 4px,
+    var(--color-paper) 4px 8px
+  );
+}
+
+/* The hero: cream into banana. */
+@utility bg-hero {
+  background: linear-gradient(
+    180deg,
+    var(--color-cream) 0%,
+    var(--color-cream) 40%,
+    var(--color-butter) 72%,
+    var(--color-banana) 100%
+  );
+}
+
+/* The hero's 80px grid, fading out by 55%. */
+@utility bg-hero-grid {
+  background-image:
+    linear-gradient(rgb(28 24 16 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(28 24 16 / 0.05) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 55%);
+}
+
+/* The yellow panel on the auth cards. */
+@utility bg-peel {
+  background: radial-gradient(
+    120% 90% at 30% 0%,
+    var(--color-lemon) 0%,
+    var(--color-banana) 50%,
+    var(--color-gold) 100%
+  );
+}
+
+/* The final call to action: the same yellow, lit from the top centre. */
+@utility bg-peel-center {
+  background-color: var(--color-banana);
+  background-image: radial-gradient(
+    120% 90% at 50% 0%,
+    var(--color-lemon) 0%,
+    var(--color-banana) 50%,
+    var(--color-gold) 100%
+  );
+}
+
+/* The event card's cover. */
+@utility bg-event-cover {
+  background: linear-gradient(135deg, var(--color-banana), var(--color-ripe));
+}
+
+/* Soft glows. */
+@utility bg-glow-cream {
+  background: radial-gradient(circle, rgb(255 240 180 / 0.7), transparent 70%);
+}
+@utility bg-glow-banana {
+  background: radial-gradient(circle, rgb(242 194 48 / 0.26), transparent 70%);
+}
+@utility bg-glow-banana-22 {
+  background: radial-gradient(circle, rgb(242 194 48 / 0.22), transparent 65%);
+}
+@utility bg-glow-banana-20 {
+  background: radial-gradient(circle, rgb(242 194 48 / 0.2), transparent 65%);
+}
+@utility bg-glow-banana-10 {
+  background: radial-gradient(circle, rgb(242 194 48 / 0.1), transparent 65%);
+}
+
+/* Ripeness swatches with their brown spots. */
+@utility bg-stage-4 {
+  background-color: var(--color-banana);
+  background-image: radial-gradient(circle at 30% 50%, var(--color-freckle) 2px, transparent 2.5px);
+}
+@utility bg-stage-5 {
+  background-color: var(--color-ripe);
+  background-image:
+    radial-gradient(circle at 25% 45%, var(--color-stem) 2px, transparent 2.5px),
+    radial-gradient(circle at 65% 60%, var(--color-stem) 2.5px, transparent 3px);
+}
+
+/* The Mastercard chip: two halves. */
+@utility bg-card-mc {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-card-mc-red) 50%,
+    var(--color-card-mc-orange) 50%
+  );
+}
+
+/*
+ * The brand scope (BrandRoot): ink on cream, and the app's tokens pointed at
+ * the palette for the shared components inside. In the
+ * base layer, so any utility on an element (a link's own colour) wins.
+ */
+@layer base {
+  .brand {
+    --background: var(--color-cream);
+    --foreground: var(--color-ink);
+    --card: var(--color-paper);
+    --card-foreground: var(--color-ink);
+    --popover: var(--color-paper);
+    --popover-foreground: var(--color-ink);
+    --primary: var(--color-ink);
+    --primary-foreground: var(--color-cream);
+    --primary-hover: var(--color-ink-hover);
+    --secondary: var(--color-sand);
+    --secondary-foreground: var(--color-ink);
+    --muted: var(--color-oat);
+    --muted-foreground: var(--color-ink-muted);
+    --accent: var(--color-oat);
+    --accent-foreground: var(--color-ink);
+    --border: rgb(28 24 16 / 0.12);
+    --input: rgb(28 24 16 / 0.16);
+    --ring: var(--color-banana);
+    --brand-accent: var(--color-banana);
+    --brand-accent-foreground: var(--color-ink);
+    --success: var(--color-leaf-ink);
+    --warning: var(--color-honey);
+    /* The design leaves line height to the browser, not Tailwind's 1.5. */
+    line-height: normal;
+    color: var(--color-ink);
+    background-color: var(--color-cream);
+    -webkit-font-smoothing: antialiased;
+
+    & a {
+      color: var(--color-ink);
+      text-decoration: none;
+    }
+    & a:not([data-plain]):hover {
+      color: var(--color-honey-hover);
+    }
+    & ::placeholder {
+      color: var(--color-ink-ghost);
+    }
+    & :focus-visible {
+      outline: 2px solid var(--color-ink);
+      outline-offset: 3px;
+    }
+    & [id] {
+      scroll-margin-top: 80px;
+    }
+  }
+}

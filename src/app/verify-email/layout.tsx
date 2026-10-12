@@ -1,6 +1,6 @@
-import { PublicThemeRoot } from "@/components/theme/public-theme-root";
+import { BrandRoot } from "@/components/brand/brand-root";
 
-/** Light/dark from the device (or the visitor's choice); see PublicThemeRoot. */
+/** Bananasplit's own look, always light (src/app/brand.css). */
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <PublicThemeRoot>{children}</PublicThemeRoot>;
+  return <BrandRoot>{children}</BrandRoot>;
 }

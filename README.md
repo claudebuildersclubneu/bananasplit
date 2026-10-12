@@ -1,7 +1,12 @@
-# Bananasplit
+# <img src="public/brand/bananasplit-logo.svg" alt="Bananasplit" width="280">
 
-A multi-tenant workspace for student club executive boards: task management, notes, meeting
-scheduling, and finance tracking.
+The all-in-one workspace for student clubs (and the teams that grow out of them): tasks,
+availability polls and RSVPs, notes and files, databases, the club budget, and the org chart,
+for every member, in one multi-tenant app.
+
+The marketing site (`/`), sign-in, sign-up, onboarding and checkout follow the brand design
+(`src/app/brand.css`, `src/components/brand/`); each club's workspace takes its own theme, with
+the Bananasplit preset as the default. See `docs/features/themes.md`.
 
 ## Stack
 
@@ -10,7 +15,7 @@ password), Tailwind CSS + shadcn/ui. See the project spec for the full rationale
 
 Sign-in supports both Google OAuth and email/password (bcrypt-hashed, `/sign-up` to register).
 Email/password is a deliberate addition beyond the original spec, which scoped v1 to Google-only.
-"Continue with Google" (on `/sign-in` and `/invite/[token]`) appears only when `AUTH_GOOGLE_ID`
+"Continue with Google" (on `/sign-in`, `/sign-up` and `/invite/[token]`) appears only when `AUTH_GOOGLE_ID`
 and `AUTH_GOOGLE_SECRET` are both set (`src/lib/auth/google-sign-in.ts`); without them the pages
 offer email and password only. Google Calendar sync (Settings > Integrations) is a separate OAuth
 client.

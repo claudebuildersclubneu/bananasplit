@@ -33,7 +33,7 @@ import {
 } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
-import { Chip, DashedButton } from "./step-card";
+import { Chip, DashedButton } from "./step-fields";
 import { ScheduleImport } from "./schedule-import";
 
 /**

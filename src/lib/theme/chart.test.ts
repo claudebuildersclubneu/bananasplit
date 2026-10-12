@@ -37,11 +37,16 @@ describe("chart palette", () => {
     ]).toEqual(REFERENCE_CHART_PALETTE.dark.slice(0, 5));
   });
 
-  it("leads the Default (Bananasplit) charts with its raspberry, passing every gate", () => {
+  it("gives the Default (Bananasplit) charts the reference slots, passing every gate", () => {
+    // Its ink primary is near-achromatic, so it never leads a chart (a grey
+    // series would read as "no data"); the dark mode's banana primary does.
     const { primary, background, surface } = DEFAULT_PRESET.light;
     const palette = deriveChartPalette(primary, "light", [background, surface]);
-    expect(palette[0]).toBe(primary);
+    expect(palette[0]).not.toBe(primary);
     expect(checkChartPalette(palette, "light", [background, surface]).ok).toBe(true);
+    const dark = DEFAULT_PRESET.dark;
+    const darkPalette = deriveChartPalette(dark.primary, "dark", [dark.background, dark.surface]);
+    expect(checkChartPalette(darkPalette, "dark", [dark.background, dark.surface]).ok).toBe(true);
   });
 
   it("snaps a slot's lightness (hue held) until it reads on the surface", () => {

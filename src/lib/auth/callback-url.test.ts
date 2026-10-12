@@ -20,6 +20,11 @@ describe("safeCallbackUrl (same-origin relative only)", () => {
     "/sign-in",
     "/sign-in?callbackUrl=/app",
     "/api/cron/jobs",
+    // Paths that normalize into a protocol-relative URL (another host).
+    "/..//evil.example",
+    "/.//evil.example",
+    "/%2e%2e//evil.example",
+    "/app/../..//evil.example",
     "/app/\ncbc",
     "",
     null,

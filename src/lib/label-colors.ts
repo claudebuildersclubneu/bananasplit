@@ -1,4 +1,15 @@
+import { contrastRatio } from "@/lib/theme/color";
+
+/**
+ * Task label colours. The first four are Bananasplit's own tones (ripe
+ * banana, stem, ink, dusk), the ones onboarding suggests; the rest are the
+ * original brights.
+ */
 export const LABEL_COLOR_PALETTE = [
+  "#e3a90a",
+  "#6b4a1e",
+  "#1c1810",
+  "#c9bfa8",
   "#ef4444",
   "#f59e0b",
   "#22c55e",
@@ -9,3 +20,11 @@ export const LABEL_COLOR_PALETTE = [
 ] as const;
 
 export type LabelColor = (typeof LABEL_COLOR_PALETTE)[number];
+
+/**
+ * Text on a label's colour: white, unless white would be hard to read (under
+ * 3:1, the large-text minimum), as on the dusk and banana tones; then ink.
+ */
+export function labelTextColor(color: string): string {
+  return contrastRatio(color, "#ffffff") < 3 ? "#1c1810" : "#ffffff";
+}

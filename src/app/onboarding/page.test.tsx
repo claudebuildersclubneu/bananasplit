@@ -95,7 +95,7 @@ describe("OnboardingPage", () => {
     expect(html).not.toContain("Check your email");
     expect(html).toContain("Invite to Robotics");
     expect(html).toContain('href="/onboarding/join"');
-    expect(html).toContain("Join with invite code");
+    expect(html).toContain("Join with a club code");
     expect(html).toContain('href="/onboarding/organization"');
   });
 });

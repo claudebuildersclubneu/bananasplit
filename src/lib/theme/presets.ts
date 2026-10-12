@@ -23,31 +23,45 @@ export const DEFAULT_PRESET_ID = "default";
 export const GRAPHITE_PRESET_ID = "graphite";
 
 /**
- * "Bananasplit", the app's built-in look, printed like a two-ink riso zine:
- * vanilla paper, fudge ink, a raspberry primary (h≈0, kept clear of the
- * destructive red at h≈27 so a Save never reads as a Delete) and banana as
- * the highlighter (a fill only, 1.5:1 on paper, never text). Dark mode is
- * the same sundae on chocolate: banana becomes the primary, with an ink
- * label, and the highlighter turns strawberry.
+ * "Bananasplit", the app's built-in look, in the brand's own palette (the
+ * design handoff, src/app/brand.css): cream paper, ink text and an ink
+ * primary, with banana as the highlighter (a fill only, about 1.5:1 on
+ * cream, never text). Dark mode is the same banana split at night: ink-dark
+ * paper, cream text, banana as the primary with an ink label, and a riper
+ * banana for the highlighter.
  */
 export const DEFAULT_PRESET: ThemePreset = {
   id: DEFAULT_PRESET_ID,
   name: "Bananasplit",
-  description: "Vanilla paper, fudge ink, a raspberry primary and a banana highlighter.",
+  description: "Cream paper, ink type and a banana highlighter.",
   light: {
-    primary: "#b0135f",
+    primary: "#1c1810",
     accent: "#f2c230",
-    background: "#fbf6ea",
+    background: "#f7f2e6",
     surface: "#fffdf7",
-    text: "#1f1611",
+    text: "#1c1810",
   },
   dark: {
-    primary: "#f4c84a",
-    accent: "#ee6f9e",
-    background: "#17110d",
-    surface: "#221a14",
-    text: "#f8f0e0",
+    primary: "#f2c230",
+    accent: "#e3a90a",
+    background: "#17140e",
+    surface: "#221d15",
+    text: "#f7f2e6",
   },
+};
+
+/**
+ * The Bananasplit preset before the brand redesign (a raspberry primary).
+ * Orgs that saved it have these palettes stored under the "default" id;
+ * resolve.ts moves them onto today's Bananasplit, since picking Bananasplit
+ * means following the brand.
+ */
+export const LEGACY_DEFAULT_LIGHT: ThemePreset["light"] = {
+  primary: "#b0135f",
+  accent: "#f2c230",
+  background: "#fbf6ea",
+  surface: "#fffdf7",
+  text: "#1f1611",
 };
 
 /**
@@ -210,7 +224,7 @@ export function findPreset(id: string): ThemePreset | undefined {
   return THEME_PRESETS.find((preset) => preset.id === id);
 }
 
-function sameRoles(a: ThemeRoles, b: ThemeRoles): boolean {
+export function sameRoles(a: ThemeRoles, b: ThemeRoles): boolean {
   return (
     a.primary === b.primary &&
     a.accent === b.accent &&

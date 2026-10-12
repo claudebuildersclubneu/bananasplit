@@ -55,7 +55,20 @@ async function purgeDeletedNoteFiles(now: Date = new Date()): Promise<number> {
   return purged;
 }
 
-/** Prunes expired rate-limit buckets, old finished jobs and long-deleted Notes files. */
+/** Spent or replaced links are deleted at once; expired ones are kept a week, so a late click still reads "expired". */
+export const AUTH_TOKEN_GRACE_DAYS = 7;
+
+/** Password-reset and email-verification links that expired over a week ago. */
+async function pruneExpiredAuthTokens(now: Date = new Date()): Promise<number> {
+  const before = new Date(now.getTime() - AUTH_TOKEN_GRACE_DAYS * 24 * 60 * 60 * 1000);
+  const [resets, verifies] = await authDb.$transaction([
+    authDb.passwordResetToken.deleteMany({ where: { expiresAt: { lt: before } } }),
+    authDb.verificationToken.deleteMany({ where: { expires: { lt: before } } }),
+  ]);
+  return resets.count + verifies.count;
+}
+
+/** Prunes expired rate-limit buckets, old finished jobs, stale sign-in links and long-deleted Notes files. */
 export const maintenanceJob: JobHandler<unknown> = async () => {
   const buckets = await serviceDb.$queryRaw<{ n: number }[]>`
     SELECT app.prune_rate_limit_buckets(${BUCKET_RETENTION_SECONDS}::int) AS n`;
@@ -65,7 +78,11 @@ export const maintenanceJob: JobHandler<unknown> = async () => {
     console.error("[jobs] purging deleted Notes files failed", error);
     return 0;
   });
+  const tokens = await pruneExpiredAuthTokens().catch((error) => {
+    console.error("[jobs] pruning expired sign-in links failed", error);
+    return 0;
+  });
   console.info(
-    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s) and ${files} deleted file(s)`,
+    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s), ${tokens} expired link(s) and ${files} deleted file(s)`,
   );
 };

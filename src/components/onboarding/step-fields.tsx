@@ -1,99 +1,13 @@
-import { ArrowRight, Check, Loader2, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { SignOutButton } from "@/components/auth/sign-out-button";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/**
- * The onboarding card: an icon badge, the step counter and a segmented
- * progress bar, the title and the fields. Every colour is a theme token, so
- * it matches the rest of the app in light and dark. Sign out sits in the
- * corner, since onboarding has no org shell and so no user menu.
+/*
+ * Field pieces for the profile-setup steps (and the profile page's theme
+ * form): labels, toggle chips, the dashed "add" control, the "what's next"
+ * choices and field errors. The step layout itself is setup-shell.tsx.
  */
-
-export function OnboardingFrame({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  return (
-    <div className="relative flex min-h-svh flex-1 flex-col items-center justify-center px-4 pt-14 pb-10 sm:py-16">
-      <SignOutButton className="absolute top-3 right-3 sm:top-4 sm:right-4" />
-      <div className={cn("relative w-full space-y-4", wide ? "max-w-xl" : "max-w-md")}>{children}</div>
-    </div>
-  );
-}
-
-export function ProgressSegments({
-  total,
-  done,
-  tone = "primary",
-}: {
-  total: number;
-  /** Segments filled in, including the current one. */
-  done: number;
-  tone?: "primary" | "warning";
-}) {
-  return (
-    <div
-      className="flex gap-1"
-      role="progressbar"
-      aria-valuemin={1}
-      aria-valuemax={total}
-      aria-valuenow={done}
-      aria-label={`Step ${done} of ${total}`}
-    >
-      {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "h-1 flex-1 rounded-full transition-colors duration-500",
-            i < done ? (tone === "warning" ? "bg-warning" : "bg-primary") : "bg-muted",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-export function StepCard({
-  step,
-  tone = "primary",
-  title,
-  description,
-  children,
-  className,
-}: {
-  /** Progress through the flow, when the card is one of its numbered steps. */
-  step?: { index: number; total: number };
-  tone?: "primary" | "warning";
-  title: ReactNode;
-  description?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "bg-card text-card-foreground animate-in fade-in-0 slide-in-from-bottom-2 space-y-5 rounded-2xl border p-5 shadow-sm duration-500 sm:p-7",
-        className,
-      )}
-    >
-      {step && <ProgressSegments total={step.total} done={step.index} tone={tone} />}
-      <header>
-        <div className="min-w-0">
-          <div className="flex items-baseline justify-between gap-3">
-            <h1 className="heading text-xl">{title}</h1>
-            {step && (
-              <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                {step.index} / {step.total}
-              </span>
-            )}
-          </div>
-          {description && <p className="text-muted-foreground mt-0.5 text-sm leading-relaxed">{description}</p>}
-        </div>
-      </header>
-      {children}
-    </section>
-  );
-}
 
 /** A field label with an optional icon and hint on the right. */
 export function FieldLabel({
@@ -116,7 +30,9 @@ export function FieldLabel({
         {Icon && <Icon className="text-muted-foreground size-3.5" aria-hidden="true" />}
         {children}
       </Tag>
-      {aside && <span className="text-muted-foreground font-mono text-[11px] tabular-nums">{aside}</span>}
+      {aside && (
+        <span className="text-muted-foreground font-mono text-[11px] tabular-nums">{aside}</span>
+      )}
     </div>
   );
 }
@@ -224,47 +140,6 @@ export function ChoiceTileBody({
         aria-hidden="true"
       />
     </>
-  );
-}
-
-/** The primary "Continue" of an org-setup step, with a spinner while it saves. */
-export function ContinueButton({
-  pending,
-  disabled,
-  onClick,
-  children = "Continue",
-  pendingLabel = "Saving…",
-  icon: Icon = ArrowRight,
-  className,
-}: {
-  pending: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children?: ReactNode;
-  pendingLabel?: string;
-  icon?: LucideIcon;
-  className?: string;
-}) {
-  return (
-    <Button
-      type="button"
-      size="lg"
-      className={cn("group flex-1 font-semibold", className)}
-      onClick={onClick}
-      disabled={pending || disabled}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="animate-spin" aria-hidden="true" />
-          {pendingLabel}
-        </>
-      ) : (
-        <>
-          {children}
-          <Icon className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-        </>
-      )}
-    </Button>
   );
 }
 

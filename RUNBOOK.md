@@ -330,6 +330,40 @@ five minutes). **Turning it off** — remove `COLLAB_ENABLED` and redeploy;
 nothing else changes (`Note.yjsState` is kept, and autosaves keep it in
 step, so turning it on again later is safe).
 
+## Email (production)
+
+Verification and password-reset links must arrive on day one: password
+sign-ups can't join a club until they verify.
+
+1. **Resend domain.** `bananasplit.fyi`'s DNS is on Vercel. The sending
+   records for `send.bananasplit.fyi` already exist (return-path MX to
+   `feedback-smtp.us-east-1.amazonses.com`, SPF `v=spf1 include:amazonses.com ~all`,
+   DKIM `resend._domainkey`): confirm the domain shows **Verified** in Resend.
+   Copy any record exactly as Resend's dashboard shows it.
+2. **DMARC** (missing today): add a TXT record at `_dmarc.bananasplit.fyi`,
+   `v=DMARC1; p=none; rua=mailto:<a mailbox that receives mail>`. After a few
+   weeks of reports showing everything passes, move to `p=quarantine`, then
+   `p=reject`.
+3. **Inbound mail** (missing today): nothing receives mail at
+   `@bananasplit.fyi`, so replies, a support@ or privacy@ address and DMARC
+   reports bounce. Add MX records for a mailbox provider, or a forwarding
+   service, before publishing those addresses.
+4. **Vercel, Production scope only**: `RESEND_API_KEY` (a *sending access*
+   key restricted to the domain; never a full-access key, and none in Preview),
+   `EMAIL_FROM="Bananasplit <no-reply@bananasplit.fyi>"` (the app's domain,
+   or the health check fails), an https `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`.
+   Redeploy.
+5. **Retries**: link mail sends right after the request that queued it; a
+   failed send retries from the outbox, which needs the jobs pinger or Pro
+   cron (Background jobs, above). Resend's free plan stops at 100 emails a
+   day: use Pro before launch.
+6. **Check**: `curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/health`
+   passes `production:email`; sign up a test account and use **Forgot?**;
+   the `Job` table shows `verify-email` and `password-reset-email` as `DONE`.
+
+Previews never send real mail (a log-only sink), so password sign-ups there
+can't verify; test with Google or locally.
+
 ## Security switches (Phase 0A)
 
 - **Org creation lock.** In production (`VERCEL_ENV=production`, or
@@ -350,12 +384,18 @@ step, so turning it on again later is safe).
   with the same verified address; an unverified password account squatting on
   that address is deleted first (or loses its password if it already joined
   an org). Google sign-ins whose address Google has not verified are refused.
-  Removing `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` hides the button, and an
-  account that only ever signed in with Google has no password (there is no
-  reset flow yet), so it cannot sign in from `/sign-in` until they are set
-  again; `/sign-up` refuses the address as already taken.
-- **Content Security Policy.** `/app`, `/poll`, `/invite` and the auth pages
-  get a per-request nonce policy (`src/proxy.ts`); every other route gets a
+  Removing `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` hides the button; an
+  account that only ever signed in with Google can then set a password
+  through **Forgot?** (`/forgot-password`). See docs/features/accounts.md.
+- **Password reset and sessions.** Reset links last an hour and work once;
+  a reset ends every session for that account (`UserCredential.sessionVersion`).
+  To sign someone out everywhere by hand, bump it:
+  `UPDATE "UserCredential" SET "sessionVersion" = "sessionVersion" + 1 WHERE "userId" = '…';`
+  (insert a row with `"sessionVersion" = 1` for a Google-only account).
+- **Content Security Policy.** `/app`, `/poll`, `/invite`, onboarding,
+  checkout and the auth pages (sign-in, sign-up, email confirmation and
+  password reset) get a per-request nonce policy (`src/proxy.ts`; a test
+  checks every nonce route actually reaches the proxy); every other route gets a
   static policy (`next.config.ts`). Both are **enforced** by default, in
   every environment. To trial a policy change, set `CSP_MODE=report-only`
   and redeploy (the static policy is fixed at build time), read the `[csp]`

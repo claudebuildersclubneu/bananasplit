@@ -9,9 +9,9 @@ pages wear the same theme and logo.
 
 1. Open **Settings > Theme**.
 2. **Palette.** Pick a preset, or **Custom** to choose the five colours yourself:
-   - **Bananasplit** (the Default, id `default`): vanilla paper, fudge ink, a
-     raspberry primary and a banana highlighter; in dark mode, chocolate paper
-     with a banana primary and a strawberry highlighter.
+   - **Bananasplit** (the Default, id `default`): cream paper, ink type and an
+     ink primary with a banana highlighter; in dark mode, ink-dark paper with a
+     banana primary.
    - **Paper & Coral** (id `cbc`): warm paper, ink text, terracotta links and a
      coral highlighter, from the Claude Builders Club website's design system. In
      dark mode the coral becomes the primary with an ink label.
@@ -64,8 +64,8 @@ In production an admin picks it on the Theme page.
   by the server and the browser, so the preview equals the saved result.
 - **Charts.** `chart.ts` builds `--chart-1..5` with the data-viz method: the
   validated reference palette in its fixed order (an achromatic theme like
-  Graphite starts `#2a78d6`, `#eb6834` in light, `#3987e5`, `#d95926` in dark;
-  Bananasplit leads with its raspberry), each slot's lightness snapped
+  Graphite starts `#2a78d6`, `#eb6834` in light, `#3987e5`, `#d95926` in dark,
+  and so does Bananasplit's light ink), each slot's lightness snapped
   (hue held) to 3:1 on the page and the cards, a chromatic brand primary as slot 1,
   and every adjacent pair checked for colour-blind separation (deltaE >= 8) and
   normal-vision separation (>= 15). Use the slots in order; never style text with
@@ -109,43 +109,51 @@ In production an admin picks it on the Theme page.
   palette classes (`text-green-600`) and raw colour values in `.tsx` files. Every
   site is converted; the only exceptions are the two ignores below.
 
-## The look: "Riso bulletin" (developers)
+## The look (developers)
 
-Every theme is printed like a two-ink risograph zine: the org's **primary** and
-**accent** are the two inks, so the same marks suit any preset or custom theme.
-The look lives in `src/app/globals.css` (after the token blocks) and never names
-a colour: utilities mix the tokens where they paint, so the scoped previews on
-Settings > Theme restyle them too. Only palette-free values sit on `:root` (the
-highlighter's strength per mode, the motion curve). Surfaces are flat: no
-grain on the page and no drop shadow under cards.
+The type, motion and logo on top of the tokens follow the design handoff. The
+look lives in `src/app/globals.css` (after the token blocks) and never names a
+colour, so any theme an org picks or builds restyles it, the scoped previews on
+Settings > Theme included. Surfaces are flat: no grain on the page.
 
-- **Type** (`src/app/layout.tsx`, all variable): **Anybody** for headings and
-  figures, pushed to the ends of its width (50-150%) and weight (100-900) axes;
-  **Atkinson Hyperlegible Next** for body text; **Martian Mono** for labels,
-  dates and keyboard shortcuts.
-- **Utilities.** `page-title` (every page's `<h1>`: wide and heavy),
-  `heading` (card, dialog and sheet titles), `eyebrow` (mono caps labels),
-  `numeral` (thin, condensed big figures), `figure` (mono tabular money in
-  text), `ink-mark` (highlight inline words), `misregister` (the accent ink
-  printed off register), `ink-edge` (a primary button's darker bottom edge) and `crop-marks`
-  (printer's marks outside an element's corners; not on an `overflow-hidden`
-  element, which would clip them).
-- **Motion.** `reveal` staggers its children in on mount; the app's `<main>`
-  has `reveal-page`, which staggers the blocks of whatever page is inside it.
-  Both are zero-specificity base styles (an `animate-*` utility on a block wins)
-  and switch off under `prefers-reduced-motion`. The landing wordmark's
-  ink-register and split animations are `motion-safe:` only.
-- **Pieces.** `src/components/print-marks.tsx` (`RegistrationMark`,
-  `SplitWordmark`), `src/components/auth/auth-frame.tsx` (sign-in and sign-up),
-  `src/app/not-found.tsx`.
-- **Logo.** A banana, split, in two inks. `src/components/bananasplit-mark.tsx`
-  draws the mark inline in the tokens (`--mark-top`, default the primary;
-  `--mark-under`, default the accent), so in a club it prints in the club's
-  inks: the sidebar's signature under Settings, and the sign-in and sign-up
-  pages. The fixed-colour files are in `public/brand/` (the mark, which follows
-  the viewer's light or dark mode; the app icon; the lockup for light and dark
-  backgrounds, with Anybody embedded). `src/app/icon.svg`, `apple-icon.png` and
-  `favicon.ico` are the app icon.
+- **Type** (`src/app/layout.tsx`, loaded once for every page): **Young Serif**
+  (`font-heading`) for page titles and big figures, **Hanken Grotesk**
+  (`font-sans`) for everything you read and click, **JetBrains Mono**
+  (`font-mono`), sparingly, for labels, dates and money.
+- **Utilities.** `page-title` (every page's `<h1>`, the serif set tight),
+  `heading` (card, dialog and sheet titles: the grotesk, bold), `eyebrow`
+  (mono caps labels), `numeral` (big figures in the serif) and `figure` (mono
+  tabular money in text).
+- **Motion.** The app's `<main>` has `reveal-page`, which staggers the blocks
+  of whatever page is inside it in on mount: a zero-specificity base style (an
+  `animate-*` utility on a block wins) that switches off under
+  `prefers-reduced-motion`.
+- **Default palette.** The "Bananasplit" preset (`DEFAULT_PRESET`) is the
+  brand's own: ink `#1c1810` primary and text, banana `#f2c230` highlighter,
+  cream `#f7f2e6` background, paper `#fffdf7` surfaces; dark mode is ink-dark
+  paper with a banana primary. A row saved with the earlier raspberry
+  Bananasplit (`LEGACY_DEFAULT_LIGHT`) resolves to today's palettes.
+- **Logo.** "The Core", a banana cut across: a banana ring, cream flesh and
+  three seeds. `src/components/brand/logo.tsx` (`CoreMark`, `Logo`) draws it in
+  fixed brand colours, and `src/components/bananasplit-mark.tsx` wraps it for
+  the app shell. The files are in `public/brand/` (the mark, the app icon, and
+  the lockup for light and dark backgrounds with Young Serif embedded).
+  `src/app/icon.svg`, `apple-icon.png` and `favicon.ico` are built from them.
+
+## Bananasplit's own pages (developers)
+
+The home page, sign-in, sign-up, password help, joining a club, checkout,
+onboarding, email confirmation and the 404 page follow the design handoff, not
+an org theme. They mount `BrandRoot` (`src/components/brand/brand-root.tsx`):
+always light, the brand faces (Young Serif, Hanken Grotesk, JetBrains Mono,
+loaded only there) and the fixed palette in `src/app/brand.css` as Tailwind
+colours (`bg-ink`, `text-ink-muted`, `bg-banana`, `border-ink/10` ...), with
+shadows (`shadow-card`, `shadow-frame` ...) and gradients (`bg-peel`,
+`bg-hero` ...) as utilities. `.brand` also points the app tokens at the
+palette, so shared components inside (Input, Switch, Checkbox) print in ink on
+cream. Type sizes there are plain pixels (`text-[14px]`): Tailwind's
+`text-sm` and friends also set a line height, and the design uses the
+browser's `normal`.
 
 ## Converted colours
 

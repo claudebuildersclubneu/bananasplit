@@ -35,7 +35,7 @@ describe("/sign-in", () => {
     const html = await render();
     expect(html).toContain("Continue with Google");
     expect(html).toContain(">or<");
-    expect(html).toContain("Use your Google account or your email and password.");
+    expect(html).toContain("Log in to your club workspace.");
     expect(html).toContain('name="password"');
   });
 
@@ -50,7 +50,7 @@ describe("/sign-in", () => {
     expect(html).not.toContain("Continue with Google");
     expect(html).not.toContain(">or<");
     expect(html).not.toContain("Google account");
-    expect(html).toContain("Use your email and password.");
+    expect(html).toContain("Log in to your club workspace.");
     expect(html).toContain('name="password"');
   });
 });

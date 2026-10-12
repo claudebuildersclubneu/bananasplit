@@ -26,6 +26,9 @@ export function safeCallbackUrl(value: unknown): string | null {
     return null;
   }
   if (url.origin !== BASE) return null;
+  // Normalizing can turn a safe-looking path into a protocol-relative one
+  // ("/..//evil.com" -> "//evil.com"), which a browser reads as a host.
+  if (url.pathname.startsWith("//") || url.pathname.startsWith("/\\")) return null;
   if (BLOCKED_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith("/") ? p : `${p}/`))) {
     return null;
   }

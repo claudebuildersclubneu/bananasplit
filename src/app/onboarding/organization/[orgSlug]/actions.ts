@@ -8,8 +8,8 @@ import { nextOrgStep, orgStepHref, type OrgStep } from "@/lib/onboarding/steps";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 import { EventValidationError } from "@/server/events/service";
 import {
-  saveDataLabels,
   saveFinanceSetup,
+  saveTaskLabels,
   saveTeamsSetup,
   StepFailure,
   type StepResult,
@@ -17,7 +17,7 @@ import {
 import { loadSetupState, skipStep } from "@/server/setup/progress";
 
 /**
- * Org setup (onboarding Flow B, B2-B5) for an OWNER/ADMIN of the new org.
+ * Org setup (onboarding Flow B, B2-B6) for an OWNER/ADMIN of the new org.
  * Each step runs in one withOrgAction transaction as app_user (RLS
  * applies); the services in src/server/onboarding/org-setup.ts check the
  * permissions and validate the input again. A refusal thrown mid-step rolls
@@ -59,7 +59,7 @@ export const skipDataStepAction = step(async (ctx) => {
   return { ok: true };
 });
 
-export const saveLabelsStepAction = step((ctx, input: unknown) => saveDataLabels(ctx, input));
+export const saveLabelsStepAction = step((ctx, input: unknown) => saveTaskLabels(ctx, input));
 
 export const saveFinanceStepAction = step(async (ctx, input: unknown) =>
   saveFinanceSetup(ctx, input, await orgTimezone(ctx)),
@@ -69,7 +69,7 @@ export const saveTeamsStepAction = step(async (ctx, input: unknown) =>
   saveTeamsSetup(ctx, input, await orgTimezone(ctx)),
 );
 
-/** After a step saved: the next step, or the org's home as its admin (B5 -> END). */
+/** After a step saved: the next step, or the org's home as its admin (B6 -> END). */
 export async function goToNextOrgStep(orgSlug: string, current: OrgStep): Promise<void> {
   const next = nextOrgStep(current);
   const slug = /^[a-z0-9-]{1,60}$/.test(orgSlug) ? orgSlug : "";

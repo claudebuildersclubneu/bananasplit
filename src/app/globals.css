@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./brand.css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -8,9 +9,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-martian), ui-monospace, monospace;
-  --font-heading: var(--font-anybody), var(--font-atkinson), ui-sans-serif, sans-serif;
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-heading: var(--font-young-serif), ui-serif, Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -69,201 +70,140 @@
  * snapped to 3:1 on these surfaces and checked for colour-blind separation.
  */
 :root {
-  --background: #fbf6ea;
-  --foreground: #1f1611;
+  --background: #f7f2e6;
+  --foreground: #1c1810;
   --card: #fffdf7;
-  --card-foreground: #1f1611;
+  --card-foreground: #1c1810;
   --popover: #fffdf7;
-  --popover-foreground: #1f1611;
-  --primary: #b0135f;
+  --popover-foreground: #1c1810;
+  --primary: #1c1810;
   --primary-foreground: #fffdf7;
-  --primary-hover: #c52f70;
-  --secondary: #f0eadf;
-  --secondary-foreground: #1f1611;
-  --muted: #f0eadf;
-  --muted-foreground: #70675f;
-  --accent: #faefd5;
-  --accent-foreground: #1f1611;
+  --primary-hover: #2a261e;
+  --secondary: #ece7db;
+  --secondary-foreground: #1c1810;
+  --muted: #ece7db;
+  --muted-foreground: #6b665c;
+  --accent: #f6ecd1;
+  --accent-foreground: #1c1810;
   --brand-accent: #f2c230;
-  --brand-accent-foreground: #1f1611;
+  --brand-accent-foreground: #1c1810;
   --destructive: #db0018;
   --destructive-foreground: #ffffff;
   --success: #007e3f;
   --success-foreground: #ffffff;
   --warning: #915b00;
   --warning-foreground: #ffffff;
-  --border: #e0dacf;
-  --input: #dbd5ca;
-  --ring: #b0135f;
-  --chart-1: #b0135f;
-  --chart-2: #2a78d6;
-  --chart-3: #e96632;
-  --chart-4: #00a26f;
-  --chart-5: #c18200;
-  --sidebar: #f5f0e4;
-  --sidebar-foreground: #1f1611;
-  --sidebar-primary: #b0135f;
+  --border: #dcd7cb;
+  --input: #d7d2c6;
+  --ring: #1c1810;
+  --chart-1: #2a78d6;
+  --chart-2: #e5632e;
+  --chart-3: #00a06e;
+  --chart-4: #bd8000;
+  --chart-5: #d36891;
+  --sidebar: #f1ece0;
+  --sidebar-foreground: #1c1810;
+  --sidebar-primary: #1c1810;
   --sidebar-primary-foreground: #fffdf7;
-  --sidebar-accent: #f5e9cd;
-  --sidebar-accent-foreground: #1f1611;
-  --sidebar-border: #dbd5ca;
-  --sidebar-ring: #b0135f;
+  --sidebar-accent: #f1e6c9;
+  --sidebar-accent-foreground: #1c1810;
+  --sidebar-border: #d7d2c6;
+  --sidebar-ring: #1c1810;
   --radius: 0.4375rem;
 }
 
 .dark {
-  --background: #17110d;
-  --foreground: #f8f0e0;
-  --card: #221a14;
-  --card-foreground: #f8f0e0;
-  --popover: #221a14;
-  --popover-foreground: #f8f0e0;
-  --primary: #f4c84a;
-  --primary-foreground: #17110d;
-  --primary-hover: #e0b531;
-  --secondary: #2b2520;
-  --secondary-foreground: #f8f0e0;
-  --muted: #2b2520;
-  --muted-foreground: #958e82;
-  --accent: #3c2326;
-  --accent-foreground: #f8f0e0;
-  --brand-accent: #ee6f9e;
-  --brand-accent-foreground: #17110d;
+  --background: #17140e;
+  --foreground: #f7f2e6;
+  --card: #221d15;
+  --card-foreground: #f7f2e6;
+  --popover: #221d15;
+  --popover-foreground: #f7f2e6;
+  --primary: #f2c230;
+  --primary-foreground: #17140e;
+  --primary-hover: #deaf00;
+  --secondary: #2b2821;
+  --secondary-foreground: #f7f2e6;
+  --muted: #2b2821;
+  --muted-foreground: #959086;
+  --accent: #3a2e16;
+  --accent-foreground: #f7f2e6;
+  --brand-accent: #e3a90a;
+  --brand-accent-foreground: #17140e;
   --destructive: #ff655a;
   --destructive-foreground: #000000;
   --success: #5bcc80;
   --success-foreground: #000000;
   --warning: #faab3f;
   --warning-foreground: #000000;
-  --border: #352e29;
-  --input: #3d3630;
-  --ring: #f4c84a;
-  --chart-1: #b58e00;
+  --border: #35312a;
+  --input: #3d3932;
+  --ring: #f2c230;
+  --chart-1: #b78f00;
   --chart-2: #3987e5;
   --chart-3: #d95926;
   --chart-4: #199e70;
   --chart-5: #9085e9;
-  --sidebar: #221a14;
-  --sidebar-foreground: #f8f0e0;
-  --sidebar-primary: #f4c84a;
-  --sidebar-primary-foreground: #17110d;
-  --sidebar-accent: #4a2c2f;
-  --sidebar-accent-foreground: #f8f0e0;
-  --sidebar-border: #3f372f;
-  --sidebar-ring: #f4c84a;
+  --sidebar: #221d15;
+  --sidebar-foreground: #f7f2e6;
+  --sidebar-primary: #f2c230;
+  --sidebar-primary-foreground: #17140e;
+  --sidebar-accent: #47381d;
+  --sidebar-accent-foreground: #f7f2e6;
+  --sidebar-border: #3f3a31;
+  --sidebar-ring: #f2c230;
 }
 
 /*
- * "Riso bulletin": the look on top of the tokens. Every club's workspace is
- * printed like a two-ink risograph zine: the org's primary and accent are the
- * two inks, so the same marks (the highlighter on inline words, misregistered
- * wordmarks) suit any theme an org picks or builds. Nothing here names a
- * colour: utilities mix the tokens where they paint, so the scoped theme
- * previews (tokenStyle on a wrapper) restyle them too.
- *
- * Only palette-free values live on :root: the highlighter's strength per
- * mode, and the motion curve.
+ * The type and motion on top of the tokens, in the brand's faces (the design
+ * handoff): Young Serif for page titles and big figures, Hanken Grotesk for
+ * everything you read and click, JetBrains Mono for small labels and money.
+ * Nothing here names a colour, so any theme an org picks restyles it.
  */
 :root {
-  --highlight-strength: 70%;
   --ease-ink: cubic-bezier(0.2, 0.75, 0.15, 1);
 }
 
-.dark {
-  --highlight-strength: 48%;
-}
-
-/* Page titles: the display face wide and heavy. */
+/* Page titles: the display serif, set tight. */
 @utility page-title {
   font-family: var(--font-heading);
   font-size: clamp(1.75rem, 1.3rem + 1.5vw, 2.5rem);
-  font-weight: 800;
-  font-stretch: 118%;
-  line-height: 1.02;
-  letter-spacing: -0.025em;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-/* Section and card headings: the same face, narrower and lighter. */
+/* Section, card and dialog headings: the grotesk, bold. */
 @utility heading {
-  font-family: var(--font-heading);
+  font-family: var(--font-sans);
   font-weight: 700;
-  font-stretch: 100%;
   letter-spacing: -0.01em;
 }
 
-/* Small labels (dates, groups, kickers): mono caps, the print slug. */
+/* Small labels (dates, groups, kickers): mono caps. */
 @utility eyebrow {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 500;
-  font-stretch: 87.5%;
   letter-spacing: 0.07em;
   line-height: 1.3;
   text-transform: uppercase;
 }
 
-/* Big figures: the display face at the other end of both axes. */
+/* Big figures: the display serif. */
 @utility numeral {
   font-family: var(--font-heading);
-  font-weight: 250;
-  font-stretch: 58%;
+  font-weight: 400;
   font-variant-numeric: tabular-nums lining-nums;
   line-height: 0.9;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 /* Money and other figures in running text. */
 @utility figure {
   font-family: var(--font-mono);
-  font-stretch: 87.5%;
   font-variant-numeric: tabular-nums slashed-zero;
-}
-
-/* A highlighter stroke behind inline words. */
-@utility ink-mark {
-  background-image: linear-gradient(
-    transparent 58%,
-    color-mix(in oklab, var(--brand-accent) var(--highlight-strength), transparent) 58%,
-    color-mix(in oklab, var(--brand-accent) var(--highlight-strength), transparent) 92%,
-    transparent 92%
-  );
-  box-decoration-break: clone;
-  padding-inline: 0.08em;
-}
-
-/* The second ink printed slightly out of register. */
-@utility misregister {
-  text-shadow: 0.055em 0.045em 0 var(--brand-accent);
-}
-
-/* A primary button's bottom edge: its own ink, a shade darker, in any theme. */
-@utility ink-edge {
-  box-shadow: inset 0 -2px 0 oklch(from var(--primary) calc(l - 0.09) c h);
-}
-
-/* Printer's crop marks outside an element's corners. */
-@utility crop-marks {
-  position: relative;
-  &::before {
-    content: "";
-    position: absolute;
-    inset: -18px;
-    pointer-events: none;
-    --mark: linear-gradient(
-      color-mix(in oklab, var(--muted-foreground) 70%, transparent),
-      color-mix(in oklab, var(--muted-foreground) 70%, transparent)
-    );
-    background:
-      var(--mark) left 0 top 18px / 11px 1px no-repeat,
-      var(--mark) left 18px top 0 / 1px 11px no-repeat,
-      var(--mark) right 0 top 18px / 11px 1px no-repeat,
-      var(--mark) right 18px top 0 / 1px 11px no-repeat,
-      var(--mark) left 0 bottom 18px / 11px 1px no-repeat,
-      var(--mark) left 18px bottom 0 / 1px 11px no-repeat,
-      var(--mark) right 0 bottom 18px / 11px 1px no-repeat,
-      var(--mark) right 18px bottom 0 / 1px 11px no-repeat;
-  }
 }
 
 /*
@@ -278,46 +218,32 @@
   }
 }
 
-@keyframes ink-register {
-  from {
-    text-shadow: 0 0 0 transparent;
-  }
-}
-
-/* The wordmark's second half sliding out from under the first. */
-@keyframes split-off {
-  from {
-    transform: translate(-0.6em, -0.18em);
-    opacity: 0;
-  }
-}
-
 /*
- * `.reveal` staggers its children; `.reveal-page` (the app's <main>)
- * staggers the blocks of whichever page is inside it. Zero specificity in the
- * base layer, so any animate-* utility on a block (a skeleton's pulse) wins.
+ * `.reveal-page` (the app's <main>) staggers the blocks of whichever page is
+ * inside it. Zero specificity in the base layer, so any animate-* utility on
+ * a block (a skeleton's pulse) wins.
  */
 @layer base {
-  :where(.reveal > *, .reveal-page > * > *) {
+  :where(.reveal-page > * > *) {
     animation: ink-rise 560ms var(--ease-ink) backwards;
   }
-  :where(.reveal > :nth-child(2), .reveal-page > * > :nth-child(2)) {
+  :where(.reveal-page > * > :nth-child(2)) {
     animation-delay: 60ms;
   }
-  :where(.reveal > :nth-child(3), .reveal-page > * > :nth-child(3)) {
+  :where(.reveal-page > * > :nth-child(3)) {
     animation-delay: 120ms;
   }
-  :where(.reveal > :nth-child(4), .reveal-page > * > :nth-child(4)) {
+  :where(.reveal-page > * > :nth-child(4)) {
     animation-delay: 180ms;
   }
-  :where(.reveal > :nth-child(5), .reveal-page > * > :nth-child(5)) {
+  :where(.reveal-page > * > :nth-child(5)) {
     animation-delay: 240ms;
   }
-  :where(.reveal > :nth-child(n + 6), .reveal-page > * > :nth-child(n + 6)) {
+  :where(.reveal-page > * > :nth-child(n + 6)) {
     animation-delay: 300ms;
   }
   @media (prefers-reduced-motion: reduce) {
-    :where(.reveal > *, .reveal-page > * > *) {
+    :where(.reveal-page > * > *) {
       animation: none;
     }
   }
@@ -497,6 +423,5 @@
   }
   kbd {
     @apply font-mono;
-    font-stretch: 87.5%;
   }
 }

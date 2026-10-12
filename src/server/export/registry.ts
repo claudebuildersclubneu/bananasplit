@@ -19,6 +19,12 @@ export interface ExportTable {
   key: readonly string[];
   omit?: readonly string[];
   /**
+   * Rows the export leaves out, as a Prisma `where`. The export reads on the
+   * service path, past the row policies, so anything the app shows only to
+   * one person (a private note, a private file) is filtered here instead.
+   */
+  where?: Readonly<Record<string, unknown>>;
+  /**
    * Individual ballots: exported only when OrgSettings.ballotIndividualVisibility
    * lets an OWNER see them (not NOBODY), read with an explicit OWNER tier.
    */
@@ -36,7 +42,6 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "OrgIntegration", key: ID, omit: ["secretFingerprint"] },
   { model: "OrgAuditLog", key: ID },
   { model: "OrgExport", key: ID, omit: ["blobKey", "cursor"] },
-  { model: "Notification", key: ID },
   { model: "Project", key: ID },
   { model: "Label", key: ID },
   { model: "Task", key: ID },
@@ -47,8 +52,10 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "TaskActivity", key: ID },
   { model: "WeeklyUpdate", key: ID },
   // yjsState: the live editor's binary copy of the body contentJson carries.
-  { model: "Note", key: ID, omit: ["yjsState"] },
-  { model: "OrgFile", key: ID, omit: ["storageKey"] },
+  // Shared with the club only: a private note or file is its author's alone,
+  // owners included (the Note and OrgFile row policies), and stays so here.
+  { model: "Note", key: ID, omit: ["yjsState"], where: { visibility: "ORGANIZATION", deletedAt: null } },
+  { model: "OrgFile", key: ID, omit: ["storageKey"], where: { visibility: "ORGANIZATION", deletedAt: null } },
   { model: "NoteFolder", key: ID },
   { model: "Event", key: ID },
   { model: "EventAttendee", key: ["eventId", "userId"] },
@@ -85,6 +92,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
 /** Org tables that are deliberately not exported, and why. */
 export const EXPORT_EXCLUDED: Readonly<Record<string, string>> = {
   OrgSecret: "Encrypted integration secrets: ciphertext is never exported.",
+  Notification: "Each member's own inbox: personal, not club data, and only its recipient can read it.",
   OrgJoinCode: "The live invite code is a credential for joining the org; an export must not carry it.",
   Job: "Background job bookkeeping (ids and sanitized errors), not org data.",
   OrgSlugHistory:

@@ -37,10 +37,9 @@ function testClientIp(): string {
 export async function signUp(page: Page, user: TestUser): Promise<void> {
   await page.context().setExtraHTTPHeaders({ "x-real-ip": testClientIp() });
   await page.goto("/sign-up");
-  await page.getByLabel("Name").fill(user.name);
-  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Full name").fill(user.name);
+  await page.getByLabel("School email").fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
-  await page.getByLabel("Confirm password").fill(user.password);
   await page.getByRole("button", { name: "Create account" }).click();
 }
 
@@ -48,13 +47,18 @@ export async function signUp(page: Page, user: TestUser): Promise<void> {
 const MAIL_DIR = path.join(process.cwd(), ".data", "mail");
 
 /**
- * The token from the newest verification email sent to `email`, read from
- * the dev mail sink. The verify-email job sends it right after sign-up (or
- * after "Send a new link"), so this waits for it to appear. Requires the
+ * The token from the newest email sent to `email` that links to
+ * `/<route>/<token>`, read from the dev mail sink. Jobs send right after the
+ * request that queued them, so this waits for it to appear. Requires the
  * sink: RESEND_API_KEY empty and EMAIL_DELIVERY unset or "sink".
  */
-export async function readVerificationToken(email: string, timeoutMs = 30_000): Promise<string> {
+async function readMailedToken(
+  email: string,
+  route: "verify-email" | "reset-password",
+  timeoutMs: number,
+): Promise<string> {
   const address = email.trim().toLowerCase();
+  const link = new RegExp(`/${route}/([A-Za-z0-9_-]{20,200})`);
   // Sink files are named by ISO timestamp; only look at the last 10 minutes.
   const oldest = new Date(Date.now() - 10 * 60 * 1000).toISOString().replace(/[:.]/g, "-");
   const deadline = Date.now() + timeoutMs;
@@ -76,14 +80,24 @@ export async function readVerificationToken(email: string, timeoutMs = 30_000): 
         continue; // still being written
       }
       if (message.to?.trim().toLowerCase() !== address) continue;
-      const match = /\/verify-email\/([A-Za-z0-9_-]{20,200})/.exec(message.text ?? "");
+      const match = link.exec(message.text ?? "");
       if (match) return match[1]!;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(
-    `No verification email for ${email} in ${MAIL_DIR}. The e2e run needs the dev mail sink (RESEND_API_KEY empty).`,
+    `No ${route} email for ${email} in ${MAIL_DIR}. The e2e run needs the dev mail sink (RESEND_API_KEY empty).`,
   );
+}
+
+/** The token from the newest verification email sent to `email`. */
+export function readVerificationToken(email: string, timeoutMs = 30_000): Promise<string> {
+  return readMailedToken(email, "verify-email", timeoutMs);
+}
+
+/** The token from the newest password reset email sent to `email`. */
+export function readPasswordResetToken(email: string, timeoutMs = 30_000): Promise<string> {
+  return readMailedToken(email, "reset-password", timeoutMs);
 }
 
 /**
@@ -96,8 +110,8 @@ export async function verifyEmail(page: Page, email: string): Promise<void> {
   const token = await readVerificationToken(email);
   await page.goto(`/verify-email/${token}`);
   await page.getByRole("button", { name: "Confirm email" }).click();
-  await page.getByText("Email confirmed").waitFor();
-  await page.getByRole("link", { name: /^(Continue|Sign in)$/ }).click();
+  await page.getByRole("heading", { name: /Email confirmed/ }).waitFor();
+  await page.getByRole("link", { name: /^(Continue|Log in)$/ }).click();
 }
 
 /**
@@ -114,21 +128,21 @@ export async function completeProfileSetup(page: Page, next: "join" | "create"):
   }
   await page
     .getByRole("button", {
-      name: next === "join" ? "Join with invite code" : "Create an organization",
+      name: next === "join" ? "Join with a club code" : "Start a new club",
     })
     .click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
 }
 
 /**
- * Org setup (onboarding Flow B) with the defaults: name the org, skip the
- * connections, keep the labels, finance and starter teams, and land on the
- * new org's home as its OWNER. Returns the org's slug.
+ * Org setup (onboarding Flow B) with the defaults: name the club, skip the
+ * connections, keep the suggested labels, finance and starter teams, invite
+ * no one, and land on the new club's home as its OWNER. Returns the slug.
  */
 export async function createOrgViaOnboarding(page: Page, orgName: string): Promise<string> {
   if (!/\/onboarding\/organization$/.test(new URL(page.url()).pathname))
     await page.goto("/onboarding/organization");
-  await page.getByLabel("Organization name").fill(orgName);
+  await page.getByLabel("Club name").fill(orgName);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/onboarding\/organization\/[^/]+\/data$/);
   const slug = new URL(page.url()).pathname.split("/")[3]!;
@@ -138,6 +152,8 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.waitForURL(/\/finance$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/teams$/);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Finish setup" }).click();
   await page.waitForURL(new RegExp(`/app/${slug}\\?welcome=1$`));
   return slug;
@@ -166,7 +182,7 @@ export async function signIn(
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Log in" }).click();
   // The credentials sign-in server action redirects to /app once the session
   // cookie is set — wait for that before navigating again, or a subsequent
   // goto() can race the redirect and land pre-auth.

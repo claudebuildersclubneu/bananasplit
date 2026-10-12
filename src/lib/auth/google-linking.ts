@@ -89,9 +89,10 @@ export async function googleSignInGate(params: {
   if (purged > 0) {
     console.info("[auth] removed an unverified password account before a verified Google sign-in");
   }
+  // Taking the password away also ends any session it opened.
   await authDb.userCredential.updateMany({
     where: { passwordHash: { not: null }, user: { email, emailVerified: null } },
-    data: { passwordHash: null },
+    data: { passwordHash: null, sessionVersion: { increment: 1 } },
   });
   return true;
 }

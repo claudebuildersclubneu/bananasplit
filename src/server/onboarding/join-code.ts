@@ -48,7 +48,7 @@ const joinCodeSelect = {
   rotatedAt: true,
 } satisfies Prisma.OrgJoinCodeSelect;
 
-/** Five tries at a fresh code; a collision in 8.5e11 is not expected at all. */
+/** Five tries at a fresh code; a collision in 7.3e8 is rare and simply retried. */
 async function insertWithFreshCode(db: TxClient, organizationId: string, userId: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -160,6 +160,11 @@ export async function updateJoinCodeSettings(
 
 /** Per user: enough for typos, far too few to guess a code. */
 const LOOKUP_LIMIT = { limit: 10, windowSec: 15 * 60 };
+/** Per client IP, across accounts: guessing can't scale by signing up more. */
+const LOOKUP_IP_LIMIT = { limit: 30, windowSec: 60 * 60 };
+
+/** A miss says nothing about why, so a guess can't tell a dead code from none. */
+const NO_MATCH = "That code doesn't match a club. Check it with whoever sent it.";
 
 export interface JoinCodeOrg {
   organizationId: string;
@@ -201,10 +206,19 @@ interface LookupRow {
  * Checks a code for `user` and says which org it opens. Used both to show
  * "You're joining X" before the user commits, and again by joinWithCode.
  */
-export async function checkJoinCode(user: SessionUser, rawCode: string): Promise<JoinCodeCheck> {
+export async function checkJoinCode(
+  user: SessionUser,
+  rawCode: string,
+  /** The caller's client IP, for the per-IP limit (from the action). */
+  ip: string,
+): Promise<JoinCodeCheck> {
   const code = normalizeJoinCode(rawCode);
   if (!code)
-    return { ok: false, reason: "invalid_format", message: "Invite codes look like ABCD-EFGH." };
+    return {
+      ok: false,
+      reason: "invalid_format",
+      message: "Club codes are 6 letters and numbers, like ROBO26.",
+    };
 
   const identity = await getUserIdentity(user.id);
   if (!identity?.emailVerified) {
@@ -215,11 +229,15 @@ export async function checkJoinCode(user: SessionUser, rawCode: string): Promise
     };
   }
 
-  const limit = await checkRateLimit(
-    rateLimitKey("join-code", user.id),
-    LOOKUP_LIMIT.limit,
-    LOOKUP_LIMIT.windowSec,
-  );
+  const [byUser, byIp] = await Promise.all([
+    checkRateLimit(rateLimitKey("join-code", user.id), LOOKUP_LIMIT.limit, LOOKUP_LIMIT.windowSec),
+    checkRateLimit(
+      rateLimitKey("join-code-ip", ip),
+      LOOKUP_IP_LIMIT.limit,
+      LOOKUP_IP_LIMIT.windowSec,
+    ),
+  ]);
+  const limit = !byUser.allowed ? byUser : byIp;
   if (!limit.allowed) {
     return {
       ok: false,
@@ -242,20 +260,9 @@ export async function checkJoinCode(user: SessionUser, rawCode: string): Promise
     return { row: found, alreadyMember: Boolean(member) };
   });
 
-  if (!row)
-    return {
-      ok: false,
-      reason: "not_found",
-      message: "That code doesn't match any organization. Check it with whoever sent it.",
-    };
-  if (row.deleted)
-    return { ok: false, reason: "org_inactive", message: "This organization is no longer active." };
-  if (!row.enabled)
-    return {
-      ok: false,
-      reason: "disabled",
-      message: "This organization has turned its invite code off. Ask an admin for a new one.",
-    };
+  if (!row) return { ok: false, reason: "not_found", message: NO_MATCH };
+  if (row.deleted) return { ok: false, reason: "org_inactive", message: NO_MATCH };
+  if (!row.enabled) return { ok: false, reason: "disabled", message: NO_MATCH };
   if (row.allowedDomain && !emailOnDomain(identity.email, row.allowedDomain)) {
     return {
       ok: false,
@@ -288,8 +295,9 @@ export type JoinWithCodeResult =
 export async function joinWithCode(
   user: SessionUser,
   rawCode: string,
+  ip: string,
 ): Promise<JoinWithCodeResult> {
-  const check = await checkJoinCode(user, rawCode);
+  const check = await checkJoinCode(user, rawCode, ip);
   if (!check.ok) return { ok: false, message: check.message };
   const { org } = check;
   if (check.alreadyMember) return { ok: true, orgId: org.organizationId, orgSlug: org.orgSlug };

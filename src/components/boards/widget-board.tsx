@@ -380,7 +380,7 @@ export function WidgetBoard({
                   <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
                   <h2
                     title={m.title}
-                    className="font-heading min-w-0 truncate text-[0.95rem] font-bold tracking-[-0.005em] font-stretch-[88%]"
+                    className="heading min-w-0 truncate text-[0.95rem]"
                   >
                     {m.title}
                   </h2>
