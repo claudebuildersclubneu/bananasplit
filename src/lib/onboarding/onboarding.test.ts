@@ -99,27 +99,28 @@ describe("availability", () => {
 });
 
 describe("join codes", () => {
-  it("generates six-character codes with no look-alike characters", () => {
+  it("generates eight-character XXXX-XXXX codes with no look-alike characters", () => {
     for (let i = 0; i < 50; i++) {
       const code = generateJoinCode();
-      expect(code).toMatch(/^[A-Z0-9]{6}$/);
+      expect(code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
       expect(code).toMatch(JOIN_CODE_RE);
       expect(code).not.toMatch(/[01OILU]/);
     }
   });
 
   it("normalizes what people type", () => {
-    expect(normalizeJoinCode(" robo26 ")).toBe("ROBO26");
-    expect(normalizeJoinCode("ro-bo 26")).toBe("ROBO26");
+    expect(normalizeJoinCode(" rpka ywsf ")).toBe("RPKA-YWSF");
+    expect(normalizeJoinCode("rpka-ywsf")).toBe("RPKA-YWSF");
+    expect(normalizeJoinCode("RPKAYWSF")).toBe("RPKA-YWSF");
     expect(normalizeJoinCode("abc")).toBeNull();
     expect(normalizeJoinCode("abcdefg")).toBeNull();
     expect(normalizeJoinCode("abcd-efgh-ijkl")).toBeNull();
   });
 
-  it("still accepts the earlier XXXX-XXXX codes", () => {
-    expect(normalizeJoinCode(" abcd efgh ")).toBe("ABCD-EFGH");
-    expect(normalizeJoinCode("abcd-efgh")).toBe("ABCD-EFGH");
-    expect(JOIN_CODE_RE.test("ABCD-EFGH")).toBe(true);
+  it("still accepts the six-character codes issued for a while", () => {
+    expect(normalizeJoinCode(" robo26 ")).toBe("ROBO26");
+    expect(normalizeJoinCode("ro-bo 26")).toBe("ROBO26");
+    expect(JOIN_CODE_RE.test("ROBO26")).toBe(true);
   });
 
   it("matches an email to the org's domain and its subdomains only", () => {
