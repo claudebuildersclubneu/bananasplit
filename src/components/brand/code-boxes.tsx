@@ -109,7 +109,7 @@ export function CodeBoxes({
             }
           }}
           className={cn(
-            "font-display focus-banana caret-ripe h-[68px] max-w-[58px] min-w-0 flex-1 basis-0 rounded-[14px] border-[1.5px] text-center text-[30px] uppercase transition-[border-color,box-shadow,background-color] outline-none",
+            "font-heading focus-banana caret-ripe h-[68px] max-w-[58px] min-w-0 flex-1 basis-0 rounded-[14px] border-[1.5px] text-center text-[30px] uppercase transition-[border-color,box-shadow,background-color] outline-none",
             length > 6 && "max-w-[46px] text-[26px]",
             char ? "border-ink bg-paper" : "border-ink/16 bg-cream",
             invalid && "border-destructive",

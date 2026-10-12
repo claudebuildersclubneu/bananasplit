@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { DashedButton, FieldError, FieldLabel } from "@/components/onboarding/step-card";
+import { DashedButton, FieldError, FieldLabel } from "@/components/onboarding/step-fields";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { detectLinkKind, SETUP_BIO_MAX } from "@/lib/onboarding/steps";

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { CodeBoxes, cleanCode } from "@/components/brand/code-boxes";
-import { primaryPillClass } from "@/components/brand/fields";
+import { pill } from "@/components/brand/pill";
 import { JOIN_CODE_LENGTH, LEGACY_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +88,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
             // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
             <img src={org.logoUrl} alt="" className="size-11 flex-none rounded-xl object-cover" />
           ) : (
-            <span className="bg-pine text-cream font-display grid size-11 flex-none place-items-center rounded-xl text-[20px]">
+            <span className="bg-pine text-cream font-heading grid size-11 flex-none place-items-center rounded-xl text-[20px]">
               {org.name.trim()[0]?.toUpperCase()}
             </span>
           )}
@@ -117,7 +117,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
       )}
 
       {org && ready && found.alreadyMember ? (
-        <Link href={`/app/${org.slug}`} className={cn(primaryPillClass, "shadow-none")}>
+        <Link href={`/app/${org.slug}`} className={pill()}>
           Open {org.name}
         </Link>
       ) : (
@@ -127,10 +127,10 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
           disabled={!ready || joining}
           aria-live="polite"
           className={cn(
-            "h-[52px] rounded-full border-none text-[16px] font-semibold transition-colors",
-            ready
-              ? "bg-ink text-cream hover:bg-ink-hover cursor-pointer"
-              : "bg-sand text-ink-faint",
+            pill(),
+            // The design's resting state: sand until the code is complete.
+            !ready &&
+              "bg-sand text-ink-faint hover:bg-sand hover:text-ink-faint disabled:opacity-100",
           )}
         >
           {joining

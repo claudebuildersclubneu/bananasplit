@@ -4,6 +4,7 @@ import { type FormEvent, useState, useTransition } from "react";
 
 import { inviteMember } from "@/app/app/[orgSlug]/settings/members/actions";
 import { brandInputClass } from "@/components/brand/fields";
+import { pill } from "@/components/brand/pill";
 import {
   ContinuePill,
   PreviewHeader,
@@ -31,10 +32,6 @@ const roleLabel = (role: string) =>
   ROLES.find((r) => r.value === role)?.label ?? role.charAt(0) + role.slice(1).toLowerCase();
 
 const AVATAR_TONES = ["bg-banana", "bg-wheat", "bg-dusk", "bg-spot text-cream"] as const;
-
-/** The small outline pill (Copy code, Copy link). */
-const outlinePill =
-  "border-ink/18 bg-paper hover:bg-cream cursor-pointer rounded-full border px-3.5 py-[7px] text-[13px] font-semibold transition-colors";
 
 /**
  * B6 · Invite officers: email invites (the same invites as Settings >
@@ -132,7 +129,7 @@ export function InviteStep({
           ))}
           {code && (
             <p className="text-ink-faint m-0 mt-auto text-[12px] leading-normal">
-              Anyone with the code <b className="text-ink-muted font-code">{code}</b> and a verified
+              Anyone with the code <b className="text-ink-muted font-mono">{code}</b> and a verified
               email can join as a member.
             </p>
           )}
@@ -150,17 +147,25 @@ export function InviteStep({
             <span className="flex flex-col gap-1">
               <span className="text-ink-soft text-[13px] font-semibold">Your club code</span>
               <span
-                className="font-display text-[30px] leading-none tracking-[0.12em]"
+                className="font-heading text-[30px] leading-none tracking-[0.12em]"
                 aria-label={`Club code ${code.split("").join(" ")}`}
               >
                 {code}
               </span>
             </span>
             <span className="flex gap-2">
-              <button type="button" onClick={() => copy("code")} className={outlinePill}>
+              <button
+                type="button"
+                onClick={() => copy("code")}
+                className={pill({ tone: "outline", size: "sm" })}
+              >
                 {copied === "code" ? "Copied" : "Copy code"}
               </button>
-              <button type="button" onClick={() => copy("link")} className={outlinePill}>
+              <button
+                type="button"
+                onClick={() => copy("link")}
+                className={pill({ tone: "outline", size: "sm" })}
+              >
                 {copied === "link" ? "Copied" : "Copy link"}
               </button>
             </span>
@@ -197,7 +202,7 @@ export function InviteStep({
             <button
               type="submit"
               disabled={inviting || !email.trim()}
-              className="bg-ink text-cream hover:bg-ink-hover h-[50px] flex-none cursor-pointer rounded-full border-none px-5 text-[15px] font-semibold transition-colors disabled:cursor-default disabled:opacity-50"
+              className={cn(pill({ size: "field" }), "flex-none")}
             >
               {inviting ? "Sending…" : "Send invite"}
             </button>

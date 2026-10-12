@@ -13,13 +13,13 @@ import { CoreMark, Logo } from "./logo";
  * logo sits above the form.
  */
 export function AuthCard({
-  panel,
+  panel = <AuthHeadline />,
   children,
   tall = false,
   formClassName,
 }: {
-  /** The bottom of the yellow panel: the headline and anything under it. */
-  panel: ReactNode;
+  /** The bottom of the yellow panel; the tagline when not given. */
+  panel?: ReactNode;
   children: ReactNode;
   /** Sign-up's taller card (660px instead of 620px). */
   tall?: boolean;
@@ -61,12 +61,18 @@ export function AuthCard({
   );
 }
 
-/** The panel's headline: Young Serif 52px, set tight. */
-export function AuthHeadline({ children, className }: { children: ReactNode; className?: string }) {
+/** The panel's headline (the tagline unless given): Young Serif 52px, set tight. */
+export function AuthHeadline({
+  children = "Running your club shouldn't be bananas.",
+  className,
+}: {
+  children?: ReactNode;
+  className?: string;
+}) {
   return (
     <p
       className={cn(
-        "font-display m-0 text-[52px] leading-none tracking-[-0.035em] text-balance",
+        "font-heading m-0 text-[52px] leading-none tracking-[-0.035em] text-balance",
         className,
       )}
     >
@@ -88,7 +94,7 @@ export function AuthTitle({
   return (
     <div className="flex flex-col gap-2">
       {eyebrow && <span className="text-honey text-[14px] font-bold">{eyebrow}</span>}
-      <h1 className="font-display m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
+      <h1 className="font-heading m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
         {title}
       </h1>
       {description && <p className="text-ink-muted m-0 text-[16px]">{description}</p>}

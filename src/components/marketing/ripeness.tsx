@@ -42,7 +42,7 @@ export function Ripeness() {
         {STAGES.map((stage, i) => (
           <div key={stage.title} className="border-ink/14 flex flex-col gap-3.5 border-t pt-6">
             <span className={cn("h-3.5 w-10 rounded-full", stage.swatch)} />
-            <span className="font-code text-ink-faint text-[12px]">Stage {i + 1}</span>
+            <span className="text-ink-faint font-mono text-[12px]">Stage {i + 1}</span>
             <span className="text-[18px] font-bold">{stage.title}</span>
             <span className="text-ink-muted text-[15px] leading-[1.5]">{stage.body}</span>
           </div>

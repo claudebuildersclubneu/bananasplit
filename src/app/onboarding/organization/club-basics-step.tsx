@@ -89,12 +89,12 @@ export function ClubBasicsStep({
         <>
           <PreviewHeader meta="Your club's home" />
           <PreviewTile className="flex-row items-center gap-3">
-            <span className="bg-pine text-cream font-display grid size-11 flex-none place-items-center rounded-xl text-[20px]">
+            <span className="bg-pine text-cream font-heading grid size-11 flex-none place-items-center rounded-xl text-[20px]">
               {clubName[0]?.toUpperCase()}
             </span>
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate text-[15px] font-bold">{clubName}</span>
-              <span className="text-ink-soft font-code truncate text-[12px]">
+              <span className="text-ink-soft truncate font-mono text-[12px]">
                 /app/{slug || "your-club"}
               </span>
             </span>
@@ -165,7 +165,7 @@ export function ClubBasicsStep({
               }
             >
               <div className="bg-paper border-ink/16 focus-within-banana flex h-[50px] items-center rounded-xl border pl-4 text-[15px] transition-shadow">
-                <span className="text-ink-faint font-code text-[13px]">/app/</span>
+                <span className="text-ink-faint font-mono text-[13px]">/app/</span>
                 <input
                   id="org-slug"
                   name="slug"
@@ -203,7 +203,7 @@ export function ClubBasicsStep({
                   required
                   autoComplete="off"
                   placeholder="XXXX-XXXX-XXXX-XXXX"
-                  className="font-code uppercase"
+                  className="font-mono uppercase"
                 />
                 <span className="text-ink-soft text-[13px]">
                   A single-use code from a platform admin. Codes expire after 14 days.

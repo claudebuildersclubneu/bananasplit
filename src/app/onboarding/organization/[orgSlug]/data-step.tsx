@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import { pill } from "@/components/brand/pill";
 import {
   ContinuePill,
   PreviewHeader,
@@ -40,10 +41,6 @@ const STATUS: Record<SetupStepStatus, { text: string; chip: string; dot: string 
   skipped: { text: "Skipped", chip: "bg-oat text-ink-muted", dot: "bg-ink/20" },
   todo: { text: "Not connected", chip: "bg-oat text-ink-muted", dot: "bg-ink/20" },
 };
-
-/** The small outline pill on a row (Connect, Manage). */
-const rowPill =
-  "border-ink/18 bg-paper hover:bg-cream text-ink flex-none rounded-full border px-3.5 py-[7px] text-[13px] font-semibold transition-colors";
 
 /**
  * B2 · Connect data: the club's real connections (the guided setup's
@@ -87,7 +84,7 @@ export function DataStep({
         <>
           <PreviewHeader meta="Your sources" />
           <PreviewTile className="gap-1">
-            <span className="font-display text-[44px] leading-none tracking-[-0.03em] tabular-nums">
+            <span className="font-heading text-[44px] leading-none tracking-[-0.03em] tabular-nums">
               {connectedCount}
               <span className="text-ink-faint text-[26px]"> of {connections.length}</span>
             </span>
@@ -132,14 +129,17 @@ export function DataStep({
                     </span>
                   </span>
                   {c.detail || c.lastError ? (
-                    <span className="text-ink-soft font-code truncate text-[12px]">
+                    <span className="text-ink-soft truncate font-mono text-[12px]">
                       {c.detail ?? c.lastError}
                     </span>
                   ) : (
                     <span className="text-ink-soft truncate text-[13px]">{c.summary}</span>
                   )}
                 </span>
-                <Link href={`/app/${orgSlug}/setup?step=${c.id}&from=${back}`} className={rowPill}>
+                <Link
+                  href={`/app/${orgSlug}/setup?step=${c.id}&from=${back}`}
+                  className={cn(pill({ tone: "outline", size: "sm" }), "flex-none")}
+                >
                   {connected ? "Manage" : "Connect"}
                 </Link>
               </li>

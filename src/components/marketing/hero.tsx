@@ -43,7 +43,7 @@ export function Hero() {
     <section className="bg-hero relative overflow-hidden">
       <div aria-hidden="true" className="bg-hero-grid absolute inset-0" />
       <div className="relative mx-auto flex max-w-[1240px] flex-col items-center gap-6 px-6 pt-[clamp(56px,7vw,88px)] text-center">
-        <h1 className="font-display max-w-[940px] text-[clamp(42px,6.4vw,84px)] leading-none tracking-[-0.035em] text-balance">
+        <h1 className="font-heading max-w-[940px] text-[clamp(42px,6.4vw,84px)] leading-none tracking-[-0.035em] text-balance">
           Running your club shouldn&apos;t be bananas.
         </h1>
         <p className="text-ink-muted max-w-[600px] text-[clamp(18px,1.6vw,21px)] leading-[1.55] text-pretty">
@@ -65,7 +65,7 @@ export function Hero() {
               <span className="bg-chrome size-2.5 rounded-full" />
               <span className="bg-chrome size-2.5 rounded-full" />
               <span className="bg-chrome size-2.5 rounded-full" />
-              <span className="bg-oat font-code text-ink-faint mx-auto rounded-md px-10 py-[3px] text-[12px]">
+              <span className="bg-oat text-ink-faint mx-auto rounded-md px-10 py-[3px] font-mono text-[12px]">
                 bananasplit.fyi
               </span>
             </div>
@@ -85,7 +85,7 @@ export function Hero() {
           <FloatCard className="right-[clamp(140px,22vw,290px)] bottom-6">
             <span className="flex flex-col gap-0.5">
               <span className="text-ink-soft text-[12px]">Budget left this term</span>
-              <span className="font-display text-[24px] tracking-[-0.02em]">$1,240</span>
+              <span className="font-heading text-[24px] tracking-[-0.02em]">$1,240</span>
             </span>
             <span className="bg-leaf text-leaf-ink rounded-full px-[9px] py-1 text-[12px] font-bold whitespace-nowrap">
               9 weeks runway

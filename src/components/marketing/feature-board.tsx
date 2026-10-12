@@ -172,7 +172,7 @@ function OverviewTile() {
       )}
     >
       <TileTitle>Overview</TileTitle>
-      <h3 className="font-display max-w-[520px] text-[clamp(30px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
+      <h3 className="font-heading max-w-[520px] text-[clamp(30px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
         Everyone opens to what matters to them.
       </h3>
       <p className="text-ink-muted max-w-[460px] text-[16px] leading-[1.55] text-pretty">
@@ -199,7 +199,7 @@ function TasksTile() {
         Tasks
       </TileTitle>
       <div className="relative mt-auto flex items-end gap-3.5">
-        <span className="font-display text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
+        <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
           5
         </span>
         <span className="pb-0.5 text-[19px] leading-[1.25] font-semibold">
@@ -229,7 +229,7 @@ function CalendarTile() {
   return (
     <div className={cn(PAPER_TILE, "flex flex-[1_0_auto] flex-col gap-2.5 p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
-      <div className="font-display mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
+      <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
         Find a time, then put it on everyone&apos;s calendar.
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
@@ -245,7 +245,7 @@ function EventsTile() {
     <div className={cn(PAPER_TILE, SPLIT_TILE, "flex-[1.6_1_460px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle replaces="Luma">RSVPs and events</TileTitle>
-        <h3 className="font-display text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.025em] text-balance">
+        <h3 className="font-heading text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.025em] text-balance">
           You don&apos;t need Luma anymore.
         </h3>
         <p className="text-ink-muted text-[16px] leading-[1.55] text-pretty">
@@ -255,7 +255,7 @@ function EventsTile() {
       </div>
       <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[20px] border p-[18px]">
         <div className="bg-event-cover flex h-24 items-end rounded-xl p-3">
-          <span className="bg-paper/85 font-code rounded-md px-2 py-[3px] text-[11px] font-medium">
+          <span className="bg-paper/85 rounded-md px-2 py-[3px] font-mono text-[11px] font-medium">
             FRI · 7:00 PM
           </span>
         </div>
@@ -285,7 +285,7 @@ function AiTile() {
         className="bg-glow-banana absolute -top-20 -right-20 size-[280px] rounded-full"
       />
       <TileTitle tone="ink">AI built in</TileTitle>
-      <h3 className="font-display relative text-[clamp(30px,3vw,40px)] leading-[1.05] tracking-[-0.025em] text-balance">
+      <h3 className="font-heading relative text-[clamp(30px,3vw,40px)] leading-[1.05] tracking-[-0.025em] text-balance">
         Type it. It&apos;s sorted.
       </h3>
       <div className="relative my-1.5 flex flex-col gap-2">
@@ -319,7 +319,7 @@ function NotesTile() {
         overlap="-ml-2.5"
         className="mt-2"
       />
-      <div className="font-display mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
+      <div className="font-heading mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
         Edit together, live.
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
@@ -335,7 +335,7 @@ function DatabasesTile() {
       <TileTitle tone="sand" replaces="Airtable and spreadsheets">
         Databases
       </TileTitle>
-      <h3 className="font-display max-w-[460px] text-[clamp(26px,2.4vw,32px)] leading-[1.1] tracking-[-0.025em] text-balance">
+      <h3 className="font-heading max-w-[460px] text-[clamp(26px,2.4vw,32px)] leading-[1.1] tracking-[-0.025em] text-balance">
         Attendance, sign-ups and ballots, connected to the data you already have.
       </h3>
       <div className="mt-auto flex flex-wrap gap-2">
@@ -361,7 +361,7 @@ function CustomizationTile() {
     <div className={cn(PAPER_TILE, SPLIT_TILE, "flex-[2_1_520px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle>Customization</TileTitle>
-        <h3 className="font-display text-[clamp(30px,3.2vw,44px)] leading-[1.05] tracking-[-0.025em] text-balance">
+        <h3 className="font-heading text-[clamp(30px,3.2vw,44px)] leading-[1.05] tracking-[-0.025em] text-balance">
           Make it look like your club.
         </h3>
         <p className="text-ink-muted text-[16px] leading-[1.55] text-pretty">
@@ -422,7 +422,7 @@ function PeopleTile() {
           ))}
         </div>
       </div>
-      <div className="font-display mt-auto text-[clamp(34px,3.4vw,46px)] leading-[1.02] tracking-[-0.03em]">
+      <div className="font-heading mt-auto text-[clamp(34px,3.4vw,46px)] leading-[1.02] tracking-[-0.03em]">
         Hand over in one click.
       </div>
       <p className="text-bark-soft text-[15px] leading-[1.55] text-pretty">

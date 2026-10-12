@@ -48,7 +48,7 @@ export function Screenshot({
           className="object-cover object-left-top"
         />
       ) : (
-        <span className={cn("bg-paper font-code text-ink-muted rounded-md", CHIP[chip])}>
+        <span className={cn("bg-paper text-ink-muted rounded-md font-mono", CHIP[chip])}>
           {label}
         </span>
       )}

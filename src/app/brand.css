@@ -87,12 +87,6 @@
   --shadow-divider-left: -1px 0 0 rgb(28 24 16 / 0.06);
 }
 
-@theme inline {
-  --font-display: var(--font-young-serif), ui-serif, Georgia, serif;
-  --font-grotesk: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
-  --font-code: var(--font-jetbrains), ui-monospace, monospace;
-}
-
 /* The focus ring on inputs and code boxes: an ink border and a banana halo. */
 @utility focus-banana {
   &:focus,
@@ -224,8 +218,8 @@
 }
 
 /*
- * The brand scope (BrandRoot): the brand faces, ink on cream, and the app's
- * tokens pointed at the palette for the shared components inside. In the
+ * The brand scope (BrandRoot): ink on cream, and the app's tokens pointed at
+ * the palette for the shared components inside. In the
  * base layer, so any utility on an element (a link's own colour) wins.
  */
 @layer base {
@@ -252,11 +246,6 @@
     --brand-accent-foreground: var(--color-ink);
     --success: var(--color-leaf-ink);
     --warning: var(--color-honey);
-    /* The app's faces, swapped for the brand's inside the scope. */
-    --font-anybody: var(--font-young-serif);
-    --font-atkinson: var(--font-hanken);
-    --font-martian: var(--font-jetbrains);
-    font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
     /* The design leaves line height to the browser, not Tailwind's 1.5. */
     line-height: normal;
     color: var(--color-ink);

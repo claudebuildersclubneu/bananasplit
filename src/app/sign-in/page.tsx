@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
-import { AuthCard, AuthHeadline, AuthTitle } from "@/components/brand/auth-card";
+import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { FormMessage, OrDivider } from "@/components/brand/fields";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
@@ -45,7 +45,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const googleEnabled = googleSignInEnabled();
 
   return (
-    <AuthCard panel={<AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>}>
+    <AuthCard>
       <AuthTitle title="Welcome back." description="Log in to your club workspace." />
       {errorMessage && <FormMessage>{errorMessage}</FormMessage>}
       {googleEnabled && (

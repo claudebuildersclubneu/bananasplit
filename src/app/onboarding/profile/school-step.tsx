@@ -22,7 +22,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { MajorInput } from "@/components/onboarding/major-input";
-import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-card";
+import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-fields";
 import { Input } from "@/components/ui/input";
 import {
   gradYearChoices,

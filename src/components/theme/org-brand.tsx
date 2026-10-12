@@ -69,7 +69,7 @@ export function OrgBrand({
           // A two-ink monogram: initials in the primary, the accent off register.
           <span
             aria-hidden="true"
-            className="bg-primary text-primary-foreground misregister font-heading flex size-8 shrink-0 items-center justify-center rounded-md text-[0.8rem] font-black font-stretch-[125%]"
+            className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md font-sans text-[0.8rem] font-extrabold"
           >
             {orgInitials(name)}
           </span>

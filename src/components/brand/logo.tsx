@@ -63,7 +63,7 @@ export function Logo({
     <span className={cn("flex items-center gap-2.5", className)}>
       <CoreMark size={size} tone={tone} />
       <span
-        className={cn("font-display tracking-[-0.01em]", wordmarkClassName)}
+        className={cn("font-heading tracking-[-0.01em]", wordmarkClassName)}
         style={{ fontSize: textSize }}
       >
         bananasplit

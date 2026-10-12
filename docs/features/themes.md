@@ -109,34 +109,25 @@ In production an admin picks it on the Theme page.
   palette classes (`text-green-600`) and raw colour values in `.tsx` files. Every
   site is converted; the only exceptions are the two ignores below.
 
-## The look: "Riso bulletin" (developers)
+## The look (developers)
 
-Every theme is printed like a two-ink risograph zine: the org's **primary** and
-**accent** are the two inks, so the same marks suit any preset or custom theme.
-The look lives in `src/app/globals.css` (after the token blocks) and never names
-a colour: utilities mix the tokens where they paint, so the scoped previews on
-Settings > Theme restyle them too. Only palette-free values sit on `:root` (the
-highlighter's strength per mode, the motion curve). Surfaces are flat: no
-grain on the page and no drop shadow under cards.
+The type, motion and logo on top of the tokens follow the design handoff. The
+look lives in `src/app/globals.css` (after the token blocks) and never names a
+colour, so any theme an org picks or builds restyles it, the scoped previews on
+Settings > Theme included. Surfaces are flat: no grain on the page.
 
-- **Type** (`src/app/layout.tsx`, all variable): **Anybody** for headings and
-  figures, pushed to the ends of its width (50-150%) and weight (100-900) axes;
-  **Atkinson Hyperlegible Next** for body text; **Martian Mono** for labels,
-  dates and keyboard shortcuts.
-- **Utilities.** `page-title` (every page's `<h1>`: wide and heavy),
-  `heading` (card, dialog and sheet titles), `eyebrow` (mono caps labels),
-  `numeral` (thin, condensed big figures), `figure` (mono tabular money in
-  text), `ink-mark` (highlight inline words), `misregister` (the accent ink
-  printed off register), `ink-edge` (a primary button's darker bottom edge) and `crop-marks`
-  (printer's marks outside an element's corners; not on an `overflow-hidden`
-  element, which would clip them).
-- **Motion.** `reveal` staggers its children in on mount; the app's `<main>`
-  has `reveal-page`, which staggers the blocks of whatever page is inside it.
-  Both are zero-specificity base styles (an `animate-*` utility on a block wins)
-  and switch off under `prefers-reduced-motion`. The landing wordmark's
-  ink-register and split animations are `motion-safe:` only.
-- **Pieces.** `src/app/not-found.tsx` and the app shell use the brand mark;
-  the riso utilities above remain for the app interior.
+- **Type** (`src/app/layout.tsx`, loaded once for every page): **Young Serif**
+  (`font-heading`) for page titles and big figures, **Hanken Grotesk**
+  (`font-sans`) for everything you read and click, **JetBrains Mono**
+  (`font-mono`), sparingly, for labels, dates and money.
+- **Utilities.** `page-title` (every page's `<h1>`, the serif set tight),
+  `heading` (card, dialog and sheet titles: the grotesk, bold), `eyebrow`
+  (mono caps labels), `numeral` (big figures in the serif) and `figure` (mono
+  tabular money in text).
+- **Motion.** The app's `<main>` has `reveal-page`, which staggers the blocks
+  of whatever page is inside it in on mount: a zero-specificity base style (an
+  `animate-*` utility on a block wins) that switches off under
+  `prefers-reduced-motion`.
 - **Default palette.** The "Bananasplit" preset (`DEFAULT_PRESET`) is the
   brand's own: ink `#1c1810` primary and text, banana `#f2c230` highlighter,
   cream `#f7f2e6` background, paper `#fffdf7` surfaces; dark mode is ink-dark

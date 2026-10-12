@@ -229,11 +229,9 @@ export function SidebarNav({
       <div className="border-sidebar-border mt-3 border-t pt-3">
         <NavItemLink link={settings} pathname={pathname} all={all} onNavigate={onNavigate} />
         {/* The platform's signature, under the club's own nav: quiet, not a link. */}
-        <p className="text-sidebar-foreground/60 mt-3 flex items-center gap-2 px-3">
-          <BananasplitMark className="size-5" />
-          <span className="font-heading text-[0.7rem] font-black tracking-[-0.02em] font-stretch-[150%]">
-            Bananasplit
-          </span>
+        <p className="text-sidebar-foreground/70 mt-3 flex items-center gap-2.5 px-3">
+          <BananasplitMark className="size-[18px]" />
+          <span className="font-heading text-[14px] tracking-[-0.01em]">bananasplit</span>
         </p>
       </div>
     </nav>

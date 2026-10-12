@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { AuthCard, AuthHeadline, AuthTitle } from "@/components/brand/auth-card";
-import { primaryPillClass } from "@/components/brand/fields";
+import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
+import { pill } from "@/components/brand/pill";
 import { CONTACT_HREF } from "@/lib/brand/links";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ export const metadata = { title: "Forgot your password · Bananasplit" };
 export default function ForgotPasswordPage() {
   const googleEnabled = googleSignInEnabled();
   return (
-    <AuthCard panel={<AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>}>
+    <AuthCard>
       <AuthTitle
         title="Forgot your password?"
         description="We can't reset passwords by email yet."
@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
           from your account&apos;s email and we&apos;ll help you back in.
         </li>
       </ul>
-      <Link href="/sign-in" className={cn(primaryPillClass, "w-full")}>
+      <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
         Back to log in
       </Link>
     </AuthCard>

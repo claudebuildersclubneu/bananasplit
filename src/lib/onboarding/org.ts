@@ -10,32 +10,9 @@ import { localDateKey } from "@/lib/tasks/dates";
  * Actions. Pure and client-safe.
  */
 
-// ---------------------------------------------------------------- B3 labels
+// ---------------------------------------------------------------- privacy
 
-export const DATA_TAGS = ["Finance", "People", "Operations", "Events", "Other"] as const;
-export type DataTag = (typeof DATA_TAGS)[number];
-
-export function isDataTag(value: unknown): value is DataTag {
-  return typeof value === "string" && (DATA_TAGS as readonly string[]).includes(value);
-}
-
-/** The suggested tag for a built-in database, before anyone picks one. */
-export function defaultTagForKind(kind: string): DataTag {
-  switch (kind) {
-    case "PEOPLE":
-    case "SIGNUPS":
-      return "People";
-    case "SESSIONS":
-    case "ATTENDANCE":
-      return "Events";
-    case "BALLOTS":
-      return "Operations";
-    default:
-      return "Other";
-  }
-}
-
-/** MemberVisibility, in the words the select shows. */
+/** MemberVisibility, in the words the select shows (Settings > Privacy). */
 export const VISIBILITY_OPTIONS = [
   { value: "MEMBERS", label: "Everyone in the org" },
   { value: "ADMINS", label: "Owners and admins" },
@@ -43,38 +20,8 @@ export const VISIBILITY_OPTIONS = [
   { value: "HIDDEN", label: "Hidden from members' list" },
 ] as const;
 export type VisibilityValue = (typeof VISIBILITY_OPTIONS)[number]["value"];
-const visibilityValues = VISIBILITY_OPTIONS.map((o) => o.value) as [
-  VisibilityValue,
-  ...VisibilityValue[],
-];
 
-export const labelsInputSchema = z
-  .object({
-    sources: z
-      .array(
-        z
-          .object({
-            id: z.string().min(1).max(100),
-            name: z
-              .string()
-              .transform((s) => s.replace(/\s+/g, " ").trim())
-              .pipe(
-                z
-                  .string()
-                  .min(1, "Give every source a label.")
-                  .max(60, "Keep labels under 60 characters."),
-              ),
-            tag: z.enum(DATA_TAGS).nullable(),
-          })
-          .strict(),
-      )
-      .max(100),
-    /** Who can see each tag's data: applied to every source with that tag. */
-    visibility: z.partialRecord(z.enum(DATA_TAGS), z.enum(visibilityValues)),
-  })
-  .strict();
-
-export type LabelsInput = z.input<typeof labelsInputSchema>;
+// ---------------------------------------------------------------- B3 labels
 
 /** B3: the org's task labels, as the setup step leaves them. */
 export const MAX_SETUP_LABELS = 12;

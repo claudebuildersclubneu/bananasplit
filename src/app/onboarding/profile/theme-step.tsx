@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { useState } from "react";
 
-import { FieldError } from "@/components/onboarding/step-card";
+import { FieldError } from "@/components/onboarding/step-fields";
 import {
   choiceName,
   initialThemeChoice,

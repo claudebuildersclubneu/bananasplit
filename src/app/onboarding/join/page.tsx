@@ -41,7 +41,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
       formClassName="gap-6"
       panel={
         <div className="flex flex-col gap-5">
-          <p className="font-display m-0 text-[46px] leading-[1.02] tracking-[-0.035em]">
+          <p className="font-heading m-0 text-[46px] leading-[1.02] tracking-[-0.035em]">
             Where&apos;s my code?
           </p>
           <ul className="m-0 flex list-none flex-col gap-3 p-0 text-[15px] leading-[1.45]">

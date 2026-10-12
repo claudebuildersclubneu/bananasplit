@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { AvailabilityEditor } from "@/components/onboarding/availability-editor";
-import { FieldError } from "@/components/onboarding/step-card";
+import { FieldError } from "@/components/onboarding/step-fields";
 import type { Availability } from "@/lib/availability";
 
 import { saveAvailabilityStep } from "./actions";

@@ -22,7 +22,7 @@ import {
   StepFooter,
   StepIntro,
 } from "@/components/onboarding/setup-shell";
-import { ChoiceTileBody, choiceTileClass } from "@/components/onboarding/step-card";
+import { ChoiceTileBody, choiceTileClass } from "@/components/onboarding/step-fields";
 import { UserAvatar } from "@/components/user-avatar";
 import { requireUser } from "@/lib/auth/session";
 import { blockedHoursPerWeek } from "@/lib/availability";

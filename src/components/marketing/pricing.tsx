@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 
+import { CLUB_PLANS, dollars, TEAM_PLANS } from "@/lib/billing/plans";
 import { CONTACT_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
@@ -45,13 +46,13 @@ const COPY: Record<Audience, { title: string; intro: string }> = {
 const TIERS: Record<Audience, readonly Tier[]> = {
   clubs: [
     {
-      name: "Club",
+      name: CLUB_PLANS.club.name,
       who: "For active clubs with an officer team.",
-      price: "$4",
+      price: dollars(CLUB_PLANS.club.perMemberPerSemester),
       per: "per member / semester",
-      note: "A 40-member club pays $160 a semester.",
+      note: `A 40-member club pays ${dollars(40 * CLUB_PLANS.club.perMemberPerSemester)} a semester.`,
       cta: "Create your club",
-      href: "/sign-up?plan=club",
+      href: "/sign-up",
       lead: "Everything to run the club:",
       items: [
         "Tasks in five views",
@@ -63,15 +64,15 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       ],
     },
     {
-      name: "Society",
+      name: CLUB_PLANS.society.name,
       featured: true,
       badge: "Most popular",
       who: "For growing clubs that want every feature. Built for big clubs, loved by small ones.",
-      price: "$7",
+      price: dollars(CLUB_PLANS.society.perMemberPerSemester),
       per: "per member / semester",
-      note: "A 120-member society pays $840 a semester.",
+      note: `A 120-member society pays ${dollars(120 * CLUB_PLANS.society.perMemberPerSemester)} a semester.`,
       cta: "Go Society",
-      href: "/sign-up?plan=society",
+      href: "/sign-up",
       lead: "Everything in Club, plus:",
       items: [
         "Public event pages, waitlists and check-in",
@@ -86,15 +87,15 @@ const TIERS: Record<Audience, readonly Tier[]> = {
   ],
   teams: [
     {
-      name: "Team",
+      name: TEAM_PLANS.team.name,
       featured: true,
       badge: "For teams",
       who: "For startups, studios and groups outside school.",
-      price: "$15",
+      price: dollars(TEAM_PLANS.team.perSeatPerMonth),
       per: "per seat / month",
-      note: "Or $150 per seat billed yearly.",
+      note: `Or ${dollars(TEAM_PLANS.team.perSeatPerYear)} per seat billed yearly.`,
       cta: "Start your team",
-      href: "/sign-up?plan=team",
+      href: "/sign-up",
       lead: "Every Society feature, plus:",
       items: [
         "Google Workspace sign-in",
@@ -105,11 +106,11 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       ],
     },
     {
-      name: "Business",
+      name: TEAM_PLANS.business.name,
       who: "For organizations with several teams.",
-      price: "$25",
+      price: dollars(TEAM_PLANS.business.perSeatPerMonth),
       per: "per seat / month",
-      note: "Or $250 per seat billed yearly.",
+      note: `Or ${dollars(TEAM_PLANS.business.perSeatPerYear)} per seat billed yearly.`,
       cta: "Talk to us",
       href: CONTACT_HREF,
       lead: "Everything in Team, plus:",
@@ -214,7 +215,7 @@ function TierCard({ tier }: { tier: Tier }) {
         <div className="flex items-center justify-between gap-3">
           <span className="text-[19px] font-bold">{tier.name}</span>
           {tier.featured && tier.badge && (
-            <span className="bg-ink font-code text-banana rounded-full px-2.5 py-[5px] text-[11px] tracking-[0.05em] uppercase">
+            <span className="bg-ink text-banana rounded-full px-2.5 py-[5px] font-mono text-[11px] tracking-[0.05em] uppercase">
               {tier.badge}
             </span>
           )}
@@ -223,7 +224,7 @@ function TierCard({ tier }: { tier: Tier }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-2.5">
-          <span className="font-display text-[64px] leading-none tracking-[-0.04em]">
+          <span className="font-heading text-[64px] leading-none tracking-[-0.04em]">
             {tier.price}
           </span>
           <span className="text-ink-muted text-[15px] leading-[1.3]">{tier.per}</span>
@@ -266,7 +267,7 @@ function SchoolsPanel() {
       />
       <div className="relative flex flex-col gap-3.5">
         <span className="text-banana text-[14px] font-bold">For schools</span>
-        <h3 className="font-display text-[clamp(28px,3vw,40px)] leading-[1.06] tracking-[-0.025em] text-balance">
+        <h3 className="font-heading text-[clamp(28px,3vw,40px)] leading-[1.06] tracking-[-0.025em] text-balance">
           Run every club on campus from one place.
         </h3>
         <p className="text-dusk max-w-[480px] text-[16px] leading-[1.6]">

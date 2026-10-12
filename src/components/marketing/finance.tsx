@@ -46,7 +46,7 @@ export function Finance() {
               <span className="bg-banana text-ink self-start rounded-full px-3 py-[5px] text-[13px] font-bold">
                 Finance
               </span>
-              <h2 className="font-display text-[clamp(38px,4.8vw,62px)] leading-[1.02] tracking-[-0.035em] text-balance">
+              <h2 className="font-heading text-[clamp(38px,4.8vw,62px)] leading-[1.02] tracking-[-0.035em] text-balance">
                 Know where every dollar went,{" "}
                 <span className="text-banana">and how long the rest will last.</span>
               </h2>
@@ -61,7 +61,7 @@ export function Finance() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex flex-col gap-1">
                     <span className="text-ink-soft text-[13px]">Left this term</span>
-                    <span className="font-display text-[44px] leading-none tracking-[-0.03em] tabular-nums">
+                    <span className="font-heading text-[44px] leading-none tracking-[-0.03em] tabular-nums">
                       $1,240
                     </span>
                   </div>

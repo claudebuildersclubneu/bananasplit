@@ -11,7 +11,7 @@ export function SectionTitle({
   return (
     <h2
       className={cn(
-        "font-display text-[clamp(38px,5vw,64px)] leading-[1.02] tracking-[-0.03em]",
+        "font-heading text-[clamp(38px,5vw,64px)] leading-[1.02] tracking-[-0.03em]",
         className,
       )}
     >

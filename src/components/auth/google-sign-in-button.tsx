@@ -1,7 +1,8 @@
 import { GoogleIcon } from "@/components/google-icon";
+import { pill } from "@/components/brand/pill";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { signIn } from "@/lib/auth/config";
+import { cn } from "@/lib/utils";
 
 /**
  * "Continue with Google" (/sign-in, /sign-up, /invite/[token]). With Google,
@@ -45,10 +46,7 @@ export function BrandGoogleButton({
         await signIn("google", redirectTo ? { redirectTo } : undefined);
       }}
     >
-      <button
-        type="submit"
-        className="bg-paper border-ink/16 hover:bg-cream flex h-[50px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-full border text-[15px] font-semibold transition-colors"
-      >
+      <button type="submit" className={cn(pill({ tone: "outline", size: "field" }), "w-full")}>
         <span
           aria-hidden="true"
           className="border-ink grid size-5 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold"
@@ -58,16 +56,5 @@ export function BrandGoogleButton({
         {label}
       </button>
     </form>
-  );
-}
-
-/** The "or" between the Google button and the email form. */
-export function AuthOrDivider() {
-  return (
-    <div className="flex items-center gap-3">
-      <Separator className="flex-1" />
-      <span className="text-muted-foreground text-xs">or</span>
-      <Separator className="flex-1" />
-    </div>
   );
 }

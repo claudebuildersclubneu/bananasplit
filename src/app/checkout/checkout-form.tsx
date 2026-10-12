@@ -5,17 +5,10 @@ import { useId, useState, type FormEvent } from "react";
 
 import { ArrowLeft } from "@/components/brand/arrows";
 import { CoreMark } from "@/components/brand/logo";
+import { CLUB_PLANS, type ClubPlanId } from "@/lib/billing/plans";
 import type { SemesterSeason } from "@/lib/billing/semester";
 import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
-
-export type CheckoutPlan = "club" | "society";
-
-/** Student pricing: dollars per member per semester (as on the home page). */
-const PLANS: Record<CheckoutPlan, { name: string; rate: number }> = {
-  club: { name: "Club", rate: 4 },
-  society: { name: "Society", rate: 7 },
-};
 
 /** "$280.00", "$1,400.00". */
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -52,7 +45,7 @@ const COUNTRIES = [
 ] as const;
 
 export interface CheckoutFormProps {
-  plan: CheckoutPlan;
+  plan: ClubPlanId;
   clubName: string;
   /** The club's member count (at least 1), or the sample 40 with no club. */
   initialMembers: number;
@@ -86,7 +79,7 @@ export function CheckoutForm({
   const [notice, setNotice] = useState<string | null>(null);
   const headingId = useId();
 
-  const { name, rate } = PLANS[plan];
+  const { name, perMemberPerSemester: rate } = CLUB_PLANS[plan];
   const total = usd.format(rate * members);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {

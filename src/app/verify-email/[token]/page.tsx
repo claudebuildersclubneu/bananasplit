@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { AuthCard, AuthHeadline, AuthTitle } from "@/components/brand/auth-card";
-import { primaryPillClass } from "@/components/brand/fields";
+import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
+import { pill } from "@/components/brand/pill";
 import { getSession } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { peekVerificationToken } from "@/server/email/verification";
@@ -45,10 +45,6 @@ function isResult(value: unknown): value is Result {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(RESULTS, value);
 }
 
-/** The outline pill under the main action (Send a new link). */
-const secondaryPillClass =
-  "border-ink/16 bg-paper hover:bg-cream inline-flex h-[50px] w-full cursor-pointer items-center justify-center rounded-full border text-[15px] font-semibold transition-colors";
-
 function Shell({
   title,
   description,
@@ -59,7 +55,7 @@ function Shell({
   children?: React.ReactNode;
 }) {
   return (
-    <AuthCard panel={<AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>}>
+    <AuthCard>
       <AuthTitle title={title} description={description} />
       {children}
     </AuthCard>
@@ -75,13 +71,13 @@ export default async function VerifyEmailPage({
   const session = await getSession();
 
   const continueLink = (
-    <Link href={session ? "/app" : "/sign-in"} className={cn(primaryPillClass, "w-full")}>
+    <Link href={session ? "/app" : "/sign-in"} className={cn(pill({ raised: true }), "w-full")}>
       {session ? "Continue" : "Log in"}
     </Link>
   );
   const resendButton = session ? (
     <form action={resendVerificationAction.bind(null, token)}>
-      <button type="submit" className={secondaryPillClass}>
+      <button type="submit" className={cn(pill({ tone: "outline", size: "field" }), "w-full")}>
         Send a new link
       </button>
     </form>
@@ -114,7 +110,7 @@ export default async function VerifyEmailPage({
       description="Confirm this address to finish setting up your Bananasplit account."
     >
       <form action={confirmEmailAction.bind(null, token)}>
-        <button type="submit" className={cn(primaryPillClass, "w-full")}>
+        <button type="submit" className={cn(pill({ raised: true }), "w-full")}>
           Confirm email
         </button>
       </form>

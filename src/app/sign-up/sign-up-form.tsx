@@ -4,13 +4,8 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { AuthTitle } from "@/components/brand/auth-card";
-import {
-  BrandField,
-  BrandInput,
-  FormMessage,
-  PrimaryButton,
-  primaryPillClass,
-} from "@/components/brand/fields";
+import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
+import { pill } from "@/components/brand/pill";
 import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
 import { PASSWORD_MIN_LENGTH, passwordStrength } from "@/lib/auth/password-strength";
 import { cn } from "@/lib/utils";
@@ -37,7 +32,7 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
           }
         />
         {state.error && <FormMessage>{state.error}</FormMessage>}
-        <Link href="/sign-in" className={cn(primaryPillClass, "w-full")}>
+        <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
           Go to log in
         </Link>
       </>

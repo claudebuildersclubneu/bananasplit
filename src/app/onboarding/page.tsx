@@ -48,7 +48,7 @@ export default async function OnboardingPage() {
     <AuthCard
       panel={
         <div className="flex flex-col gap-6">
-          <AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>
+          <AuthHeadline />
           <JoinSteps current={2} />
         </div>
       }

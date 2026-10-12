@@ -3,10 +3,13 @@
 import { useRef, useState, useTransition } from "react";
 
 import {
+  AddRowButton,
   ContinuePill,
   DotChip,
+  PREVIEW_AVATAR_TONES,
   PreviewHeader,
   PreviewTile,
+  RemoveButton,
   SetupCard,
   StepBody,
   StepError,
@@ -38,8 +41,6 @@ const SAMPLE_TASKS = [
   "Email sponsors about spring",
   "Plan the campus info table",
 ] as const;
-
-const AVATAR_TONES = ["bg-wheat", "bg-ink", "bg-dusk", "bg-spot"] as const;
 
 function asColor(color: string): LabelColor {
   return (LABEL_COLOR_PALETTE as readonly string[]).includes(color)
@@ -143,7 +144,7 @@ export function LabelsStep({
                   aria-hidden="true"
                   className={cn(
                     "size-[22px] flex-none rounded-full",
-                    AVATAR_TONES[i % AVATAR_TONES.length],
+                    PREVIEW_AVATAR_TONES[i % PREVIEW_AVATAR_TONES.length],
                   )}
                 />
               </span>
@@ -198,25 +199,15 @@ export function LabelsStep({
                   ? "New"
                   : `${row.taskCount} ${row.taskCount === 1 ? "item" : "items"}`}
               </span>
-              <button
-                type="button"
-                aria-label={`Remove ${row.name || "this label"}`}
+              <RemoveButton
+                label={`Remove ${row.name || "this label"}`}
                 onClick={() => setRows(rows.filter((r) => r.key !== row.key))}
-                className="text-ink-ghost hover:text-ink flex-none cursor-pointer border-none bg-transparent p-0 text-[18px] leading-none"
-              >
-                ×
-              </button>
+              />
             </li>
           ))}
           {rows.length < MAX_SETUP_LABELS && (
             <li>
-              <button
-                type="button"
-                onClick={add}
-                className="border-ink/25 text-ink-muted hover:bg-cream flex h-[50px] w-full cursor-pointer items-center rounded-xl border border-dashed bg-transparent px-4 text-left text-[15px] font-semibold transition-colors"
-              >
-                + Add a label
-              </button>
+              <AddRowButton onClick={add}>Add a label</AddRowButton>
             </li>
           )}
         </ul>

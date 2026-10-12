@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { requireUser } from "@/lib/auth/session";
+import { isClubPlanId } from "@/lib/billing/plans";
 import { formatSemesterDate, nextSemesterStart } from "@/lib/billing/semester";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOnboardingProfile } from "@/server/onboarding/profile";
 
-import { CheckoutForm, type CheckoutPlan } from "./checkout-form";
+import { CheckoutForm } from "./checkout-form";
 
 export const metadata: Metadata = { title: "Subscribe · Bananasplit" };
 
@@ -29,7 +30,7 @@ function renewal() {
 export default async function CheckoutPage({ searchParams }: PageProps<"/checkout">) {
   const user = await requireUser();
   const params = await searchParams;
-  const plan: CheckoutPlan = params.plan === "club" ? "club" : "society";
+  const plan = isClubPlanId(params.plan) ? params.plan : "society";
   const orgParam = typeof params.org === "string" ? params.org : null;
 
   // Only the user's own orgs: a slug they don't belong to falls back to

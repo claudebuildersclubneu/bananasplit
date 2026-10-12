@@ -27,7 +27,7 @@ export default async function SignUpPage() {
       formClassName="gap-[18px] lg:py-9"
       panel={
         <div className="flex flex-col gap-6">
-          <AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>
+          <AuthHeadline />
           <JoinSteps current={1} />
         </div>
       }

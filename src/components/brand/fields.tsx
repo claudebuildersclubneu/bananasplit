@@ -2,9 +2,11 @@ import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+import { pill } from "./pill";
+
 /*
  * Form controls for Bananasplit's own pages (sign-in, sign-up, joining a
- * club): 12px-radius inputs with the banana focus ring, and pill buttons.
+ * club): 12px-radius inputs with the banana focus ring, and the submit pill.
  */
 
 export const brandInputClass =
@@ -39,12 +41,9 @@ export function BrandInput({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(brandInputClass, className)} {...props} />;
 }
 
-/** The ink pill: 52px, the page's main action. */
-export const primaryPillClass =
-  "bg-ink text-cream shadow-cta-soft hover:bg-ink-hover hover:text-cream inline-flex h-[52px] cursor-pointer items-center justify-center gap-2.5 rounded-full border-none text-[16px] font-semibold transition-colors disabled:cursor-default";
-
+/** A form's submit: the 52px ink pill with its shadow. */
 export function PrimaryButton({ className, ...props }: ComponentProps<"button">) {
-  return <button className={cn(primaryPillClass, className)} {...props} />;
+  return <button className={cn(pill({ raised: true }), className)} {...props} />;
 }
 
 /** The "or" between the Google button and the email form. */

@@ -1,35 +1,29 @@
 import type { Metadata } from "next";
-import { Anybody, Atkinson_Hyperlegible_Next, Martian_Mono } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono, Young_Serif } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth/config";
 
 /*
- * The type system (globals.css, "Riso bulletin"): one expressive display
- * face pushed to the ends of its width and weight axes for headings and
- * figures, a body face built for legibility in dense tables and forms, and
- * a mono for money, dates and labels. All three are variable.
+ * The type system (the design handoff; globals.css maps these to font-heading,
+ * font-sans and font-mono): Young Serif for display, Hanken Grotesk for the
+ * interface and body, JetBrains Mono, sparingly, for labels and figures.
  */
-const display = Anybody({
-  variable: "--font-anybody",
+const display = Young_Serif({
+  variable: "--font-young-serif",
   subsets: ["latin"],
-  axes: ["wdth"],
+  weight: "400",
 });
 
-const body = Atkinson_Hyperlegible_Next({
-  variable: "--font-atkinson",
+const body = Hanken_Grotesk({
+  variable: "--font-hanken",
   subsets: ["latin"],
-  // next/font has no metrics for this face yet, so it can't size-match a
-  // fallback; say so instead of warning on every compile.
-  adjustFontFallback: false,
-  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const mono = Martian_Mono({
-  variable: "--font-martian",
+const mono = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
-  axes: ["wdth"],
 });
 
 export const metadata: Metadata = {

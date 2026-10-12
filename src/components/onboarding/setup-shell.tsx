@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { ArrowLeft, ArrowRight } from "@/components/brand/arrows";
 import { Logo } from "@/components/brand/logo";
+import { pill } from "@/components/brand/pill";
 import { cn } from "@/lib/utils";
 
 /*
@@ -150,7 +151,7 @@ export function StepIntro({
       <span className="text-ink-soft text-[13px] font-semibold">
         Step {index} of {total}
       </span>
-      <h1 className="font-display m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
+      <h1 className="font-heading m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
         {title}
       </h1>
       {children && (
@@ -246,7 +247,7 @@ export function ContinuePill({
       onClick={onClick}
       disabled={pending || disabled}
       style={style}
-      className="bg-ink text-cream hover:bg-ink-hover flex h-12 cursor-pointer items-center gap-2.5 rounded-full border-none px-6 text-[15px] font-semibold transition-colors disabled:cursor-default disabled:opacity-50"
+      className={pill({ size: "md" })}
     >
       {pending ? (
         <>
@@ -262,6 +263,36 @@ export function ContinuePill({
     </button>
   );
 }
+
+/** The dashed "+ Add a label" / "+ Add a team" row under a list. */
+export function AddRowButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border-ink/25 text-ink-muted hover:bg-cream flex h-[50px] w-full cursor-pointer items-center rounded-xl border border-dashed bg-transparent px-4 text-left text-[15px] font-semibold transition-colors"
+    >
+      + {children}
+    </button>
+  );
+}
+
+/** The × that removes a row; `label` names what it removes. */
+export function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="text-ink-ghost hover:text-ink flex-none cursor-pointer border-none bg-transparent p-0 text-[18px] leading-none"
+    >
+      ×
+    </button>
+  );
+}
+
+/** Stand-in avatar colours for people in a preview. */
+export const PREVIEW_AVATAR_TONES = ["bg-wheat", "bg-ink", "bg-dusk", "bg-spot"] as const;
 
 /** The preview's header: "Preview" and what it shows. */
 export function PreviewHeader({ meta, label = "Preview" }: { meta?: ReactNode; label?: string }) {
