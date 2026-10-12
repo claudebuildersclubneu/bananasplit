@@ -73,6 +73,9 @@ const CLIENT_ALLOWLIST = [
   "src/lib/auth/google-linking.ts",
   "src/app/sign-up/actions.ts",
   "src/app/verify-email/**",
+  // authDb only: UserCredential.sessionVersion and PasswordResetToken.
+  "src/lib/auth/session-version.ts",
+  "src/server/email/password-reset.ts",
   "src/lib/rate-limit.ts",
   // serviceDb only: app.blob_* (StoredBlob, file bytes when there's no Blob store).
   "src/server/storage/database-driver.ts",
@@ -285,7 +288,11 @@ const eslintConfig = defineConfig([
   // Re-apply the stricter rules to the non-allowlisted email modules.
   {
     files: ["src/server/email/**"],
-    ignores: ["src/server/email/jobs.ts", "src/server/email/verification.ts"],
+    ignores: [
+      "src/server/email/jobs.ts",
+      "src/server/email/verification.ts",
+      "src/server/email/password-reset.ts",
+    ],
     rules: {
       "no-restricted-imports": restrictImports(NEXT_CACHE, PRIVILEGED_CLIENTS, NAVIGATION),
     },

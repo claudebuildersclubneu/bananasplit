@@ -19,7 +19,8 @@ import {
 import {
   describeMeeting,
   fiscalYearFor,
-  labelsInputSchema,
+  MAX_SETUP_LABELS,
+  taskLabelsInputSchema,
   teamsInputSchema,
 } from "@/lib/onboarding/org";
 import {
@@ -98,19 +99,27 @@ describe("availability", () => {
 });
 
 describe("join codes", () => {
-  it("generates XXXX-XXXX codes with no look-alike characters", () => {
+  it("generates six-character codes with no look-alike characters", () => {
     for (let i = 0; i < 50; i++) {
       const code = generateJoinCode();
+      expect(code).toMatch(/^[A-Z0-9]{6}$/);
       expect(code).toMatch(JOIN_CODE_RE);
       expect(code).not.toMatch(/[01OILU]/);
     }
   });
 
   it("normalizes what people type", () => {
+    expect(normalizeJoinCode(" robo26 ")).toBe("ROBO26");
+    expect(normalizeJoinCode("ro-bo 26")).toBe("ROBO26");
+    expect(normalizeJoinCode("abc")).toBeNull();
+    expect(normalizeJoinCode("abcdefg")).toBeNull();
+    expect(normalizeJoinCode("abcd-efgh-ijkl")).toBeNull();
+  });
+
+  it("still accepts the earlier XXXX-XXXX codes", () => {
     expect(normalizeJoinCode(" abcd efgh ")).toBe("ABCD-EFGH");
     expect(normalizeJoinCode("abcd-efgh")).toBe("ABCD-EFGH");
-    expect(normalizeJoinCode("abc")).toBeNull();
-    expect(normalizeJoinCode("abcd-efgh-ijkl")).toBeNull();
+    expect(JOIN_CODE_RE.test("ABCD-EFGH")).toBe(true);
   });
 
   it("matches an email to the org's domain and its subdomains only", () => {
@@ -203,7 +212,7 @@ describe("org setup", () => {
     );
   });
 
-  it("validates teams and labels", () => {
+  it("validates teams", () => {
     expect(
       teamsInputSchema.safeParse({
         teams: [],
@@ -224,10 +233,21 @@ describe("org setup", () => {
         showMemberAvailability: true,
       }).success,
     ).toBe(false);
+  });
+
+  it("validates the task labels: palette colours, a name each, and a cap", () => {
+    const label = { id: null, name: "  Events  ", color: "#e3a90a" };
+    const parsed = taskLabelsInputSchema.safeParse({ labels: [label] });
+    expect(parsed.success && parsed.data.labels[0]?.name).toBe("Events");
     expect(
-      labelsInputSchema.safeParse({
-        sources: [{ id: "d1", name: "People", tag: "Spies" }],
-        visibility: {},
+      taskLabelsInputSchema.safeParse({ labels: [{ ...label, color: "#123456" }] }).success,
+    ).toBe(false);
+    expect(taskLabelsInputSchema.safeParse({ labels: [{ ...label, name: "   " }] }).success).toBe(
+      false,
+    );
+    expect(
+      taskLabelsInputSchema.safeParse({
+        labels: Array.from({ length: MAX_SETUP_LABELS + 1 }, () => label),
       }).success,
     ).toBe(false);
   });

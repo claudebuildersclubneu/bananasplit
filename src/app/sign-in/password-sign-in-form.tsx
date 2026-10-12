@@ -1,42 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
 
 import { passwordSignInAction } from "./actions";
 
 export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | null }) {
   const [state, formAction, isPending] = useActionState(passwordSignInAction, {});
+  // Controlled, so React's reset after the action doesn't wipe what was typed.
+  const [email, setEmail] = useState("");
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={formAction} className="flex flex-col gap-5">
       {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
-      <div className="grid gap-1.5">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" required autoComplete="email" />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="password">Password</Label>
-        <Input
+      <BrandField id="email" label="Email">
+        <BrandInput
+          id="email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          placeholder="you@school.edu"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </BrandField>
+      <BrandField
+        id="password"
+        label="Password"
+        aside={
+          <Link href="/forgot-password" className="text-honey font-medium">
+            Forgot?
+          </Link>
+        }
+      >
+        <BrandInput
           id="password"
           name="password"
           type="password"
           required
           autoComplete="current-password"
+          placeholder="••••••••"
         />
-      </div>
-      {state.error && <p className="text-destructive text-sm">{state.error}</p>}
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Signing in…" : "Sign in"}
-      </Button>
-      <p className="text-muted-foreground text-center text-sm">
-        Don&apos;t have an account?{" "}
-        <Link href="/sign-up" className="underline underline-offset-4">
-          Sign up
+      </BrandField>
+      {state.error && <FormMessage>{state.error}</FormMessage>}
+      <PrimaryButton type="submit" disabled={isPending}>
+        {isPending ? "Logging in…" : "Log in"}
+      </PrimaryButton>
+      <p className="text-ink-muted m-0 text-center text-[14px]">
+        New to Bananasplit?{" "}
+        <Link href="/sign-up" className="font-bold">
+          Create an account
         </Link>
       </p>
     </form>

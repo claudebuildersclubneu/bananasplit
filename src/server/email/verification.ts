@@ -10,9 +10,13 @@ import { enqueueJob } from "@/server/jobs/enqueue";
  * - enqueueVerificationEmail(userId): a verify-email platform job (the job
  *   mints the token and sends the link; see ./jobs.ts). Call it after the
  *   sign-up write and from "resend verification".
- * - consumeVerificationToken(rawToken): for the /verify-email/[token] page.
- *   Marks the user verified when the token's hash matches an unexpired
- *   VerificationToken, and deletes the user's tokens. Single use.
+ * - consumeVerificationToken(rawToken, userId): for the /verify-email/[token]
+ *   page. Marks the user verified when the token's hash matches an unexpired
+ *   VerificationToken for THAT user's address, and deletes the address's
+ *   tokens. Single use. Tying the link to the signed-in account stops a
+ *   pre-account takeover: if someone signs up with your address, you
+ *   clicking the link can't verify their account, because only that
+ *   account, signed in, can use it.
  */
 
 export async function enqueueVerificationEmail(userId: string): Promise<void> {
@@ -24,7 +28,9 @@ export async function enqueueVerificationEmail(userId: string): Promise<void> {
   });
 }
 
-export type VerifyResult = { ok: true; email: string } | { ok: false; reason: "invalid" | "expired" };
+export type VerifyResult =
+  | { ok: true; email: string }
+  | { ok: false; reason: "invalid" | "expired" | "wrong-account" };
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{20,200}$/;
 
@@ -47,13 +53,22 @@ export async function peekVerificationToken(rawToken: string): Promise<"valid" |
   return row.expires <= new Date() ? "expired" : "valid";
 }
 
-export async function consumeVerificationToken(rawToken: string): Promise<VerifyResult> {
+export async function consumeVerificationToken(
+  rawToken: string,
+  userId: string,
+): Promise<VerifyResult> {
   if (!TOKEN_SHAPE.test(rawToken)) return { ok: false, reason: "invalid" };
   const tokenHash = hashToken(rawToken);
 
   return authDb.$transaction(async (tx) => {
     const row = await tx.verificationToken.findFirst({ where: { token: tokenHash } });
     if (!row) return { ok: false, reason: "invalid" } as const;
+    // Only the account the link was sent for can use it; the link stays
+    // live for that account.
+    const signedIn = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!signedIn || signedIn.email !== row.identifier) {
+      return { ok: false, reason: "wrong-account" } as const;
+    }
     await tx.verificationToken.deleteMany({ where: { identifier: row.identifier } });
     if (row.expires <= new Date()) return { ok: false, reason: "expired" } as const;
     const updated = await tx.user.updateMany({

@@ -76,7 +76,7 @@ test("a handed-down task emails a deep link that survives sign-in", async ({ pag
   await expect(page).toHaveURL(/\/sign-in\?callbackUrl=/);
   await page.getByLabel("Email").fill(alex.email);
   await page.getByLabel("Password").fill(alex.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Log in" }).click();
   await page.waitForURL(new RegExp(`${link}$`));
   // The page opens straight onto the task's form; its title is the first field.
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);

@@ -104,6 +104,10 @@ describe("static policy for every other route", () => {
       "/sign-up",
       "/verify-email/tok",
       "/onboarding",
+      "/onboarding/join",
+      "/checkout",
+      "/forgot-password",
+      "/reset-password/tok",
     ]) {
       expect(regex.test(path), path).toBe(false);
       expect(isNonceRoute(path), path).toBe(true);
@@ -122,7 +126,13 @@ describe("the Notes files route", () => {
     const file = "/api/orgs/org_1/files/f_1";
     expect(deny.test(file)).toBe(false);
     expect(staticCsp.test(file)).toBe(false);
-    for (const path of ["/", "/api/health", "/api/orgs/org_1/logo", "/api/orgs/org_1/receipts", "/app/cbc"]) {
+    for (const path of [
+      "/",
+      "/api/health",
+      "/api/orgs/org_1/logo",
+      "/api/orgs/org_1/receipts",
+      "/app/cbc",
+    ]) {
       expect(deny.test(path), path).toBe(true);
     }
     expect(staticCsp.test("/api/orgs/org_1/logo")).toBe(true);
@@ -136,7 +146,9 @@ describe("mode and headers", () => {
     for (const nodeEnv of ["production", "development", "test"]) {
       expect(cspMode(env({ NODE_ENV: nodeEnv })), nodeEnv).toBe("enforce");
       expect(cspMode(env({ NODE_ENV: nodeEnv, CSP_MODE: "enforce" })), nodeEnv).toBe("enforce");
-      expect(cspMode(env({ NODE_ENV: nodeEnv, CSP_MODE: "report-only" })), nodeEnv).toBe("report-only");
+      expect(cspMode(env({ NODE_ENV: nodeEnv, CSP_MODE: "report-only" })), nodeEnv).toBe(
+        "report-only",
+      );
       // Anything else is not an opt-out.
       expect(cspMode(env({ NODE_ENV: nodeEnv, CSP_MODE: "" })), nodeEnv).toBe("enforce");
       expect(cspMode(env({ NODE_ENV: nodeEnv, CSP_MODE: "Report-Only" })), nodeEnv).toBe("enforce");
@@ -174,6 +186,9 @@ describe("mode and headers", () => {
       "/sign-up",
       "/verify-email",
       "/onboarding",
+      "/checkout",
+      "/forgot-password",
+      "/reset-password",
     ]);
   });
 });

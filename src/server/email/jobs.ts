@@ -11,9 +11,12 @@ import { PermanentJobError, type JobHandler, type JobOutcome } from "@/server/jo
 import { renderTaskNotificationEmail } from "@/server/tasks/email";
 
 import { getOrgMailer, getPlatformMailer } from "./mailer";
+import { hashResetToken, PASSWORD_RESET_TTL_MINUTES } from "./password-reset";
 import {
   invitationEmail,
   notificationEmail,
+  passwordChangedEmail,
+  passwordResetEmail,
   reimbursementStatusEmail,
   treasurerDigestEmail,
   verifyEmailEmail,
@@ -309,6 +312,65 @@ export const verifyEmailJob: JobHandler<{ userId: string }> = async (run) => {
         verifyUrl,
         expiresHours: VERIFY_EMAIL_TTL_HOURS,
       }),
+    },
+    { signal: run.signal },
+  );
+};
+
+/**
+ * password-reset-email:{userId} — a platform job (app_auth enqueues it from
+ * "Forgot your password?"). Mints a reset token (only its sha256 is stored,
+ * in PasswordResetToken), replacing any earlier link, and mails it through
+ * the platform sender. A deleted user is a no-op. No idempotency key: a
+ * second run mints a new link, and replaying the first email would send a
+ * link that no longer works.
+ */
+export const passwordResetEmailJob: JobHandler<{ userId: string }> = async (run) => {
+  const user = await authDb.user.findUnique({
+    where: { id: run.payload.userId },
+    select: { id: true, email: true, name: true },
+  });
+  if (!user) return;
+
+  const token = randomBytes(32).toString("base64url");
+  // Built before any write, as in verifyEmailJob: no usable app URL fails
+  // the job instead of mailing a link to localhost.
+  const resetUrl = appUrl(`/reset-password/${token}`);
+  await authDb.$transaction([
+    authDb.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+    authDb.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashResetToken(token),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60 * 1000),
+      },
+    }),
+  ]);
+
+  await getPlatformMailer().send(
+    {
+      to: user.email,
+      ...passwordResetEmail({
+        name: user.name,
+        resetUrl,
+        expiresMinutes: PASSWORD_RESET_TTL_MINUTES,
+      }),
+    },
+    { signal: run.signal },
+  );
+};
+
+/** password-changed-email:{userId} — the notice after a reset (platform sender). */
+export const passwordChangedEmailJob: JobHandler<{ userId: string }> = async (run) => {
+  const user = await authDb.user.findUnique({
+    where: { id: run.payload.userId },
+    select: { email: true, name: true },
+  });
+  if (!user) return;
+  await getPlatformMailer().send(
+    {
+      to: user.email,
+      ...passwordChangedEmail({ name: user.name, resetUrl: appUrl("/forgot-password") }),
     },
     { signal: run.signal },
   );

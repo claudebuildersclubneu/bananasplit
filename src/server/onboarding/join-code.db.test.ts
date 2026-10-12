@@ -5,6 +5,9 @@ import { randomBytes } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+/** A per-run address in the benchmarking range, so the per-IP join-code limit never carries over between runs. */
+const ip = `198.18.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 254)}`;
+
 /**
  * Joining an org with its invite code, against the real roles, policies and
  * app.org_by_join_code on the local database. A throwaway org and users are
@@ -102,7 +105,7 @@ describe("invite codes against the local database", () => {
     if (!reachable) return;
     const first = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
     const again = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
-    expect(first.code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(first.code).toMatch(/^[A-Z0-9]{6}$/);
     expect(again.code).toBe(first.code);
     expect(first.enabled).toBe(true);
   });
@@ -111,14 +114,18 @@ describe("invite codes against the local database", () => {
     if (!reachable) return;
     const { code } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
 
-    const check = await checkJoinCode(joiner, code.toLowerCase().replace("-", " "));
+    const check = await checkJoinCode(
+      joiner,
+      ` ${code.toLowerCase().slice(0, 3)} ${code.toLowerCase().slice(3)} `,
+      ip,
+    );
     expect(check).toMatchObject({
       ok: true,
       alreadyMember: false,
       org: { orgSlug: slug, memberCount: 1 },
     });
 
-    const joined = await joinWithCode(joiner, code);
+    const joined = await joinWithCode(joiner, code, ip);
     expect(joined).toEqual({ ok: true, orgId, orgSlug: slug });
     const membership = await ownerDb.membership.findUnique({
       where: { userId_organizationId: { userId: joiner.id, organizationId: orgId } },
@@ -132,7 +139,7 @@ describe("invite codes against the local database", () => {
     expect(row?.useCount).toBe(1);
 
     // Joining twice is harmless.
-    expect(await joinWithCode(joiner, code)).toEqual({ ok: true, orgId, orgSlug: slug });
+    expect(await joinWithCode(joiner, code, ip)).toEqual({ ok: true, orgId, orgSlug: slug });
     const again = await ownerDb.orgJoinCode.findUnique({
       where: { organizationId: orgId },
       select: { useCount: true },
@@ -145,11 +152,11 @@ describe("invite codes against the local database", () => {
     // Local development may treat every address as verified; a deployment never does.
     vi.stubEnv("AUTH_REQUIRE_EMAIL_VERIFICATION", "true");
     const { code } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
-    expect(await checkJoinCode(unverified, code)).toMatchObject({
+    expect(await checkJoinCode(unverified, code, ip)).toMatchObject({
       ok: false,
       reason: "unverified",
     });
-    expect(await joinWithCode(unverified, code)).toMatchObject({ ok: false });
+    expect(await joinWithCode(unverified, code, ip)).toMatchObject({ ok: false });
     vi.unstubAllEnvs();
   });
 
@@ -160,11 +167,11 @@ describe("invite codes against the local database", () => {
     );
     expect(updated).toMatchObject({ ok: true, code: { allowedDomain: "example.edu" } });
     const { code } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
-    expect(await checkJoinCode(outsider, code)).toMatchObject({
+    expect(await checkJoinCode(outsider, code, ip)).toMatchObject({
       ok: false,
       reason: "wrong_domain",
     });
-    expect(await joinWithCode(outsider, code)).toMatchObject({ ok: false });
+    expect(await joinWithCode(outsider, code, ip)).toMatchObject({ ok: false });
     const bad = await asAdmin(({ db }) =>
       updateJoinCodeSettings(db, orgId, admin.id, { allowedDomain: "not a domain" }),
     );
@@ -176,13 +183,13 @@ describe("invite codes against the local database", () => {
     if (!reachable) return;
     const { code: old } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
     await asAdmin(({ db }) => updateJoinCodeSettings(db, orgId, admin.id, { enabled: false }));
-    expect(await checkJoinCode(outsider, old)).toMatchObject({ ok: false, reason: "disabled" });
+    expect(await checkJoinCode(outsider, old, ip)).toMatchObject({ ok: false, reason: "disabled" });
     await asAdmin(({ db }) => updateJoinCodeSettings(db, orgId, admin.id, { enabled: true }));
 
     const rotated = await asAdmin(({ db }) => rotateJoinCode(db, orgId, admin.id));
     expect(rotated.code).not.toBe(old);
-    expect(await checkJoinCode(outsider, old)).toMatchObject({ ok: false, reason: "not_found" });
-    expect(await checkJoinCode(outsider, rotated.code)).toMatchObject({ ok: true });
+    expect(await checkJoinCode(outsider, old, ip)).toMatchObject({ ok: false, reason: "not_found" });
+    expect(await checkJoinCode(outsider, rotated.code, ip)).toMatchObject({ ok: true });
   });
 
   it("never lets a plain member read or change the code", async () => {

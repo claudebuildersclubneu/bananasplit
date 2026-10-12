@@ -1,11 +1,9 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ContinuePill, StepFooter } from "@/components/onboarding/setup-shell";
 import {
   nextProfileStep,
   previousProfileStep,
@@ -59,35 +57,15 @@ export function StepNav({
 }) {
   const previous = previousProfileStep(step);
   return (
-    <div className="flex gap-2 border-t pt-4">
-      {previous && (
-        <Button asChild variant="outline" size="lg" className="text-muted-foreground">
-          <Link href={profileStepHref(previous)}>
-            <ArrowLeft aria-hidden="true" />
-            Back
-          </Link>
-        </Button>
-      )}
-      <Button
-        type="button"
-        size="lg"
-        className="group flex-1 font-semibold"
+    <StepFooter back={previous ? { href: profileStepHref(previous) } : undefined}>
+      <ContinuePill
+        pending={pending}
         onClick={onContinue}
-        disabled={pending || disabled}
+        disabled={disabled}
         style={continueStyle}
       >
-        {pending ? (
-          <>
-            <Loader2 className="animate-spin" aria-hidden="true" />
-            Saving…
-          </>
-        ) : (
-          <>
-            {continueLabel}
-            <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-          </>
-        )}
-      </Button>
-    </div>
+        {continueLabel}
+      </ContinuePill>
+    </StepFooter>
   );
 }

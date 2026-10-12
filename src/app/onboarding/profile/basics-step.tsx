@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AvatarEditor } from "@/app/app/[orgSlug]/profile/avatar-editor";
 import { TimezoneSelect } from "@/app/app/[orgSlug]/profile/timezone-select";
-import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-card";
+import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-fields";
 import { Input } from "@/components/ui/input";
 import type { UserAvatarUser } from "@/components/user-avatar";
 import { PRONOUN_CHOICES } from "@/lib/onboarding/steps";
@@ -47,7 +47,7 @@ export function BasicsStep({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 flex-col gap-5">
       <AvatarEditor user={user} compact />
 
       <div className="grid gap-1.5">

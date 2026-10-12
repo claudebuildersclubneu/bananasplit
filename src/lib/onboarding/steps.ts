@@ -10,7 +10,8 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
  *      A1 basics -> A2 school -> A3 bio -> A4 theme -> A5 availability -> A6 review
  *      then A7: join with an invite code, or create an organization (Flow B).
  *   B  Create an organization, only for the person creating one:
- *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> the org, as admin.
+ *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> B6 invite
+ *      -> the org, as admin.
  *
  * Pure and client-safe: the pages, forms and actions share these.
  */
@@ -53,10 +54,20 @@ export function previousProfileStep(step: ProfileStep): ProfileStep | null {
 }
 
 // B1 is /onboarding/organization; the rest live under the new org's slug.
-export const ORG_STEPS = ["data", "labels", "finance", "teams"] as const;
+export const ORG_STEPS = ["data", "labels", "finance", "teams", "invite"] as const;
 export type OrgStep = (typeof ORG_STEPS)[number];
-/** Five segments in the progress bar: B1 plus these four. */
+/** Six steps in the stepper: B1 plus these five. */
 export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
+
+/** The stepper's names for B1-B6, in order. */
+export const ORG_STEP_NAMES = [
+  "Club basics",
+  "Connect data",
+  "Labels",
+  "Finance",
+  "Teams",
+  "Invite officers",
+] as const;
 
 export function isOrgStep(value: unknown): value is OrgStep {
   return typeof value === "string" && (ORG_STEPS as readonly string[]).includes(value);

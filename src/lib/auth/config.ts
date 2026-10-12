@@ -10,7 +10,8 @@ import {
   withNormalizedEmails,
 } from "@/lib/auth/google-linking";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
-import { verifyPassword } from "@/lib/auth/password";
+import { spendPasswordCheck, verifyPassword } from "@/lib/auth/password";
+import { checkSessionVersion, loadSessionVersion } from "@/lib/auth/session-version";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { clientIpFrom } from "@/lib/request-ip";
 import { authDb } from "@/server/db/clients";
@@ -110,6 +111,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
         const passwordHash = user?.credential?.passwordHash;
         if (!user || !passwordHash) {
+          // As slow as a wrong password, so timing doesn't reveal accounts.
+          await spendPasswordCheck(password);
           return null;
         }
 
@@ -128,11 +131,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // verified address, and clears an unverified password account squatting
     // on it before Auth.js links (fails closed; see google-linking.ts).
     signIn: ({ account, profile }) => googleSignInGate({ account, profile }),
-    jwt({ token, user }) {
-      if (user) {
+    // Stamps the account's session version at sign-in, then ends the session
+    // once the version moves on (a password reset; see session-version.ts).
+    async jwt({ token, user }) {
+      if (user?.id) {
         token.id = user.id;
+        token.sv = (await loadSessionVersion(user.id)) ?? 0;
+        return token;
       }
-      return token;
+      return (await checkSessionVersion(token)) === "keep" ? token : null;
     },
     session({ session, token }) {
       if (typeof token.id === "string") {

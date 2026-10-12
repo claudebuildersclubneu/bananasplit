@@ -1,13 +1,17 @@
 import { redirect } from "next/navigation";
 
-import { AuthFrame } from "@/components/auth/auth-frame";
-import { AuthOrDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
+import { AuthCard, AuthHeadline } from "@/components/brand/auth-card";
+import { OrDivider } from "@/components/brand/fields";
+import { JoinSteps } from "@/components/brand/join-steps";
 import { auth } from "@/lib/auth/config";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
 
 import { SignUpForm } from "./sign-up-form";
 
+export const metadata = { title: "Create your account · Bananasplit" };
+
+/** Sign up: step 1 of joining a club (design: App screens, 02). */
 export default async function SignUpPage() {
   const session = await auth();
   if (session) {
@@ -18,29 +22,26 @@ export default async function SignUpPage() {
   const googleEnabled = googleSignInEnabled();
 
   return (
-    <AuthFrame>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl">Create your account</CardTitle>
-          <CardDescription>
-            {googleEnabled
-              ? "Use your Google account, or sign up with an email and password."
-              : "Sign up with an email and password."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SignUpForm
-            google={
-              googleEnabled ? (
-                <>
-                  <GoogleSignInButton />
-                  <AuthOrDivider />
-                </>
-              ) : null
-            }
-          />
-        </CardContent>
-      </Card>
-    </AuthFrame>
+    <AuthCard
+      tall
+      formClassName="gap-[18px] lg:py-9"
+      panel={
+        <div className="flex flex-col gap-6">
+          <AuthHeadline />
+          <JoinSteps current={1} />
+        </div>
+      }
+    >
+      <SignUpForm
+        google={
+          googleEnabled ? (
+            <>
+              <BrandGoogleButton label="Sign up with Google" />
+              <OrDivider />
+            </>
+          ) : null
+        }
+      />
+    </AuthCard>
   );
 }

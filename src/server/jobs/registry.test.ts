@@ -40,7 +40,13 @@ describe("job-kind registry rules ('Background jobs' decision, item 7)", () => {
 
   it("platform kinds are the ones app_auth and the maintenance cron enqueue", () => {
     const platform = kinds.filter((k) => jobKind(k).scope === "platform").sort();
-    expect(platform).toEqual(["maintenance", "purge-unverified", "verify-email"]);
+    expect(platform).toEqual([
+      "maintenance",
+      "password-changed-email",
+      "password-reset-email",
+      "purge-unverified",
+      "verify-email",
+    ]);
   });
 
   it("payload schemas take ids only", () => {
@@ -60,6 +66,8 @@ describe("job-kind registry rules ('Background jobs' decision, item 7)", () => {
         "invite-email",
         "reimbursement-email",
         "verify-email",
+        "password-reset-email",
+        "password-changed-email",
         "purge-unverified",
         "maintenance",
       ]),

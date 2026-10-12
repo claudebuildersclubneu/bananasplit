@@ -7,11 +7,13 @@ Two flows, from the design in the "Onboarding flows" flowchart:
 - **Flow B, create an organization.** Only for the person creating one. They
   become its owner.
 
-Both flows are one card per step, with a segmented progress bar and a label
-above the card (`A1 · Basics`, `B3 · Label sources`). They use the app's theme
-tokens, so they look like the rest of the app in light and dark. Every step
-saves when you press **Continue**, so leaving halfway loses nothing, and each
-step has its own URL.
+Both flows use one step screen (the design handoff's "Onboarding"): a top bar
+with what's being set up, a stepper of named steps, and a framed card with the
+step on the left and a live preview on the right
+(`src/components/onboarding/setup-shell.tsx`). Like sign-in and sign-up, it is
+Bananasplit's own look, not a club's theme. Every step saves when you press
+**Continue**, so leaving halfway loses nothing (**Save and exit** goes to the
+club), and each step has its own URL.
 
 ## How someone gets in
 
@@ -61,9 +63,10 @@ busy times (B5). That org's admins, and you, always do.
 There are two ways in, and both are checked against the organization before
 anyone joins:
 
-1. **Invite code.** Each org has one shareable code (`ABCD-EFGH`) and a link
-   that fills it in (`/onboarding/join?code=...`). The person enters it, sees
-   which organization it belongs to (name, logo, member count), then presses
+1. **Invite code.** Each org has one shareable six-character code (like
+   `ROBO26`) and a link that fills it in (`/onboarding/join?code=...`). The
+   person types or pastes it into six boxes; once all six are in, the page
+   shows which club it belongs to (name, logo, member count), then they press
    **Join**. The server checks that:
    - their email is verified;
    - the code matches an org, the org isn't being deleted, and the code is
@@ -78,9 +81,11 @@ anyone joins:
    on the same page with a **Join** button. This works exactly as it did
    before: the invite only works for the address it was sent to.
 
-Lookups are rate limited per user (10 every 15 minutes). The code comes from a
-31-letter alphabet with no look-alikes (0/O, 1/I/L, U), so there are about
-8.5 × 10¹¹ possible codes.
+Lookups are rate limited per user (10 every 15 minutes) and need a verified
+email. Codes come from a 30-character alphabet with no look-alikes (0/O, 1/I/L,
+U), so there are about 7.3 × 10⁸ of them. Codes made before the six-box screen
+are `XXXX-XXXX`; they keep working (a pasted or linked one gets eight boxes)
+until an admin makes a new code.
 
 **Managing the code:** **Settings › Members › Invite code**, owners and admins
 only. From there you can copy the code or the link, turn it off, limit it to an
@@ -92,14 +97,15 @@ finishes (the flowchart's "invite link shown on first load").
 
 | Step | Page                                  | What it does                                                                                                                                                                                                                                                                                                     |
 | ---- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1   | `/onboarding/organization`            | Name, portal URL (checked as you type) and default time zone, plus an org-creation code where the platform requires one. Creates the org, with you as owner.                                                                                                                                                     |
-| B2   | `/onboarding/organization/<url>/data` | The org's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. **Continue** unlocks once one works. **Skip for now** marks the rest skipped. |
-| B3   | `.../labels`                          | A label and a tag (Finance, People, Operations, Events, Other) for each database, and **who can see** each tag's data. That sets the databases' member visibility, which the database enforces.                                                                                                                  |
+| B1   | `/onboarding/organization`            | Club basics: name, web address (checked as you type) and time zone, plus a club-creation code where the platform requires one. Creates the club, with you as owner.                                                                                                                                           |
+| B2   | `/onboarding/organization/<url>/data` | The club's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. **Continue** unlocks once one works. **Skip for now** marks the rest skipped. |
+| B3   | `.../labels`                          | The club's task labels (the same ones as Settings › Labels): keep, rename, recolour, remove or add. A new club starts with four suggestions. The preview shows the newest tasks wearing them. Database names and who can see them live in Settings › Privacy and Databases.                                     |
 | B4   | `.../finance`                         | Which sections the finance dashboard shows, and when the fiscal year starts. An owner or treasurer can start that year's budget period here, with the usual categories at $0.                                                                                                                                    |
 | B5   | `.../teams`                           | Teams, each with a lead and a regular meeting. They're published as the org chart: the first team is the top and the rest report to it. The meetings are added to the calendar for the next 12 weeks, and mirror to Google Calendar when it's connected. Also: whether members see each other's busy times.      |
-| End  | `/app/<url>?welcome=1`                | The org's overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                           |
+| B6   | `.../invite`                          | Invite officers by email (the same invites as Settings › Members, valid for 7 days, as Admin, Treasurer or Member) and share the club code. **Finish setup** opens the club.                                                                                                                                       |
+| End  | `/app/<url>?welcome=1`                | The club's overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                          |
 
-B2-B5 are for owners and admins. Anyone else who opens them is told so.
+B2-B6 are for owners and admins. Anyone else who opens them is told so.
 Everything can be changed later in Settings, the Org Chart, Finance and
 Databases.
 

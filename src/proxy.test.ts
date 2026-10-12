@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
+import { isNonceRoute } from "@/lib/security/csp";
+
 import { config, proxy } from "./proxy";
 
 describe("proxy — per-request nonce CSP (0A Fix 13)", () => {
@@ -25,7 +27,9 @@ describe("proxy — per-request nonce CSP (0A Fix 13)", () => {
       headers: { "x-pathname": "https://evil.example" },
     });
     const response = proxy(request);
-    expect(response.headers.get("x-middleware-request-x-pathname")).toBe("/app/cbc/tasks/t1?view=mine");
+    expect(response.headers.get("x-middleware-request-x-pathname")).toBe(
+      "/app/cbc/tasks/t1?view=mine",
+    );
   });
 
   it("uses a new nonce for every request", () => {
@@ -47,6 +51,10 @@ describe("proxy — per-request nonce CSP (0A Fix 13)", () => {
       "/sign-up",
       "/verify-email/:path*",
       "/onboarding",
+      "/onboarding/:path*",
+      "/checkout",
+      "/forgot-password",
+      "/reset-password/:path*",
     ]);
     for (const entry of config.matcher) {
       expect(entry.missing).toEqual([
@@ -54,5 +62,41 @@ describe("proxy — per-request nonce CSP (0A Fix 13)", () => {
         { type: "header", key: "purpose", value: "prefetch" },
       ]);
     }
+  });
+});
+
+/**
+ * Every nonce route must actually reach the proxy, or it gets neither
+ * policy: the matcher once listed only "/onboarding", so its sub-pages
+ * shipped with no CSP. The sources are exact paths or "/x/:path*".
+ */
+describe("the proxy matcher", () => {
+  const sources = config.matcher.map((m) => m.source);
+  const matches = (path: string) =>
+    sources.some((source) =>
+      source.endsWith("/:path*")
+        ? path === source.slice(0, -"/:path*".length) ||
+          path.startsWith(`${source.slice(0, -"/:path*".length)}/`)
+        : path === source,
+    );
+
+  it.each([
+    "/app",
+    "/app/club/tasks",
+    "/poll/p1",
+    "/invite/tok",
+    "/sign-in",
+    "/sign-up",
+    "/verify-email/tok",
+    "/onboarding",
+    "/onboarding/join",
+    "/onboarding/profile/basics",
+    "/onboarding/organization/club/labels",
+    "/checkout",
+    "/forgot-password",
+    "/reset-password/tok",
+  ])("covers the nonce route %s", (path) => {
+    expect(isNonceRoute(path)).toBe(true);
+    expect(matches(path)).toBe(true);
   });
 });

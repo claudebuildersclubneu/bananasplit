@@ -5,6 +5,9 @@ import { randomBytes } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+/** A per-run address in the benchmarking range, so the per-IP join-code limit never carries over between runs. */
+const ip = `198.18.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 254)}`;
+
 /**
  * Several organizations on one platform, against the real roles, policies
  * and functions on the local database. Two people each create an org
@@ -118,8 +121,8 @@ describe("several organizations against the local database", () => {
     const codeB = await as(founderB, orgB.id, ({ db }) => getOrCreateJoinCode(db, orgB.id, founderB.id));
     expect(codeA.code).not.toBe(codeB.code);
 
-    expect(await joinWithCode(both, codeA.code)).toMatchObject({ ok: true, orgId: orgA.id });
-    expect(await joinWithCode(both, codeB.code)).toMatchObject({ ok: true, orgId: orgB.id });
+    expect(await joinWithCode(both, codeA.code, ip)).toMatchObject({ ok: true, orgId: orgA.id });
+    expect(await joinWithCode(both, codeB.code, ip)).toMatchObject({ ok: true, orgId: orgB.id });
 
     const memberships = await withUserTx(both.id, ({ db }) =>
       db.membership.findMany({ where: { userId: both.id }, select: { organizationId: true, role: true } }),

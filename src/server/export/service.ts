@@ -141,7 +141,7 @@ export async function readPage(
     const delegate = (db as unknown as Record<string, Delegate>)[delegateName(table.model)];
     if (!delegate) throw new PermanentJobError(`export: no delegate for ${table.model}`);
     return delegate.findMany({
-      where: { organizationId: orgId, ...keysetAfter(table.key, last) },
+      where: { organizationId: orgId, ...table.where, ...keysetAfter(table.key, last) },
       orderBy: keysetOrder(table.key),
       take: PAGE_SIZE,
     });
