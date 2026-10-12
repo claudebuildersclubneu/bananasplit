@@ -463,8 +463,8 @@ function NoteDocument({ note }: { note: NotePdfInput }) {
       title={title}
       author={note.authorName}
       subject={`Note from ${note.orgName}`}
-      creator="CBC Portal"
-      producer="CBC Portal"
+      creator="Bananasplit"
+      producer="Bananasplit"
     >
       <Page size="LETTER" style={styles.page}>
         <View style={styles.header}>

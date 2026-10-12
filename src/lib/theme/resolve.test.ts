@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDarkRoles, deriveTheme } from "./derive";
-import { CBC_PRESET, DEFAULT_PRESET, GRAPHITE_PRESET } from "./presets";
+import { CBC_PRESET, DEFAULT_PRESET, GRAPHITE_PRESET, LEGACY_DEFAULT_LIGHT } from "./presets";
 import { buildThemeRecord } from "./record";
 import { DEFAULT_RESOLVED_THEME, resolveTheme, themeProviderMode } from "./resolve";
 
@@ -63,6 +63,22 @@ describe("resolveTheme", () => {
       dark: DEFAULT_PRESET.dark,
     });
     expect(theme.preset).toBe("default");
+  });
+
+  it("moves a row saved with the raspberry Bananasplit onto today's palettes", () => {
+    const theme = resolveTheme({
+      preset: "default",
+      mode: "LIGHT",
+      lockMode: true,
+      light: LEGACY_DEFAULT_LIGHT,
+      dark: { ...DEFAULT_PRESET.dark, primary: "#f4c84a", accent: "#ee6f9e" },
+    });
+    expect(theme.preset).toBe("default");
+    expect(theme.light).toEqual(DEFAULT_PRESET.light);
+    expect(theme.dark).toEqual(DEFAULT_PRESET.dark);
+    // The org's own choices stay.
+    expect(theme.mode).toBe("LIGHT");
+    expect(theme.lockMode).toBe(true);
   });
 
   it("never locks the SYSTEM mode, and survives unknown enum values", () => {

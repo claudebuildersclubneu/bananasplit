@@ -1,31 +1,38 @@
 import Link from "next/link";
 
-import { RegistrationMark } from "@/components/print-marks";
-import { PublicThemeRoot } from "@/components/theme/public-theme-root";
-import { Button } from "@/components/ui/button";
+import { BrandRoot } from "@/components/brand/brand-root";
+import { primaryPillClass } from "@/components/brand/fields";
+import { CoreMark, Logo } from "@/components/brand/logo";
+import { cn } from "@/lib/utils";
 
-/** Any unknown URL (and every notFound()): a misprint, in the default theme. */
+/** Any unknown URL (and every notFound()): Bananasplit's own look. */
 export default function NotFound() {
   return (
-    <PublicThemeRoot>
-      <main className="reveal flex flex-1 flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-        <RegistrationMark className="size-7" />
-        <p className="eyebrow text-muted-foreground">Error 404 · Misprint</p>
+    <BrandRoot>
+      <header className="flex h-[72px] items-center px-6 lg:px-10">
+        <Link href="/" className="text-ink" data-plain>
+          <Logo />
+        </Link>
+      </header>
+      <main className="flex flex-1 flex-col items-center justify-center gap-5 px-6 pb-24 text-center">
         <p
           aria-hidden="true"
-          className="numeral text-primary misregister text-[clamp(7rem,32vw,15rem)] leading-[0.8]"
+          className="font-display m-0 flex items-center gap-[0.08em] text-[clamp(96px,22vw,200px)] leading-none tracking-[-0.05em]"
         >
-          404
+          4
+          <CoreMark className="size-[0.78em]" />4
         </p>
-        <h1 className="page-title">This page didn&apos;t make it to print.</h1>
-        <p className="text-muted-foreground max-w-sm text-balance">
+        <h1 className="font-display m-0 text-[clamp(32px,4vw,46px)] leading-[1.05] font-normal tracking-[-0.03em]">
+          We couldn&apos;t find that page.
+        </h1>
+        <p className="text-ink-muted m-0 max-w-[420px] text-[17px] leading-[1.55] text-balance">
           The link may be old, or the page may have moved. Check the address, or start again from
-          the front page.
+          the home page.
         </p>
-        <Button asChild size="lg" className="mt-2">
-          <Link href="/">Back to the front page</Link>
-        </Button>
+        <Link href="/" className={cn(primaryPillClass, "mt-2 px-7")}>
+          Back to the home page
+        </Link>
       </main>
-    </PublicThemeRoot>
+    </BrandRoot>
   );
 }

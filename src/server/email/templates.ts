@@ -32,20 +32,20 @@ export function layout(input: LayoutInput): RenderedEmail {
   const footer =
     input.footer ?? `You're receiving this because of your account on ${PRODUCT}.`;
   const cta = input.cta
-    ? `<p style="margin:24px 0"><a href="${safeHref(input.cta.url)}" style="display:inline-block;background:#18181b;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600">${escapeHtml(input.cta.label)}</a></p>
-<p style="margin:0 0 16px;font-size:12px;color:#71717a">Or paste this link into your browser:<br><span style="word-break:break-all">${escapeHtml(input.cta.url)}</span></p>`
+    ? `<p style="margin:24px 0"><a href="${safeHref(input.cta.url)}" style="display:inline-block;background:#1c1810;color:#f7f2e6;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:600">${escapeHtml(input.cta.label)}</a></p>
+<p style="margin:0 0 16px;font-size:12px;color:#7a6e58">Or paste this link into your browser:<br><span style="word-break:break-all">${escapeHtml(input.cta.url)}</span></p>`
     : "";
   const eyebrow = input.eyebrow
-    ? `<p style="margin:0 0 16px;font-size:12px;letter-spacing:.02em;color:#71717a">${escapeHtml(input.eyebrow)}</p>`
+    ? `<p style="margin:0 0 16px;font-size:12px;letter-spacing:.02em;color:#7a6e58">${escapeHtml(input.eyebrow)}</p>`
     : "";
 
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:24px 12px;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;line-height:1.5">
+<body style="margin:0;padding:24px 12px;background:#f7f2e6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1c1810;line-height:1.5">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px"><tr><td style="padding:28px 28px 20px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fffdf7;border:1px solid #e9e1cf;border-radius:16px"><tr><td style="padding:28px 28px 20px">
 ${eyebrow}${input.bodyHtml}${cta}
-<p style="margin:24px 0 0;font-size:12px;color:#71717a">${escapeHtml(footer)}</p>
+<p style="margin:24px 0 0;font-size:12px;color:#7a6e58">${escapeHtml(footer)}</p>
 </td></tr></table>
 </td></tr></table>
 </body></html>`;
@@ -131,7 +131,7 @@ export function treasurerDigestEmail(input: {
   const items = input.pending
     .map(
       (p) =>
-        `<li style="margin:0 0 6px">${escapeHtml(p.description)} &mdash; ${escapeHtml(p.amountFormatted)} <span style="color:#71717a">(${escapeHtml(p.submitterName)})</span></li>`,
+        `<li style="margin:0 0 6px">${escapeHtml(p.description)} &mdash; ${escapeHtml(p.amountFormatted)} <span style="color:#7a6e58">(${escapeHtml(p.submitterName)})</span></li>`,
     )
     .join("");
   return layout({

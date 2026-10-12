@@ -96,7 +96,7 @@ export async function verifyEmail(page: Page, email: string): Promise<void> {
   await page.goto(`/verify-email/${token}`);
   await page.getByRole("button", { name: "Confirm email" }).click();
   await page.getByText("Email confirmed").waitFor();
-  await page.getByRole("link", { name: /^(Continue|Sign in)$/ }).click();
+  await page.getByRole("link", { name: /^(Continue|Log in)$/ }).click();
 }
 
 /**

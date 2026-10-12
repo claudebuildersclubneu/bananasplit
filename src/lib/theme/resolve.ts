@@ -1,5 +1,11 @@
 import { deriveDarkRoles, deriveTheme, type DerivedTheme } from "./derive";
-import { DEFAULT_PRESET, savedPresetId } from "./presets";
+import {
+  DEFAULT_PRESET,
+  DEFAULT_PRESET_ID,
+  LEGACY_DEFAULT_LIGHT,
+  sameRoles,
+  savedPresetId,
+} from "./presets";
 import {
   LOGO_DISPLAYS,
   THEME_MODES,
@@ -70,9 +76,13 @@ function buildResolved(input: Omit<ResolvedTheme, "effectiveDark" | "tokens">): 
 
 export function resolveTheme(row: OrgThemeRowLike | null | undefined): ResolvedTheme {
   if (!row) return DEFAULT_RESOLVED_THEME;
-  const light = parseRoles(row.light);
-  if (!light) return DEFAULT_RESOLVED_THEME;
+  const stored = parseRoles(row.light);
+  if (!stored) return DEFAULT_RESOLVED_THEME;
   const mode = asMode(row.mode);
+  // Bananasplit saved before the brand redesign: follow the brand onto
+  // today's palettes rather than keep the old raspberry.
+  const legacy = row.preset === DEFAULT_PRESET_ID && sameRoles(stored, LEGACY_DEFAULT_LIGHT);
+  const light = legacy ? DEFAULT_PRESET.light : stored;
   const preset = savedPresetId(row.preset, light);
   return buildResolved({
     preset,
@@ -80,7 +90,7 @@ export function resolveTheme(row: OrgThemeRowLike | null | undefined): ResolvedT
     lockMode: row.lockMode && mode !== "SYSTEM",
     logoDisplay: asLogoDisplay(row.logoDisplay),
     light,
-    dark: parseRoles(row.dark),
+    dark: legacy ? DEFAULT_PRESET.dark : parseRoles(row.dark),
     isDefault: false,
   });
 }

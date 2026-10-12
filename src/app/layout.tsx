@@ -34,7 +34,8 @@ const mono = Martian_Mono({
 
 export const metadata: Metadata = {
   title: "Bananasplit",
-  description: "A workspace for student club executive boards.",
+  description:
+    "The all-in-one workspace for student clubs: tasks, polls, RSVPs, notes, databases and the club budget.",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

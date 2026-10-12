@@ -347,7 +347,8 @@ export function ThemePicker({
           role="radio"
           aria-checked={followOrg}
           onClick={() => onChange({ ...value, preset: FOLLOW_ORG })}
-          className={cn(tile(followOrg), "flex-row items-center gap-3 p-3")}
+          // A button sizes to its content, so stretch it to the grid's width.
+          className={cn(tile(followOrg), "w-full flex-row items-center gap-3 p-3")}
         >
           <Building2 className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">

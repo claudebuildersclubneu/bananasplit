@@ -69,7 +69,7 @@ describe("presets", () => {
   });
 
   it("keep the Bananasplit highlighter a fill and its primary clear of the destructive red", () => {
-    // Banana on vanilla is a highlighter, never text; raspberry reads as a link.
+    // Banana on cream is a highlighter, never text; the ink primary reads as text.
     expect(
       contrastRatio(DEFAULT_PRESET.light.accent, DEFAULT_PRESET.light.background),
     ).toBeLessThan(3);
@@ -80,6 +80,19 @@ describe("presets", () => {
     const hue = (hex: string) => hexToOklch(hex).h;
     const gap = Math.abs(((hue(light.primary) - hue(light.destructive) + 540) % 360) - 180);
     expect(gap).toBeGreaterThan(20);
+  });
+
+  it("give Bananasplit the brand palette: ink on cream with a banana highlighter", () => {
+    expect(DEFAULT_PRESET.name).toBe("Bananasplit");
+    expect(DEFAULT_PRESET.light).toEqual({
+      primary: "#1c1810",
+      accent: "#f2c230",
+      background: "#f7f2e6",
+      surface: "#fffdf7",
+      text: "#1c1810",
+    });
+    // Dark: banana primary with an ink label.
+    expect(deriveTokens(DEFAULT_PRESET.dark)["primary-foreground"]).toBe("#17140e");
   });
 
   it("match a palette back to its preset", () => {
