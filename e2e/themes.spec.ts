@@ -135,9 +135,9 @@ test("a preset restyles the whole app, portals included, with no CSP violation",
     await admin.page.goto("/app/debate-society/calendar");
     expect(await admin.page.locator("style[data-org-theme]").count()).toBe(1);
     expect(await token(admin.page, "primary")).toBe(HARBOR_LIGHT_PRIMARY);
-    // FullCalendar reads the tokens.
-    const fcButton = admin.page.locator(".fc .fc-button-primary").first();
-    await expect(fcButton).toHaveCSS("background-color", "rgb(29, 78, 216)");
+    // The calendar's primary button is painted with the theme's primary.
+    const newEvent = admin.page.getByRole("button", { name: "New event" }).first();
+    await expect(newEvent).toHaveCSS("background-color", "rgb(29, 78, 216)");
 
     // A Radix portal on <body> picks up the theme.
     await admin.page.getByRole("button", { name: /Open user menu/ }).click();

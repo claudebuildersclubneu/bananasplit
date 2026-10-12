@@ -24,10 +24,12 @@ test("expense reimbursement lifecycle", async ({ page }) => {
 
   await page.goto(`/app/${orgSlug}/finance/budget`);
   await page.getByRole("button", { name: "New period" }).first().click();
-  await page.getByLabel("Name").fill("E2E fiscal year");
+  // Club setup already made a period, so its categories ("Category name") are on the page too.
+  const periodDialog = page.getByRole("dialog");
+  await periodDialog.getByLabel("Name", { exact: true }).fill("E2E fiscal year");
   const endsOn = new Date();
   endsOn.setFullYear(endsOn.getFullYear() + 1);
-  await page.getByLabel("Ends").fill(endsOn.toISOString().slice(0, 10));
+  await periodDialog.getByLabel("Ends").fill(endsOn.toISOString().slice(0, 10));
   await page.getByRole("button", { name: "Create and make active" }).click();
   await expect(page.getByText("E2E fiscal year").first()).toBeVisible();
 
@@ -65,7 +67,8 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   await page
     .locator("input[type='file']")
     .setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: pngBytes });
-  await expect(page.getByText("receipt.png")).toBeVisible();
+  // The first upload compiles its route on the dev server, so give it time.
+  await expect(page.getByText("receipt.png")).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole("tab", { name: "Details" }).click();
   await page.getByRole("button", { name: "Submit" }).click();
@@ -83,9 +86,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   await signOut(page);
   await signIn(page, owner);
   await page.goto(`/app/${orgSlug}/finance`);
-  await expect(page.getByText("Balance", { exact: true }).locator("..").first()).toContainText(
-    "-$42.50",
-  );
+  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42.50");
 
   await page.goto(`/app/${orgSlug}/finance/transactions`);
   await page.getByText(expenseDescription).click();
@@ -100,9 +101,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   // Reimbursement doesn't touch the ledger balance — the expense already
   // counted against it the moment it was submitted (a draft never does).
   await page.goto(`/app/${orgSlug}/finance`);
-  await expect(page.getByText("Balance", { exact: true }).locator("..").first()).toContainText(
-    "-$42.50",
-  );
+  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42.50");
 
   // --- the submitter's "owed to you" clears back to zero ---
   await signOut(page);

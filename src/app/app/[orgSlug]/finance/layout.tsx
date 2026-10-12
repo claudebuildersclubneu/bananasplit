@@ -38,7 +38,10 @@ export default async function FinanceLayout({
             orgSlug={orgSlug}
             isFinance={isFinance}
             currentUserId={user.id}
-            periods={periods.map((p) => ({ id: p.id, label: p.label }))}
+            // The active period first: a new entry defaults to it.
+            periods={[...periods]
+              .sort((a, b) => Number(b.isActive) - Number(a.isActive))
+              .map((p) => ({ id: p.id, label: p.label }))}
             categories={categories.map((c) => ({
               id: c.id,
               name: c.name,
