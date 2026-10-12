@@ -64,6 +64,7 @@ const SUBPAGES: Record<string, string> = {
   "calendar/polls": "Polls",
   "calendar/polls/ask": "Ask a question",
   "calendar/polls/new": "Find a time",
+  "calendar/rsvp": "RSVP pages",
   "calendar/sync": "Calendar sync",
   "databases/reports": "Reports",
   "finance/budget": "Budget",
@@ -129,7 +130,8 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
   const parts = path.slice(base.length).split("/").filter(Boolean);
   if (parts.some((p) => !/^[A-Za-z0-9_.-]{1,80}$/.test(p))) return null;
   const pathHref = parts.length ? `${base}/${parts.join("/")}` : base;
-  if (parts.length === 0) return { href: pathHref, kind: "page", label: "Overview", skipRecent: true };
+  if (parts.length === 0)
+    return { href: pathHref, kind: "page", label: "Overview", skipRecent: true };
 
   const [section, second, third] = parts;
   const kept = keptQuery(section, parts, new URLSearchParams(queryPart));
@@ -153,11 +155,14 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
         suffix: only ? ` · ${only}` : undefined,
       };
     }
-    if (q.folder === "none") return { href, kind: "page", label: `${only ?? "Files"} not in a folder` };
+    if (q.folder === "none")
+      return { href, kind: "page", label: `${only ?? "Files"} not in a folder` };
     return { href, kind: "page", label: only ? `Files · ${only}` : "Files" };
   }
   if (section === "tasks" && parts.length === 1) {
-    const bits = [q.view ? TASK_VIEWS[q.view] : null, q.scope ? TASK_SCOPES[q.scope] : null].filter(Boolean);
+    const bits = [q.view ? TASK_VIEWS[q.view] : null, q.scope ? TASK_SCOPES[q.scope] : null].filter(
+      Boolean,
+    );
     return { href, kind: "page", label: bits.length ? `Tasks · ${bits.join(" · ")}` : "Tasks" };
   }
   if (parts.length === 1) return { href, kind: "page", label: SECTIONS[section] };
@@ -174,11 +179,26 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
   if (section === "tasks" && parts.length === 2 && ID.test(second)) {
     return { href, kind: "task", label: "Task", lookup: { type: "task", id: second } };
   }
-  if (section === "calendar" && second === "polls" && third && parts.length === 3 && ID.test(third)) {
+  if (
+    section === "calendar" &&
+    second === "polls" &&
+    third &&
+    parts.length === 3 &&
+    ID.test(third)
+  ) {
     return { href, kind: "event", label: "Poll", lookup: { type: "poll", id: third } };
   }
   if (section === "calendar" && parts.length === 2 && ID.test(second)) {
     return { href, kind: "event", label: "Event", lookup: { type: "event", id: second } };
+  }
+  if (section === "calendar" && parts.length === 3 && third === "rsvp" && ID.test(second)) {
+    return {
+      href,
+      kind: "event",
+      label: "RSVP page",
+      lookup: { type: "event", id: second },
+      suffix: " · RSVPs",
+    };
   }
   if (section === "databases" && ID.test(second)) {
     const suffix = third ? ` · ${titleCase(third)}` : "";
@@ -194,9 +214,17 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
     return { href, kind: "person", label: "Person", lookup: { type: "person", id: second } };
   }
   if (section === "org-chart" && (second === "drafts" || second === "versions") && third) {
-    return { href, kind: "page", label: second === "drafts" ? "Org chart draft" : "Org chart version" };
+    return {
+      href,
+      kind: "page",
+      label: second === "drafts" ? "Org chart draft" : "Org chart version",
+    };
   }
-  return { href, kind: "page", label: `${SECTIONS[section]} · ${titleCase(parts[parts.length - 1])}` };
+  return {
+    href,
+    kind: "page",
+    label: `${SECTIONS[section]} · ${titleCase(parts[parts.length - 1])}`,
+  };
 }
 
 /** The canonical address of `address`, for comparing with saved pins. */

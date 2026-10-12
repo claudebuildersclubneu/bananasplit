@@ -1974,6 +1974,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "refresh_contact_rollups",
         "refresh_lapsed",
         "resolve_org_slug",
+        // Public RSVP pages: the org and event behind a live page's code.
+        "rsvp_page",
         "secret_delete",
         "secret_read",
         "secret_write",
@@ -2167,6 +2169,7 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       pending_invitations_for_me: "u",
       poll_org_id: "s",
       purge_unverified_users: "a",
+      rsvp_page: "s",
       rate_limit_hit: "sa",
       secret_delete: "s",
       secret_read: "s",

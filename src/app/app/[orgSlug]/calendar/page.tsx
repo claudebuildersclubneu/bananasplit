@@ -1,4 +1,4 @@
-import { CalendarSync } from "lucide-react";
+import { CalendarSync, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
@@ -107,17 +107,27 @@ export default async function CalendarPage({
       <PageHeader
         title="Calendar"
         actions={
-          can({ role }, "integrations.view") && (
-            <Button variant="ghost" size="icon-sm" asChild>
-              <Link
-                href={`/app/${orgSlug}/calendar/sync`}
-                aria-label="Google Calendar sync and website feed"
-                title="Google Calendar sync and website feed"
-              >
-                <CalendarSync className="size-4" aria-hidden="true" />
-              </Link>
-            </Button>
-          )
+          <>
+            {can({ role }, "events.write") && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/app/${orgSlug}/calendar/rsvp`}>
+                  <Ticket aria-hidden="true" />
+                  RSVP pages
+                </Link>
+              </Button>
+            )}
+            {can({ role }, "integrations.view") && (
+              <Button variant="ghost" size="icon-sm" asChild>
+                <Link
+                  href={`/app/${orgSlug}/calendar/sync`}
+                  aria-label="Google Calendar sync and website feed"
+                  title="Google Calendar sync and website feed"
+                >
+                  <CalendarSync className="size-4" aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
+          </>
         }
       />
       <EventCalendar

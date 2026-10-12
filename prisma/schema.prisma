@@ -55,50 +55,51 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   memberships            Membership[]
-  sentInvitations        Invitation[]       @relation("InvitationInvitedBy")
-  createdTasks           Task[]             @relation("TaskCreatedBy")
+  sentInvitations        Invitation[]        @relation("InvitationInvitedBy")
+  createdTasks           Task[]              @relation("TaskCreatedBy")
   taskAssignments        TaskAssignee[]
-  authoredNotes          Note[]             @relation("NoteAuthor")
-  updatedNotes           Note[]             @relation("NoteUpdatedBy")
-  createdEvents          Event[]            @relation("EventCreatedBy")
+  authoredNotes          Note[]              @relation("NoteAuthor")
+  updatedNotes           Note[]              @relation("NoteUpdatedBy")
+  createdEvents          Event[]             @relation("EventCreatedBy")
   eventAttendances       EventAttendee[]
-  createdPolls           AvailabilityPoll[] @relation("PollCreatedBy")
+  eventRegistrations     EventRegistration[] @relation("EventRegistrationUser")
+  createdPolls           AvailabilityPoll[]  @relation("PollCreatedBy")
   pollResponses          PollResponse[]
-  createdQuestionPolls   Poll[]             @relation("QuestionPollCreatedBy")
-  addedPollOptions       PollOption[]       @relation("PollOptionAddedBy")
+  createdQuestionPolls   Poll[]              @relation("QuestionPollCreatedBy")
+  addedPollOptions       PollOption[]        @relation("PollOptionAddedBy")
   pollVotes              PollVote[]
-  submittedTransactions  Transaction[]      @relation("TransactionSubmittedBy")
-  approvedTransactions   Transaction[]      @relation("TransactionApprovedBy")
-  reconciledTransactions Transaction[]      @relation("TransactionReconciledBy")
+  submittedTransactions  Transaction[]       @relation("TransactionSubmittedBy")
+  approvedTransactions   Transaction[]       @relation("TransactionApprovedBy")
+  reconciledTransactions Transaction[]       @relation("TransactionReconciledBy")
   uploadedReceipts       Receipt[]
-  ownedSponsorships      Sponsorship[]      @relation("SponsorshipOwner")
+  ownedSponsorships      Sponsorship[]       @relation("SponsorshipOwner")
   financeAuditLogs       FinanceAuditLog[]
   notifications          Notification[]
   orgAuditLogs           OrgAuditLog[]
   memberHistory          OrgMemberHistory[]
-  connectedIntegrations  OrgIntegration[]   @relation("IntegrationConnectedBy")
-  requestedExports       OrgExport[]        @relation("OrgExportRequestedBy")
-  hostedEvents           Event[]            @relation("EventHost")
-  createdChartVersions   OrgChartVersion[]  @relation("OrgChartVersionCreatedBy")
-  publishedChartVersions OrgChartVersion[]  @relation("OrgChartVersionPublishedBy")
-  chartPositions         OrgChartPosition[] @relation("OrgChartPositionUser")
-  contacts               Contact[]          @relation("ContactUser")
-  ownedTasks             Task[]             @relation("TaskOwner")
-  triageProjects         Project[]          @relation("ProjectTriageUser")
-  assignmentsMade        TaskAssignee[]     @relation("TaskAssignedBy")
-  taskComments           TaskComment[]      @relation("TaskCommentAuthor")
-  taskMentions           TaskMention[]      @relation("TaskMentionedUser")
-  taskMentionsMade       TaskMention[]      @relation("TaskMentionedBy")
-  taskActivity           TaskActivity[]     @relation("TaskActivityActor")
-  weeklyUpdates          WeeklyUpdate[]     @relation("WeeklyUpdateUser")
-  notificationsActed     Notification[]     @relation("NotificationActor")
-  createdJoinCodes       OrgJoinCode[]      @relation("OrgJoinCodeCreatedBy")
+  connectedIntegrations  OrgIntegration[]    @relation("IntegrationConnectedBy")
+  requestedExports       OrgExport[]         @relation("OrgExportRequestedBy")
+  hostedEvents           Event[]             @relation("EventHost")
+  createdChartVersions   OrgChartVersion[]   @relation("OrgChartVersionCreatedBy")
+  publishedChartVersions OrgChartVersion[]   @relation("OrgChartVersionPublishedBy")
+  chartPositions         OrgChartPosition[]  @relation("OrgChartPositionUser")
+  contacts               Contact[]           @relation("ContactUser")
+  ownedTasks             Task[]              @relation("TaskOwner")
+  triageProjects         Project[]           @relation("ProjectTriageUser")
+  assignmentsMade        TaskAssignee[]      @relation("TaskAssignedBy")
+  taskComments           TaskComment[]       @relation("TaskCommentAuthor")
+  taskMentions           TaskMention[]       @relation("TaskMentionedUser")
+  taskMentionsMade       TaskMention[]       @relation("TaskMentionedBy")
+  taskActivity           TaskActivity[]      @relation("TaskActivityActor")
+  weeklyUpdates          WeeklyUpdate[]      @relation("WeeklyUpdateUser")
+  notificationsActed     Notification[]      @relation("NotificationActor")
+  createdJoinCodes       OrgJoinCode[]       @relation("OrgJoinCodeCreatedBy")
   availability           UserAvailability?
   pins                   Pin[]
   recentVisits           RecentVisit[]
   memberPrefs            MemberPrefs[]
-  uploadedFiles          OrgFile[]          @relation("OrgFileUploadedBy")
-  noteFolders            NoteFolder[]       @relation("NoteFolderCreatedBy")
+  uploadedFiles          OrgFile[]           @relation("OrgFileUploadedBy")
+  noteFolders            NoteFolder[]        @relation("NoteFolderCreatedBy")
 }
 
 /// When a user can't meet (profile setup A5, the profile page). Its own
@@ -162,13 +163,13 @@ model RecentVisit {
 /// A member's own settings inside one org: which finance widgets they see,
 /// and the like. Owner-only (RLS).
 model MemberPrefs {
-  organizationId String
-  userId         String
+  organizationId  String
+  userId          String
   /// Finance widget layout: [{ id, type, w, h }] (src/lib/boards).
-  financeWidgets Json?
+  financeWidgets  Json?
   /// Overview widget layout, same shape (src/lib/overview/widgets.ts).
   overviewWidgets Json?
-  updatedAt      DateTime @default(now()) @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -835,19 +836,44 @@ model Event {
   capacityFull       Boolean            @default(false)
   featured           Boolean            @default(false)
   publicNote         String?
+  // Public RSVP page (docs/features/rsvp.md): anyone with the link signs up
+  // at /e/{rsvpSlug}, member or not. Owner/admin settings, like the rest of
+  // the event.
+  rsvpEnabled        Boolean            @default(false)
+  /// The page's code: 8 lowercase letters and digits, set when first turned on.
+  rsvpSlug           String?            @unique
+  /// How to find the room ("Room 204, take the east elevator"). Max 1000.
+  locationDetails    String?
+  /// Going spots; NULL is unlimited.
+  rsvpCapacity       Int?
+  /// Once it is full, new sign-ups join a waitlist (else registration closes).
+  rsvpWaitlist       Boolean            @default(true)
+  /// Registration closed by hand.
+  rsvpClosed         Boolean            @default(false)
+  /// The address, directions and map show only to people who signed up.
+  rsvpHideLocation   Boolean            @default(false)
+  /// The page doesn't list who's going.
+  rsvpHideGuests     Boolean            @default(false)
+  /// The page doesn't say how many are going, or how many spots are left.
+  rsvpHideCount      Boolean            @default(false)
+  /// The page's background (src/lib/rsvp/backgrounds.ts).
+  rsvpBackground     String             @default("banana")
+  /// {key, s480, s960, updatedAt}: WebP variants of the cover image (public store).
+  rsvpCover          Json?
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy         User               @relation("EventCreatedBy", fields: [createdById], references: [id])
-  host              User?              @relation("EventHost", fields: [hostUserId], references: [id], onDelete: SetNull)
-  mergedInto        Event?             @relation("EventMergedInto", fields: [mergedIntoId], references: [id], onDelete: SetNull)
-  mergedFrom        Event[]            @relation("EventMergedInto")
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy         User                @relation("EventCreatedBy", fields: [createdById], references: [id])
+  host              User?               @relation("EventHost", fields: [hostUserId], references: [id], onDelete: SetNull)
+  mergedInto        Event?              @relation("EventMergedInto", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom        Event[]             @relation("EventMergedInto")
   attendees         EventAttendee[]
   notes             Note[]
-  finalizedFromPoll AvailabilityPoll?  @relation("PollFinalizedEvent")
+  finalizedFromPoll AvailabilityPoll?   @relation("PollFinalizedEvent")
   transactions      Transaction[]
   linkLogs          EventLinkLog[]
   attendance        Attendance[]
   ballotDefinitions BallotDefinition[]
+  registrations     EventRegistration[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, sourceSessionId])
@@ -889,6 +915,46 @@ enum RSVPStatus {
   YES
   NO
   MAYBE
+}
+
+enum RegistrationStatus {
+  GOING
+  WAITLIST
+  CANCELLED
+}
+
+/// A sign-up on an event's public RSVP page (docs/features/rsvp.md): anyone
+/// with the link, member or not. It holds an email and a phone number, so
+/// in the suite only owners and admins read it (RLS); the public page reads
+/// and writes it on the service path, for that page's event only.
+model EventRegistration {
+  id                 String             @id @default(cuid())
+  organizationId     String
+  eventId            String
+  name               String
+  /// Lowercased.
+  email              String
+  /// E.164 (+15551234567) when it parses, else digits as typed.
+  phone              String
+  status             RegistrationStatus @default(GOING)
+  /// Set when they were signed in to Bananasplit.
+  userId             String?
+  checkedInAt        DateTime?
+  cancelledAt        DateTime?
+  /// When each reminder went out (a compare-and-set, so a retried job never
+  /// sends twice).
+  reminderDaySentAt  DateTime?
+  reminderHourSentAt DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  event Event @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
+  user  User? @relation("EventRegistrationUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, email])
+  @@unique([organizationId, id])
+  @@index([organizationId, eventId, status, createdAt])
+  @@index([userId])
 }
 
 /// organizationId is denormalized from Event (Phase 7) and kept equal by the

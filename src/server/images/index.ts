@@ -11,7 +11,8 @@ import { parseStorageKey, type StorageKindName } from "@/server/storage/kinds";
  *   client's declared type). At most 40 megapixels (a pixel bomb is refused
  *   before decoding).
  * - Output: WebP variants per preset (avatar 64/128/256 square crops, logo
- *   64/256/512 fitted inside the box), no metadata.
+ *   64/256/512 fitted inside the box, RSVP cover 480/960 square crops), no
+ *   metadata.
  * - storeImage writes the variants under a random, immutable prefix in the
  *   public store and returns the JSON stored on the row
  *   ({ key, s64, s128, ... , updatedAt }); replace the row first, then
@@ -21,6 +22,8 @@ import { parseStorageKey, type StorageKindName } from "@/server/storage/kinds";
 export const IMAGE_PRESETS = {
   avatar: { sizes: [64, 128, 256], fit: "cover" },
   logo: { sizes: [64, 256, 512], fit: "inside" },
+  // An RSVP page's cover: square crops, shown up to 480px (960 on retina).
+  cover: { sizes: [480, 960], fit: "cover" },
 } as const satisfies Record<string, { sizes: readonly number[]; fit: "cover" | "inside" }>;
 
 export type ImagePreset = keyof typeof IMAGE_PRESETS;
@@ -42,7 +45,9 @@ export class ImageRejectedError extends Error {
 /** The image type from magic bytes, or null when it is not JPEG, PNG or WebP. */
 export function sniffImageType(bytes: Buffer): AllowedImageType | null {
   const type = sniffMimeType(bytes);
-  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type ?? "") ? (type as AllowedImageType) : null;
+  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type ?? "")
+    ? (type as AllowedImageType)
+    : null;
 }
 
 export interface ProcessedImage {
@@ -110,7 +115,7 @@ export interface StoredImage {
 
 /** Processes `bytes` and writes the variants to the public store. Outside any transaction. */
 export async function storeImage(
-  kind: Extract<StorageKindName, "avatars" | "logos">,
+  kind: Extract<StorageKindName, "avatars" | "logos" | "event-covers">,
   scopeId: string,
   preset: ImagePreset,
   bytes: Buffer,

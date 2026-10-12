@@ -1,0 +1,85 @@
+/*
+ * Public RSVP pages (/e/[slug]): the page backgrounds a host picks
+ * (src/lib/rsvp/backgrounds.ts) and the text colours that sit on them. The
+ * registration card is always paper and ink; everything else follows the
+ * tone through these variables.
+ */
+
+.rsvp-page {
+  --rsvp-fg: var(--color-ink);
+  --rsvp-muted: var(--color-ink-muted);
+  --rsvp-soft: var(--color-ink-soft);
+  --rsvp-line: rgb(28 24 16 / 0.12);
+  --rsvp-tile: rgb(255 253 247 / 0.72);
+  --rsvp-tile-line: rgb(28 24 16 / 0.09);
+  --rsvp-ring: var(--color-cream);
+  color: var(--rsvp-fg);
+}
+
+.rsvp-page[data-tone="dark"] {
+  --rsvp-fg: var(--color-cream);
+  --rsvp-muted: var(--color-dusk-light);
+  --rsvp-soft: var(--color-dusk);
+  --rsvp-line: rgb(247 242 230 / 0.16);
+  --rsvp-tile: rgb(247 242 230 / 0.1);
+  --rsvp-tile-line: rgb(247 242 230 / 0.16);
+  --rsvp-ring: var(--color-night);
+}
+
+.rsvp-bg-banana {
+  background-color: var(--color-cream);
+  background-image:
+    radial-gradient(90% 60% at 85% -10%, rgb(242 194 48 / 0.35), transparent 70%),
+    radial-gradient(70% 50% at 0% 110%, rgb(246 231 180 / 0.9), transparent 70%);
+}
+
+.rsvp-bg-cream {
+  background-color: var(--color-cream);
+  background-image:
+    linear-gradient(rgb(28 24 16 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(28 24 16 / 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.rsvp-bg-peel {
+  background-color: var(--color-banana);
+  background-image: radial-gradient(
+    120% 80% at 50% 0%,
+    var(--color-lemon) 0%,
+    var(--color-banana) 50%,
+    var(--color-gold) 100%
+  );
+}
+
+.rsvp-bg-night {
+  background-color: var(--color-night);
+  background-image:
+    radial-gradient(60% 45% at 90% -5%, rgb(242 194 48 / 0.24), transparent 70%),
+    radial-gradient(50% 40% at 0% 105%, rgb(242 194 48 / 0.12), transparent 70%);
+}
+
+.rsvp-bg-pine {
+  background-color: #1d3a32;
+  background-image:
+    radial-gradient(60% 45% at 90% -5%, rgb(190 190 69 / 0.3), transparent 70%),
+    linear-gradient(180deg, var(--color-pine) 0%, #172c26 100%);
+}
+
+.rsvp-bg-brick {
+  background-color: #5c241f;
+  background-image:
+    radial-gradient(60% 45% at 90% -5%, rgb(242 194 48 / 0.26), transparent 70%),
+    linear-gradient(180deg, var(--color-brick) 0%, #4a1d19 100%);
+}
+
+.rsvp-bg-navy {
+  background-color: #222c4f;
+  background-image:
+    radial-gradient(60% 45% at 90% -5%, rgb(242 194 48 / 0.22), transparent 70%),
+    linear-gradient(180deg, var(--color-navy) 0%, #1b2340 100%);
+}
+
+/* "Cover photo": the cover itself, blurred and dimmed, drawn by the page. */
+.rsvp-bg-cover {
+  background-color: var(--color-night);
+}

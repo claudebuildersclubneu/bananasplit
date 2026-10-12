@@ -66,6 +66,7 @@ const id = z
   .max(100)
   .regex(/^[A-Za-z0-9_-]+$/, "ids only");
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const isoInstant = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
 
 /** Templates the generic `email` kind can render (src/server/email/jobs.ts). */
 export const EMAIL_JOB_TEMPLATES = ["treasurer-digest"] as const;
@@ -223,6 +224,50 @@ export const JOB_KINDS = {
     afterEligible: false,
     handler: () => import("@/server/public-events/rebuild").then((m) => m.siteRebuildJob),
     description: "POST the org's Netlify build hook after PUBLIC event changes (runAt now+60s).",
+  }),
+  // ---- RSVP pages (docs/features/rsvp.md) ----
+  "rsvp-email": kind({
+    payload: z
+      .object({
+        registrationId: id,
+        template: z.enum([
+          "registered",
+          "waitlisted",
+          "promoted",
+          "reminder-day",
+          "reminder-hour",
+          "event-cancelled",
+        ]),
+        /** Reminders: the start they were queued for (a moved event skips them). */
+        startsAt: isoInstant.optional(),
+      })
+      .strict(),
+    scope: "org",
+    maxRuntimeMs: 20_000,
+    leaseSeconds: 60,
+    tier: "fast",
+    afterEligible: true,
+    sendsEmail: true,
+    handler: () => import("@/server/rsvp/jobs").then((m) => m.rsvpEmailJob),
+    description:
+      "One RSVP email to a guest (confirmation, waitlist, a spot opened, reminders with a text, cancelled); key rsvp-email:{registrationId}:{template}[...]",
+  }),
+  "rsvp-fanout": kind({
+    payload: z
+      .object({
+        eventId: id,
+        stage: z.enum(["day", "hour", "cancelled"]),
+        startsAt: isoInstant.optional(),
+      })
+      .strict(),
+    scope: "org",
+    maxRuntimeMs: 20_000,
+    leaseSeconds: 60,
+    tier: "fast",
+    afterEligible: false,
+    handler: () => import("@/server/rsvp/jobs").then((m) => m.rsvpFanoutJob),
+    description:
+      "One rsvp-email per guest: the 24h and 1h reminders to everyone going (key rsvp-fanout:{eventId}:{stage}:{startMinute}, runAt before the start), or the cancellation when the event is deleted (key rsvp-fanout:{eventId}:cancelled).",
   }),
   "google-import": kind({
     payload: z.object({ integrationId: id, mode: z.enum(["dry-run", "apply"]) }).strict(),

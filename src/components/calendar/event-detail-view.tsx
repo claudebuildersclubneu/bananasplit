@@ -9,6 +9,7 @@ import {
   Mic,
   NotebookText,
   Pencil,
+  Settings2,
   Ticket,
   Trash2,
   Video,
@@ -60,12 +61,23 @@ export interface EventDetail extends EventFormEvent {
   notes: { id: string; title: string | null }[];
 }
 
+export interface EventRsvpSummary {
+  enabled: boolean;
+  /** The public page, while it's on. */
+  url: string | null;
+  /** Owners and admins only (0 for everyone else). */
+  going: number;
+  waitlist: number;
+  capacity: number | null;
+}
+
 export function EventDetailView({
   orgId,
   orgSlug,
   timeZone,
   event,
   members,
+  rsvp,
   currentUserId,
   canEdit,
   startInEdit = false,
@@ -75,6 +87,7 @@ export function EventDetailView({
   timeZone: string;
   event: EventDetail;
   members: CalendarMember[];
+  rsvp: EventRsvpSummary;
   currentUserId: string;
   canEdit: boolean;
   /** Opened from the calendar's "Edit" (?edit=1), so the form is already up. */
@@ -272,6 +285,63 @@ export function EventDetailView({
         </div>
 
         <aside className="space-y-5">
+          {(canEdit || rsvp.url) && (
+            <section className="bg-card space-y-3 rounded-xl border p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-medium">
+                  <Ticket aria-hidden className="text-muted-foreground size-4" />
+                  RSVP page
+                </h2>
+                {rsvp.enabled ? (
+                  <Badge>Live</Badge>
+                ) : (
+                  canEdit && <Badge variant="outline">Off</Badge>
+                )}
+              </div>
+              {rsvp.enabled ? (
+                <>
+                  {canEdit && (
+                    <p className="text-sm tabular-nums">
+                      <span className="font-semibold">{rsvp.going}</span>
+                      {rsvp.capacity ? ` of ${rsvp.capacity}` : ""} going
+                      {rsvp.waitlist > 0 && (
+                        <span className="text-muted-foreground"> · {rsvp.waitlist} waitlisted</span>
+                      )}
+                    </p>
+                  )}
+                  {rsvp.url && (
+                    <a
+                      href={rsvp.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary block truncate text-xs hover:underline"
+                    >
+                      {rsvp.url.replace(/^https?:\/\//, "")}
+                    </a>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  A public page where anyone with the link signs up, with a waitlist, a map and
+                  reminders.
+                </p>
+              )}
+              {canEdit && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={rsvp.enabled ? "outline" : "default"}
+                  className="w-full"
+                >
+                  <Link href={`/app/${orgSlug}/calendar/${event.id}/rsvp`}>
+                    {rsvp.enabled ? <Settings2 aria-hidden /> : <Ticket aria-hidden />}
+                    {rsvp.enabled ? "Manage guests and page" : "Set up an RSVP page"}
+                  </Link>
+                </Button>
+              )}
+            </section>
+          )}
+
           {myAttendance && (
             <section className="bg-muted/40 space-y-2 rounded-lg border p-3">
               <h2 className="text-sm font-medium">Your RSVP</h2>

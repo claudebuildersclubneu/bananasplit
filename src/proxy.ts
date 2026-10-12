@@ -72,6 +72,13 @@ export const config = {
       ],
     },
     {
+      source: "/e/:path*",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+    {
       source: "/invite/:path*",
       missing: [
         { type: "header", key: "next-router-prefetch" },

@@ -31,6 +31,9 @@ const GRANTS = {
   DatabaseDefinition: ["SIU", "SIUD", ""],
   Event: ["SIUD", "SIUD", ""],
   EventAttendee: ["SIUD", "SIUD", ""],
+  // RSVP page sign-ups: owners/admins in the suite (row policy), the public
+  // page and the reminder jobs on the service path.
+  EventRegistration: ["SIUD", "SIUD", ""],
   EventLinkLog: ["SI", "SI", ""],
   FinanceAuditLog: ["S", "S", ""],
   Invitation: ["SIUD", "SIUD", ""],
@@ -150,6 +153,7 @@ const NEW_TENANT_TABLES = [
   "Poll",
   "PollOption",
   "PollVote",
+  "EventRegistration",
 ];
 
 /**

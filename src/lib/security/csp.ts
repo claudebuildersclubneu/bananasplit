@@ -39,6 +39,7 @@ export type CspMode = "enforce" | "report-only";
 export const NONCE_ROUTE_PREFIXES = [
   "/app",
   "/poll",
+  "/e",
   "/invite",
   "/sign-in",
   "/sign-up",
@@ -80,6 +81,9 @@ export function sentryOrigin(env: NodeJS.ProcessEnv = process.env): string | nul
 /** Vercel Blob's public store (logos, avatars) and Google profile photos. */
 const IMAGE_HOSTS = ["https://*.public.blob.vercel-storage.com", "https://*.googleusercontent.com"];
 
+/** The map on a public RSVP page (/e/[slug]) is Google Maps' keyless embed. */
+const FRAME_SOURCES = ["https://www.google.com"];
+
 /** The Google sign-in form POST redirects to accounts.google.com. */
 const FORM_TARGETS = ["https://accounts.google.com"];
 
@@ -102,6 +106,7 @@ function sharedDirectives(env: NodeJS.ProcessEnv): string[] {
     `img-src 'self' blob: data: ${IMAGE_HOSTS.join(" ")}`,
     // FullCalendar ships its icon font inline as a data: URI in its CSS.
     "font-src 'self' data:",
+    `frame-src ${FRAME_SOURCES.join(" ")}`,
     `connect-src ${connect.join(" ")}`,
     `form-action 'self' ${FORM_TARGETS.join(" ")}`,
     "frame-ancestors 'none'",
@@ -168,4 +173,4 @@ export const NOT_FRAMABLE_SOURCE = `/((?!${FRAMABLE}).*)`;
  * next.config.ts `source` for the static CSP: every path EXCEPT the nonce
  * routes (so a matched route never carries two policies).
  */
-export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;
+export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|e/|e$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;
