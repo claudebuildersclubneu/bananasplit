@@ -33,7 +33,13 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 }
 
 /** Name, pronouns, major and year, bio and timezone. */
-export function DetailsForm({ initial, orgTimezone }: { initial: DetailsInitial; orgTimezone: string }) {
+export function DetailsForm({
+  initial,
+  orgTimezone,
+}: {
+  initial: DetailsInitial;
+  orgTimezone: string;
+}) {
   const [values, setValues] = useState(initial);
   const [yearOptions] = useState(() => gradYearChoices(new Date(), 8));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -139,7 +145,7 @@ export function DetailsForm({ initial, orgTimezone }: { initial: DetailsInitial;
             onChange={(e) => set("gradYear", e.target.value)}
             aria-invalid={Boolean(errors.gradYear) || undefined}
             aria-describedby={describedBy("gradYear")}
-            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-3"
+            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 w-full rounded-lg border bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3"
           >
             <option value="">Not set</option>
             {/* A year already on the profile stays selectable, even once it has passed. */}

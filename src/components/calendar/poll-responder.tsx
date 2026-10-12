@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 
 import { finalizePoll } from "@/app/app/[orgSlug]/calendar/polls/actions";
 import { submitPollResponse } from "@/app/poll/[pollId]/actions";
-import { Badge } from "@/components/ui/badge";
+import { PollStatusBadge } from "@/components/polls/poll-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { segmentedItem, segmentedTrack } from "@/components/ui/segmented";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PollAvailability } from "@/generated/prisma/enums";
 import type { PollAnswer, PollView } from "@/lib/polls/poll-view";
@@ -106,7 +107,7 @@ export function PollResponder({
   orgId?: string;
   orgSlug?: string;
   canFinalize: boolean;
-  /** Buttons for the header (the app's share and delete). */
+  /** The header's actions (the app's invite, pin and "…" menu). */
   actions?: ReactNode;
   /** Page-specific notes shown under the header. */
   notices?: ReactNode;
@@ -422,7 +423,9 @@ export function PollResponder({
             </p>
           )}
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-            <StatusBadge finalized={isFinalized} closed={isClosed} />
+            <PollStatusBadge tone={isFinalized ? "scheduled" : isClosed ? "closed" : "open"}>
+              {isFinalized ? "Scheduled" : isClosed ? "Closed" : "Open"}
+            </PollStatusBadge>
             {!isClosed && poll.closesAt && <span>Closes {momentLabel(poll.closesAt, zone)}</span>}
             <span className="inline-flex items-center gap-1">
               <Clock aria-hidden className="size-3.5" />
@@ -434,7 +437,7 @@ export function PollResponder({
             </span>
           </div>
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-1.5">{actions}</div>}
       </div>
 
       {/* --------------------------------------------------------------- notices */}
@@ -739,20 +742,9 @@ function GroupView({
   );
 }
 
-function StatusBadge({ finalized, closed }: { finalized: boolean; closed: boolean }) {
-  if (finalized) return <Badge>Scheduled</Badge>;
-  if (closed) return <Badge variant="secondary">Closed</Badge>;
-  return (
-    <Badge variant="outline" className="gap-1">
-      <span aria-hidden className="bg-success size-1.5 rounded-full" />
-      Open
-    </Badge>
-  );
-}
-
 function Note({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <div className="bg-muted/40 flex gap-2 rounded-lg border p-3 text-sm" role="note">
+    <div className="bg-muted/40 flex gap-2 rounded-xl border p-3 text-sm" role="note">
       <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -772,13 +764,15 @@ function BrushPicker({
       <span aria-hidden className="text-sm font-medium">
         Mark as
       </span>
-      <div className="bg-muted flex w-full rounded-lg p-[3px] sm:inline-flex sm:w-auto">
+      {/* The shared segmented look, kept as radios: a brush is a choice, not a view. */}
+      <div className={cn(segmentedTrack, "flex w-full sm:inline-flex sm:w-auto")}>
         {BRUSHES.map((option) => (
           <label
             key={option}
             className={cn(
-              "text-foreground/70 hover:text-foreground flex h-7 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent px-2 text-sm font-medium whitespace-nowrap transition-colors sm:flex-none sm:px-2.5",
-              "has-checked:bg-background has-checked:text-foreground dark:has-checked:border-input dark:has-checked:bg-input/30 has-checked:shadow-sm",
+              segmentedItem(value === option),
+              // The swatch's tick keeps its own size.
+              "flex-1 cursor-pointer justify-center sm:flex-none [&_svg]:size-3",
               "has-focus-visible:ring-ring/50 has-focus-visible:ring-3",
             )}
           >

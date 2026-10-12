@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, ExternalLink, Link2, Trash2, UserPlus, Vote } from "lucide-react";
+import { CalendarRange, Link2, Trash2, UserPlus, Vote } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -11,9 +11,9 @@ import { PinToggle } from "@/components/pins/pins-context";
 import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
-import { cn } from "@/lib/utils";
 
 import { copyGuestPollLink, copyPollLink } from "./copy-link";
+import { PollStatusBadge, type PollStatusTone } from "./poll-status-badge";
 
 /**
  * The polls page's list: both kinds of poll in one list, open ones first.
@@ -30,7 +30,7 @@ export interface PollListItem {
   href: string;
   /** An open availability poll takes guests' answers on its public page. */
   takesGuests?: boolean;
-  status: { tone: "open" | "closed" | "scheduled"; label: string };
+  status: { tone: PollStatusTone; label: string };
   /** "3 options · Anonymous · 12 people voted" */
   meta: string;
   /** Its creator, or an owner/admin (the actions check again). */
@@ -104,7 +104,7 @@ function Section({
       {polls.length === 0 ? (
         <p className="text-muted-foreground rounded-xl border border-dashed p-4 text-sm">{empty}</p>
       ) : (
-        <ul className="bg-card divide-y overflow-hidden rounded-xl border shadow-xs">
+        <ul className="bg-card divide-y overflow-hidden rounded-xl border">
           {polls.map((poll) => (
             <PollRow key={poll.id} poll={poll} onDelete={() => onDelete(poll)} />
           ))}
@@ -119,17 +119,6 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
   const Icon = kind.icon;
   return (
     <li className="group hover:bg-muted/40 relative flex items-center gap-3 px-4 py-3 transition-colors">
-      <span
-        aria-hidden
-        className={cn(
-          "grid size-9 shrink-0 place-items-center rounded-lg",
-          poll.kind === "question"
-            ? "bg-primary/10 text-primary"
-            : "bg-muted text-muted-foreground",
-        )}
-      >
-        <Icon className="size-4" />
-      </span>
       <div className="min-w-0 flex-1 space-y-1">
         {/* The link covers the row; the pin and the menu sit above it. */}
         <Link
@@ -140,9 +129,10 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
         </Link>
         <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <Badge variant="outline" className="text-muted-foreground font-normal">
+            <Icon aria-hidden />
             {kind.label}
           </Badge>
-          <Status status={poll.status} />
+          <PollStatusBadge tone={poll.status.tone}>{poll.status.label}</PollStatusBadge>
           <span>{poll.meta}</span>
         </div>
       </div>
@@ -155,7 +145,6 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
         <ItemMenu
           label={`Actions for ${poll.title}`}
           items={[
-            { label: "Open", icon: ExternalLink, href: poll.href },
             poll.takesGuests && {
               label: "Copy guest link",
               icon: UserPlus,
@@ -173,16 +162,4 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
       </div>
     </li>
   );
-}
-
-function Status({ status }: { status: PollListItem["status"] }) {
-  if (status.tone === "open") {
-    return (
-      <Badge variant="outline" className="gap-1.5">
-        <span aria-hidden className="bg-success size-1.5 rounded-full" />
-        {status.label}
-      </Badge>
-    );
-  }
-  return <Badge variant="secondary">{status.label}</Badge>;
 }

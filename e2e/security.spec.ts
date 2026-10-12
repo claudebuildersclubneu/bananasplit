@@ -169,7 +169,7 @@ test("calendar feed: the link is shown once, and regenerating kills the old one"
   await page.goto(`/app/${orgSlug}/settings/calendar`);
 
   await page.getByRole("button", { name: "Create link" }).click();
-  const first = await page.getByLabel("Calendar feed URL").inputValue();
+  const first = await page.getByLabel("Your calendar feed link").inputValue();
   expect(first).toMatch(/^https?:\/\/[^/]+\/api\/calendar\/feed\/[A-Za-z0-9_-]+$/);
   const firstPath = new URL(first).pathname;
   expect((await page.request.get(firstPath)).status()).toBe(200);
@@ -177,12 +177,16 @@ test("calendar feed: the link is shown once, and regenerating kills the old one"
   // Never shown again after a reload.
   await page.reload();
   await expect(page.locator("#main-content").getByText(/Feed active since/)).toBeVisible();
-  await expect(page.getByLabel("Calendar feed URL")).toHaveCount(0);
+  await expect(page.getByLabel("Your calendar feed link")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Regenerate link" }).click();
-  const second = await page.getByLabel("Calendar feed URL").inputValue();
+  await page.getByRole("button", { name: "Generate new link" }).click();
+  await page
+    .getByRole("group", { name: "Confirm new link" })
+    .getByRole("button", { name: "Generate new link" })
+    .click();
+  const second = await page.getByLabel("Your calendar feed link").inputValue();
   expect(second).not.toBe(first);
-  await expect(page.getByText(/previous feed link has stopped working/)).toBeVisible();
+  await expect(page.getByText(/previous link has stopped working/)).toBeVisible();
   expect((await page.request.get(firstPath)).status()).toBe(404);
   expect((await page.request.get(new URL(second).pathname)).status()).toBe(200);
 });

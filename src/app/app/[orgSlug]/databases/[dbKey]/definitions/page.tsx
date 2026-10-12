@@ -1,10 +1,10 @@
 import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/back-link";
 import { DefinitionEditForm, DefinitionImportForm } from "@/components/databases/definition-forms";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { NotFoundError } from "@/lib/auth/errors";
 import { exclusionLabel, readDefinition } from "@/server/databases/ballot-definitions";
@@ -56,38 +56,38 @@ export default async function BallotDefinitionsPage({
   }
 
   const tz = organization.timezone;
-  const local = (d: Date | null) => (d ? format(new TZDate(d.getTime(), tz), "yyyy-MM-dd'T'HH:mm") : "");
-  const sessions = data.sessions.map((s) => ({ id: s.id, label: `${s.title} · ${fmtDate(s.startsAt, tz)}` }));
+  const local = (d: Date | null) =>
+    d ? format(new TZDate(d.getTime(), tz), "yyyy-MM-dd'T'HH:mm") : "";
+  const sessions = data.sessions.map((s) => ({
+    id: s.id,
+    label: `${s.title} · ${fmtDate(s.startsAt, tz)}`,
+  }));
   const bySlug = new Map<string, { reason: string | null; n: number }[]>();
   for (const r of data.reasons) {
     const list = bySlug.get(r.pollSlug) ?? [];
     list.push({ reason: r.excludedReason, n: r._count._all });
     bySlug.set(r.pollSlug, list);
   }
-  const unknown = [...bySlug.keys()].filter((slug) => !data.definitions.some((d) => d.slug === slug));
+  const unknown = [...bySlug.keys()].filter(
+    (slug) => !data.definitions.some((d) => d.slug === slug),
+  );
 
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <Link
-          href={`/app/${orgSlug}/databases/${dbKey}`}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-        >
-          <ChevronLeft className="size-3" aria-hidden="true" />
-          {data.database.name}
-        </Link>
-        <h1 className="page-title">Poll definitions</h1>
-        <p className="text-muted-foreground text-sm">
-          Labels, question types and voting windows for each poll. Ballots cast outside the window, test polls,
-          load and smoke tests, and ballots naming options a poll no longer has are kept but not counted.
-        </p>
+        <BackLink href={`/app/${orgSlug}/databases/${dbKey}`} label={data.database.name} />
+        <PageHeader
+          title="Poll definitions"
+          description="Labels, question types and voting windows for each poll. Ballots cast outside the window, test polls, load and smoke tests, and ballots naming options a poll no longer has are kept but not counted."
+        />
       </div>
 
       <DefinitionImportForm organizationId={organization.id} sessions={sessions} />
 
       {unknown.length > 0 && (
-        <p className="border-warning/40 bg-warning/10 rounded-md border p-3 text-sm">
-          Ballots are waiting for a definition: {unknown.join(", ")}. Import the poll file to count them.
+        <p className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
+          Ballots are waiting for a definition: {unknown.join(", ")}. Import the poll file to count
+          them.
         </p>
       )}
 
@@ -97,9 +97,9 @@ export default async function BallotDefinitionsPage({
           const counts = bySlug.get(d.slug) ?? [];
           const counted = counts.filter((c) => !c.reason).reduce((s, c) => s + c.n, 0);
           return (
-            <li key={d.id} className="space-y-3 rounded-lg border p-4">
+            <li key={d.id} className="space-y-3 rounded-xl border p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-medium">{d.title}</h2>
+                <h2 className="text-sm font-semibold">{d.title}</h2>
                 <code className="text-muted-foreground text-xs">{d.slug}</code>
                 {d.isTest && <Badge variant="outline">Test</Badge>}
               </div>

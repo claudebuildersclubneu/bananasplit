@@ -1,11 +1,12 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
 import { syncNowAction } from "@/app/app/[orgSlug]/databases/actions";
+import { ItemMenu } from "@/components/item-menu";
 import { Badge } from "@/components/ui/badge";
-
-import { ActionButton } from "./action-button";
 
 export interface SyncPanelStream {
   stream: string;
@@ -17,9 +18,10 @@ export interface SyncPanelStream {
 }
 
 /**
- * Website sync status and "Sync now" (ADMIN+). Sync now only enqueues the
- * job and kicks the drain; the numbers update when the job finishes
- * (refresh the page).
+ * Website sync status (ADMIN+). The sync runs by itself every few minutes,
+ * so "Sync now", "Full reconcile" and the connection's Admin panel page sit
+ * in the "…" menu. Sync now only enqueues the job and kicks the drain; the
+ * numbers update when the job finishes (refresh the page).
  */
 export function SyncPanel({
   organizationId,
@@ -38,37 +40,75 @@ export function SyncPanel({
   streams: SyncPanelStream[];
   settingsHref: string;
 }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const sync = (full: boolean) => {
+    if (
+      full &&
+      !window.confirm("Re-read everything from the website and remove rows it no longer has?")
+    )
+      return;
+    setError(null);
+    start(async () => {
+      const result = await syncNowAction(organizationId, full);
+      if (result.error) setError(result.error);
+      else router.refresh();
+    });
+  };
+
   return (
-    <section className="space-y-3 rounded-lg border p-4" aria-labelledby="sync-heading">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+    <section className="space-y-3 rounded-xl border p-4" aria-labelledby="sync-heading">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
           <h2 id="sync-heading" className="flex items-center gap-2 text-sm font-semibold">
             Website data sync
-            <Badge variant={status === "CONNECTED" ? "default" : status === "ERROR" ? "destructive" : "secondary"}>
+            <Badge
+              variant={
+                status === "CONNECTED"
+                  ? "default"
+                  : status === "ERROR"
+                    ? "destructive"
+                    : "secondary"
+              }
+            >
               {status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, " ")}
             </Badge>
+            {pending && (
+              <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Syncing" />
+            )}
           </h2>
           <p className="text-muted-foreground text-xs">
-            {endpoint ? `Reads ${endpoint} through the suite export.` : (configError ?? "Not configured.")}{" "}
-            <a className="underline underline-offset-2" href={settingsHref}>
-              Settings
-            </a>
+            {endpoint
+              ? `Reads ${endpoint} through the suite export.`
+              : (configError ?? "Not configured.")}
           </p>
         </div>
-        <div className="flex gap-2">
-          <ActionButton action={syncNowAction} args={[organizationId, false]}>
-            <RefreshCw aria-hidden="true" />
-            Sync now
-          </ActionButton>
-          <ActionButton
-            variant="ghost"
-            action={syncNowAction} args={[organizationId, true]}
-            confirm="Re-read everything from the website and remove rows it no longer has?"
-          >
-            Full reconcile
-          </ActionButton>
-        </div>
+        <ItemMenu
+          label="Website sync actions"
+          items={[
+            { label: "Sync now", icon: RefreshCw, onSelect: () => sync(false), disabled: pending },
+            {
+              label: "Full reconcile…",
+              icon: RotateCcw,
+              onSelect: () => sync(true),
+              disabled: pending,
+            },
+            {
+              label: "Admin panel › Integrations",
+              icon: Settings2,
+              href: settingsHref,
+              separated: true,
+            },
+          ]}
+        />
       </div>
+      {error && (
+        <p role="alert" className="text-destructive text-xs">
+          {error}
+        </p>
+      )}
       {lastError && (
         <p role="status" className="text-destructive text-xs">
           Last error: {lastError}
@@ -90,7 +130,11 @@ export function SyncPanel({
               <td className="py-1.5">{s.lastSynced ?? "Never"}</td>
               <td className="py-1.5 text-right tabular-nums">{s.rowsUpserted.toLocaleString()}</td>
               <td className="py-1.5 pl-3">
-                {s.lastError ? <span className="text-destructive">{s.lastError}</span> : (s.detail ?? "")}
+                {s.lastError ? (
+                  <span className="text-destructive">{s.lastError}</span>
+                ) : (
+                  (s.detail ?? "")
+                )}
               </td>
             </tr>
           ))}

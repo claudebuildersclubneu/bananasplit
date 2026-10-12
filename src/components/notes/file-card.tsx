@@ -41,23 +41,22 @@ export interface FileCardData {
   uploadedBy: { name: string | null };
 }
 
-/** A file on the Notes page; opens its in-app preview. */
+/** An uploaded file in Files; opens its in-app preview. */
 export function FileCard({ file, orgSlug }: { file: FileCardData; orgSlug: string }) {
   const family = familyOf(file.contentType);
   const Icon = FILE_ICONS[family];
   return (
     <Link
       href={`/app/${orgSlug}/notes/files/${file.id}`}
-      className="bg-card hover:border-foreground/20 focus-visible:ring-ring flex items-center gap-3 rounded-xl border p-3 text-sm shadow-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      className="bg-card hover:border-foreground/20 focus-visible:ring-ring flex items-center gap-3 rounded-xl border p-3 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
-      <span
+      <Icon
         className={cn(
-          "grid size-10 shrink-0 place-items-center rounded-lg",
-          family === "pdf" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary",
+          "size-5 shrink-0",
+          family === "pdf" ? "text-destructive" : "text-muted-foreground",
         )}
-      >
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
+        aria-hidden="true"
+      />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 font-medium">
           <span className="truncate">{file.name}</span>
@@ -66,7 +65,8 @@ export function FileCard({ file, orgSlug }: { file: FileCardData; orgSlug: strin
           )}
         </span>
         <span className="text-muted-foreground block truncate text-xs">
-          {FILE_LABELS[family]} · {formatBytes(file.sizeBytes)} · {file.uploadedBy.name ?? "A member"},{" "}
+          {FILE_LABELS[family]} · {formatBytes(file.sizeBytes)} ·{" "}
+          {file.uploadedBy.name ?? "A member"},{" "}
           {formatDistanceToNow(file.createdAt, { addSuffix: true })}
         </span>
       </span>

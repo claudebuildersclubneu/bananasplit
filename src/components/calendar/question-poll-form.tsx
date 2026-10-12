@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, Loader2, Plus, X } from "lucide-react";
+import { BackLink } from "@/components/back-link";
+import { Loader2, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +15,7 @@ import {
 } from "react";
 
 import { createQuestionPoll } from "@/app/app/[orgSlug]/calendar/polls/question-actions";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -212,19 +214,11 @@ export function QuestionPollForm({ orgId, orgSlug }: { orgId: string; orgSlug: s
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-8" noValidate>
       <div className="space-y-3">
-        <Link
-          href={`/app/${orgSlug}/calendar/polls`}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Polls
-        </Link>
-        <div>
-          <h1 className="page-title">Ask a question</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Give the options and let the club vote. Everyone in the club can answer.
-          </p>
-        </div>
+        <BackLink href={`/app/${orgSlug}/calendar/polls`} label="Polls" />
+        <PageHeader
+          title="Ask a question"
+          description="Give the options and let the club vote. Everyone in the club can answer."
+        />
       </div>
 
       <Section title="Question">
@@ -300,7 +294,7 @@ export function QuestionPollForm({ orgId, orgSlug }: { orgId: string; orgSlug: s
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     className={cn(
                       "text-muted-foreground shrink-0",
                       options.length <= MIN_OPTIONS && "invisible",
@@ -382,7 +376,7 @@ export function QuestionPollForm({ orgId, orgSlug }: { orgId: string; orgSlug: s
               aria-checked={closing === c.id}
               onClick={() => pickClosing(c.id)}
               className={cn(
-                "focus-visible:ring-ring/50 h-8 rounded-full border px-3.5 text-sm transition-colors outline-none focus-visible:ring-3",
+                "focus-visible:ring-ring/50 h-8 rounded-md border px-3 text-sm transition-colors outline-none focus-visible:ring-3",
                 closing === c.id
                   ? "border-primary bg-primary text-primary-foreground"
                   : "bg-background hover:bg-muted",

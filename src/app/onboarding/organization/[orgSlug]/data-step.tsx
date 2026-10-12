@@ -106,7 +106,7 @@ export function DataStep({
     >
       <StepIntro index={index} total={total} title="Connect the tools your club already uses.">
         Each one is tested before it counts, and keys are stored encrypted. You can connect more
-        later in Settings.
+        later in the Admin panel.
       </StepIntro>
 
       <StepBody>

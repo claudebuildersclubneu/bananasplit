@@ -2,7 +2,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowUpRight, TriangleAlert } from "lucide-react";
 
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import { asOfLabel } from "./format";
@@ -53,7 +60,9 @@ export function ReportCard({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">{children}</CardContent>
       {computedAt ? (
-        <p className="text-muted-foreground px-(--card-spacing) text-xs tabular-nums">{asOfLabel(computedAt, tz)}</p>
+        <p className="text-muted-foreground px-(--card-spacing) text-xs tabular-nums">
+          {asOfLabel(computedAt, tz)}
+        </p>
       ) : null}
     </Card>
   );
@@ -65,7 +74,8 @@ export function ReportError({ id, title, tz }: { id: string; title: string; tz: 
     <ReportCard id={id} title={title} description="This report could not be loaded." tz={tz}>
       <p className="text-muted-foreground flex items-center gap-2 text-sm">
         <TriangleAlert className="size-4" aria-hidden="true" />
-        Something went wrong while computing it. Try Refresh, or reload the page.
+        Something went wrong while computing it. Refresh the reports to try again, or reload the
+        page.
       </p>
     </ReportCard>
   );
@@ -74,7 +84,7 @@ export function ReportError({ id, title, tz }: { id: string; title: string; tz: 
 /** A body for a report with nothing to show in the range. */
 export function ReportEmpty({ children }: { children: ReactNode }) {
   return (
-    <div className="text-muted-foreground flex min-h-24 flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
+    <div className="text-muted-foreground flex min-h-24 flex-1 items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm">
       {children}
     </div>
   );

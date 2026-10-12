@@ -32,7 +32,9 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
       body.set("file", file);
       body.set("mode", mode);
       const res = await fetch(uploadUrl, { method: "POST", body });
-      const data = (await res.json().catch(() => ({ error: "The server did not answer." }))) as PreviewResult;
+      const data = (await res
+        .json()
+        .catch(() => ({ error: "The server did not answer." }))) as PreviewResult;
       setPreview(data);
       if (mode === "commit" && data.committed) router.refresh();
     } finally {
@@ -52,9 +54,14 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
             setFile(e.target.files?.[0] ?? null);
             setPreview(null);
           }}
-          className="text-sm"
+          className="file:border-border file:bg-background hover:file:bg-muted text-sm file:mr-3 file:h-7 file:cursor-pointer file:rounded-lg file:border file:px-2.5 file:text-[0.8rem] file:font-medium"
         />
-        <Button size="sm" variant="outline" disabled={!file || busy} onClick={() => send("preview")}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!file || busy}
+          onClick={() => send("preview")}
+        >
           Preview
         </Button>
         {preview && !preview.committed && !preview.error && (preview.valid ?? 0) > 0 && (
@@ -71,7 +78,8 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
       )}
       {preview?.committed && (
         <p className="text-success text-sm">
-          Imported {preview.committed.created} rows ({preview.committed.skipped} skipped as duplicates or problems).{" "}
+          Imported {preview.committed.created} rows ({preview.committed.skipped} skipped as
+          duplicates or problems).{" "}
           <a className="underline underline-offset-2" href={backHref}>
             Back to the table
           </a>
@@ -83,7 +91,7 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
         </p>
       )}
       {preview?.issues && preview.issues.length > 0 && (
-        <div className="border-warning/40 bg-warning/10 rounded-md border p-3 text-sm">
+        <div className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
           <p className="font-medium">Rows that will be skipped</p>
           <ul className="mt-1 max-h-48 list-disc overflow-y-auto pl-5 text-xs">
             {preview.issues.map((i) => (
@@ -95,7 +103,7 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
         </div>
       )}
       {columns.length > 0 && !preview?.committed && (
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto rounded-xl border">
           <table className="w-full text-xs">
             <thead className="bg-muted/40 text-left">
               <tr>

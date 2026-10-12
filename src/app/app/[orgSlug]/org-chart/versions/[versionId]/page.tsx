@@ -1,6 +1,5 @@
-import { ChevronLeft } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChartList } from "@/components/org-chart/chart-list";
@@ -22,7 +21,9 @@ function toNodes(detail: VersionDetail): ChartNodeDTO[] {
     title: p.title,
     personName: p.personName,
     userId: p.userId,
-    user: p.user ? { id: p.user.id, name: p.user.name, image: p.user.image, avatar: p.user.avatar } : null,
+    user: p.user
+      ? { id: p.user.id, name: p.user.name, image: p.user.image, avatar: p.user.avatar }
+      : null,
     reportsToId: p.reportsToId,
     isOpen: p.isOpen,
     isAdvisor: p.isAdvisor,
@@ -116,21 +117,24 @@ export default async function VersionPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <Link
-            href={`${base}/versions`}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-          >
-            <ChevronLeft className="size-4" aria-hidden="true" />
-            Version history
-          </Link>
+          <BackLink href={`${base}/versions`} label="Version history" />
           <h1 className="page-title flex items-center gap-2">
             Version {version.number}
-            {version.isActive ? <Badge>Published</Badge> : <Badge variant="outline">{version.status.toLowerCase()}</Badge>}
+            {version.isActive ? (
+              <Badge>Published</Badge>
+            ) : (
+              <Badge variant="outline">{version.status.toLowerCase()}</Badge>
+            )}
           </h1>
           <p className="text-muted-foreground text-sm">{detail.positions.length} positions</p>
         </div>
         {!version.isActive && (version.status === "ARCHIVED" || version.status === "PUBLISHED") && (
-          <RollbackButton orgId={organization.id} orgSlug={orgSlug} versionId={version.id} number={version.number} />
+          <RollbackButton
+            orgId={organization.id}
+            orgSlug={orgSlug}
+            versionId={version.id}
+            number={version.number}
+          />
         )}
       </div>
 
@@ -143,7 +147,7 @@ export default async function VersionPage({
             id="compare"
             name="compare"
             defaultValue={other?.version.id ?? ""}
-            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+            className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
           >
             {versions
               .filter((v) => v.id !== version.id)
@@ -176,7 +180,9 @@ export default async function VersionPage({
             </div>
           )
         ) : (
-          <p className="text-muted-foreground text-sm">There is no other version to compare with.</p>
+          <p className="text-muted-foreground text-sm">
+            There is no other version to compare with.
+          </p>
         )}
       </section>
 

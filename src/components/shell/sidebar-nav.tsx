@@ -6,12 +6,12 @@ import {
   CheckSquare,
   Database,
   FileText,
+  FolderOpen,
   LayoutDashboard,
   Network,
   NotebookText,
   Pin,
   Plus,
-  Settings,
   Users,
   Wallet,
   X,
@@ -43,10 +43,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   CalendarDays,
   CheckSquare,
   Database,
+  FolderOpen,
   LayoutDashboard,
   Network,
   NotebookText,
-  Settings,
   Users,
   Wallet,
 };
@@ -88,11 +88,7 @@ function NavItemLink({
 }
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="eyebrow text-sidebar-foreground/60 px-3 pt-4 pb-1.5">
-      {children}
-    </span>
-  );
+  return <span className="eyebrow text-sidebar-foreground/60 px-3 pt-4 pb-1.5">{children}</span>;
 }
 
 function PinnedList({
@@ -109,7 +105,9 @@ function PinnedList({
   const router = useRouter();
   const pinsCtx = usePins();
   const search = useSearchParams().toString();
-  const current = pinsCtx ? canonicalHref(pinsCtx.orgSlug, search ? `${pathname}?${search}` : pathname) : pathname;
+  const current = pinsCtx
+    ? canonicalHref(pinsCtx.orgSlug, search ? `${pathname}?${search}` : pathname)
+    : pathname;
   const [pending, start] = useTransition();
   const { over, error, zone, pinProps } = usePinDrop(
     orgId,
@@ -136,7 +134,7 @@ function PinnedList({
             onClick={() => pinsCtx.openPicker()}
             aria-label="Pin something"
             title="Pin something"
-            className="text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent mt-2 rounded p-0.5"
+            className="text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-ring/50 mt-2 grid size-5 place-items-center rounded-md outline-none focus-visible:ring-3"
           >
             <Plus className="size-3.5" aria-hidden="true" />
           </button>
@@ -144,12 +142,13 @@ function PinnedList({
       </div>
       {pins.length === 0 ? (
         <p
+          title="Drag a page here, or press the pin at the top of any page."
           className={cn(
-            "text-sidebar-foreground/50 mx-1 rounded-md border border-dashed px-2 py-2 text-xs leading-snug",
-            over && "border-sidebar-ring text-sidebar-foreground",
+            "text-sidebar-foreground/50 px-3 py-1 text-xs",
+            over && "text-sidebar-foreground",
           )}
         >
-          Drag any page here, press Pin at the top of a page, or use + to pin anything.
+          {over ? "Drop to pin" : "Nothing pinned yet"}
         </p>
       ) : (
         <ul className="flex flex-col gap-0.5">
@@ -178,7 +177,7 @@ function PinnedList({
                       router.refresh();
                     })
                   }
-                  className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-ring absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+                  className="text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-ring absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <X className="size-3.5" aria-hidden="true" />
                 </button>
@@ -199,19 +198,17 @@ function PinnedList({
 
 export function SidebarNav({
   sections,
-  settings,
   orgId,
   pins = [],
   onNavigate,
 }: {
   sections: NavSection[];
-  settings: NavLink;
   orgId: string;
   pins?: SidebarPin[];
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const all = [...sections.flatMap((s) => s.items), settings];
+  const all = sections.flatMap((s) => s.items);
 
   return (
     <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
@@ -220,19 +217,29 @@ export function SidebarNav({
           <div key={section.id} className="flex flex-col gap-0.5">
             {section.label && <GroupLabel>{section.label}</GroupLabel>}
             {section.items.map((link) => (
-              <NavItemLink key={link.id} link={link} pathname={pathname} all={all} onNavigate={onNavigate} />
+              <NavItemLink
+                key={link.id}
+                link={link}
+                pathname={pathname}
+                all={all}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
         ))}
         <PinnedList pins={pins} orgId={orgId} pathname={pathname} onNavigate={onNavigate} />
       </div>
       <div className="border-sidebar-border mt-3 border-t pt-3">
-        <NavItemLink link={settings} pathname={pathname} all={all} onNavigate={onNavigate} />
-        {/* The platform's signature, under the club's own nav: quiet, not a link. */}
-        <p className="text-sidebar-foreground/70 mt-3 flex items-center gap-2.5 px-3">
+        {/* The platform's signature, under the club's own nav: quiet, and the way back to the home page. */}
+        <Link
+          href="/"
+          onClick={onNavigate}
+          title="Bananasplit home page"
+          className="text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:ring-ring/50 flex items-center gap-2.5 rounded-md px-3 py-1 transition-colors outline-none focus-visible:ring-3"
+        >
           <BananasplitMark className="size-[18px]" />
           <span className="font-heading text-[14px] tracking-[-0.01em]">bananasplit</span>
-        </p>
+        </Link>
       </div>
     </nav>
   );

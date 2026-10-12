@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /**
- * Names and makes a Notes folder (Notes › New › Folder, and the Move dialog).
+ * Names and makes a folder in Files (Files › New › New folder, and the Move dialog).
  * Folders are shared with the club; anyone can make one.
  */
 export function NewFolderForm({

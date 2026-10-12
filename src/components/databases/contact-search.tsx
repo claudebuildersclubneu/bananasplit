@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { searchContactsAction } from "@/app/app/[orgSlug]/databases/actions";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
 
 export interface ContactOption {
   id: string;
@@ -39,14 +39,20 @@ export function ContactSearch({
 
   return (
     <div className="space-y-1">
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} aria-label="Search people" />
+      <SearchField
+        value={q}
+        onValueChange={setQ}
+        placeholder={placeholder}
+        aria-label="Search people"
+        className="sm:w-full"
+      />
       {q.trim().length >= 2 && results.length > 0 && (
-        <ul className="max-h-48 overflow-y-auto rounded-md border text-sm">
+        <ul className="max-h-48 overflow-y-auto rounded-lg border p-1 text-sm">
           {results.map((c) => (
             <li key={c.id}>
               <button
                 type="button"
-                className="hover:bg-muted flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left"
+                className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left"
                 onClick={() => {
                   onPick(c);
                   setQ("");

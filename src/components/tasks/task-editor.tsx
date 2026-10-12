@@ -1,9 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLink, Trash2, UserMinus, UserPlus } from "lucide-react";
+import { Maximize2, Plus, SquareCheck, Trash2, UserMinus, UserPlus, X } from "lucide-react";
 import Link from "next/link";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 
 import {
   acknowledgeTaskFlag,
@@ -13,18 +13,11 @@ import {
   selfAssignTask,
   updateTask,
 } from "@/app/app/[orgSlug]/tasks/actions";
+import { useModKey } from "@/components/command-palette/use-mod-key";
+import { PinToggle } from "@/components/pins/pins-context";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Segmented } from "@/components/ui/segmented";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toaster";
 import { UserAvatar } from "@/components/user-avatar";
@@ -34,24 +27,40 @@ import { relationFor } from "@/lib/tasks/assignment";
 import { addDaysToKey, dueDateKey } from "@/lib/tasks/dates";
 import { MAX_BLOCKED_REASON } from "@/lib/tasks/status";
 import { canChangeVisibility, namedAudienceIds } from "@/lib/tasks/visibility";
+import { cn } from "@/lib/utils";
 
-import { LabelPicker } from "./label-picker";
-import { CollaboratorsPicker, OwnerPicker } from "./member-picker";
 import { MentionTextarea } from "./mention-textarea";
-import { PrioritySelect } from "./priority-select";
 import { useConfirmFlagged } from "./prompts";
-import { StatusSelect } from "./status-select";
 import { Subtasks } from "./subtasks";
 import { TaskActivity } from "./task-activity";
-import { FlagBadge } from "./task-badges";
+import { FlagBadge, isTaskPrivate, PrivateBadge } from "./task-badges";
 import { TaskComments } from "./task-comments";
+import {
+  DueField,
+  Field,
+  FieldLabel,
+  LabelsField,
+  OwnerField,
+  PeopleField,
+  PRIORITY_OPTIONS,
+  ProjectField,
+  SegmentBox,
+  STATUS_OPTIONS,
+  VISIBILITY_OPTIONS,
+} from "./task-fields";
 import { TaskMarkdown } from "./task-markdown";
+import { TaskSentence } from "./task-sentence";
 import { accessSubjectOf, useTasks, visibilitySubjectOf } from "./tasks-context";
 import type { TaskItem } from "./types";
-import { AudienceList, VisibilityControl } from "./visibility-control";
+import { AudienceList } from "./visibility-control";
 
 /**
- * The task form, in the dialog and on the task's own page. Create and edit:
+ * The task form, in the side panel and on the task's own page, laid out as
+ * the task drawer design has it: the title and description set straight on
+ * the panel, then labelled fields (dropdown wells, and segments for status,
+ * priority and who can see it), with Cancel and Create (⌘↵) along the
+ * bottom. A new task can also be written as one sentence (Sentence mode).
+ * Create and edit:
  * title, description with @mentions, status (a reason when Blocked),
  * priority, due date, project, labels, the accountable owner and "also
  * involved" collaborators, 'Created by', flags with their acknowledgement,
@@ -89,15 +98,18 @@ export function TaskEditor({
   /** After a delete (defaults to onDone). */
   onDeleted?: () => void;
   onOpenTask?: (taskId: string) => void;
+  /** "dialog": the side panel (its own header, scrolling body, footer). "page": a task's page. */
   mode?: "dialog" | "page";
   initialComments?: React.ComponentProps<typeof TaskComments>["initial"];
 }) {
-  const { org, viewer, actor, labels, projects, projectById, memberById, members, announce } =
-    useTasks();
+  const { org, viewer, actor, labels, projectById, memberById, members, announce } = useTasks();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmElement, confirmFlagged] = useConfirmFlagged();
   const [confirmEl, confirm] = useConfirm();
+  const mod = useModKey();
+  const saving = useRef(false);
+  const [view, setView] = useState<"form" | "sentence">("form");
 
   const initialProjectId = task?.projectId ?? defaults?.projectId ?? null;
   const initialProject = initialProjectId ? projectById.get(initialProjectId) : undefined;
@@ -177,6 +189,17 @@ export function TaskEditor({
   const dueRequired = org.requireDueDate && isTopLevel;
 
   async function save() {
+    // One save at a time: ⌘↵ held down, or pressed while the first is in flight.
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      await saveOnce();
+    } finally {
+      saving.current = false;
+    }
+  }
+
+  async function saveOnce() {
     setError(null);
     if (status === TaskStatus.BLOCKED && !blockedReason.trim()) {
       setError("Say what the task is blocked on.");
@@ -211,23 +234,30 @@ export function TaskEditor({
       ...(canSetVisibility ? { visibility } : {}),
       confirmFlagged: confirmed,
     };
-    startTransition(async () => {
-      const send = (extra: { confirmFlagged: boolean }) =>
-        task
-          ? updateTask(org.id, task.id, { ...input, ...extra, expectedVersion: task.version })
-          : createTask(org.id, { ...input, ...extra, parentTaskId });
-      let result = await send({ confirmFlagged: confirmed });
-      if ("confirm" in result && result.confirm) {
-        const ok = await confirmFlagged(result.confirm.flagged.map((f) => f.name ?? "Someone"));
-        if (!ok) return;
-        result = await send({ confirmFlagged: true });
-      }
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      onDone?.();
-    });
+    // Resolves once the save is over, so the guard in save() holds until then.
+    await new Promise<void>((done) =>
+      startTransition(async () => {
+        try {
+          const send = (extra: { confirmFlagged: boolean }) =>
+            task
+              ? updateTask(org.id, task.id, { ...input, ...extra, expectedVersion: task.version })
+              : createTask(org.id, { ...input, ...extra, parentTaskId });
+          let result = await send({ confirmFlagged: confirmed });
+          if ("confirm" in result && result.confirm) {
+            const ok = await confirmFlagged(result.confirm.flagged.map((f) => f.name ?? "Someone"));
+            if (!ok) return;
+            result = await send({ confirmFlagged: true });
+          }
+          if (result.error) {
+            setError(result.error);
+            return;
+          }
+          onDone?.();
+        } finally {
+          done();
+        }
+      }),
+    );
   }
 
   async function remove() {
@@ -299,10 +329,265 @@ export function TaskEditor({
   const involved = self.owner || self.joined;
   const isAssignee = self.joined;
 
-  return (
-    <div className="space-y-5">
-      {confirmElement}
-      {confirmEl}
+  const heading = task
+    ? task.parentTaskId
+      ? "Subtask"
+      : "Task"
+    : parentTaskId
+      ? "New subtask"
+      : "New task";
+  const visibilityHint =
+    visibility === TaskVisibility.PRIVATE
+      ? "Only the people on it, plus the club's owners and admins, can see this task."
+      : "Anyone in the club can find and open this task.";
+
+  const footer = (
+    <div
+      className={cn("flex items-center gap-2", mode === "dialog" ? "border-t px-5 py-3.5" : "pt-1")}
+    >
+      {task && canEdit && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="text-muted-foreground hover:text-destructive -ms-2"
+          onClick={() => void remove()}
+          disabled={isPending}
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+          Delete
+        </Button>
+      )}
+      <span className="flex-1" />
+      {mode === "dialog" && onDone && (
+        <Button type="button" variant="outline" size="lg" className="px-4" onClick={onDone}>
+          {canEdit ? "Cancel" : "Close"}
+        </Button>
+      )}
+      {canEdit && (
+        <Button
+          type="button"
+          size="lg"
+          className="gap-3 ps-[18px] pe-2"
+          onClick={() => void save()}
+          disabled={isPending || !title.trim()}
+        >
+          {isPending
+            ? "Saving…"
+            : isNew
+              ? parentTaskId
+                ? "Create subtask"
+                : "Create task"
+              : "Save"}
+          <span aria-hidden="true" className="inline-flex gap-0.5">
+            <kbd className="bg-primary-foreground/15 inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] px-1 font-mono text-[11px] font-semibold">
+              {mod}
+            </kbd>
+            <kbd className="bg-primary-foreground/15 inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] font-mono text-[11px] font-semibold">
+              ↵
+            </kbd>
+          </span>
+        </Button>
+      )}
+    </div>
+  );
+
+  const form = (
+    <div className="flex flex-col gap-[18px]">
+      {/* Title and description, set straight onto the panel. */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="task-title" className="sr-only">
+          Title
+        </label>
+        <textarea
+          id="task-title"
+          rows={1}
+          value={title}
+          disabled={readOnly}
+          autoFocus={isNew}
+          placeholder="Untitled task"
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) e.preventDefault();
+          }}
+          className="placeholder:text-muted-foreground/70 field-sizing-content w-full resize-none border-0 bg-transparent p-0 text-[26px] leading-[1.25] font-semibold tracking-[-0.015em] outline-none disabled:opacity-100"
+        />
+        <label htmlFor="task-description" className="sr-only">
+          Description
+        </label>
+        {readOnly ? (
+          description ? (
+            <TaskMarkdown className="text-foreground/80 text-sm">{description}</TaskMarkdown>
+          ) : (
+            <p className="text-muted-foreground text-sm">No description.</p>
+          )
+        ) : (
+          <MentionTextarea
+            id="task-description"
+            audience={visibility === TaskVisibility.PRIVATE ? mentionAudience : null}
+            value={description}
+            onChange={setDescription}
+            onSubmitShortcut={() => void save()}
+            rows={2}
+            placeholder="Add a description. Markdown and @mentions work."
+            className="text-foreground/80 placeholder:text-muted-foreground/70 field-sizing-content min-h-0 resize-none rounded-none border-0 bg-transparent p-0 text-sm leading-[1.55] shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent"
+          />
+        )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="task-owner" required={ownerRequired}>
+            Owner
+          </FieldLabel>
+          <OwnerField
+            id="task-owner"
+            value={ownerId}
+            onChange={setOwnerId}
+            disabled={readOnly || (intake && !triage)}
+            allowNone={!ownerRequired}
+          />
+          {intake && !triage && (
+            <p className="text-muted-foreground text-xs">
+              {project?.triageUserId
+                ? (memberById.get(project.triageUserId)?.name ?? "The triage owner")
+                : "An admin"}{" "}
+              sets the owner and priority of requests.
+            </p>
+          )}
+          {ownerId &&
+            relationFor(viewer.chart, ownerId) === "ABOVE" &&
+            ownerId !== task?.ownerId && (
+              <p className="text-warning text-xs">
+                Above your level: this assignment will be flagged.
+              </p>
+            )}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="task-involved" optional>
+            Involved people
+          </FieldLabel>
+          <PeopleField
+            id="task-involved"
+            value={assigneeIds}
+            onChange={setAssigneeIds}
+            exclude={ownerId}
+            disabled={readOnly}
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="task-due-date" required={dueRequired}>
+            Due date
+          </FieldLabel>
+          <DueField id="task-due-date" value={dueDate} onChange={setDueDate} disabled={readOnly} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="task-project" optional>
+            Project
+          </FieldLabel>
+          <ProjectField
+            id="task-project"
+            value={projectId}
+            onChange={setProjectId}
+            disabled={readOnly}
+          />
+        </Field>
+      </div>
+
+      <Field>
+        <FieldLabel htmlFor="task-status">Status</FieldLabel>
+        <SegmentBox
+          id="task-status"
+          label="Status"
+          value={status}
+          onChange={setStatus}
+          options={STATUS_OPTIONS}
+          disabled={readOnly}
+        />
+        {status === TaskStatus.BLOCKED && (
+          <Textarea
+            id="task-blocked-reason"
+            aria-label="Blocked on"
+            value={blockedReason}
+            maxLength={MAX_BLOCKED_REASON}
+            rows={2}
+            disabled={readOnly}
+            placeholder="What is it blocked on?"
+            onChange={(e) => setBlockedReason(e.target.value)}
+            className="bg-card dark:bg-card min-h-0 rounded-[11px] text-[13px]"
+          />
+        )}
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="task-priority">Priority</FieldLabel>
+        <SegmentBox
+          id="task-priority"
+          label="Priority"
+          value={priority}
+          onChange={setPriority}
+          options={PRIORITY_OPTIONS}
+          disabled={readOnly || (intake && !triage)}
+        />
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="task-labels" optional>
+          Labels
+        </FieldLabel>
+        <LabelsField
+          id="task-labels"
+          labels={labels}
+          value={labelIds}
+          onChange={setLabelIds}
+          disabled={readOnly}
+        />
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="task-visibility">Who can see it</FieldLabel>
+        <SegmentBox
+          id="task-visibility"
+          label="Who can see this task"
+          value={visibility}
+          onChange={setVisibility}
+          options={VISIBILITY_OPTIONS}
+          disabled={readOnly || !canSetVisibility}
+        />
+        <p className="text-muted-foreground text-xs">{visibilityLocked ?? visibilityHint}</p>
+        {visibility === TaskVisibility.PRIVATE && (
+          <div className="bg-card rounded-[11px] border p-3">
+            <AudienceList
+              ownerId={ownerId}
+              createdById={task?.createdById ?? viewer.userId}
+              assigneeIds={assigneeIds}
+            />
+            <p className="text-muted-foreground mt-2 text-xs">
+              {audience.length === 1
+                ? "Only you, and the club owners and admins."
+                : `${audience.length} people plus owners and admins.`}{" "}
+              Comments, history and @mentions on it are hidden too. To mention somebody else, add
+              them here first.
+            </p>
+          </div>
+        )}
+      </Field>
+
+      {task && (
+        <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+          Created by
+          <UserAvatar user={task.createdBy} size="xs" />
+          <span className="text-foreground">{task.createdBy.name ?? "a former member"}</span>
+          on {format(new Date(task.createdAt), "MMM d, yyyy")}
+        </p>
+      )}
+    </div>
+  );
+
+  const notices = (
+    <>
       {task?.parentTask && (
         <p className="text-muted-foreground text-sm">
           Subtask of{" "}
@@ -326,7 +611,7 @@ export function TaskEditor({
       )}
 
       {flaggedPeople.length > 0 && (
-        <div className="border-warning/40 bg-warning/10 space-y-2 rounded-md border p-3 text-sm">
+        <div className="border-warning/40 bg-warning/10 space-y-2 rounded-[11px] border p-3 text-sm">
           {flaggedPeople.map((f) => (
             <div key={`${f.role}-${f.userId}`} className="flex flex-wrap items-center gap-2">
               <FlagBadge />
@@ -350,7 +635,7 @@ export function TaskEditor({
       )}
 
       {task && readOnly && (
-        <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md p-3 text-sm">
+        <div className="bg-card flex flex-wrap items-center gap-2 rounded-[11px] border p-3 text-sm">
           <span className="text-muted-foreground min-w-0 flex-1">
             Only the creator, owner, collaborators, their managers and admins edit this task. You
             can still add yourself.
@@ -379,259 +664,12 @@ export function TaskEditor({
           )}
         </div>
       )}
-      {task && !readOnly && isAssignee && (
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={isPending}
-            onClick={() => selfAssign("leave")}
-          >
-            <UserMinus className="size-4" /> Leave this task
-          </Button>
-        </div>
-      )}
+    </>
+  );
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-title">Title</Label>
-        <Input
-          id="task-title"
-          value={title}
-          disabled={readOnly}
-          onChange={(e) => setTitle(e.target.value)}
-          autoFocus={isNew}
-        />
-      </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-description">Description</Label>
-        {readOnly ? (
-          description ? (
-            <TaskMarkdown className="rounded-md border p-3">{description}</TaskMarkdown>
-          ) : (
-            <p className="text-muted-foreground text-sm">No description.</p>
-          )
-        ) : (
-          <Tabs defaultValue="write">
-            <TabsList>
-              <TabsTrigger value="write">Write</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-            </TabsList>
-            <TabsContent value="write">
-              <MentionTextarea
-                id="task-description"
-                audience={visibility === TaskVisibility.PRIVATE ? mentionAudience : null}
-                value={description}
-                onChange={setDescription}
-                rows={5}
-                placeholder="Markdown works. Type @ to mention someone."
-              />
-            </TabsContent>
-            <TabsContent value="preview">
-              {description ? (
-                <TaskMarkdown className="min-h-24 rounded-md border p-3">
-                  {description}
-                </TaskMarkdown>
-              ) : (
-                <p className="text-muted-foreground min-h-24 rounded-md border p-3 text-sm">
-                  Nothing to preview yet.
-                </p>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-owner">
-            Owner{ownerRequired && <span className="text-destructive"> *</span>}
-          </Label>
-          <OwnerPicker
-            id="task-owner"
-            value={ownerId}
-            onChange={setOwnerId}
-            disabled={readOnly || (intake && !triage)}
-          />
-          {intake && !triage && (
-            <p className="text-muted-foreground text-xs">
-              {project?.triageUserId
-                ? (memberById.get(project.triageUserId)?.name ?? "The triage owner")
-                : "An admin"}{" "}
-              sets the owner and priority of requests.
-            </p>
-          )}
-          {ownerId &&
-            relationFor(viewer.chart, ownerId) === "ABOVE" &&
-            ownerId !== task?.ownerId && (
-              <p className="text-warning text-xs">
-                Above your level: this assignment will be flagged.
-              </p>
-            )}
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-involved">Also involved</Label>
-          <CollaboratorsPicker
-            id="task-involved"
-            value={assigneeIds}
-            onChange={setAssigneeIds}
-            exclude={ownerId}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-status">Status</Label>
-          <StatusSelect id="task-status" value={status} onChange={setStatus} disabled={readOnly} />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-priority">Priority</Label>
-          <PrioritySelect
-            id="task-priority"
-            value={priority}
-            onChange={setPriority}
-            disabled={readOnly || (intake && !triage)}
-          />
-        </div>
-      </div>
-
-      {status === TaskStatus.BLOCKED && (
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-blocked-reason">Blocked on</Label>
-          <Textarea
-            id="task-blocked-reason"
-            value={blockedReason}
-            maxLength={MAX_BLOCKED_REASON}
-            rows={2}
-            disabled={readOnly}
-            placeholder="What is it waiting on?"
-            onChange={(e) => setBlockedReason(e.target.value)}
-          />
-        </div>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-due-date">
-            Due date{dueRequired && <span className="text-destructive"> *</span>}
-          </Label>
-          <Input
-            id="task-due-date"
-            type="date"
-            value={dueDate}
-            disabled={readOnly}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="task-project">Project</Label>
-          <Select
-            value={projectId ?? "none"}
-            onValueChange={(v) => setProjectId(v === "none" ? null : v)}
-            disabled={readOnly}
-          >
-            <SelectTrigger id="task-project" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No project</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                  {p.isIntake ? " (requests)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-labels">Labels</Label>
-        <LabelPicker
-          id="task-labels"
-          labels={labels}
-          selectedIds={labelIds}
-          onChange={setLabelIds}
-          disabled={readOnly}
-        />
-      </div>
-
-      <div className="grid gap-1.5">
-        <Label htmlFor="task-visibility">Who can see it</Label>
-        <VisibilityControl
-          id="task-visibility"
-          value={visibility}
-          onChange={setVisibility}
-          disabled={readOnly || !canSetVisibility}
-          lockedReason={visibilityLocked}
-        />
-        {visibility === TaskVisibility.PRIVATE && (
-          <div className="bg-muted/50 mt-1 rounded-lg p-3">
-            <AudienceList
-              ownerId={ownerId}
-              createdById={task?.createdById ?? viewer.userId}
-              assigneeIds={assigneeIds}
-            />
-            <p className="text-muted-foreground mt-2 text-xs">
-              {audience.length === 1
-                ? "Only you, and the club owners and admins."
-                : `${audience.length} people plus owners and admins.`}{" "}
-              Comments, history and @mentions on it are hidden too — to mention somebody else, add
-              them here first.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {task && (
-        <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-          Created by
-          <UserAvatar user={task.createdBy} size="xs" />
-          <span className="text-foreground">{task.createdBy.name ?? "a former member"}</span>
-          on {format(new Date(task.createdAt), "MMM d, yyyy")}
-          {mode === "dialog" && (
-            <Link
-              href={`/app/${org.slug}/tasks/${task.id}`}
-              className="ml-auto inline-flex items-center gap-1 hover:underline"
-            >
-              Open page <ExternalLink className="size-3" aria-hidden="true" />
-            </Link>
-          )}
-        </p>
-      )}
-
-      {error && (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="flex items-center justify-between gap-2">
-        {task && canEdit ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => void remove()}
-            disabled={isPending}
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-            Delete
-          </Button>
-        ) : (
-          <span />
-        )}
-        {canEdit && (
-          <Button type="button" onClick={() => void save()} disabled={isPending || !title.trim()}>
-            {isPending ? "Saving…" : "Save"}
-          </Button>
-        )}
-      </div>
-
-      {task && isTopLevel && (
+  const extras = task && (
+    <div className="space-y-6">
+      {isTopLevel && (
         <Subtasks
           parentId={task.id}
           subtasks={task.subtasks}
@@ -639,24 +677,146 @@ export function TaskEditor({
           onOpen={onOpenTask}
         />
       )}
+      <section className="space-y-2 border-t pt-5">
+        <h3 className="heading text-sm">Comments</h3>
+        <TaskComments
+          taskId={task.id}
+          initial={initialComments}
+          audience={visibility === TaskVisibility.PRIVATE ? mentionAudience : null}
+        />
+      </section>
+      <section className="space-y-2 border-t pt-5">
+        <h3 className="heading text-sm">History</h3>
+        <TaskActivity taskId={task.id} />
+      </section>
+    </div>
+  );
 
-      {task && (
-        <div className="space-y-2 border-t pt-4">
-          <h3 className="text-sm font-medium">Comments</h3>
-          <TaskComments
-            taskId={task.id}
-            initial={initialComments}
-            audience={visibility === TaskVisibility.PRIVATE ? mentionAudience : null}
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 flex-col",
+        mode === "dialog" ? "h-full" : "bg-background rounded-xl border",
+      )}
+      onKeyDown={(e) => {
+        // A field that already handled ⌘↵ (the description, Sentence's title) marks it.
+        if (e.defaultPrevented) return;
+        if (
+          (e.metaKey || e.ctrlKey) &&
+          e.key === "Enter" &&
+          canEdit &&
+          title.trim() &&
+          !isPending
+        ) {
+          e.preventDefault();
+          void save();
+        }
+      }}
+    >
+      {confirmElement}
+      {confirmEl}
+
+      <header className="flex shrink-0 items-center justify-between gap-2 py-3.5 ps-6 pe-3.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="bg-primary/15 text-primary grid size-[22px] shrink-0 place-items-center rounded-md"
+          >
+            {isNew ? (
+              <Plus className="size-3.5" strokeWidth={2.2} />
+            ) : (
+              <SquareCheck className="size-3.5" />
+            )}
+          </span>
+          <span className="truncate text-sm font-semibold">{heading}</span>
+          {task && isTaskPrivate(task) && <PrivateBadge />}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {isNew && (
+            <Segmented
+              label="Editor style"
+              value={view}
+              onSelect={(v) => setView(v as "form" | "sentence")}
+              options={[
+                { value: "form", label: "Form" },
+                { value: "sentence", label: "Sentence" },
+              ]}
+            />
+          )}
+          {task && <PinToggle path={`/tasks/${task.id}`} label={task.title} />}
+          {task && mode === "dialog" && (
+            <Button asChild variant="ghost" size="icon-sm">
+              <Link
+                href={`/app/${org.slug}/tasks/${task.id}`}
+                aria-label="Open as a page"
+                title="Open as a page"
+              >
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </Link>
+            </Button>
+          )}
+          {task && !readOnly && isAssignee && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={isPending}
+              onClick={() => selfAssign("leave")}
+              aria-label="Leave this task"
+              title="Leave this task"
+            >
+              <UserMinus className="size-4" aria-hidden="true" />
+            </Button>
+          )}
+          {mode === "dialog" && onDone && (
+            <Button variant="ghost" size="icon-sm" onClick={onDone} aria-label="Close">
+              <X className="size-4" aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+      </header>
+
+      <div
+        className={cn(
+          "min-h-0 flex-1 space-y-[18px] px-6 pb-6",
+          mode === "dialog" && "overflow-y-auto",
+        )}
+      >
+        {notices}
+        {isNew && view === "sentence" ? (
+          <TaskSentence
+            title={title}
+            onTitle={setTitle}
+            ownerId={ownerId}
+            onOwner={setOwnerId}
+            ownerLocked={intake && !triage}
+            dueDate={dueDate}
+            onDue={setDueDate}
+            projectId={projectId}
+            onProject={setProjectId}
+            priority={priority}
+            onPriority={setPriority}
+            priorityLocked={intake && !triage}
+            status={status}
+            onStatus={setStatus}
+            visibility={visibility}
+            onVisibility={setVisibility}
+            visibilityLocked={!canSetVisibility}
+            onMore={() => setView("form")}
+            onSubmit={() => void save()}
           />
-        </div>
-      )}
+        ) : (
+          form
+        )}
+        {error && (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        )}
+        {mode === "page" && footer}
+        {extras}
+      </div>
 
-      {task && (
-        <div className="space-y-2 border-t pt-4">
-          <h3 className="text-sm font-medium">History</h3>
-          <TaskActivity taskId={task.id} />
-        </div>
-      )}
+      {mode === "dialog" && footer}
     </div>
   );
 }

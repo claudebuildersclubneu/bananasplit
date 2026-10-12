@@ -38,7 +38,7 @@ import type { SetupStepView } from "./view";
  */
 
 const selectClass =
-  "border-input bg-background focus-visible:ring-ring h-9 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none";
+  "border-input bg-background focus-visible:ring-ring h-8 w-full rounded-lg border px-2.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";

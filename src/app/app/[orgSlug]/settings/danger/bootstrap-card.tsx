@@ -56,7 +56,7 @@ export function BootstrapCard({
               {p.name} <span className="text-muted-foreground">· {p.title}</span>
             </span>
             <select
-              className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+              className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
               value={mapping[p.key] ?? ""}
               onChange={(e) => setMapping((m) => ({ ...m, [p.key]: e.target.value }))}
             >

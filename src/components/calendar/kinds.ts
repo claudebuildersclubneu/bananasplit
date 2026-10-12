@@ -1,4 +1,9 @@
-import type { CalendarSyncState, EventKind, EventVisibility, RSVPStatus } from "@/generated/prisma/enums";
+import type {
+  CalendarSyncState,
+  EventKind,
+  EventVisibility,
+  RSVPStatus,
+} from "@/generated/prisma/enums";
 
 /**
  * Labels and colour variables for the calendar's event kinds, visibility,
@@ -31,7 +36,14 @@ export const KIND_META: Record<EventKind, KindMeta> = {
   OTHER: { label: "Other", token: "--muted-foreground" },
 };
 
-export const KIND_ORDER: EventKind[] = ["WORKSHOP", "INFO_SESSION", "HACKATHON", "SOCIAL", "BOARD_MEETING", "OTHER"];
+export const KIND_ORDER: EventKind[] = [
+  "WORKSHOP",
+  "INFO_SESSION",
+  "HACKATHON",
+  "SOCIAL",
+  "BOARD_MEETING",
+  "OTHER",
+];
 
 /**
  * The style object that puts a kind's colour on an element as `--kind`.
@@ -40,6 +52,11 @@ export const KIND_ORDER: EventKind[] = ["WORKSHOP", "INFO_SESSION", "HACKATHON",
  */
 export function kindStyle(kind: EventKind): React.CSSProperties {
   return { ["--kind" as string]: `var(${KIND_META[kind].token})` };
+}
+
+/** A chip's colour: its kind's, or the primary for a task's due date. */
+export function itemStyle(item: { kind: EventKind; task?: unknown }): React.CSSProperties {
+  return item.task ? { ["--kind" as string]: "var(--primary)" } : kindStyle(item.kind);
 }
 
 export const VISIBILITY_META: Record<EventVisibility, { label: string; hint: string }> = {

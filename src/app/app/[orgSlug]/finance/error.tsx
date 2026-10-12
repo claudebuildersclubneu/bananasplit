@@ -14,15 +14,24 @@ import { Button } from "@/components/ui/button";
  * server logs. Try again re-renders the page; My reimbursements works for
  * every member.
  */
-export default function FinanceError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+export default function FinanceError({
+  error,
+  retry,
+}: {
+  error: Error & { digest?: string };
+  retry: () => void;
+}) {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   return (
     <EmptyState
       title="This finance page couldn't load"
       description={
         <>
-          Try again in a moment. If it keeps happening, send your e-board this code so they can look it up:{" "}
-          <code className="bg-muted rounded px-1 py-0.5 text-xs">{error.digest ?? "no code"}</code>
+          Try again in a moment. If it keeps happening, send your e-board this code so they can look
+          it up:{" "}
+          <code className="bg-muted rounded-md px-1 py-0.5 text-xs">
+            {error.digest ?? "no code"}
+          </code>
         </>
       }
       action={

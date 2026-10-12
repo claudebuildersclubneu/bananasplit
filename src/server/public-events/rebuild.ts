@@ -100,7 +100,7 @@ export const siteRebuildJob: JobHandler<Record<string, never>> = async (run) => 
   if (res.status === 404 || res.status === 410) {
     await recordHookState(organizationId, {
       status: IntegrationStatus.ERROR,
-      lastError: sanitize(`${message}: the hook no longer exists. Save a new one in Settings > Integrations.`, 300),
+      lastError: sanitize(`${message}: the hook no longer exists. Save a new one in Admin panel › Integrations.`, 300),
       verified: false,
     });
     throw new PermanentJobError(message);

@@ -1,13 +1,15 @@
 "use client";
 
-import { ArchiveRestore, PanelRightOpen, Plus, Trash2 } from "lucide-react";
+import { ArchiveRestore, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { TransactionWithRelations } from "@/app/app/[orgSlug]/finance/queries";
-import { deleteTransaction, restoreTransaction } from "@/app/app/[orgSlug]/finance/transactions-actions";
+import {
+  deleteTransaction,
+  restoreTransaction,
+} from "@/app/app/[orgSlug]/finance/transactions-actions";
 import { ItemMenu } from "@/components/item-menu";
-import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import {
@@ -34,6 +36,7 @@ export function TransactionTable({
   categories,
   isFinance,
   currentUserId,
+  emptyDescription = "Nothing matches these filters yet. Use “Add transaction” to record money in or out: an expense, a sponsorship, dues or other income.",
 }: {
   orgId: string;
   transactions: TransactionWithRelations[];
@@ -41,6 +44,8 @@ export function TransactionTable({
   categories: { id: string; name: string; budgetPeriodId: string }[];
   isFinance: boolean;
   currentUserId: string;
+  /** What the empty list says, naming the header button that fills it. */
+  emptyDescription?: string;
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -52,7 +57,9 @@ export function TransactionTable({
     !t.voidedAt &&
     !t.reconciledAt &&
     (isFinance ||
-      (t.submittedById === currentUserId && t.kind === "EXPENSE" && (t.status === "DRAFT" || t.status === "SUBMITTED")));
+      (t.submittedById === currentUserId &&
+        t.kind === "EXPENSE" &&
+        (t.status === "DRAFT" || t.status === "SUBMITTED")));
 
   async function remove(t: TransactionWithRelations) {
     const ok = await confirm({
@@ -89,12 +96,7 @@ export function TransactionTable({
   }
 
   if (transactions.length === 0) {
-    return (
-      <EmptyState
-        title="No transactions here"
-        description="Nothing matches these filters yet. Use “Add transaction” to record money in or out: an expense, a sponsorship, dues or other income."
-      />
-    );
+    return <EmptyState title="No transactions here" description={emptyDescription} />;
   }
 
   return (
@@ -142,22 +144,16 @@ export function TransactionTable({
                 {formatCents(t.amountCents)}
               </TableCell>
               <TableCell className="w-10 py-1 text-right">
+                {/* Opening it is the row click; the menu holds the rest. */}
                 <ItemMenu
                   label={`Actions for ${t.description}`}
                   items={[
-                    {
-                      label: "Open",
-                      icon: PanelRightOpen,
-                      onSelect: () => {
-                        setOpenId(t.id);
-                        setDialogOpen(true);
+                    t.voidedAt &&
+                      isFinance && {
+                        label: "Restore",
+                        icon: ArchiveRestore,
+                        onSelect: () => void restore(t),
                       },
-                    },
-                    t.voidedAt && isFinance && {
-                      label: "Restore",
-                      icon: ArchiveRestore,
-                      onSelect: () => void restore(t),
-                    },
                     canDelete(t) && {
                       label: "Delete",
                       icon: Trash2,
@@ -183,40 +179,6 @@ export function TransactionTable({
         currentUserId={currentUserId}
       />
       {confirmEl}
-    </>
-  );
-}
-
-export function NewTransactionButton({
-  orgId,
-  periods,
-  categories,
-  isFinance,
-  currentUserId,
-}: {
-  orgId: string;
-  periods: { id: string; label: string }[];
-  categories: { id: string; name: string; budgetPeriodId: string }[];
-  isFinance: boolean;
-  currentUserId: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <Button type="button" onClick={() => setOpen(true)}>
-        <Plus className="size-4" aria-hidden="true" />
-        Add transaction
-      </Button>
-      <TransactionDialog
-        orgId={orgId}
-        open={open}
-        onOpenChange={setOpen}
-        transaction={null}
-        periods={periods}
-        categories={categories}
-        isFinance={isFinance}
-        currentUserId={currentUserId}
-      />
     </>
   );
 }

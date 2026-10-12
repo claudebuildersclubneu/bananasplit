@@ -1,11 +1,13 @@
 "use client";
 
-import { ArrowLeft, Loader2, X } from "lucide-react";
+import { BackLink } from "@/components/back-link";
+import { Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from "react";
 
 import { createPoll } from "@/app/app/[orgSlug]/calendar/polls/actions";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -158,20 +160,12 @@ export function PollForm({
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-8" noValidate>
       <div className="space-y-3">
-        <Link
-          href={`/app/${orgSlug}/calendar/polls`}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeft aria-hidden className="size-4" />
-          Polls
-        </Link>
-        <div>
-          <h1 className="page-title">New availability poll</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Offer some days and hours; people mark when they&apos;re free, and an admin schedules
-            the best time.
-          </p>
-        </div>
+        <BackLink href={`/app/${orgSlug}/calendar/polls`} label="Polls" />
+        {/* Named as the New poll menu and the command palette name it. */}
+        <PageHeader
+          title="Find a time"
+          description="Offer some days and hours; people mark when they're free, and an admin schedules the best time."
+        />
       </div>
 
       <Section title="What it's for">

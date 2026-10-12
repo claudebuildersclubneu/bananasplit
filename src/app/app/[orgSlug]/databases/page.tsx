@@ -14,6 +14,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 import { SyncPanel } from "@/components/databases/sync-panel";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
@@ -22,12 +23,14 @@ import { listDatabases } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadSetupState } from "@/server/setup/progress";
 import { loadSyncStatus } from "@/server/sync/status";
+import { reportTier } from "@/server/reports/tier";
 import { cn } from "@/lib/utils";
 import { PinToggle } from "@/components/pins/pins-context";
 import { listPins } from "@/server/pins";
 
 import { StepPanel } from "../setup/step-panel";
 import type { SetupStepView } from "../setup/view";
+import { DatabasesTabs } from "./databases-tabs";
 
 const ICONS: Record<string, LucideIcon> = {
   CalendarDays,
@@ -62,51 +65,55 @@ export default async function DatabasesPage({
   const { organization, role, user } = await getOrgContextBySlug(orgSlug);
   const isAdmin = can({ role }, "databases.write");
   const canConnect = can({ role }, "integrations.write");
+  const showReports = Boolean(reportTier(role)) && can({ role }, "reports.view");
 
-  const { databases, counts, sync, dataStep, pinned } = await withOrgTx(organization.id, async ({ db }) => {
-    const list = await listDatabases(db, organization.id, role);
-    const counts: Record<string, number> = {};
-    for (const d of list) {
-      if (d.kind === "SESSIONS") {
-        counts[d.key] = await db.event.count({
-          where: { organizationId: organization.id, deletedAt: null, mergedIntoId: null },
-        });
-      } else if (d.kind === "ATTENDANCE") {
-        counts[d.key] = await db.attendance.count({
-          where: { organizationId: organization.id, suppressedAt: null },
-        });
-      } else if (d.kind === "SIGNUPS") {
-        counts[d.key] = await db.signup.count({
-          where: { organizationId: organization.id, suppressedAt: null },
-        });
-      } else if (d.kind === "PEOPLE") {
-        counts[d.key] = await db.contact.count({
-          where: { organizationId: organization.id, sessionsAttended: { gt: 0 } },
-        });
-      } else if (d.kind === "BALLOTS") {
-        counts[d.key] = await db.ballotDefinition.count({
-          where: { organizationId: organization.id, isTest: false },
-        });
-      }
-    }
-    const sync = isAdmin ? await loadSyncStatus(db, organization.id) : null;
-    const setup = canConnect ? await loadSetupState(db, organization.id) : null;
-    const data = setup?.steps.find((s) => s.step.id === "data") ?? null;
-    const dataStep: SetupStepView | null = data
-      ? {
-          id: data.step.id,
-          status: data.status,
-          hasSecret: data.hasSecret,
-          last4: data.last4,
-          lastVerifiedAt: data.lastVerifiedAt?.toISOString() ?? null,
-          lastError: data.lastError,
-          config: data.config,
-          connectedByName: data.connectedByName,
+  const { databases, counts, sync, dataStep, pinned } = await withOrgTx(
+    organization.id,
+    async ({ db }) => {
+      const list = await listDatabases(db, organization.id, role);
+      const counts: Record<string, number> = {};
+      for (const d of list) {
+        if (d.kind === "SESSIONS") {
+          counts[d.key] = await db.event.count({
+            where: { organizationId: organization.id, deletedAt: null, mergedIntoId: null },
+          });
+        } else if (d.kind === "ATTENDANCE") {
+          counts[d.key] = await db.attendance.count({
+            where: { organizationId: organization.id, suppressedAt: null },
+          });
+        } else if (d.kind === "SIGNUPS") {
+          counts[d.key] = await db.signup.count({
+            where: { organizationId: organization.id, suppressedAt: null },
+          });
+        } else if (d.kind === "PEOPLE") {
+          counts[d.key] = await db.contact.count({
+            where: { organizationId: organization.id, sessionsAttended: { gt: 0 } },
+          });
+        } else if (d.kind === "BALLOTS") {
+          counts[d.key] = await db.ballotDefinition.count({
+            where: { organizationId: organization.id, isTest: false },
+          });
         }
-      : null;
-    const pins = await listPins(db, organization.id, organization.slug, user.id);
-    return { databases: list, counts, sync, dataStep, pinned: new Set(pins.map((p) => p.href)) };
-  });
+      }
+      const sync = isAdmin ? await loadSyncStatus(db, organization.id) : null;
+      const setup = canConnect ? await loadSetupState(db, organization.id) : null;
+      const data = setup?.steps.find((s) => s.step.id === "data") ?? null;
+      const dataStep: SetupStepView | null = data
+        ? {
+            id: data.step.id,
+            status: data.status,
+            hasSecret: data.hasSecret,
+            last4: data.last4,
+            lastVerifiedAt: data.lastVerifiedAt?.toISOString() ?? null,
+            lastError: data.lastError,
+            config: data.config,
+            connectedByName: data.connectedByName,
+          }
+        : null;
+      const pins = await listPins(db, organization.id, organization.slug, user.id);
+      return { databases: list, counts, sync, dataStep, pinned: new Set(pins.map((p) => p.href)) };
+    },
+  );
 
   const withData = databases.filter((d) => (counts[d.key] ?? 0) > 0);
   const empty = databases.filter((d) => (counts[d.key] ?? 0) === 0);
@@ -162,17 +169,18 @@ export default async function DatabasesPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Databases</h1>
-        <p className="text-muted-foreground text-sm">
-          {organization.name}&apos;s data: your events, check-ins, sign-ups and poll results.
-        </p>
-      </div>
+      <PageHeader
+        title="Databases"
+        description={
+          <>{organization.name}&apos;s data: your events, check-ins, sign-ups and poll results.</>
+        }
+        tabs={<DatabasesTabs orgSlug={orgSlug} showReports={showReports} />}
+      />
 
       {databases.length === 0 ? (
         <EmptyState
           title="No databases are visible to you"
-          description="Your club's owners decide who sees which data, in Settings › Privacy."
+          description="Your club's owners decide who sees which data, in Admin panel › Privacy."
         />
       ) : needsSetup && !isAdmin ? (
         <EmptyState
@@ -192,7 +200,12 @@ export default async function DatabasesPage({
           </div>
 
           <ul className="divide-y rounded-xl border">
-            <li className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 p-4", connecting && "bg-muted/40")}>
+            <li
+              className={cn(
+                "flex flex-wrap items-center gap-x-6 gap-y-3 p-4",
+                connecting && "bg-muted/40",
+              )}
+            >
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="font-medium">Connect a website database</p>
                 <p className="text-muted-foreground text-sm">
@@ -221,7 +234,7 @@ export default async function DatabasesPage({
                 {importable.map((d) => (
                   <Button key={d.id} asChild size="sm" variant="outline">
                     <Link href={`/app/${orgSlug}/databases/${d.key}/import`}>
-                      <Upload className="size-3.5" aria-hidden="true" />
+                      <Upload aria-hidden="true" />
                       {d.name}
                     </Link>
                   </Button>
@@ -232,8 +245,8 @@ export default async function DatabasesPage({
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="font-medium">Start from the calendar</p>
                 <p className="text-muted-foreground text-sm">
-                  No website? Every event you add to the calendar becomes a session here, ready
-                  for check-ins.
+                  No website? Every event you add to the calendar becomes a session here, ready for
+                  check-ins.
                 </p>
               </div>
               <Button asChild size="sm" variant="outline">
@@ -262,28 +275,36 @@ export default async function DatabasesPage({
           )}
 
           <p className="text-muted-foreground text-sm">
-            <Link
-              href={`/app/${orgSlug}/databases?all=1`}
-              className="underline underline-offset-2"
-            >
+            <Link href={`/app/${orgSlug}/databases?all=1`} className="underline underline-offset-2">
               Show the empty databases anyway
             </Link>
           </p>
         </section>
       ) : (
         <>
-          {withData.length > 0 && <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{withData.map((d) => card(d))}</ul>}
+          {withData.length > 0 && (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {withData.map((d) => card(d))}
+            </ul>
+          )}
           {empty.length > 0 &&
             (withData.length === 0 || showAll ? (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{empty.map((d) => card(d, true))}</ul>
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {empty.map((d) => card(d, true))}
+              </ul>
             ) : (
               <details className="group rounded-xl border border-dashed">
                 <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
-                  <ChevronRight className="size-4 transition-transform group-open:rotate-90" aria-hidden="true" />
+                  <ChevronRight
+                    className="size-4 transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
                   {empty.length} empty database{empty.length === 1 ? "" : "s"}:{" "}
                   {empty.map((d) => d.name).join(", ")}
                 </summary>
-                <ul className="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">{empty.map((d) => card(d, true))}</ul>
+                <ul className="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
+                  {empty.map((d) => card(d, true))}
+                </ul>
               </details>
             ))}
         </>
@@ -307,14 +328,15 @@ export default async function DatabasesPage({
           }))}
         />
       )}
-      {isAdmin && !sync && !needsSetup && canConnect && (
-        <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+      {/* Admins only (databases.write and integrations.write); hidden while the connect panel below is open. */}
+      {isAdmin && !sync && !needsSetup && canConnect && !(showAll && connecting && dataStep) && (
+        <p className="text-muted-foreground text-sm">
           Keep check-ins, sign-ups and votes in a website database?{" "}
           <Link
-            className="underline underline-offset-2"
+            className="hover:text-foreground underline underline-offset-2"
             href={`/app/${orgSlug}/databases?connect=1&all=1#connect`}
           >
-            Connect it here
+            Connect it
           </Link>{" "}
           and it syncs by itself.
         </p>

@@ -53,7 +53,13 @@ const RUNWAY: Widget[] = [{ id: "runway", type: "runway", w: 4, h: null }];
 
 const render = (data: DashboardData, layout: Widget[] = RUNWAY) =>
   renderToStaticMarkup(
-    <FinanceBoard orgId="org_1" orgSlug="cbc" data={data} initialLayout={layout} customized={false} />,
+    <FinanceBoard
+      orgId="org_1"
+      orgSlug="cbc"
+      data={data}
+      initialLayout={layout}
+      customized={false}
+    />,
   );
 
 describe("finance board: the runway widget", () => {
@@ -103,7 +109,9 @@ describe("finance board: the runway widget", () => {
   });
 
   it("offers a way back when the board is empty", () => {
-    expect(render(dashboard({}), [])).toContain("Your board is empty. Add a widget.");
+    const html = render(dashboard({}), []);
+    expect(html).toContain("Your board is empty.");
+    expect(html).toContain("Add a widget");
   });
 });
 

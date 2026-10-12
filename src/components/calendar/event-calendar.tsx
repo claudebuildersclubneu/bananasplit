@@ -1,13 +1,35 @@
 "use client";
 
-import { CalendarClock, CalendarX2, ChevronLeft, ChevronRight, Globe } from "lucide-react";
+import {
+  CalendarClock,
+  CalendarX2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  ImageUp,
+  Plus,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 
 import { moveEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Segmented } from "@/components/ui/segmented";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { EventKind, EventVisibility } from "@/generated/prisma/enums";
 import { addDaysToKey } from "@/lib/calendar/dates";
 import {
@@ -58,11 +80,19 @@ export interface CalendarWindow {
   view: CalendarView;
   kinds: EventKind[];
   visibility: EventVisibility | null;
+  /** Tasks' due dates drawn beside the events. */
+  tasks: boolean;
 }
 
 /** Loaded on demand: nobody who is only reading the calendar pays for the form. */
 const EventFormDialog = dynamic(
   () => import("./event-form-dialog").then((m) => m.EventFormDialog),
+  { ssr: false },
+);
+
+/** "From a screenshot" (under New event): also loaded only when used. */
+const CalendarShotImport = dynamic(
+  () => import("@/components/ai/calendar-shot-import").then((m) => m.CalendarShotImport),
   { ssr: false },
 );
 
@@ -101,10 +131,13 @@ export function EventCalendar({
 
   const [peek, setPeek] = useState<PeekAnchor | null>(null);
   const [dialog, setDialog] = useState<
-    { mode: "create"; start: Date | null; allDay: boolean } | { mode: "edit"; event: EventFormEvent } | null
+    | { mode: "create"; start: Date | null; allDay: boolean }
+    | { mode: "edit"; event: EventFormEvent }
+    | null
   >(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
+  const [shotOpen, setShotOpen] = useState(false);
 
   // Today is read in the org timezone on the server so the first paint
   // matches, then swapped for the viewer's own day on hydration.
@@ -112,7 +145,10 @@ export function EventCalendar({
 
   const dayCount = windowDays(range.fromKey, range.toKey);
   const monthKey = useMemo(
-    () => (range.view === "timeGridWeek" || range.view === "timeGridDay" ? range.fromKey.slice(0, 7) : midMonth(range.fromKey, dayCount)),
+    () =>
+      range.view === "timeGridWeek" || range.view === "timeGridDay"
+        ? range.fromKey.slice(0, 7)
+        : midMonth(range.fromKey, dayCount),
     [range.view, range.fromKey, dayCount],
   );
 
@@ -147,22 +183,35 @@ export function EventCalendar({
 
   function setView(view: CalendarView) {
     if (view === range.view) return;
-    const anchor = range.view === "dayGridMonth" || range.view === "listMonth" ? anchorDay(monthKey, todayKey) : range.fromKey;
+    const anchor =
+      range.view === "dayGridMonth" || range.view === "listMonth"
+        ? anchorDay(monthKey, todayKey)
+        : range.fromKey;
     if (view === "timeGridWeek") navigate({ ...range, view, ...weekWindowFor(anchor) });
     else if (view === "timeGridDay") navigate({ ...range, view, ...dayWindowFor(anchor) });
     else navigate({ ...range, view, ...monthWindowFor(anchor.slice(0, 7)) });
   }
 
   function toggleKind(kind: EventKind) {
-    const kinds = range.kinds.includes(kind) ? range.kinds.filter((k) => k !== kind) : [...range.kinds, kind];
+    const kinds = range.kinds.includes(kind)
+      ? range.kinds.filter((k) => k !== kind)
+      : [...range.kinds, kind];
     navigate({ ...range, kinds: KIND_ORDER.filter((k) => kinds.includes(k)) });
   }
 
-  const openPeek = useCallback((item: CalendarItem, chip: HTMLElement) => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    setPeek((current) => (current?.id === item.id ? null : anchorFor(chip, wrap, item.id)));
-  }, []);
+  const openPeek = useCallback(
+    (item: CalendarItem, chip: HTMLElement) => {
+      // A task's due date opens the task itself.
+      if (item.task) {
+        router.push(`/app/${orgSlug}/tasks/${item.id}`);
+        return;
+      }
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      setPeek((current) => (current?.id === item.id ? null : anchorFor(chip, wrap, item.id)));
+    },
+    [orgSlug, router],
+  );
 
   function openCreate(start: Date | null, allDay = false) {
     setPeek(null);
@@ -192,15 +241,18 @@ export function EventCalendar({
    * rearranging a term's calendar on a phone.
    */
   const dragProps = canManage
-    ? (item: CalendarItem) => ({
-        draggable: true,
-        onDragStart: (event: React.DragEvent) => {
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", item.id);
-          setDrag({ id: item.id, over: null });
-        },
-        onDragEnd: () => setDrag(null),
-      })
+    ? (item: CalendarItem) =>
+        item.task
+          ? {}
+          : {
+              draggable: true,
+              onDragStart: (event: React.DragEvent) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", item.id);
+                setDrag({ id: item.id, over: null });
+              },
+              onDragEnd: () => setDrag(null),
+            }
     : undefined;
 
   const dayDropProps = canManage
@@ -221,7 +273,7 @@ export function EventCalendar({
     : undefined;
 
   function moveToDay(id: string, dayKey: string) {
-    const item = items.find((i) => i.id === id);
+    const item = items.find((i) => i.id === id && !i.task);
     if (!item) return;
     const firstDay = item.allDay ? item.start : localDayKey(new Date(item.start));
     if (firstDay === dayKey) return;
@@ -248,9 +300,19 @@ export function EventCalendar({
     });
   }
 
-  const openItem = peek ? (items.find((i) => i.id === peek.id) ?? null) : null;
+  const openItem = peek ? (items.find((i) => i.id === peek.id && !i.task) ?? null) : null;
   const count = items.length;
-  const countLabel = count === 0 ? "Nothing scheduled" : count === 1 ? "1 event" : `${count} events`;
+  const eventCount = items.filter((i) => !i.task).length;
+  const taskCount = count - eventCount;
+  const countLabel =
+    count === 0
+      ? "Nothing scheduled"
+      : [
+          eventCount > 0 && (eventCount === 1 ? "1 event" : `${eventCount} events`),
+          taskCount > 0 && (taskCount === 1 ? "1 task due" : `${taskCount} tasks due`),
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
   const emptyState = (
     <div className="cal-empty">
@@ -264,7 +326,11 @@ export function EventCalendar({
       </p>
       <div className="mt-1 flex gap-2">
         {(range.kinds.length > 0 || range.visibility) && (
-          <Button size="sm" variant="outline" onClick={() => navigate({ ...range, kinds: [], visibility: null })}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate({ ...range, kinds: [], visibility: null })}
+          >
             Clear filters
           </Button>
         )}
@@ -296,50 +362,93 @@ export function EventCalendar({
         */}
         <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => step(-1)} aria-label={prevLabel(range.view)}>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => step(-1)}
+              aria-label={prevLabel(range.view)}
+            >
               <ChevronLeft aria-hidden className="size-4" />
             </Button>
-            <Button variant="outline" size="icon" onClick={() => step(1)} aria-label={nextLabel(range.view)}>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => step(1)}
+              aria-label={nextLabel(range.view)}
+            >
               <ChevronRight aria-hidden className="size-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={goToday} disabled={isTodayInWindow(range, todayKey, dayCount)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToday}
+              disabled={isTodayInWindow(range, todayKey, dayCount)}
+            >
               Today
             </Button>
           </div>
 
           {canManage && (
-            <Button size="sm" className="ml-auto md:order-3 md:ml-0" onClick={() => openCreate(null)}>
-              New event
-            </Button>
+            // New event, with "From a screenshot" folded into its menu.
+            <div className="ml-auto flex md:order-3 md:ml-0">
+              <Button size="sm" className="rounded-r-none" onClick={() => openCreate(null)}>
+                <Plus className="size-4" aria-hidden="true" />
+                New event
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
+                    aria-label="More ways to add events"
+                  >
+                    <ChevronDown className="size-3.5" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuItem onSelect={() => openCreate(null)}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    New event
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setShotOpen(true)}>
+                    <ImageUp className="size-4" aria-hidden="true" />
+                    <span className="flex flex-col">
+                      From a screenshot
+                      <span className="text-muted-foreground text-xs">
+                        An invite, an email or a flyer
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
 
-          <div
-            className="bg-muted order-last flex w-full rounded-md p-0.5 md:order-2 md:w-auto"
-            role="group"
-            aria-label="Calendar view"
-          >
-            {VIEW_LABELS.map(({ view, label }) => (
-              <button
-                key={view}
-                type="button"
-                aria-pressed={range.view === view}
-                onClick={() => setView(view)}
-                className={cn(
-                  "flex-1 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors md:flex-none",
-                  range.view === view
-                    ? "bg-background text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Calendar view"
+            className="order-last w-full md:order-2 md:w-auto [&>*]:flex-1 md:[&>*]:flex-none"
+            value={range.view}
+            onSelect={(v) => setView(v as CalendarView)}
+            options={VIEW_LABELS.map(({ view, label }) => ({ value: view, label }))}
+          />
         </div>
       </div>
 
-      <div className="-mx-1 overflow-x-auto px-1 pb-0.5">
+      <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="cal-filters">
+          <button
+            type="button"
+            className="cal-filter"
+            data-task="open"
+            style={{ ["--kind" as string]: "var(--primary)" }}
+            aria-pressed={range.tasks}
+            title={range.tasks ? "Hide tasks' due dates" : "Show tasks' due dates"}
+            onClick={() => navigate({ ...range, tasks: !range.tasks })}
+          >
+            <span aria-hidden className="cal-chip__dot" />
+            Tasks
+          </button>
+          <span aria-hidden className="bg-border mx-0.5 h-4 w-px shrink-0" />
           <span className="sr-only" id="cal-kind-filter-label">
             Filter by type
           </span>
@@ -362,9 +471,15 @@ export function EventCalendar({
           })}
           <Select
             value={range.visibility ?? "ALL"}
-            onValueChange={(v) => navigate({ ...range, visibility: v === "ALL" ? null : (v as EventVisibility) })}
+            onValueChange={(v) =>
+              navigate({ ...range, visibility: v === "ALL" ? null : (v as EventVisibility) })
+            }
           >
-            <SelectTrigger size="sm" className="w-auto min-w-38 shrink-0" aria-label="Filter by visibility">
+            <SelectTrigger
+              size="sm"
+              className="w-auto min-w-38 shrink-0"
+              aria-label="Filter by visibility"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -392,7 +507,9 @@ export function EventCalendar({
             openId={peek?.id ?? null}
             onOpen={openPeek}
             onAddOn={addOn}
-            onShowDay={(dayKey) => navigate({ ...range, view: "timeGridDay", ...dayWindowFor(dayKey) })}
+            onShowDay={(dayKey) =>
+              navigate({ ...range, view: "timeGridDay", ...dayWindowFor(dayKey) })
+            }
             canManage={canManage}
             showSync={canManage}
             dropDayKey={drag?.over ?? null}
@@ -440,9 +557,7 @@ export function EventCalendar({
         )}
       </div>
 
-      {count === 0 && range.view !== "listMonth" && (
-        <div className="cal-agenda">{emptyState}</div>
-      )}
+      {count === 0 && range.view !== "listMonth" && <div className="cal-agenda">{emptyState}</div>}
 
       <div className="cal-legend">
         <span className="cal-legend__item">
@@ -466,8 +581,19 @@ export function EventCalendar({
           </>
         )}
         <span>Times are in your timezone; all-day events are whole days in {timeZone}.</span>
-        {canManage && <span className="hidden md:inline">Drag an event in the month grid to move it.</span>}
+        {canManage && (
+          <span className="hidden md:inline">Drag an event in the month grid to move it.</span>
+        )}
       </div>
+
+      {canManage && shotOpen && (
+        <CalendarShotImport
+          orgId={orgId}
+          orgSlug={orgSlug}
+          open={shotOpen}
+          onOpenChange={setShotOpen}
+        />
+      )}
 
       {canManage && dialog?.mode === "create" && (
         <EventFormDialog
@@ -509,7 +635,11 @@ function isTodayInWindow(range: CalendarWindow, todayKey: string, dayCount: numb
   return todayKey >= range.fromKey && todayKey < range.toKey;
 }
 
-const rangeFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const rangeFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
 function rangeLabel(range: CalendarWindow, monthKey: string, dayCount: number): string {
   if (range.view === "timeGridDay") return longDate(range.fromKey);

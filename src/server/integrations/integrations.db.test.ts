@@ -432,7 +432,7 @@ describe.skipIf(!dbReady)("integrations against the local database", () => {
       await getSecret({ orgId, provider: "GOOGLE_CALENDAR", kind: "REFRESH_TOKEN" }),
     ).toBeNull();
     expect(await importGoogleEvents(orgId, "dry-run")).toEqual({
-      error: "Connect Google Calendar in Settings > Integrations first.",
+      error: "Connect Google Calendar in Admin panel › Integrations first.",
     });
   });
 });

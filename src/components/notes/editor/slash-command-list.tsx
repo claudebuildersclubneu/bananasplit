@@ -44,14 +44,14 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
 
     if (items.length === 0) {
       return (
-        <div className="bg-popover text-muted-foreground w-64 rounded-md border p-3 text-sm shadow-md">
+        <div className="bg-popover text-muted-foreground w-64 rounded-lg border p-3 text-sm shadow-md">
           No matching blocks
         </div>
       );
     }
 
     return (
-      <div className="bg-popover w-64 overflow-hidden rounded-md border p-1 shadow-md">
+      <div className="bg-popover w-64 overflow-hidden rounded-lg border p-1 shadow-md">
         {items.map((item, index) => (
           <button
             key={item.title}
@@ -59,7 +59,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
             onClick={() => command(item)}
             onMouseEnter={() => setSelectedIndex(index)}
             className={cn(
-              "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm",
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
               index === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
             )}
           >

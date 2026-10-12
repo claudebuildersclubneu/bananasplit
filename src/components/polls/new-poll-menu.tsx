@@ -34,15 +34,19 @@ const CHOICES: readonly Choice[] = [
   },
 ];
 
-/** The polls page's "New poll": a question or a find-a-time poll. */
+/**
+ * The polls page's one create action, "New poll": a question or a
+ * find-a-time poll. The empty page leans on it too, so there's no second
+ * pair of buttons for the same two choices.
+ */
 export function NewPollMenu({ orgSlug }: { orgSlug: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button>
+        <Button size="sm">
           <Plus aria-hidden className="size-4" />
           New poll
-          <ChevronDown aria-hidden className="size-3.5 opacity-70" />
+          <ChevronDown aria-hidden className="size-4 opacity-70" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 p-1.5">
@@ -52,7 +56,7 @@ export function NewPollMenu({ orgSlug }: { orgSlug: string }) {
             <DropdownMenuItem
               key={choice.path}
               asChild
-              className="items-start gap-3 rounded-lg p-2.5"
+              className="items-start gap-3 rounded-md p-2.5"
             >
               <Link href={`/app/${orgSlug}${choice.path}`}>
                 <Icon aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0" />
@@ -66,24 +70,5 @@ export function NewPollMenu({ orgSlug }: { orgSlug: string }) {
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** Both kinds side by side, for the empty polls page. */
-export function NewPollButtons({ orgSlug }: { orgSlug: string }) {
-  return (
-    <>
-      {CHOICES.map((choice, i) => {
-        const Icon = choice.icon;
-        return (
-          <Button key={choice.path} asChild size="sm" variant={i === 0 ? "default" : "outline"}>
-            <Link href={`/app/${orgSlug}${choice.path}`}>
-              <Icon aria-hidden className="size-4" />
-              {choice.label}
-            </Link>
-          </Button>
-        );
-      })}
-    </>
   );
 }

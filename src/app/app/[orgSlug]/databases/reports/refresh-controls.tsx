@@ -10,16 +10,21 @@ import { cn } from "@/lib/utils";
 
 import { refreshReports } from "./actions";
 
-/** Drops the org's cached reports and re-renders the page (Server Action). */
+/**
+ * Drops the org's cached reports and re-renders the page (Server Action):
+ * one small icon button beside the range; a failure shows next to it.
+ */
 export function RefreshButton({ organizationId }: { organizationId: string }) {
   const { startTransition, pending } = useReportsFrame();
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="flex items-center gap-2">
+    <>
       <Button
-        variant="outline"
-        size="lg"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Refresh reports"
+        title="Refresh reports"
         disabled={pending}
         onClick={() => {
           setError(null);
@@ -30,12 +35,15 @@ export function RefreshButton({ organizationId }: { organizationId: string }) {
         }}
       >
         <RefreshCw className={cn(pending && "animate-spin")} aria-hidden="true" />
-        Refresh
       </Button>
-      <span role="status" aria-live="polite" className="text-muted-foreground text-xs">
+      <span
+        role="status"
+        aria-live="polite"
+        className={cn("text-destructive text-xs", !error && "sr-only")}
+      >
         {error}
       </span>
-    </div>
+    </>
   );
 }
 

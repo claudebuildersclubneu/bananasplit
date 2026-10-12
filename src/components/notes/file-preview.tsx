@@ -2,12 +2,16 @@
 
 import { generateJSON, generateText } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { Download, Loader2, NotebookPen, Trash2 } from "lucide-react";
+import { Download, Link2, Loader2, NotebookPen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { importNote } from "@/app/app/[orgSlug]/notes/actions";
-import { removeNoteFileAction, restoreNoteFileAction } from "@/app/app/[orgSlug]/notes/files-actions";
+import {
+  removeNoteFileAction,
+  restoreNoteFileAction,
+} from "@/app/app/[orgSlug]/notes/files-actions";
+import { ItemMenu } from "@/components/item-menu";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
@@ -26,14 +30,16 @@ export function DocumentPreview({ html }: { html: string }) {
     extensions: noteSchemaExtensions(),
     content: html || "<p></p>",
     editorProps: {
-      attributes: { class: "tiptap prose prose-sm dark:prose-invert max-w-none focus:outline-none" },
+      attributes: {
+        class: "tiptap prose prose-sm dark:prose-invert max-w-none focus:outline-none",
+      },
     },
   });
   if (!editor) return <div className="bg-muted/40 h-64 animate-pulse rounded-lg" />;
   return <EditorContent editor={editor} />;
 }
 
-/** Download, "Make a note from this" (Word), and remove. */
+/** Download, and a "…" menu: make a note from it (Word), copy its link, delete it. */
 export function FileActions({
   orgId,
   orgSlug,
@@ -74,12 +80,12 @@ export function FileActions({
   async function remove() {
     const ok = await confirm({
       title: `Delete “${name}”?`,
-      description: `It moves to Recently deleted in Notes for ${NOTE_TRASH_DAYS} days, so you can bring it back. Links to it stop working until then.`,
+      description: `It moves to Recently deleted in Files for ${NOTE_TRASH_DAYS} days, so you can bring it back. Links to it stop working until then.`,
       confirmLabel: "Delete file",
       run: async () => (await removeNoteFileAction(orgId, fileId)).error,
     });
     if (!ok) return;
-    router.push(`/app/${orgSlug}/notes?tab=files`);
+    router.push(`/app/${orgSlug}/notes`);
     router.refresh();
     toast({
       title: "File deleted",
@@ -95,33 +101,52 @@ export function FileActions({
     });
   }
 
+  function copyLink() {
+    void navigator.clipboard
+      ?.writeText(`${window.location.origin}/app/${orgSlug}/notes/files/${fileId}`)
+      .then(() => toast({ title: "Link copied", tone: "success", duration: 3_000 }))
+      .catch(() => toast({ title: "Couldn't copy the link", tone: "error" }));
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {noteHtml != null && (
-        <Button type="button" variant="outline" size="sm" disabled={pending} onClick={makeNote}>
-          {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <NotebookPen className="size-4" aria-hidden="true" />}
-          Make a note from this
-        </Button>
+      {pending && (
+        <span
+          className="text-muted-foreground inline-flex items-center gap-1 text-xs"
+          aria-live="polite"
+        >
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          Making a note…
+        </span>
       )}
       <Button asChild variant="outline" size="sm">
-        <a href={`/api/orgs/${encodeURIComponent(orgId)}/files/${encodeURIComponent(fileId)}?download=1`}>
+        <a
+          href={`/api/orgs/${encodeURIComponent(orgId)}/files/${encodeURIComponent(fileId)}?download=1`}
+        >
           <Download className="size-4" aria-hidden="true" />
           Download
         </a>
       </Button>
-      {canRemove && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive"
-          disabled={pending}
-          onClick={() => void remove()}
-        >
-          <Trash2 className="size-4" aria-hidden="true" />
-          Delete
-        </Button>
-      )}
+      <ItemMenu
+        label={`More actions for ${name}`}
+        className="rounded-lg"
+        items={[
+          noteHtml != null && {
+            label: "Make a note from this",
+            icon: NotebookPen,
+            disabled: pending,
+            onSelect: makeNote,
+          },
+          { label: "Copy link", icon: Link2, onSelect: copyLink },
+          canRemove && {
+            label: "Delete file",
+            icon: Trash2,
+            destructive: true,
+            disabled: pending,
+            onSelect: () => void remove(),
+          },
+        ]}
+      />
       {confirmEl}
       {error && (
         <p role="alert" className="text-destructive w-full text-sm">

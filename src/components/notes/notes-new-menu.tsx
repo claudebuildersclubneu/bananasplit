@@ -8,6 +8,7 @@ import {
   FileUp,
   FolderPlus,
   Globe,
+  LayoutTemplate,
   ListChecks,
   Loader2,
   Lock,
@@ -37,8 +38,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -65,7 +68,13 @@ async function readError(res: Response, fallback: string): Promise<string> {
   return typeof body?.error === "string" ? body.error : fallback;
 }
 
-function VisibilityPicker({ value, onChange }: { value: Visibility; onChange: (v: Visibility) => void }) {
+function VisibilityPicker({
+  value,
+  onChange,
+}: {
+  value: Visibility;
+  onChange: (v: Visibility) => void;
+}) {
   return (
     <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who can see it">
       {(
@@ -109,7 +118,7 @@ function FolderSelect({
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
+        className="border-input h-8 rounded-lg border bg-transparent px-2 text-sm"
       >
         <option value="">No folder</option>
         {folders.map((f) => (
@@ -123,10 +132,10 @@ function FolderSelect({
 }
 
 /**
- * Notes › New: a blank note or one from a template, a Word document or
- * Google Doc turned into a note (with a preview first, so you see what
- * came across before it's made), a file for the Files tab, or a folder.
- * Everything lands in the folder you're looking at unless you pick another.
+ * Files › New: a blank note or one from a template, an uploaded file, a
+ * Word document or Google Doc turned into a note (with a preview first, so
+ * you see what came across before it's made), or a folder. Everything lands
+ * in the folder you're looking at unless you pick another.
  */
 export function NotesNewMenu({
   orgId,
@@ -160,7 +169,12 @@ export function NotesNewMenu({
   }
 
   /** Makes a note from HTML (a template or an imported document). */
-  async function createFromHtml(title: string, html: string, vis: Visibility, folder: string | null) {
+  async function createFromHtml(
+    title: string,
+    html: string,
+    vis: Visibility,
+    folder: string | null,
+  ) {
     const extensions = noteSchemaExtensions();
     const json = generateJSON(html || "<p></p>", extensions);
     return importNote(orgId, {
@@ -175,7 +189,11 @@ export function NotesNewMenu({
   function fromTemplate(templateId: string | null) {
     start(async () => {
       const template = NOTE_TEMPLATES.find((t) => t.id === templateId);
-      const today = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(new Date());
+      const today = new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date());
       const result = await createFromHtml(
         template ? template.title : "Untitled note",
         template ? template.html(today) : "<p></p>",
@@ -201,7 +219,13 @@ export function NotesNewMenu({
     try {
       const form = new FormData();
       form.set("file", file);
-      await convert(await fetch(`/api/orgs/${encodeURIComponent(orgId)}/notes/import`, { method: "POST", body: form }), file);
+      await convert(
+        await fetch(`/api/orgs/${encodeURIComponent(orgId)}/notes/import`, {
+          method: "POST",
+          body: form,
+        }),
+        file,
+      );
     } catch {
       setError("The import failed. Check your connection.");
     } finally {
@@ -228,12 +252,19 @@ export function NotesNewMenu({
     }
   }
 
-  async function uploadFile(file: File, vis: Visibility, folder: string | null): Promise<string | null> {
+  async function uploadFile(
+    file: File,
+    vis: Visibility,
+    folder: string | null,
+  ): Promise<string | null> {
     const form = new FormData();
     form.set("file", file);
     form.set("visibility", vis);
     if (folder) form.set("folderId", folder);
-    const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/files`, { method: "POST", body: form });
+    const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/files`, {
+      method: "POST",
+      body: form,
+    });
     if (!res.ok) {
       setError(await readError(res, "The upload failed."));
       return null;
@@ -285,14 +316,18 @@ export function NotesNewMenu({
   const preview = draft && (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
       <div className="bg-muted/40 max-h-[55vh] overflow-y-auto rounded-xl border p-3 sm:p-5">
-        <div className="bg-background mx-auto max-w-2xl rounded-md p-6 shadow-sm ring-1 ring-black/5 sm:p-8">
+        <div className="bg-background mx-auto max-w-2xl rounded-md border p-6 sm:p-8">
           <DocumentPreview html={draft.html} />
         </div>
       </div>
       <div className="space-y-3">
         <label className="grid gap-1 text-sm">
           <span className="text-muted-foreground text-xs font-medium">Title</span>
-          <Input value={draft.title} maxLength={300} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <Input
+            value={draft.title}
+            maxLength={300}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          />
         </label>
         <FolderSelect folders={folders} value={folderId} onChange={setFolderId} />
         <div className="grid gap-1">
@@ -308,8 +343,10 @@ export function NotesNewMenu({
               className="accent-primary mt-0.5 size-4"
             />
             <span>
-              Keep the original .docx in Files too
-              <span className="text-muted-foreground block text-xs">So it can be downloaded as it was.</span>
+              Keep the original .docx as well
+              <span className="text-muted-foreground block text-xs">
+                So it can be downloaded as it was.
+              </span>
             </span>
           </label>
         )}
@@ -325,7 +362,11 @@ export function NotesNewMenu({
       <Button type="button" variant="ghost" disabled={busy} onClick={() => setDraft(null)}>
         Choose another
       </Button>
-      <Button type="button" disabled={busy || !draft.title.trim()} onClick={() => void createDraft()}>
+      <Button
+        type="button"
+        disabled={busy || !draft.title.trim()}
+        onClick={() => void createDraft()}
+      >
         {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         Create note
       </Button>
@@ -336,49 +377,58 @@ export function NotesNewMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" disabled={pending}>
-            {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+          <Button type="button" size="sm" disabled={pending}>
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Plus className="size-4" aria-hidden="true" />
+            )}
             New
             <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuContent align="end" className="w-60">
           <DropdownMenuItem onSelect={() => fromTemplate(null)}>
             <NotebookPen className="size-4" aria-hidden="true" />
-            Blank note
+            New note
           </DropdownMenuItem>
-          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">From a template</DropdownMenuLabel>
-          {NOTE_TEMPLATES.map((t) => {
-            const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
-            return (
-              <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
-                <Icon className="size-4" aria-hidden="true" />
-                <span className="flex flex-col">
-                  {t.title}
-                  <span className="text-muted-foreground text-xs">{t.description}</span>
-                </span>
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">Turn a document into a note</DropdownMenuLabel>
-          <DropdownMenuItem onSelect={() => show("word")}>
-            <FileText className="size-4" aria-hidden="true" />
-            Word document (.docx)
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => show("google")}>
-            <Globe className="size-4" aria-hidden="true" />
-            Google Doc
-          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <LayoutTemplate className="size-4" aria-hidden="true" />
+              Note from a template
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64">
+              {NOTE_TEMPLATES.map((t) => {
+                const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
+                return (
+                  <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
+                    <Icon className="size-4" aria-hidden="true" />
+                    <span className="flex flex-col">
+                      {t.title}
+                      <span className="text-muted-foreground text-xs">{t.description}</span>
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => show("upload")}>
             <Upload className="size-4" aria-hidden="true" />
-            Upload a file (PDF, slides, images…)
+            Upload a file
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("word")}>
+            <FileText className="size-4" aria-hidden="true" />
+            Import a Word document
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("google")}>
+            <Globe className="size-4" aria-hidden="true" />
+            Import a Google Doc
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => show("folder")}>
             <FolderPlus className="size-4" aria-hidden="true" />
-            Folder
+            New folder
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -388,7 +438,8 @@ export function NotesNewMenu({
           <DialogHeader>
             <DialogTitle>New folder</DialogTitle>
             <DialogDescription>
-              Folders are shared with the club. Drag notes and files onto one to file them.
+              Folders are shared with the club; private notes stay private inside them. Drag notes
+              and files onto a folder to file them.
             </DialogDescription>
           </DialogHeader>
           <NewFolderForm
@@ -404,9 +455,13 @@ export function NotesNewMenu({
       </Dialog>
 
       <Dialog open={open === "word"} onOpenChange={(o) => !busy && setOpen(o ? "word" : null)}>
-        <DialogContent className={cn("max-h-[92vh] overflow-y-auto", draft ? "sm:max-w-4xl" : "sm:max-w-md")}>
+        <DialogContent
+          className={cn("max-h-[92vh] overflow-y-auto", draft ? "sm:max-w-4xl" : "sm:max-w-md")}
+        >
           <DialogHeader>
-            <DialogTitle>{draft ? "Here's how it came across" : "Import a Word document"}</DialogTitle>
+            <DialogTitle>
+              {draft ? "Here's how it came across" : "Import a Word document"}
+            </DialogTitle>
             <DialogDescription>
               {draft
                 ? "Check the text, pick a title and folder, then create the note."
@@ -456,7 +511,9 @@ export function NotesNewMenu({
       </Dialog>
 
       <Dialog open={open === "google"} onOpenChange={(o) => !busy && setOpen(o ? "google" : null)}>
-        <DialogContent className={cn("max-h-[92vh] overflow-y-auto", draft ? "sm:max-w-4xl" : "sm:max-w-md")}>
+        <DialogContent
+          className={cn("max-h-[92vh] overflow-y-auto", draft ? "sm:max-w-4xl" : "sm:max-w-md")}
+        >
           <DialogHeader>
             <DialogTitle>{draft ? "Here's how it came across" : "Import a Google Doc"}</DialogTitle>
             <DialogDescription>
@@ -502,8 +559,8 @@ export function NotesNewMenu({
           <DialogHeader>
             <DialogTitle>Upload a file</DialogTitle>
             <DialogDescription>
-              PDFs, Word, PowerPoint, Excel, images, text and CSV, up to 4 MB. It opens right here in
-              the app.
+              PDFs, Word, PowerPoint, Excel, images, text and CSV, up to 4 MB. It opens right here
+              in the app.
             </DialogDescription>
           </DialogHeader>
           <VisibilityPicker value={visibility} onChange={setVisibility} />
@@ -546,4 +603,3 @@ export function NotesNewMenu({
     </>
   );
 }
-

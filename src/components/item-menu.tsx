@@ -70,7 +70,7 @@ export function ItemMenu({
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={cn(
-            "text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:ring-ring/50 data-[state=open]:bg-accent data-[state=open]:text-foreground grid shrink-0 place-items-center rounded-md outline-none focus-visible:ring-2",
+            "text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring/50 data-[state=open]:bg-muted data-[state=open]:text-foreground grid shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-3",
             size === "sm" ? "size-7" : "size-6",
             className,
           )}
@@ -87,7 +87,11 @@ export function ItemMenu({
         onPointerDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        {heading && <DropdownMenuLabel className="text-muted-foreground truncate text-xs">{heading}</DropdownMenuLabel>}
+        {heading && (
+          <DropdownMenuLabel className="text-muted-foreground truncate text-xs">
+            {heading}
+          </DropdownMenuLabel>
+        )}
         {entries.map((item, i) => {
           const Icon = item.icon;
           const body = (
@@ -98,7 +102,9 @@ export function ItemMenu({
           );
           return (
             <Fragment key={`${item.label}-${i}`}>
-              {(item.separated || (item.destructive && i > 0 && !entries[i - 1]?.destructive)) && <DropdownMenuSeparator />}
+              {(item.separated || (item.destructive && i > 0 && !entries[i - 1]?.destructive)) && (
+                <DropdownMenuSeparator />
+              )}
               {item.href ? (
                 <DropdownMenuItem asChild disabled={item.disabled}>
                   <Link href={item.href}>{body}</Link>

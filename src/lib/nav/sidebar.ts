@@ -14,12 +14,18 @@ export const SECTION_IDS = [
   "calendar",
   "notes",
   "people",
-  "org-chart",
   "polls",
   "databases",
   "finance",
 ] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
+
+/**
+ * Sections that used to be separate and still appear in saved sidebars:
+ * accepted when reading a saved config, then dropped. The org chart is part
+ * of People now.
+ */
+const RETIRED_SECTION_IDS = ["org-chart"] as const;
 
 export const GROUP_IDS = ["main", "club", "data"] as const;
 export type GroupId = (typeof GROUP_IDS)[number];
@@ -31,6 +37,8 @@ export interface SectionDef {
   icon: string;
   /** Path under /app/{slug}. */
   path: string;
+  /** Other paths (under /app/{slug}) that belong to this section. */
+  also?: string[];
   exact?: boolean;
   group: GroupId;
   /** Can't be hidden. */
@@ -42,9 +50,8 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "overview", label: "Overview", icon: "LayoutDashboard", path: "", exact: true, group: "main", locked: true, description: "Each member's home page." },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", group: "main", description: "Who's doing what, and by when." },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", group: "main", description: "Meetings and events." },
-  { id: "notes", label: "Notes", icon: "NotebookText", path: "/notes", group: "main", description: "Notes, documents and files." },
-  { id: "people", label: "People", icon: "Users", path: "/people", group: "club", description: "The member directory." },
-  { id: "org-chart", label: "Org Chart", icon: "Network", path: "/org-chart", group: "club", description: "Roles and who reports to whom." },
+  { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", group: "main", description: "Notes, documents and uploads." },
+  { id: "people", label: "People", icon: "Users", path: "/people", also: ["/org-chart"], group: "club", description: "The member directory and the org chart." },
   { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club anything, or find a time that works." },
   { id: "databases", label: "Databases", icon: "Database", path: "/databases", group: "data", description: "Attendance, sign-ups, votes and reports." },
   { id: "finance", label: "Finance", icon: "Wallet", path: "/finance", group: "data", description: "Budget, transactions and reimbursements." },
@@ -65,10 +72,15 @@ export const sidebarConfigSchema = z
     items: z
       .array(
         z
-          .object({ id: z.enum(SECTION_IDS), group: z.enum(GROUP_IDS), hidden: z.boolean(), label })
+          .object({
+            id: z.enum([...SECTION_IDS, ...RETIRED_SECTION_IDS]),
+            group: z.enum(GROUP_IDS),
+            hidden: z.boolean(),
+            label,
+          })
           .strict(),
       )
-      .max(SECTION_IDS.length),
+      .max(SECTION_IDS.length + RETIRED_SECTION_IDS.length),
   })
   .strict();
 
@@ -80,6 +92,7 @@ export interface ResolvedItem {
   defaultLabel: string;
   icon: string;
   path: string;
+  also: string[];
   exact: boolean;
   hidden: boolean;
   locked: boolean;
@@ -98,7 +111,9 @@ export function resolveSidebar(raw: unknown): ResolvedGroup[] {
   const parsed = raw ? sidebarConfigSchema.safeParse(raw) : null;
   const config = parsed?.success ? parsed.data : null;
   const groupLabel = new Map(config?.groups.map((g) => [g.id, g.label]) ?? []);
-  const saved = new Map(config?.items.map((i, index) => [i.id, { ...i, index }]) ?? []);
+  const saved = new Map<string, NonNullable<typeof config>["items"][number] & { index: number }>(
+    config?.items.map((i, index) => [i.id, { ...i, index }]) ?? [],
+  );
   const items: (ResolvedItem & { order: number })[] = SECTIONS.map((def, i) => {
     const s = saved.get(def.id);
     return {
@@ -107,6 +122,7 @@ export function resolveSidebar(raw: unknown): ResolvedGroup[] {
       defaultLabel: def.label,
       icon: def.icon,
       path: def.path,
+      also: def.also ?? [],
       exact: def.exact ?? false,
       hidden: def.locked ? false : (s?.hidden ?? false),
       locked: def.locked ?? false,
@@ -136,7 +152,7 @@ export function hiddenSectionPaths(raw: unknown): string[] {
   return resolveSidebar(raw)
     .flatMap((g) => g.items)
     .filter((i) => i.hidden)
-    .map((i) => i.path);
+    .flatMap((i) => [i.path, ...i.also]);
 }
 
 /** The config that reproduces `groups` (what Settings › Sidebar saves). */

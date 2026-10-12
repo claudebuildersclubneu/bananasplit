@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { TransactionKind, TransactionStatus } from "@/generated/prisma/enums";
 import { KIND_LABELS } from "@/components/finance/transaction-kind-select";
+import { STATUS_LABELS } from "@/components/finance/transaction-status-badge";
 
 export function TransactionFilters({
   periods,
@@ -94,7 +95,7 @@ export function TransactionFilters({
           <SelectItem value="all">Any status</SelectItem>
           {Object.values(TransactionStatus).map((s) => (
             <SelectItem key={s} value={s}>
-              {s}
+              {STATUS_LABELS[s]}
             </SelectItem>
           ))}
         </SelectContent>
@@ -126,6 +127,18 @@ export function TransactionFilters({
           <SelectItem value="all">Any</SelectItem>
           <SelectItem value="yes">Reconciled</SelectItem>
           <SelectItem value="no">Not reconciled</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select
+        value={searchParams.get("deleted") === "show" ? "show" : "hide"}
+        onValueChange={(v) => setParam("deleted", v === "show" ? "show" : null)}
+      >
+        <SelectTrigger className="w-40" aria-label="Deleted transactions">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="hide">Hide deleted</SelectItem>
+          <SelectItem value="show">Include deleted</SelectItem>
         </SelectContent>
       </Select>
       <div className="flex items-center gap-1">

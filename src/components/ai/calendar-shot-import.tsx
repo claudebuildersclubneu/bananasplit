@@ -1,6 +1,15 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, CircleAlert, ImageUp, Loader2, Repeat, Video, X } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CircleAlert,
+  ImageUp,
+  Loader2,
+  Repeat,
+  Video,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -93,7 +102,9 @@ export function CalendarShotImport({
   const [error, setError] = useState<string | null>(null);
   const [read, setRead] = useState<ReadResponse | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
-  const [made, setMade] = useState<{ key: string; title: string; eventId?: string; error?: string }[]>([]);
+  const [made, setMade] = useState<
+    { key: string; title: string; eventId?: string; error?: string }[]
+  >([]);
 
   useEffect(() => {
     if (!preview) return;
@@ -149,14 +160,21 @@ export function CalendarShotImport({
       const ext = small.type === "image/jpeg" ? "jpg" : (small.type.split("/")[1] ?? "png");
       body.set("file", small, `screenshot.${ext}`);
       if (ai.selected) body.set("connection", ai.selected.id);
-      const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/ai/calendar-screenshot`, { method: "POST", body });
-      const data = (await res.json().catch(() => ({}))) as Partial<ReadResponse> & { error?: string };
+      const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/ai/calendar-screenshot`, {
+        method: "POST",
+        body,
+      });
+      const data = (await res.json().catch(() => ({}))) as Partial<ReadResponse> & {
+        error?: string;
+      };
       if (!res.ok || !data.events) {
         setError(data.error ?? "That didn't work. Try again.");
         return;
       }
       if (data.events.length === 0) {
-        setError("No event found in that image. Try a screenshot that shows the event's date and time.");
+        setError(
+          "No event found in that image. Try a screenshot that shows the event's date and time.",
+        );
         return;
       }
       setRead(data as ReadResponse);
@@ -176,7 +194,8 @@ export function CalendarShotImport({
     if (!r.title.trim()) return "Give it a title.";
     if (!r.date) return "Pick a date.";
     if (!r.allDay && (!r.startTime || !r.endTime)) return "Pick a start and end time.";
-    if (`${r.endDate}T${r.endTime || "00:00"}` < `${r.date}T${r.startTime || "00:00"}`) return "It ends before it starts.";
+    if (`${r.endDate}T${r.endTime || "00:00"}` < `${r.date}T${r.startTime || "00:00"}`)
+      return "It ends before it starts.";
     return null;
   }
 
@@ -188,13 +207,19 @@ export function CalendarShotImport({
     setPhase("creating");
     const results: typeof made = [];
     for (const r of kept) {
-      const start = r.allDay ? r.date : parseZonedDateTimeLocal(`${r.date}T${r.startTime}`, r.timezone)?.toISOString();
-      const end = r.allDay ? r.endDate : parseZonedDateTimeLocal(`${r.endDate}T${r.endTime}`, r.timezone)?.toISOString();
+      const start = r.allDay
+        ? r.date
+        : parseZonedDateTimeLocal(`${r.date}T${r.startTime}`, r.timezone)?.toISOString();
+      const end = r.allDay
+        ? r.endDate
+        : parseZonedDateTimeLocal(`${r.endDate}T${r.endTime}`, r.timezone)?.toISOString();
       if (!start || !end) {
         results.push({ key: r.key, title: r.title, error: "Its time couldn't be read." });
         continue;
       }
-      const description = [r.description, r.recurrence ? `Repeats: ${r.recurrence}` : null].filter(Boolean).join("\n\n");
+      const description = [r.description, r.recurrence ? `Repeats: ${r.recurrence}` : null]
+        .filter(Boolean)
+        .join("\n\n");
       try {
         const result = await createEvent(orgId, {
           title: r.title.trim(),
@@ -286,7 +311,11 @@ export function CalendarShotImport({
               {preview ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the member's own file */}
-                  <img src={preview} alt="Your screenshot" className="max-h-72 w-auto rounded-md object-contain shadow-sm" />
+                  <img
+                    src={preview}
+                    alt="Your screenshot"
+                    className="max-h-72 w-auto rounded-md border object-contain"
+                  />
                   <button
                     type="button"
                     aria-label="Use another image"
@@ -295,7 +324,7 @@ export function CalendarShotImport({
                       setFile(null);
                       setPreview(null);
                     }}
-                    className="bg-background/90 hover:bg-background absolute top-2 right-2 rounded-full border p-1 shadow-xs"
+                    className="bg-background/90 hover:bg-background absolute top-2 right-2 rounded-md border p-1"
                   >
                     <X className="size-4" aria-hidden="true" />
                   </button>
@@ -303,8 +332,12 @@ export function CalendarShotImport({
               ) : (
                 <div className="space-y-1.5">
                   <ImageUp className="text-muted-foreground mx-auto size-8" aria-hidden="true" />
-                  <p className="text-sm font-medium">Drop a screenshot here, paste it, or click to choose</p>
-                  <p className="text-muted-foreground text-xs">PNG, JPEG, WebP or GIF. Tip: Ctrl+V pastes a screenshot you just took.</p>
+                  <p className="text-sm font-medium">
+                    Drop a screenshot here, paste it, or click to choose
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    PNG, JPEG, WebP or GIF. Tip: Ctrl+V pastes a screenshot you just took.
+                  </p>
                 </div>
               )}
             </div>
@@ -364,7 +397,10 @@ export function CalendarShotImport({
                 <ul className="space-y-0.5 text-xs">
                   {added.map((m) => (
                     <li key={m.key}>
-                      <Link href={`/app/${orgSlug}/calendar/${m.eventId}`} className="text-primary underline underline-offset-2">
+                      <Link
+                        href={`/app/${orgSlug}/calendar/${m.eventId}`}
+                        className="text-primary underline underline-offset-2"
+                      >
                         {m.title}
                       </Link>
                     </li>
@@ -378,7 +414,8 @@ export function CalendarShotImport({
                 <ul className="space-y-1 text-xs">
                   {failed.map((f) => (
                     <li key={f.key}>
-                      <span className="font-medium">{f.title}</span>: <span className="text-muted-foreground">{f.error}</span>
+                      <span className="font-medium">{f.title}</span>:{" "}
+                      <span className="text-muted-foreground">{f.error}</span>
                     </li>
                   ))}
                 </ul>
@@ -393,20 +430,39 @@ export function CalendarShotImport({
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={() => void readImage()} disabled={reading || !file || !ai.selected}>
+              <Button
+                type="button"
+                onClick={() => void readImage()}
+                disabled={reading || !file || !ai.selected}
+              >
                 {reading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                {reading ? "Reading…" : ai.selected ? `Read it with ${ai.selected.label}` : "Read it"}
+                {reading
+                  ? "Reading…"
+                  : ai.selected
+                    ? `Read it with ${ai.selected.label}`
+                    : "Read it"}
               </Button>
             </>
           )}
           {(phase === "review" || phase === "creating") && (
             <>
-              <Button type="button" variant="ghost" disabled={phase === "creating"} onClick={() => setPhase("input")}>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={phase === "creating"}
+                onClick={() => setPhase("input")}
+              >
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Back
               </Button>
-              <Button type="button" onClick={() => void create()} disabled={phase === "creating" || kept.length === 0 || Boolean(blocking)}>
-                {phase === "creating" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+              <Button
+                type="button"
+                onClick={() => void create()}
+                disabled={phase === "creating" || kept.length === 0 || Boolean(blocking)}
+              >
+                {phase === "creating" && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                )}
                 {kept.length === 1 ? "Add 1 event" : `Add ${kept.length} events`}
               </Button>
             </>
@@ -449,7 +505,11 @@ function EventRow({
       )}
     >
       <div className="flex items-center gap-2">
-        <Checkbox checked={row.include} onCheckedChange={(v) => onChange({ include: v === true })} aria-label={`Add “${row.title}”`} />
+        <Checkbox
+          checked={row.include}
+          onCheckedChange={(v) => onChange({ include: v === true })}
+          aria-label={`Add “${row.title}”`}
+        />
         <Input
           value={row.title}
           onChange={(e) => onChange({ title: e.target.value })}
@@ -460,12 +520,17 @@ function EventRow({
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,7.5rem)] gap-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_6.5rem] sm:items-end">
         <label className="space-y-1">
-          <span className="text-muted-foreground text-xs">{row.allDay ? "First day" : "Starts"}</span>
+          <span className="text-muted-foreground text-xs">
+            {row.allDay ? "First day" : "Starts"}
+          </span>
           <Input
             type="date"
             value={row.date}
             onChange={(e) =>
-              onChange({ date: e.target.value, endDate: row.endDate < e.target.value ? e.target.value : row.endDate })
+              onChange({
+                date: e.target.value,
+                endDate: row.endDate < e.target.value ? e.target.value : row.endDate,
+              })
             }
             className="h-8"
           />
@@ -475,35 +540,57 @@ function EventRow({
         ) : (
           <label className="space-y-1">
             <span className="text-muted-foreground text-xs">At</span>
-            <Input type="time" value={row.startTime} onChange={(e) => onChange({ startTime: e.target.value })} className="h-8" />
+            <Input
+              type="time"
+              value={row.startTime}
+              onChange={(e) => onChange({ startTime: e.target.value })}
+              className="h-8"
+            />
           </label>
         )}
         <label className="col-span-2 flex h-8 items-center gap-1.5 text-xs sm:col-span-1">
           <Checkbox
             checked={row.allDay}
             onCheckedChange={(v) =>
-              onChange(v === true ? { allDay: true, startTime: "", endTime: "" } : { allDay: false, startTime: "18:00", endTime: "19:00" })
+              onChange(
+                v === true
+                  ? { allDay: true, startTime: "", endTime: "" }
+                  : { allDay: false, startTime: "18:00", endTime: "19:00" },
+              )
             }
           />
           All day
         </label>
         <label className="space-y-1">
           <span className="text-muted-foreground text-xs">{row.allDay ? "Last day" : "Ends"}</span>
-          <Input type="date" value={row.endDate} onChange={(e) => onChange({ endDate: e.target.value })} className="h-8" />
+          <Input
+            type="date"
+            value={row.endDate}
+            onChange={(e) => onChange({ endDate: e.target.value })}
+            className="h-8"
+          />
         </label>
         {row.allDay ? (
           <span aria-hidden="true" />
         ) : (
           <label className="space-y-1">
             <span className="text-muted-foreground text-xs">At</span>
-            <Input type="time" value={row.endTime} onChange={(e) => onChange({ endTime: e.target.value })} className="h-8" />
+            <Input
+              type="time"
+              value={row.endTime}
+              onChange={(e) => onChange({ endTime: e.target.value })}
+              className="h-8"
+            />
           </label>
         )}
         <label
           className="col-span-2 flex h-8 items-center gap-1.5 text-xs sm:col-span-1"
           title="Show it on your public site and feed"
         >
-          <Checkbox checked={row.isPublic} onCheckedChange={(v) => onChange({ isPublic: v === true })} />
+          <Checkbox
+            checked={row.isPublic}
+            onCheckedChange={(v) => onChange({ isPublic: v === true })}
+          />
           Public
         </label>
       </div>
@@ -525,13 +612,18 @@ function EventRow({
           <span className="text-muted-foreground text-xs">Invite</span>
           <div className="flex min-h-8 flex-wrap items-center gap-1">
             {invited.map((m) => (
-              <span key={m.id} className="bg-muted inline-flex items-center gap-1 rounded-full py-0.5 ps-2 pe-1 text-xs">
+              <span
+                key={m.id}
+                className="bg-muted inline-flex items-center gap-1 rounded-md py-0.5 ps-2 pe-1 text-xs"
+              >
                 {m.name}
                 <button
                   type="button"
                   aria-label={`Don't invite ${m.name}`}
-                  onClick={() => onChange({ attendeeIds: row.attendeeIds.filter((id) => id !== m.id) })}
-                  className="hover:bg-background rounded-full p-0.5"
+                  onClick={() =>
+                    onChange({ attendeeIds: row.attendeeIds.filter((id) => id !== m.id) })
+                  }
+                  className="hover:bg-background rounded-md p-0.5"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -574,7 +666,13 @@ function EventRow({
           {row.conferenceUrl && (
             <span className="inline-flex items-center gap-1">
               <Video className="size-3.5" aria-hidden="true" />
-              Video link found ({row.conferenceProvider === "MEET" ? "Google Meet" : row.conferenceProvider === "ZOOM" ? "Zoom" : "Teams"})
+              Video link found (
+              {row.conferenceProvider === "MEET"
+                ? "Google Meet"
+                : row.conferenceProvider === "ZOOM"
+                  ? "Zoom"
+                  : "Teams"}
+              )
             </span>
           )}
           {row.recurrence && (

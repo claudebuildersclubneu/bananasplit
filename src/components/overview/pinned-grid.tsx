@@ -47,8 +47,8 @@ export function PinnedGrid({
         >
           <p className="text-foreground font-medium">{over ? "Drop to pin it" : "Nothing pinned yet"}</p>
           <p className="max-w-sm text-balance">
-            Drag any page from the sidebar here, press <strong>Pin</strong> at the top of a page, or
-            pick anything: notes, files, folders, tasks, events, people.
+            Drag any page from the sidebar here, press the pin at the top right of a page, or pick
+            anything: notes, files, folders, tasks, events, people.
           </p>
           {pinsCtx && (
             <Button type="button" size="sm" variant="outline" onClick={() => pinsCtx.openPicker()}>

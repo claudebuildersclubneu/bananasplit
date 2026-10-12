@@ -123,7 +123,7 @@ export function ClubBasicsStep({
       }
     >
       <StepIntro index={index} total={total} title="Let's start with the basics.">
-        You&apos;ll be the club&apos;s admin. Everything here can be changed later in Settings.
+        You&apos;ll be the club&apos;s admin. Everything here can be changed later in the Admin panel.
       </StepIntro>
 
       {notice ? (

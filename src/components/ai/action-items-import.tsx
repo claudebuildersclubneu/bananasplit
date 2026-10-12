@@ -71,9 +71,13 @@ const PLACEHOLDER = `- Sam: book the room for the fall social by Friday
 - Exec meeting Thursday 6pm in the student center
 - Someone order T-shirts before 10/20`;
 
-const selectClass = "border-input bg-background h-8 w-full rounded-md border px-2 text-sm";
+const selectClass = "border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm";
 
-const PRIORITY_LABEL: Record<ImportPriority, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
+const PRIORITY_LABEL: Record<ImportPriority, string> = {
+  LOW: "Low",
+  MEDIUM: "Medium",
+  HIGH: "High",
+};
 
 export function ActionItemsImport({
   orgId,
@@ -121,7 +125,9 @@ export function ActionItemsImport({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, connection: ai.selected?.id }),
       });
-      const body = (await res.json().catch(() => ({}))) as Partial<ReadResponse> & { error?: string };
+      const body = (await res.json().catch(() => ({}))) as Partial<ReadResponse> & {
+        error?: string;
+      };
       if (!res.ok || !body.items) {
         setError(body.error ?? "That didn't work. Try again.");
         return;
@@ -147,15 +153,20 @@ export function ActionItemsImport({
     }
   }
 
-  const memberName = useMemo(() => new Map((read?.members ?? []).map((m) => [m.id, m.name])), [read]);
+  const memberName = useMemo(
+    () => new Map((read?.members ?? []).map((m) => [m.id, m.name])),
+    [read],
+  );
   const patch = (key: string, change: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...change } : r)));
 
   function problem(r: Row): string | null {
     if (!r.title.trim()) return "Give it a title.";
     if (r.kind === "task") {
-      if (read?.rules.requireOwner && !r.ownerId) return "Your club requires an owner on every task.";
-      if (read?.rules.requireDueDate && !r.dueDate) return "Your club requires a due date on every task.";
+      if (read?.rules.requireOwner && !r.ownerId)
+        return "Your club requires an owner on every task.";
+      if (read?.rules.requireDueDate && !r.dueDate)
+        return "Your club requires a due date on every task.";
     } else if (!r.startsAt) {
       return "Pick when it starts.";
     }
@@ -202,8 +213,12 @@ export function ActionItemsImport({
       for (const r of keptEvents) {
         const startsAt = r.startsAt!;
         const endsAt = r.endsAt ?? (r.allDay ? startsAt : addMinutesLocal(startsAt, 60));
-        const start = r.allDay ? startsAt.slice(0, 10) : parseZonedDateTimeLocal(startsAt, read.timezone)?.toISOString();
-        const end = r.allDay ? endsAt.slice(0, 10) : parseZonedDateTimeLocal(endsAt, read.timezone)?.toISOString();
+        const start = r.allDay
+          ? startsAt.slice(0, 10)
+          : parseZonedDateTimeLocal(startsAt, read.timezone)?.toISOString();
+        const end = r.allDay
+          ? endsAt.slice(0, 10)
+          : parseZonedDateTimeLocal(endsAt, read.timezone)?.toISOString();
         if (!start || !end) {
           events.push({ key: r.key, title: r.title, error: "Its time couldn't be read." });
           continue;
@@ -215,7 +230,9 @@ export function ActionItemsImport({
           startsAt: start,
           endsAt: end,
           location: r.location,
-          attendeeIds: [...new Set([r.ownerId, ...r.helperIds].filter((id): id is string => Boolean(id)))],
+          attendeeIds: [
+            ...new Set([r.ownerId, ...r.helperIds].filter((id): id is string => Boolean(id))),
+          ],
         });
         events.push({ key: r.key, title: r.title, eventId: result.eventId, error: result.error });
       }
@@ -230,7 +247,9 @@ export function ActionItemsImport({
 
   async function confirmFlagged() {
     if (!outcome) return;
-    const waiting = outcome.tasks.filter((t) => t.result.confirm).map((t) => rows.find((r) => r.key === t.key)!);
+    const waiting = outcome.tasks
+      .filter((t) => t.result.confirm)
+      .map((t) => rows.find((r) => r.key === t.key)!);
     setConfirming(true);
     try {
       const again = await addTasks(waiting, true);
@@ -255,9 +274,7 @@ export function ActionItemsImport({
     >
       <DialogContent className="flex max-h-[90vh] flex-col gap-4 sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>
-            {phase === "done" ? "Imported" : "Import action items"}
-          </DialogTitle>
+          <DialogTitle>{phase === "done" ? "Imported" : "Import action items"}</DialogTitle>
           <DialogDescription>
             {phase === "input"
               ? sourceLabel
@@ -318,13 +335,19 @@ export function ActionItemsImport({
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <Checkbox
-                  checked={kept.length === rows.length ? true : kept.length === 0 ? false : "indeterminate"}
-                  onCheckedChange={(v) => setRows((rs) => rs.map((r) => ({ ...r, include: v === true })))}
+                  checked={
+                    kept.length === rows.length ? true : kept.length === 0 ? false : "indeterminate"
+                  }
+                  onCheckedChange={(v) =>
+                    setRows((rs) => rs.map((r) => ({ ...r, include: v === true })))
+                  }
                   aria-label="Keep all"
                 />
                 {kept.length} of {rows.length} selected
               </label>
-              <span className="text-muted-foreground text-xs">Event times are in {read.timezone.replace(/_/g, " ")}.</span>
+              <span className="text-muted-foreground text-xs">
+                Event times are in {read.timezone.replace(/_/g, " ")}.
+              </span>
             </div>
             <ul className="space-y-2.5">
               {rows.map((r) => (
@@ -368,18 +391,33 @@ export function ActionItemsImport({
                 disabled={reading || !text.trim() || !ai.selected}
               >
                 {reading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                {reading ? "Reading…" : ai.selected ? `Read it with ${ai.selected.label}` : "Read it"}
+                {reading
+                  ? "Reading…"
+                  : ai.selected
+                    ? `Read it with ${ai.selected.label}`
+                    : "Read it"}
               </Button>
             </>
           )}
           {(phase === "review" || phase === "creating") && (
             <>
-              <Button type="button" variant="ghost" disabled={phase === "creating"} onClick={() => reset(true)}>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={phase === "creating"}
+                onClick={() => reset(true)}
+              >
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 Back
               </Button>
-              <Button type="button" onClick={() => void create()} disabled={phase === "creating" || kept.length === 0 || Boolean(blocking)}>
-                {phase === "creating" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+              <Button
+                type="button"
+                onClick={() => void create()}
+                disabled={phase === "creating" || kept.length === 0 || Boolean(blocking)}
+              >
+                {phase === "creating" && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                )}
                 {addLabel(keptTasks.length, keptEvents.length)}
               </Button>
             </>
@@ -438,29 +476,46 @@ function ItemRow({
           onCheckedChange={(v) => onChange({ include: v === true })}
           aria-label={`Keep “${row.title}”`}
         />
-        <div className="bg-muted flex shrink-0 rounded-md p-0.5 text-xs" role="group" aria-label="Task or event">
+        <div
+          className="bg-muted flex shrink-0 rounded-md p-0.5 text-xs"
+          role="group"
+          aria-label="Task or event"
+        >
           {(["task", "event"] as const).map((k) => (
             <button
               key={k}
               type="button"
               aria-pressed={row.kind === k}
               disabled={k === "event" && !canCreateEvents}
-              title={k === "event" && !canCreateEvents ? "Only owners and admins add calendar events" : undefined}
+              title={
+                k === "event" && !canCreateEvents
+                  ? "Only owners and admins add calendar events"
+                  : undefined
+              }
               onClick={() => {
                 if (k === row.kind) return;
                 if (k === "event") {
                   const day = row.dueDate ?? new Date().toISOString().slice(0, 10);
-                  onChange({ kind: "event", startsAt: `${day}T18:00`, endsAt: `${day}T19:00`, allDay: false });
+                  onChange({
+                    kind: "event",
+                    startsAt: `${day}T18:00`,
+                    endsAt: `${day}T19:00`,
+                    allDay: false,
+                  });
                 } else {
                   onChange({ kind: "task", dueDate: row.startsAt?.slice(0, 10) ?? row.dueDate });
                 }
               }}
               className={cn(
                 "inline-flex items-center gap-1 rounded px-2 py-1 font-medium disabled:opacity-40",
-                row.kind === k ? "bg-background shadow-xs" : "text-muted-foreground",
+                row.kind === k ? "bg-background text-foreground" : "text-muted-foreground",
               )}
             >
-              {k === "task" ? <ListChecks className="size-3.5" aria-hidden="true" /> : <CalendarDays className="size-3.5" aria-hidden="true" />}
+              {k === "task" ? (
+                <ListChecks className="size-3.5" aria-hidden="true" />
+              ) : (
+                <CalendarDays className="size-3.5" aria-hidden="true" />
+              )}
               {k === "task" ? "Task" : "Event"}
             </button>
           ))}
@@ -474,7 +529,12 @@ function ItemRow({
         />
       </div>
 
-      <div className={cn("grid gap-2", isEvent ? "sm:grid-cols-2" : "sm:grid-cols-[1fr_1fr_9.5rem_7rem]")}>
+      <div
+        className={cn(
+          "grid gap-2",
+          isEvent ? "sm:grid-cols-2" : "sm:grid-cols-[1fr_1fr_9.5rem_7rem]",
+        )}
+      >
         <label className="space-y-1">
           <span className="text-muted-foreground text-xs">{isEvent ? "Host" : "Owner"}</span>
           <select
@@ -497,16 +557,21 @@ function ItemRow({
           </select>
         </label>
         <div className="space-y-1">
-          <span className="text-muted-foreground text-xs">{isEvent ? "Also invited" : "Helping"}</span>
+          <span className="text-muted-foreground text-xs">
+            {isEvent ? "Also invited" : "Helping"}
+          </span>
           <div className="flex min-h-8 flex-wrap items-center gap-1">
             {helpers.map((m) => (
-              <span key={m.id} className="bg-muted inline-flex items-center gap-1 rounded-full py-0.5 ps-2 pe-1 text-xs">
+              <span
+                key={m.id}
+                className="bg-muted inline-flex items-center gap-1 rounded-md py-0.5 ps-2 pe-1 text-xs"
+              >
                 {m.name}
                 <button
                   type="button"
                   aria-label={`Remove ${m.name}`}
                   onClick={() => onChange({ helperIds: row.helperIds.filter((id) => id !== m.id) })}
-                  className="hover:bg-background rounded-full p-0.5"
+                  className="hover:bg-background rounded-md p-0.5"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -514,10 +579,12 @@ function ItemRow({
             ))}
             {addable.length > 0 && (
               <select
-                className="border-input bg-background h-7 max-w-36 rounded-md border px-1.5 text-xs"
+                className="border-input bg-background h-7 max-w-36 rounded-lg border px-1.5 text-xs"
                 value=""
                 aria-label="Add someone"
-                onChange={(e) => e.target.value && onChange({ helperIds: [...row.helperIds, e.target.value] })}
+                onChange={(e) =>
+                  e.target.value && onChange({ helperIds: [...row.helperIds, e.target.value] })
+                }
               >
                 <option value="">+ Add</option>
                 {addable.map((m) => (
@@ -570,7 +637,11 @@ function ItemRow({
                 if (!v) return onChange({ startsAt: null });
                 const startsAt = row.allDay ? `${v}T00:00` : v;
                 const endsAt =
-                  row.endsAt && row.endsAt > startsAt ? row.endsAt : row.allDay ? startsAt : addMinutesLocal(startsAt, 60);
+                  row.endsAt && row.endsAt > startsAt
+                    ? row.endsAt
+                    : row.allDay
+                      ? startsAt
+                      : addMinutesLocal(startsAt, 60);
                 onChange({ startsAt, endsAt, dueDate: startsAt.slice(0, 10) });
               }}
               className="h-8"
@@ -593,10 +664,15 @@ function ItemRow({
               checked={row.allDay}
               onCheckedChange={(v) => {
                 const allDay = v === true;
-                const day = (row.startsAt ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+                const day =
+                  (row.startsAt ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10);
                 onChange(
                   allDay
-                    ? { allDay, startsAt: `${day}T00:00`, endsAt: `${(row.endsAt ?? row.startsAt ?? "").slice(0, 10) || day}T00:00` }
+                    ? {
+                        allDay,
+                        startsAt: `${day}T00:00`,
+                        endsAt: `${(row.endsAt ?? row.startsAt ?? "").slice(0, 10) || day}T00:00`,
+                      }
                     : { allDay, startsAt: `${day}T18:00`, endsAt: `${day}T19:00` },
                 );
               }}
@@ -652,11 +728,17 @@ function Summary({
   const madeEvents = outcome.events.filter((e) => e.eventId);
   const flagged = outcome.tasks.filter((t) => t.result.confirm);
   const failed = [
-    ...outcome.tasks.filter((t) => t.result.error).map((t) => ({ title: t.title, error: t.result.error! })),
+    ...outcome.tasks
+      .filter((t) => t.result.error)
+      .map((t) => ({ title: t.title, error: t.result.error! })),
     ...outcome.events.filter((e) => e.error).map((e) => ({ title: e.title, error: e.error! })),
   ];
   const flaggedNames = [
-    ...new Set(flagged.flatMap((t) => t.result.confirm!.flagged.map((f) => f.name ?? memberName.get(f.userId) ?? "a member"))),
+    ...new Set(
+      flagged.flatMap((t) =>
+        t.result.confirm!.flagged.map((f) => f.name ?? memberName.get(f.userId) ?? "a member"),
+      ),
+    ),
   ];
   return (
     <div className="min-h-0 space-y-3 overflow-y-auto">
@@ -665,17 +747,23 @@ function Summary({
         <div className="space-y-1 text-sm">
           <p className="font-medium">{addedLabel(madeTasks.length, madeEvents.length)}</p>
           <p className="text-muted-foreground text-xs">
-            Owners and helpers were notified like any assignment; tasks with a due date show on everyone&apos;s week
-            and the Tasks calendar.
+            Owners and helpers were notified like any assignment; tasks with a due date show on
+            everyone&apos;s week and the Tasks calendar.
           </p>
           <div className="flex flex-wrap gap-3 pt-1 text-xs">
             {madeTasks.length > 0 && (
-              <Link href={`/app/${orgSlug}/tasks`} className="text-primary underline underline-offset-2">
+              <Link
+                href={`/app/${orgSlug}/tasks`}
+                className="text-primary underline underline-offset-2"
+              >
                 Open Tasks
               </Link>
             )}
             {madeEvents.length > 0 && (
-              <Link href={`/app/${orgSlug}/calendar`} className="text-primary underline underline-offset-2">
+              <Link
+                href={`/app/${orgSlug}/calendar`}
+                className="text-primary underline underline-offset-2"
+              >
                 Open the calendar
               </Link>
             )}
@@ -685,10 +773,12 @@ function Summary({
       {flagged.length > 0 && (
         <div className="border-warning/40 bg-warning/10 space-y-2 rounded-xl border p-4 text-sm">
           <p className="font-medium">
-            {flagged.length} task{flagged.length === 1 ? "" : "s"} assign{flagged.length === 1 ? "s" : ""} work above
-            your level ({flaggedNames.join(", ")}).
+            {flagged.length} task{flagged.length === 1 ? "" : "s"} assign
+            {flagged.length === 1 ? "s" : ""} work above your level ({flaggedNames.join(", ")}).
           </p>
-          <p className="text-muted-foreground text-xs">Nothing was added for {flagged.length === 1 ? "it" : "them"} yet.</p>
+          <p className="text-muted-foreground text-xs">
+            Nothing was added for {flagged.length === 1 ? "it" : "them"} yet.
+          </p>
           <Button size="sm" onClick={onConfirm} disabled={confirming}>
             {confirming && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             Assign anyway
@@ -701,7 +791,8 @@ function Summary({
           <ul className="space-y-1 text-xs">
             {failed.map((f, i) => (
               <li key={i}>
-                <span className="font-medium">{f.title}</span>: <span className="text-muted-foreground">{f.error}</span>
+                <span className="font-medium">{f.title}</span>:{" "}
+                <span className="text-muted-foreground">{f.error}</span>
               </li>
             ))}
           </ul>

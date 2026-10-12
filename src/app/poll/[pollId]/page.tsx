@@ -73,7 +73,7 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
         canFinalize={false}
         notices={
           session && !isMember ? (
-            <div className="bg-muted/40 flex gap-2 rounded-lg border p-3 text-sm" role="note">
+            <div className="bg-muted/40 flex gap-2 rounded-xl border p-3 text-sm" role="note">
               <Info aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0" />
               <p>
                 You&apos;re signed in, but not a member of the organization running this poll, so

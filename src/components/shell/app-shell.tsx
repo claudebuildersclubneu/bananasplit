@@ -10,7 +10,7 @@ import { NotificationBell } from "@/components/shell/notification-bell";
 import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { PinsProvider } from "@/components/pins/pins-context";
 import { PinButton, VisitTracker } from "@/components/shell/pin-button";
-import type { NavLink, NavSection } from "@/components/shell/nav-config";
+import type { NavSection } from "@/components/shell/nav-config";
 import { SectionGate } from "@/components/shell/section-gate";
 import { SidebarNav, type SidebarPin } from "@/components/shell/sidebar-nav";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -28,23 +28,22 @@ export function AppShell({
   brand,
   pins = [],
   sections,
-  settings,
   sectionPaths = [],
   role = null,
   isAdmin = false,
+  canInvite = false,
   children,
 }: {
   orgSlug: string;
   orgId: string;
   orgs: OrgSummary[];
   user: ShellUser;
-  /** The org's logo and name (Settings > Theme > Logo display), above the switcher. */
+  /** The org's logo and name (Admin panel › Theme › Logo display): the club menu's face. */
   brand?: React.ReactNode;
   /** The member's pins in this org (sidebar, and the pin button's state). */
   pins?: SidebarPin[];
-  /** The org's sidebar (Settings › Sidebar). */
+  /** The org's sidebar (Admin panel › Sidebar). */
   sections: NavSection[];
-  settings: NavLink;
   /**
    * Every section (path, name, icon) and whether the org turned it off:
    * members see a notice there, and search leaves it out for them.
@@ -53,6 +52,8 @@ export function AppShell({
   /** The member's role in this org (what search may show them). */
   role?: Role | null;
   isAdmin?: boolean;
+  /** May invite members (the club menu's "Invite people"). */
+  canInvite?: boolean;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -61,6 +62,15 @@ export function AppShell({
   const setCommandOpen = (open: boolean) =>
     setCommand((c) => (open === c.open ? c : { open, session: open ? c.session + 1 : c.session }));
   const mod = useModKey();
+  const clubMenu = (
+    <OrgSwitcher
+      orgs={orgs}
+      activeSlug={orgSlug}
+      brand={brand}
+      isAdmin={isAdmin}
+      canInvite={canInvite}
+    />
+  );
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -83,15 +93,13 @@ export function AppShell({
           Skip to content
         </a>
 
-        {/* The zine's spine: a second rule inside the fold. */}
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-4 border-r p-4 shadow-[inset_-4px_0_0_var(--sidebar),inset_-5px_0_0_var(--sidebar-border)] md:sticky md:top-0 md:flex md:h-screen">
-          {brand}
-          <OrgSwitcher orgs={orgs} activeSlug={orgSlug} />
-          <SidebarNav sections={sections} settings={settings} orgId={orgId} pins={pins} />
+        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-3 border-r p-3 md:sticky md:top-0 md:flex md:h-screen">
+          {clubMenu}
+          <SidebarNav sections={sections} orgId={orgId} pins={pins} />
         </aside>
 
         <div className="flex min-w-0 flex-col">
-          <header className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 flex items-center gap-3 border-b px-4 py-3 backdrop-blur">
+          <header className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 flex h-14 items-center gap-3 border-b px-4 backdrop-blur md:px-6">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
                 <Button
@@ -105,17 +113,15 @@ export function AppShell({
               </SheetTrigger>
               <SheetContent
                 side="left"
-                className="bg-sidebar text-sidebar-foreground flex w-72 flex-col p-4"
+                className="bg-sidebar text-sidebar-foreground flex w-72 flex-col p-3"
               >
-                <SheetHeader className="gap-3 p-0">
+                <SheetHeader className="gap-3 p-0 pr-8">
                   <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  {brand}
-                  <OrgSwitcher orgs={orgs} activeSlug={orgSlug} />
+                  {clubMenu}
                 </SheetHeader>
-                <div className="mt-4 flex min-h-0 flex-1 flex-col">
+                <div className="mt-3 flex min-h-0 flex-1 flex-col">
                   <SidebarNav
                     sections={sections}
-                    settings={settings}
                     orgId={orgId}
                     pins={pins}
                     onNavigate={() => setMobileNavOpen(false)}
@@ -124,23 +130,25 @@ export function AppShell({
               </SheetContent>
             </Sheet>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-muted-foreground gap-2"
+            {/* Looks like the search boxes on every page, and opens search everywhere. */}
+            <button
+              type="button"
               onClick={() => setCommandOpen(true)}
+              aria-label="Search everything"
+              className="border-input text-muted-foreground hover:text-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 flex h-8 w-full max-w-sm min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:ring-3"
             >
-              <Search className="size-4" />
-              <span className="hidden sm:inline">Search</span>
-              <kbd className="bg-muted hidden rounded-sm px-1.5 py-0.5 text-[0.625rem] sm:inline">
+              <Search className="size-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">Search everything</span>
+              <kbd className="ms-auto hidden rounded-md border px-1 font-sans text-[10px] leading-4 sm:block">
                 {mod === "⌘" ? "⌘K" : "Ctrl K"}
               </kbd>
-            </Button>
+            </button>
 
-            <div className="flex-1" />
-            <PinButton />
-            <NotificationBell />
-            <UserMenu user={user} />
+            <div className="flex flex-1 items-center justify-end gap-1">
+              <PinButton />
+              <NotificationBell />
+              <UserMenu user={user} />
+            </div>
           </header>
 
           <main

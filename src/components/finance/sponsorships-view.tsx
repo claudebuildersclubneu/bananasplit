@@ -56,9 +56,23 @@ const STATUS_VARIANT: Record<
   WRITTEN_OFF: "destructive",
 };
 
+const STATUS_LABEL: Record<SponsorshipStatus, string> = {
+  PROSPECT: "Prospect",
+  COMMITTED: "Committed",
+  INVOICED: "Invoiced",
+  RECEIVED: "Received",
+  DECLINED: "Declined",
+  WRITTEN_OFF: "Written off",
+};
+
 const TYPE_OPTIONS = [
   { value: SponsorshipType.CASH, label: "Cash", hint: "Money paid to the club", icon: Banknote },
-  { value: SponsorshipType.CREDITS, label: "Credits", hint: "Cloud, API or software credits", icon: Ticket },
+  {
+    value: SponsorshipType.CREDITS,
+    label: "Credits",
+    hint: "Cloud, API or software credits",
+    icon: Ticket,
+  },
 ] as const;
 
 function sumCents(rows: Sponsorship[], type: SponsorshipType, statuses: SponsorshipStatus[]) {
@@ -212,7 +226,7 @@ export function SponsorshipsView({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">Sponsors</h2>
+          <h2 className="heading text-base">Sponsors</h2>
           <Button variant="outline" size="sm" onClick={() => setShowNewSponsor((v) => !v)}>
             New sponsor
           </Button>
@@ -231,7 +245,10 @@ export function SponsorshipsView({
         )}
         <div className="flex flex-wrap gap-2">
           {sponsors.map((s) => (
-            <span key={s.id} className="inline-flex items-center gap-0.5 rounded-full border py-0.5 ps-2.5 pe-0.5 text-xs">
+            <span
+              key={s.id}
+              className="inline-flex items-center gap-0.5 rounded-md border py-0.5 ps-2 pe-0.5 text-xs"
+            >
               {s.name}
               <ItemMenu
                 label={`Actions for ${s.name}`}
@@ -252,7 +269,7 @@ export function SponsorshipsView({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">Sponsorships</h2>
+          <h2 className="heading text-base">Sponsorships</h2>
           {periodId && (
             <Button variant="outline" size="sm" onClick={() => setShowNewSponsorship((v) => !v)}>
               New sponsorship
@@ -261,8 +278,12 @@ export function SponsorshipsView({
         </div>
 
         {showNewSponsorship && (
-          <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
-            <div className="col-span-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Type of sponsorship">
+          <div className="grid grid-cols-2 gap-2 rounded-xl border p-3">
+            <div
+              className="col-span-2 grid gap-2 sm:grid-cols-2"
+              role="radiogroup"
+              aria-label="Type of sponsorship"
+            >
               {TYPE_OPTIONS.map(({ value, label, hint, icon: Icon }) => (
                 <button
                   key={value}
@@ -320,8 +341,8 @@ export function SponsorshipsView({
             />
             {type === "CREDITS" && (
               <p className="text-muted-foreground col-span-2 text-xs">
-                Credits are tracked at their value but never count toward the balance: marking them received
-                records no transaction.
+                Credits are tracked at their value but never count toward the balance: marking them
+                received records no transaction.
               </p>
             )}
             <Button
@@ -334,68 +355,69 @@ export function SponsorshipsView({
           </div>
         )}
 
-        <ul className="space-y-1.5">
-          {sponsorships.map((s) => (
-            <li
-              key={s.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
-            >
-              <span className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="font-medium">{s.sponsor.name}</span>
-                {s.type === "CREDITS" && (
-                  <Badge variant="secondary">
-                    <Ticket aria-hidden="true" />
-                    Credits
-                  </Badge>
-                )}
-                {s.tier && <Badge variant="outline">{s.tier}</Badge>}
-                <span className="text-muted-foreground">
-                  {formatCents(s.amountCents)}
-                  {s.type === "CREDITS" && " in credits"}
+        {sponsorships.length === 0 ? (
+          <EmptyState
+            size="compact"
+            title="No sponsorships yet"
+            description="Add a sponsor, then record what they committed, in cash or credits. Cash only counts toward the balance once it's received; credits never do."
+          />
+        ) : (
+          <ul className="divide-y rounded-xl border">
+            {sponsorships.map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="font-medium">{s.sponsor.name}</span>
+                  {s.type === "CREDITS" && (
+                    <Badge variant="secondary">
+                      <Ticket aria-hidden="true" />
+                      Credits
+                    </Badge>
+                  )}
+                  {s.tier && <Badge variant="outline">{s.tier}</Badge>}
+                  <span className="text-muted-foreground">
+                    {formatCents(s.amountCents)}
+                    {s.type === "CREDITS" && " in credits"}
+                  </span>
                 </span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Select value={s.status} onValueChange={(v) => handleStatusChange(s.id, v)}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue>
-                      <Badge variant={STATUS_VARIANT[s.status]}>{s.status}</Badge>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(SponsorshipStatus).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ItemMenu
-                  label={`Actions for ${s.sponsor.name}`}
-                  items={[
-                    {
-                      label: "Delete sponsorship",
-                      icon: Trash2,
-                      destructive: true,
-                      onSelect: () =>
-                        void removeSponsorship(
-                          s.id,
-                          s.sponsor.name,
-                          s.type === "CASH" && s.status === "RECEIVED",
-                        ),
-                    },
-                  ]}
-                />
-              </span>
-            </li>
-          ))}
-          {sponsorships.length === 0 && (
-            <EmptyState
-              size="compact"
-              title="No sponsorships yet"
-              description="Add a sponsor, then record what they committed, in cash or credits. Cash only counts toward the balance once it's received; credits never do."
-            />
-          )}
-        </ul>
+                <span className="flex items-center gap-1">
+                  <Select value={s.status} onValueChange={(v) => handleStatusChange(s.id, v)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue>
+                        <Badge variant={STATUS_VARIANT[s.status]}>{STATUS_LABEL[s.status]}</Badge>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(SponsorshipStatus).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {STATUS_LABEL[status]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <ItemMenu
+                    label={`Actions for ${s.sponsor.name}`}
+                    items={[
+                      {
+                        label: "Delete sponsorship",
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () =>
+                          void removeSponsorship(
+                            s.id,
+                            s.sponsor.name,
+                            s.type === "CASH" && s.status === "RECEIVED",
+                          ),
+                      },
+                    ]}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

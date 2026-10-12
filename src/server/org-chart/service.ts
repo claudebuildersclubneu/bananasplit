@@ -240,7 +240,7 @@ export async function createUploadVersion(ctx: Ctx, input: UploadVersionInput): 
     notes.push(
       input.claudeAvailable
         ? "This file has no text the portal can read on its own, so Claude is reading it."
-        : "This file has no text the portal can read on its own. Add a Claude API key in Settings > Integrations and import it again, or start from the club template.",
+        : "This file has no text the portal can read on its own. Add a Claude API key in Admin panel › Integrations and import it again, or start from the club template.",
     );
   } else if (!input.accepted && !input.claudeAvailable) {
     notes.push(
@@ -340,7 +340,7 @@ export async function retryParse(ctx: Ctx, versionId: string): Promise<void> {
     throw new OrgChartError("This draft is not waiting for a retry.", 409);
   }
   if (!(await hasClaudeKey(db, organizationId))) {
-    throw new OrgChartError("Add a Claude API key in Settings > Integrations, then retry.", 409);
+    throw new OrgChartError("Add a Claude API key in Admin panel › Integrations, then retry.", 409);
   }
   await assertUploadAllowed(db, organizationId, versionId);
   const parseAttemptId = newAttemptId();

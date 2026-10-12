@@ -48,7 +48,7 @@ export function PrivateBadge({
   return (
     <span
       className={cn(
-        "bg-foreground/8 text-foreground/80 ring-border inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+        "bg-foreground/8 text-foreground/80 ring-border inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
         className,
       )}
       title="Only this task's owner, the people on it, its creator and admins can see it"
@@ -69,7 +69,7 @@ export function FlagBadge({
   return (
     <span
       className={cn(
-        "bg-warning/15 text-warning inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+        "bg-warning/15 text-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
         className,
       )}
       title="Assigned above the assigner's level in the org chart"

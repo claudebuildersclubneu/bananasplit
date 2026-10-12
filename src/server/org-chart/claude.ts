@@ -186,7 +186,7 @@ export function classifyClaudeError(error: unknown): ClaudeParseError {
   if (error instanceof ClaudeParseError) return error;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     return new ClaudeParseError(
-      "The Claude API key was rejected. Check it in Settings > Integrations, then retry.",
+      "The Claude API key was rejected. Check it in Admin panel › Integrations, then retry.",
       false,
     );
   }

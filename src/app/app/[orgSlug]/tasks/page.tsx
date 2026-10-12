@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 import { TasksProvider } from "@/components/tasks/tasks-context";
@@ -20,14 +21,12 @@ import {
   countOlderCompleted,
   getAgendaTasks,
   getBoardTasks,
-  getCalendarTasks,
   getIntakeTasks,
   getOrgLabels,
   getOrgProjects,
   getTableTasks,
   type TaskFilters,
 } from "@/server/tasks/queries";
-import { getTeamView } from "@/server/tasks/team";
 import {
   canSeeWhoPosted,
   expectedPosters,
@@ -36,11 +35,9 @@ import {
   storedLines,
 } from "@/server/tasks/weekly";
 
-import { TaskCalendar } from "./calendar/task-calendar";
 import { IntakeView } from "./intake/intake-view";
 import { KanbanBoard } from "./kanban/kanban-board";
 import { TaskTable } from "./table/task-table";
-import { TeamView } from "./team/team-view";
 import { UpdatesView, type PostedUpdate } from "./updates/updates-view";
 import { WeekView } from "./week/week-view";
 import { WorkspaceHeader } from "./workspace-header";
@@ -59,7 +56,7 @@ function dateParam(value: string | undefined): Date | undefined {
 /**
  * The task workspace (C4).
  *
- * One page, one toolbar, five layouts of the same filtered question, plus
+ * One page, one toolbar, three layouts of the same filtered question, plus
  * two destinations (Requests and the Sunday update) that are pieces of work
  * rather than ways of drawing tasks. See ./views.ts for the URL grammar and
  * the reasoning; every link other sections publish still resolves here.
@@ -70,6 +67,8 @@ export default async function TasksPage({
 }: PageProps<"/app/[orgSlug]/tasks">) {
   const { orgSlug } = await params;
   const query = await searchParams;
+  // Tasks' due dates live on the main calendar now (its Tasks layer).
+  if (query.view === "calendar") redirect(`/app/${orgSlug}/calendar`);
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
 
   const cookieStore = await cookies();
@@ -197,8 +196,7 @@ async function renderView(input: {
   positions: Awaited<ReturnType<typeof getChartForPage>>;
   intakeProjects: Awaited<ReturnType<typeof getOrgProjects>>;
 }): Promise<React.ReactNode> {
-  const { ws, filters, org, userId, isAdmin, now, today, todayKey, query, members, positions } =
-    input;
+  const { ws, filters, org, userId, now, today, todayKey, query, members } = input;
 
   switch (ws.view) {
     case "week": {
@@ -229,29 +227,6 @@ async function renderView(input: {
         getTableTasks(db, org.id, filters, page, today),
       );
       return <TaskTable tasks={tasks} total={total} page={page} pageSize={TABLE_PAGE_SIZE} />;
-    }
-
-    case "calendar": {
-      const tasks = await withOrgTx(org.id, ({ db }) =>
-        getCalendarTasks(db, org.id, filters, today),
-      );
-      return <TaskCalendar tasks={tasks} />;
-    }
-
-    case "team": {
-      const data = await withOrgTx(org.id, ({ db }) =>
-        getTeamView(db, {
-          organizationId: org.id,
-          viewerId: userId,
-          isAdmin,
-          positions,
-          members,
-          requestedScope: param(query.position) ?? null,
-          filters,
-          today,
-        }),
-      );
-      return <TeamView data={data} />;
     }
 
     case "updates": {

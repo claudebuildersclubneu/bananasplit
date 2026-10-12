@@ -1,22 +1,69 @@
+import { FinanceActions } from "@/components/finance/finance-actions";
+import { PageHeader } from "@/components/page-header";
+import { PageTabs } from "@/components/ui/page-tabs";
+import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
-import { getOrgContextBySlug } from "@/server/db/context";
+import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 
-import { FinanceSubnav } from "./finance-subnav";
+import { getCategoriesForPeriods, getOrgPeriods } from "./queries";
 
+/**
+ * Every finance page's header: the title; Add transaction (Request a
+ * reimbursement for a member) with Import and the setup guide in its "…"
+ * menu; and, for owners and treasurers, the pages they use day to day as
+ * tabs. A member only has My reimbursements, so they get no tabs.
+ */
 export default async function FinanceLayout({
   params,
   children,
 }: LayoutProps<"/app/[orgSlug]/finance">) {
   const { orgSlug } = await params;
   // Unknown slug or not a member: notFound() (getOrgContextBySlug).
-  const { role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const isFinance = can({ role }, "finance.manage");
+  // For the header's new-entry dialog (which period, which category).
+  const { periods, categories } = await withOrgTx(org.id, async ({ db }) => {
+    const periods = await getOrgPeriods(db, org.id);
+    return { periods, categories: await getCategoriesForPeriods(db, org.id, periods) };
+  }).catch(handleAuthErrorInPage);
+  const base = `/app/${orgSlug}/finance`;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="page-title">Finance</h1>
-        <FinanceSubnav orgSlug={orgSlug} isFinance={can({ role }, "finance.manage")} />
-      </div>
+      <PageHeader
+        title="Finance"
+        actions={
+          <FinanceActions
+            orgId={org.id}
+            orgSlug={orgSlug}
+            isFinance={isFinance}
+            currentUserId={user.id}
+            // The active period first: a new entry defaults to it.
+            periods={[...periods]
+              .sort((a, b) => Number(b.isActive) - Number(a.isActive))
+              .map((p) => ({ id: p.id, label: p.label }))}
+            categories={categories.map((c) => ({
+              id: c.id,
+              name: c.name,
+              budgetPeriodId: c.budgetPeriodId,
+            }))}
+          />
+        }
+        tabs={
+          isFinance ? (
+            <PageTabs
+              label="Finance"
+              tabs={[
+                { label: "Dashboard", href: base, exact: true },
+                { label: "Transactions", href: `${base}/transactions` },
+                { label: "Budget", href: `${base}/budget` },
+                { label: "Sponsorships", href: `${base}/sponsorships` },
+                { label: "My reimbursements", href: `${base}/my-reimbursements` },
+              ]}
+            />
+          ) : undefined
+        }
+      />
       {children}
     </div>
   );

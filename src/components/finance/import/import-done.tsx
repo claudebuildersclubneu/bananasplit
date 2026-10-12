@@ -50,7 +50,8 @@ export function ImportDone({
     if (summary.kind !== "transactions") return;
     const ok = await confirm({
       title: `Take out the ${summary.created.toLocaleString()} imported transactions?`,
-      description: "They're deleted the usual way (you can still see them under Show deleted). Budget years and categories the import added stay.",
+      description:
+        "They're deleted the usual way (you can still see them under Show deleted). Budget years and categories the import added stay.",
       confirmLabel: "Undo import",
     });
     if (!ok) return;
@@ -74,7 +75,7 @@ export function ImportDone({
         <div className="min-w-0 space-y-2">
           {summary.kind === "transactions" ? (
             <>
-              <h2 className="text-lg font-semibold">
+              <h2 className="heading text-lg">
                 {undone
                   ? "Import undone"
                   : `${summary.partial ? "Partly imported" : "Imported"}: ${summary.created.toLocaleString()} transaction${summary.created === 1 ? "" : "s"}`}
@@ -91,7 +92,8 @@ export function ImportDone({
                     </li>
                   ))}
                   {summary.categoriesCreated.length > 0 && (
-                    <li>New categories: {summary.categoriesCreated.slice(0, 12).join(", ")}
+                    <li>
+                      New categories: {summary.categoriesCreated.slice(0, 12).join(", ")}
                       {summary.categoriesCreated.length > 12 ? "…" : ""}
                     </li>
                   )}
@@ -106,10 +108,10 @@ export function ImportDone({
             </>
           ) : (
             <>
-              <h2 className="text-lg font-semibold">Budget saved for {summary.periodLabel}</h2>
+              <h2 className="heading text-lg">Budget saved for {summary.periodLabel}</h2>
               <p className="text-muted-foreground text-sm">
-                {summary.created} new categor{summary.created === 1 ? "y" : "ies"}, {summary.updated} updated ·{" "}
-                {formatCents(summary.totalCents)} budgeted.
+                {summary.created} new categor{summary.created === 1 ? "y" : "ies"},{" "}
+                {summary.updated} updated · {formatCents(summary.totalCents)} budgeted.
               </p>
             </>
           )}
@@ -119,7 +121,11 @@ export function ImportDone({
       <div className="flex flex-wrap gap-2">
         {summary.kind === "transactions" && !undone && summary.created > 0 && (
           <Button type="button" variant="outline" onClick={() => void undo()} disabled={busy}>
-            {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <RotateCcw className="size-4" aria-hidden="true" />}
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw className="size-4" aria-hidden="true" />
+            )}
             Undo this import
           </Button>
         )}
@@ -127,17 +133,13 @@ export function ImportDone({
           <Upload className="size-4" aria-hidden="true" />
           Import another file
         </Button>
+        {/* The dashboard is a Finance tab; the next step is what was imported. */}
         {!embedded && (
-          <>
-            <Button asChild variant="ghost">
-              <Link href={summary.kind === "budget" ? `${base}/budget` : `${base}/transactions`}>
-                {summary.kind === "budget" ? "Open the budget" : "See the transactions"}
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href={base}>Go to the dashboard</Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link href={summary.kind === "budget" ? `${base}/budget` : `${base}/transactions`}>
+              {summary.kind === "budget" ? "Open the budget" : "See the transactions"}
+            </Link>
+          </Button>
         )}
       </div>
     </div>

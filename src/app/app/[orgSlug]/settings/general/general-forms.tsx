@@ -136,7 +136,7 @@ export function TimezoneForm({
           value={value}
           disabled={!canEdit}
           onChange={(e) => setValue(e.target.value)}
-          className="border-input bg-background h-9 w-full max-w-sm rounded-md border px-3 text-sm"
+          className="border-input bg-background h-8 w-full max-w-sm rounded-lg border px-2.5 text-sm"
         >
           {!zones.includes(value) && <option value={value}>{value}</option>}
           {zones.map((z) => (
@@ -311,7 +311,10 @@ export function LogoForm({
       const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/logo`, { method, body });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) return data.error ?? "The upload failed.";
-      setStatus({ tone: "ok", text: method === "POST" ? "Club picture updated." : "Club picture removed." });
+      setStatus({
+        tone: "ok",
+        text: method === "POST" ? "Club picture updated." : "Club picture removed.",
+      });
       router.refresh();
       return null;
     } catch {
@@ -399,7 +402,11 @@ export function LogoForm({
                 onClick={() => input.current?.click()}
                 onFocus={() => void loadCropDialog()}
               >
-                {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <ImageUp className="size-3.5" aria-hidden="true" />}
+                {busy ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <ImageUp className="size-3.5" aria-hidden="true" />
+                )}
                 {logoUrl ? "Change picture" : "Upload picture"}
               </Button>
               {logoUrl && (

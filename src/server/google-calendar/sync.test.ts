@@ -857,7 +857,7 @@ describe("requesting the Google import", () => {
     store.integrations[0].status = "DISCONNECTED";
     expect(await request("dry-run")).toEqual({
       ok: false,
-      error: "Connect Google Calendar in Settings > Integrations first.",
+      error: "Connect Google Calendar in Admin panel › Integrations first.",
     });
     store.integrations[0].status = "NEEDS_REAUTH";
     expect(await request("dry-run")).toMatchObject({ ok: false, error: expect.stringMatching(/^Reconnect/) });

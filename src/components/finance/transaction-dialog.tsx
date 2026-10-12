@@ -61,6 +61,8 @@ interface Props {
   periods: { id: string; label: string }[];
   categories: { id: string; name: string; budgetPeriodId: string }[];
   isFinance: boolean;
+  /** A new entry as a reimbursement request: an expense only, whoever opens it. */
+  request?: boolean;
   currentUserId: string;
   onSaved?: () => void;
 }
@@ -89,6 +91,7 @@ function TransactionForm({
   periods,
   categories,
   isFinance,
+  request = false,
   currentUserId,
   onSaved,
 }: Omit<Props, "open">) {
@@ -96,7 +99,7 @@ function TransactionForm({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const restrictToExpense = !isFinance;
+  const restrictToExpense = !isFinance || request;
   const [kind, setKind] = useState<TransactionKind>(transaction?.kind ?? TransactionKind.EXPENSE);
   const [direction, setDirection] = useState<TransactionDirection>(
     transaction?.direction ?? TransactionDirection.OUT,
@@ -288,7 +291,7 @@ function TransactionForm({
         <div className="grid gap-1.5">
           <Label>Budget period</Label>
           {periods.length === 0 ? (
-            <p className="text-muted-foreground bg-muted/50 rounded-md border px-3 py-2 text-sm">
+            <p className="text-muted-foreground bg-muted/50 rounded-lg border px-2.5 py-1.5 text-sm">
               This school year: it&apos;s set up when you save.
             </p>
           ) : (
@@ -365,7 +368,11 @@ function TransactionForm({
     <>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          {transaction ? "Transaction" : "New transaction"}
+          {transaction
+            ? "Transaction"
+            : restrictToExpense
+              ? "Request a reimbursement"
+              : "New transaction"}
           {transaction && <TransactionStatusBadge status={transaction.status} />}
           {transaction?.voidedAt && <span className="text-destructive text-xs">Voided</span>}
           {transaction?.reconciledAt && (
@@ -426,7 +433,13 @@ function TransactionForm({
           </Button>
         )}
         {transaction?.voidedAt && isFinance && (
-          <Button type="button" variant="ghost" className="sm:mr-auto" disabled={isPending} onClick={restore}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="sm:mr-auto"
+            disabled={isPending}
+            onClick={restore}
+          >
             <ArchiveRestore className="size-4" aria-hidden="true" />
             Restore
           </Button>

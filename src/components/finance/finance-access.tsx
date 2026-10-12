@@ -38,14 +38,18 @@ export function FinanceAccessNotice({
 }) {
   const canAppoint = can({ role }, "members.changeRole");
   const who = [
-    people.owners.length ? `${list(people.owners)} (owner${people.owners.length === 1 ? "" : "s"})` : null,
-    people.treasurers.length ? `${list(people.treasurers)} (treasurer${people.treasurers.length === 1 ? "" : "s"})` : null,
+    people.owners.length
+      ? `${list(people.owners)} (owner${people.owners.length === 1 ? "" : "s"})`
+      : null,
+    people.treasurers.length
+      ? `${list(people.treasurers)} (treasurer${people.treasurers.length === 1 ? "" : "s"})`
+      : null,
   ]
     .filter(Boolean)
     .join(" and ");
   const advice =
     role === Role.ADMIN
-      ? `As an admin you can make another member treasurer in Settings › Members. Only an owner can give you access to the club's money${people.owners.length ? `: ask ${list(people.owners)}` : ""}.`
+      ? `As an admin you can make another member treasurer in Admin panel › Members. Only an owner can give you access to the club's money${people.owners.length ? `: ask ${list(people.owners)}` : ""}.`
       : `To help with the club's money, ask ${people.owners.length ? list(people.owners) : "an owner"} to make you treasurer.`;
 
   return (
@@ -57,7 +61,9 @@ export function FinanceAccessNotice({
     >
       <div className="min-w-0 flex-1 space-y-1">
         <h2 className={cn("heading", compact ? "text-sm" : "text-base")}>
-          {compact ? "The club's money is managed by its owners and treasurers" : "Only owners and treasurers see the club's money"}
+          {compact
+            ? "The club's money is managed by its owners and treasurers"
+            : "Only owners and treasurers see the club's money"}
         </h2>
         <p className="text-muted-foreground text-sm">
           {who ? `That's ${who}. ` : ""}
@@ -66,7 +72,7 @@ export function FinanceAccessNotice({
         </p>
         {!compact && (
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href={`/app/${orgSlug}/finance/my-reimbursements`}>
                 <Receipt className="size-4" aria-hidden="true" />
                 My reimbursements

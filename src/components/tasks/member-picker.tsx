@@ -208,7 +208,7 @@ export function CollaboratorsPicker({
             {selected.map((m) => (
               <span
                 key={m.id}
-                className="bg-muted inline-flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 text-xs"
+                className="bg-muted inline-flex items-center gap-1 rounded-md py-0.5 pr-2 pl-0.5 text-xs"
               >
                 <UserAvatar user={m} size="xs" />
                 {m.name ?? "Member"}

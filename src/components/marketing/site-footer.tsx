@@ -32,8 +32,11 @@ const COLUMNS = [
   },
 ] as const;
 
-/** The logo and tagline, three columns of links, and the copyright line. */
-export function SiteFooter() {
+/**
+ * The logo and tagline, three columns of links, and the copyright line.
+ * Signed in, "Log in" becomes "Open your club" (the app).
+ */
+export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <footer className="bg-cream">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-12 px-6 pt-[72px] pb-10">
@@ -50,15 +53,18 @@ export function SiteFooter() {
             {COLUMNS.map((column) => (
               <div key={column.title} className="flex flex-col gap-3">
                 <span className="text-ink text-[13px] font-bold">{column.title}</span>
-                {column.links.map((link) => (
-                  <SiteLink
-                    key={link.label}
-                    href={link.href}
-                    className="text-ink-muted text-[15px]"
-                  >
-                    {link.label}
-                  </SiteLink>
-                ))}
+                {column.links.map((link) => {
+                  const toApp = signedIn && link.href === "/sign-in";
+                  return (
+                    <SiteLink
+                      key={link.label}
+                      href={toApp ? "/app" : link.href}
+                      className="text-ink-muted text-[15px]"
+                    >
+                      {toApp ? "Open your club" : link.label}
+                    </SiteLink>
+                  );
+                })}
               </div>
             ))}
           </div>

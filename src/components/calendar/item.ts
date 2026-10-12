@@ -1,4 +1,9 @@
-import type { CalendarSyncState, EventKind, EventVisibility, RSVPStatus } from "@/generated/prisma/enums";
+import type {
+  CalendarSyncState,
+  EventKind,
+  EventVisibility,
+  RSVPStatus,
+} from "@/generated/prisma/enums";
 import type { GridItem } from "@/lib/calendar/grid";
 
 /**
@@ -21,6 +26,11 @@ export interface CalendarItem extends GridItem {
   needsReview: boolean;
   /** The viewer's own answer, or null when they are not invited. */
   rsvp: RSVPStatus | null;
+  /**
+   * Set when this is a task's due date rather than an event: drawn as a
+   * checkbox chip on its day, and opens the task.
+   */
+  task?: { done: boolean };
 }
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -62,6 +72,7 @@ export function timeRange(item: CalendarItem): string {
 
 /** The chip's accessible name: everything the visual chip drops on a phone. */
 export function itemLabel(item: CalendarItem, kindLabel: string, visibilityLabel: string): string {
+  if (item.task) return `Task: ${item.title}, due this day${item.task.done ? ", done" : ""}`;
   const when = item.allDay ? "all day" : timeRange(item);
   const where = item.location ? `, ${item.location}` : "";
   return `${item.title}, ${when}${where}, ${kindLabel}, ${visibilityLabel}`;

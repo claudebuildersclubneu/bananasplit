@@ -1,20 +1,19 @@
 "use client";
 
 import {
-  CalendarDays,
   Check,
   ChevronDown,
   Columns3,
   ListChecks,
   Lock,
-  Search,
   SlidersHorizontal,
-  Users,
+  Table2,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,9 +23,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { SearchField } from "@/components/ui/search-field";
+import { chipClass, Segmented } from "@/components/ui/segmented";
 import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
-import { cn } from "@/lib/utils";
 
 import { STATUS_LABELS } from "./status-select";
 import { useTasks, useWorkspace } from "./tasks-context";
@@ -41,15 +40,13 @@ import { useTasks, useWorkspace } from "./tasks-context";
  *
  * Layout icons carry labels on desktop and shrink to icons on a phone; the
  * filters collapse behind one button with a count so the bar never wraps
- * into a wall of selects.
+ * into a wall of selects. Every control is the same height (h-7).
  */
 
 const LAYOUT_ICONS = {
-  week: ListChecks,
   board: Columns3,
-  table: SlidersHorizontal,
-  calendar: CalendarDays,
-  team: Users,
+  week: ListChecks,
+  table: Table2,
 } as const;
 
 function Chip({
@@ -57,13 +54,11 @@ function Chip({
   onClick,
   children,
   title,
-  className,
 }: {
   active?: boolean;
   onClick: () => void;
   children: React.ReactNode;
   title?: string;
-  className?: string;
 }) {
   return (
     <button
@@ -71,13 +66,7 @@ function Chip({
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={cn(
-        "focus-visible:ring-ring inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none",
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-border text-muted-foreground hover:text-foreground hover:bg-muted",
-        className,
-      )}
+      className={chipClass(Boolean(active))}
     >
       {children}
     </button>
@@ -121,31 +110,19 @@ export function WorkspaceToolbar() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {/* Layout: five shapes of the same question. */}
-        <nav aria-label="Layout" className="bg-muted flex items-center gap-0.5 rounded-lg p-1">
-          {ws.layouts.map((layout, index) => {
-            const Icon = LAYOUT_ICONS[layout.value];
-            const active = ws.query.view === layout.value;
-            return (
-              <button
-                key={layout.value}
-                type="button"
-                aria-current={active ? "page" : undefined}
-                title={`${layout.label} — ${layout.hint} (${index + 1})`}
-                onClick={() => ws.setView(layout.value)}
-                className={cn(
-                  "focus-visible:ring-ring inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none sm:px-3",
-                  active
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only sm:not-sr-only">{layout.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Layout: three shapes of the same question. */}
+        <Segmented
+          label="Layout"
+          value={ws.query.view}
+          onSelect={(v) => ws.setView(v as (typeof ws.layouts)[number]["value"])}
+          options={ws.layouts.map((layout, index) => ({
+            value: layout.value,
+            label: layout.label,
+            icon: LAYOUT_ICONS[layout.value],
+            compact: true,
+            title: `${layout.label}: ${layout.hint} (${index + 1})`,
+          }))}
+        />
 
         {/* Scope: whose work. The team option only exists if you have reports. */}
         <div className="flex items-center gap-1" role="group" aria-label="Whose tasks">
@@ -161,7 +138,7 @@ export function WorkspaceToolbar() {
         </div>
 
         <div className="ms-auto flex flex-1 items-center justify-end gap-2 sm:flex-none">
-          <SearchField
+          <TaskSearch
             key={ws.query.q ?? ""}
             inputRef={searchRef}
             initial={ws.query.q ?? ""}
@@ -170,13 +147,11 @@ export function WorkspaceToolbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
+              <Button variant="outline" size="sm">
                 <SlidersHorizontal className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Filter</span>
                 {ws.filterCount > 0 && (
-                  <span className="bg-foreground text-background inline-flex size-4 items-center justify-center rounded-full text-[10px] font-semibold">
-                    {ws.filterCount}
-                  </span>
+                  <Badge className="h-4 min-w-4 px-1 text-[10px]">{ws.filterCount}</Badge>
                 )}
                 <ChevronDown className="size-3.5 opacity-60" aria-hidden="true" />
               </Button>
@@ -345,7 +320,7 @@ export function WorkspaceToolbar() {
  * leaving the field) writes it to the URL. Remounting on the committed value
  * keeps the two in step without an effect that fights your typing.
  */
-function SearchField({
+function TaskSearch({
   initial,
   onCommit,
   inputRef,
@@ -356,48 +331,27 @@ function SearchField({
 }) {
   const [draft, setDraft] = useState(initial);
   return (
-    <div className="relative w-full max-w-56 sm:w-56">
-      <Search
-        className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-        aria-hidden="true"
-      />
-      <Input
-        ref={inputRef}
-        value={draft}
-        placeholder="Search tasks"
-        aria-label="Search tasks by title"
-        className="h-8 ps-8 pe-8 text-sm"
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onCommit(draft.trim());
-          if (e.key === "Escape") {
-            setDraft("");
-            onCommit("");
-            e.currentTarget.blur();
-          }
-        }}
-        onBlur={() => {
-          if (draft.trim() !== initial) onCommit(draft.trim());
-        }}
-      />
-      {draft ? (
-        <button
-          type="button"
-          aria-label="Clear search"
-          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
-          onClick={() => {
-            setDraft("");
-            onCommit("");
-          }}
-        >
-          <X className="size-3.5" />
-        </button>
-      ) : (
-        <kbd className="text-muted-foreground border-border pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded border px-1 text-[10px] leading-4 sm:block">
-          /
-        </kbd>
-      )}
-    </div>
+    <SearchField
+      ref={inputRef}
+      value={draft}
+      onValueChange={setDraft}
+      onClear={() => onCommit("")}
+      hint="/"
+      placeholder="Search tasks"
+      aria-label="Search tasks by title"
+      className="max-w-56"
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onCommit(draft.trim());
+        if (e.key === "Escape") {
+          setDraft("");
+          onCommit("");
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={() => {
+        if (draft.trim() !== initial) onCommit(draft.trim());
+      }}
+    />
   );
 }
 
@@ -411,14 +365,14 @@ function FilterPill({
   onClear: () => void;
 }) {
   return (
-    <span className="bg-muted text-foreground inline-flex h-7 items-center gap-1.5 rounded-full ps-2.5 pe-1 text-xs font-medium">
+    <span className="bg-muted text-foreground inline-flex h-7 items-center gap-1.5 rounded-md ps-2.5 pe-1 text-xs font-medium">
       {icon}
       {label}
       <button
         type="button"
         aria-label={`Remove filter ${label}`}
         onClick={onClear}
-        className="text-muted-foreground hover:text-foreground hover:bg-background rounded-full p-0.5 transition-colors"
+        className="text-muted-foreground hover:text-foreground hover:bg-background rounded-md p-0.5 transition-colors"
       >
         <X className="size-3" />
       </button>

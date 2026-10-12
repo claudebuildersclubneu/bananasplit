@@ -54,15 +54,17 @@ export function ContactActions({
   };
 
   return (
-    <div className="space-y-4 rounded-md border p-3 text-sm">
-      <p className="font-medium">Manage this person</p>
+    <div className="space-y-4 rounded-xl border p-3 text-sm">
+      <h3 className="text-sm font-semibold">Manage this person</h3>
       <div className="flex gap-2">
         <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Display name" />
         <Button
           variant="outline"
           size="sm"
           disabled={pending || !name.trim() || name === contact.displayName}
-          onClick={() => go(() => renameContactAction(organizationId, contact.id, name), "Renamed.")}
+          onClick={() =>
+            go(() => renameContactAction(organizationId, contact.id, name), "Renamed.")
+          }
         >
           Rename
         </Button>
@@ -71,9 +73,12 @@ export function ContactActions({
         <select
           aria-label="Linked member"
           defaultValue={contact.userId ?? ""}
-          className="border-input bg-background h-8 flex-1 rounded-md border px-2"
+          className="border-input bg-background h-8 flex-1 rounded-lg border px-2"
           onChange={(e) =>
-            go(() => linkContactAction(organizationId, contact.id, e.target.value || null), "Link saved.")
+            go(
+              () => linkContactAction(organizationId, contact.id, e.target.value || null),
+              "Link saved.",
+            )
           }
           disabled={pending}
         >
@@ -113,12 +118,19 @@ export function ContactActions({
             </Button>
           </div>
         ) : (
-          <ContactSearch organizationId={organizationId} excludeId={contact.id} onPick={setMerge} placeholder="Find a duplicate…" />
+          <ContactSearch
+            organizationId={organizationId}
+            excludeId={contact.id}
+            onPick={setMerge}
+            placeholder="Find a duplicate…"
+          />
         )}
       </div>
       {contact.emails.length > 1 && (
         <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">Split an address off into its own person (unmerge):</p>
+          <p className="text-muted-foreground text-xs">
+            Split an address off into its own person (unmerge):
+          </p>
           {contact.emails.map((e) => (
             <div key={e.id} className="flex items-center justify-between gap-2">
               <span className="font-mono text-xs">
@@ -129,7 +141,9 @@ export function ContactActions({
                 size="xs"
                 variant="ghost"
                 disabled={pending}
-                onClick={() => go(() => splitContactEmailAction(organizationId, contact.id, e.id), "Split off.")}
+                onClick={() =>
+                  go(() => splitContactEmailAction(organizationId, contact.id, e.id), "Split off.")
+                }
               >
                 Split off
               </Button>

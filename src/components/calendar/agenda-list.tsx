@@ -1,13 +1,21 @@
 "use client";
 
-import { AlertTriangle, CalendarClock, CalendarX2, CalendarRange, Globe, Lock, MapPin } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CalendarX2,
+  CalendarRange,
+  Globe,
+  Lock,
+  MapPin,
+} from "lucide-react";
 import { useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { agendaDays } from "@/lib/calendar/grid";
 
 import { type CalendarItem, timeRange } from "./item";
-import { KIND_META, kindStyle, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
+import { itemStyle, KIND_META, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
 
 /**
  * The agenda: every day in the window that has something on it, in order,
@@ -47,7 +55,11 @@ export function AgendaList({
     <div className="cal-agenda">
       {days.map((day) => (
         <section key={day.key} className="cal-agenda__day" aria-labelledby={`agenda-${day.key}`}>
-          <h3 className="cal-agenda__head" id={`agenda-${day.key}`} data-today={day.key === todayKey ? "true" : undefined}>
+          <h3
+            className="cal-agenda__head"
+            id={`agenda-${day.key}`}
+            data-today={day.key === todayKey ? "true" : undefined}
+          >
             <span className="cal-agenda__date">{dayHeading(day.key)}</span>
             <span className="cal-agenda__rel">{relativeDay(day.key, todayKey)}</span>
           </h3>
@@ -85,20 +97,21 @@ function AgendaRow({
     <button
       type="button"
       className="cal-agenda__row"
-      style={kindStyle(item.kind)}
+      style={itemStyle(item)}
+      data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
       aria-expanded={open}
       onClick={(event) => onOpen(item, event.currentTarget)}
     >
       {/* The dot rides in the time column so every row's dot lines up. */}
       <span className="cal-agenda__when">
         <span aria-hidden className="cal-chip__dot" />
-        {item.allDay ? "All day" : timeRange(item)}
+        {item.task ? "Due" : item.allDay ? "All day" : timeRange(item)}
       </span>
 
       <span className="min-w-0">
         <span className="cal-agenda__title">{item.title}</span>
         <span className="cal-agenda__meta">
-          <span>{kind.label}</span>
+          <span>{item.task ? (item.task.done ? "Task · done" : "Task") : kind.label}</span>
           {item.location && (
             <span className="inline-flex min-w-0 items-center gap-1">
               <MapPin aria-hidden className="size-3 shrink-0" />
@@ -115,12 +128,19 @@ function AgendaRow({
       </span>
 
       <span className="cal-agenda__badges">
-        <Badge variant={item.visibility === "PUBLIC" ? "secondary" : "outline"} title={visibility.hint}>
-          <VisIcon aria-hidden className="size-3" />
-          {visibility.label}
-        </Badge>
+        {!item.task && (
+          <Badge
+            variant={item.visibility === "PUBLIC" ? "secondary" : "outline"}
+            title={visibility.hint}
+          >
+            <VisIcon aria-hidden className="size-3" />
+            {visibility.label}
+          </Badge>
+        )}
         {item.rsvp && (
-          <Badge variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}>
+          <Badge
+            variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}
+          >
             {RSVP_META[item.rsvp].short}
           </Badge>
         )}

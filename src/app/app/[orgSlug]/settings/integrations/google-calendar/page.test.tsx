@@ -97,7 +97,7 @@ beforeEach(() => {
   getGoogleSyncStatusMock.mockResolvedValue(syncStatus);
 });
 
-describe("Settings > Integrations > Google Calendar", () => {
+describe("Admin panel › Integrations › Google Calendar", () => {
   it("shows the calendar's import card with the dry run's results while connected", async () => {
     const html = await render("CONNECTED");
     expect(withOrgTxMock).toHaveBeenCalledWith(org.id, expect.any(Function));

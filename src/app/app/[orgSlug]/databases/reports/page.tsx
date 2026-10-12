@@ -2,11 +2,16 @@ import { Suspense, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { RangePicker } from "@/components/reports/range-picker";
 import { ReportSkeleton } from "@/components/reports/report-skeleton";
 import { ReportsBody, ReportsFrame } from "@/components/reports/reports-frame";
 import { BallotsSection } from "@/components/reports/sections/ballots-section";
-import { RetentionSection, SignupsSection, StampsSection } from "@/components/reports/sections/people-sections";
+import {
+  RetentionSection,
+  SignupsSection,
+  StampsSection,
+} from "@/components/reports/sections/people-sections";
 import {
   AttendanceSection,
   LastSessionSection,
@@ -21,6 +26,7 @@ import { reportTier } from "@/server/reports/tier";
 import type { ReportId } from "@/server/reports/types";
 import { getVisibleReports } from "@/server/reports/visibility";
 
+import { DatabasesTabs } from "../databases-tabs";
 import { AutoRefresh, RefreshButton } from "./refresh-controls";
 
 export const metadata = { title: "Reports" };
@@ -70,7 +76,15 @@ const SLOTS: Record<ReportId, Slot> = {
   },
 };
 
-const ORDER: ReportId[] = ["last-session", "attendance", "retention", "session-types", "signups", "stamps", "ballots"];
+const ORDER: ReportId[] = [
+  "last-session",
+  "attendance",
+  "retention",
+  "session-types",
+  "signups",
+  "stamps",
+  "ballots",
+];
 
 /**
  * Reports (Phase 5). Authorize, derive the tier, resolve the date range to
@@ -79,7 +93,10 @@ const ORDER: ReportId[] = ["last-session", "attendance", "retention", "session-t
  * the cached aggregate loaders in src/server/reports; nothing here fetches
  * rows.
  */
-export default async function ReportsPage({ params, searchParams }: PageProps<"/app/[orgSlug]/databases/reports">) {
+export default async function ReportsPage({
+  params,
+  searchParams,
+}: PageProps<"/app/[orgSlug]/databases/reports">) {
   const { orgSlug } = await params;
   const sp = await searchParams;
   const { organization, role, settings } = await getOrgContextBySlug(orgSlug);
@@ -114,24 +131,24 @@ export default async function ReportsPage({ params, searchParams }: PageProps<"/
   return (
     <ReportsFrame>
       <div className="space-y-6">
-        <div className="space-y-1">
-          <h1 className="page-title">Reports</h1>
-          <p className="text-muted-foreground text-sm">
-            Attendance, retention, signups and ballot results for {organization.name}. Times are in {tz}.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <RangePicker
-            preset={range.preset}
-            from={range.from}
-            to={range.to}
-            label={range.label}
-            span={range.span}
-          />
-          <RefreshButton organizationId={organization.id} />
-          <AutoRefresh seconds={refreshSeconds} />
-        </div>
+        <PageHeader
+          title="Reports"
+          description={`Attendance, retention, signups and ballot results for ${organization.name}. Times are in ${tz}.`}
+          actions={
+            <>
+              <RangePicker
+                preset={range.preset}
+                from={range.from}
+                to={range.to}
+                label={range.label}
+                span={range.span}
+              />
+              <RefreshButton organizationId={organization.id} />
+              <AutoRefresh seconds={refreshSeconds} />
+            </>
+          }
+          tabs={<DatabasesTabs orgSlug={orgSlug} showReports />}
+        />
 
         {ids.length === 0 ? (
           <EmptyState

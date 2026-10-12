@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2 } from "lucide-react";
+import { Building2, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -10,15 +10,15 @@ import { SETTINGS_ICONS } from "./settings-icons";
 import { isSettingsItemActive, SETTINGS_GROUPS, type SettingsNavItem } from "./settings-nav";
 
 /**
- * Settings navigation: a grouped rail beside the page on wide screens, a
- * scrolling strip of chips on a phone.
+ * Admin panel navigation: a grouped rail beside the page on wide screens, a
+ * scrolling strip of tabs on a phone.
  */
 export function SettingsSubnav({ items, orgSlug }: { items: SettingsNavItem[]; orgSlug: string }) {
   const pathname = usePathname();
   const overview = `/app/${orgSlug}/settings`;
 
   return (
-    <nav aria-label="Settings">
+    <nav aria-label="Admin panel">
       <div className="-mx-1 overflow-x-auto px-1 pb-1 lg:hidden">
         <div className="flex min-w-max gap-1.5">
           {items.map((item) => {
@@ -30,8 +30,10 @@ export function SettingsSubnav({ items, orgSlug }: { items: SettingsNavItem[]; o
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm whitespace-nowrap",
-                  active ? "bg-primary text-primary-foreground border-transparent" : "hover:bg-muted",
+                  "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-sm whitespace-nowrap",
+                  active
+                    ? "bg-muted text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-muted/60",
                 )}
               >
                 <Icon className="size-3.5" aria-hidden="true" />
@@ -47,20 +49,21 @@ export function SettingsSubnav({ items, orgSlug }: { items: SettingsNavItem[]; o
           href={overview}
           aria-current={pathname === overview ? "page" : undefined}
           className={cn(
-            "block rounded-md px-3 py-1.5 text-sm font-semibold",
-            pathname === overview ? "bg-muted" : "hover:bg-muted/60",
+            "flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+            pathname === overview
+              ? "bg-muted text-foreground font-medium"
+              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
           )}
         >
-          All settings
+          <LayoutGrid className="size-4 shrink-0" aria-hidden="true" />
+          Overview
         </Link>
         {SETTINGS_GROUPS.map((group) => {
           const groupItems = items.filter((i) => i.group === group);
           if (groupItems.length === 0) return null;
           return (
             <div key={group} className="space-y-0.5">
-              <p className="text-muted-foreground px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase">
-                {group}
-              </p>
+              <p className="eyebrow text-muted-foreground px-3 pb-1">{group}</p>
               {groupItems.map((item) => {
                 const active = isSettingsItemActive(item, pathname);
                 const Icon = SETTINGS_ICONS[item.icon] ?? Building2;

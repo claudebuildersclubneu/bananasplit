@@ -15,7 +15,7 @@ import {
 
 import { useMediaQuery, useNowMinutes } from "./hooks";
 import { type CalendarItem, itemLabel, shortTime, timeRange } from "./item";
-import { KIND_META, kindStyle, VISIBILITY_META } from "./kinds";
+import { itemStyle, KIND_META, kindStyle, VISIBILITY_META } from "./kinds";
 import { longDate } from "./month-grid";
 
 /**
@@ -82,7 +82,10 @@ export function WeekGrid({
   const narrow = useMediaQuery("(max-width: 47.99rem)");
   const showStrip = dayCount > 1 && narrow;
   const daysKey = showStrip ? pickedDay : windowKeys.join(",");
-  const days = useMemo(() => (showStrip ? [pickedDay] : windowKeys), [showStrip, pickedDay, windowKeys]);
+  const days = useMemo(
+    () => (showStrip ? [pickedDay] : windowKeys),
+    [showStrip, pickedDay, windowKeys],
+  );
 
   const placements = useMemo(
     () => days.map((key) => ({ key, placed: placeDayItems(key, byDay.get(key) ?? []) })),
@@ -139,7 +142,11 @@ export function WeekGrid({
                 </span>
                 <span aria-hidden className="cal-daystrip__dots">
                   {dayItems.slice(0, 3).map((item) => (
-                    <span key={item.id} className="cal-daystrip__dot" style={kindStyle(item.kind)} />
+                    <span
+                      key={item.id}
+                      className="cal-daystrip__dot"
+                      style={kindStyle(item.kind)}
+                    />
                   ))}
                 </span>
                 <span className="sr-only">
@@ -161,7 +168,11 @@ export function WeekGrid({
           {!showStrip && <div className="cal-week__corner" />}
           {!showStrip &&
             days.map((key) => (
-              <div key={key} className="cal-week__dayhead" data-today={key === todayKey ? "true" : undefined}>
+              <div
+                key={key}
+                className="cal-week__dayhead"
+                data-today={key === todayKey ? "true" : undefined}
+              >
                 <span aria-hidden className="cal-week__dow">
                   {DOW[weekdayOf(key)]}
                 </span>
@@ -179,7 +190,12 @@ export function WeekGrid({
               {allDayByDay.map(({ key, items: dayItems }) => (
                 <div key={key} className="cal-week__allday">
                   {dayItems.map((item) => (
-                    <AllDayChip key={item.id} item={item} open={openId === item.id} onOpen={onOpen} />
+                    <AllDayChip
+                      key={item.id}
+                      item={item}
+                      open={openId === item.id}
+                      onOpen={onOpen}
+                    />
                   ))}
                 </div>
               ))}
@@ -264,7 +280,11 @@ function Slot({
       data-internal={item.visibility === "INTERNAL" ? "true" : undefined}
       data-compact={compact ? "true" : undefined}
       aria-expanded={open}
-      aria-label={itemLabel(item, KIND_META[item.kind].label, VISIBILITY_META[item.visibility].label)}
+      aria-label={itemLabel(
+        item,
+        KIND_META[item.kind].label,
+        VISIBILITY_META[item.visibility].label,
+      )}
       onClick={(event) => onOpen(item, event.currentTarget)}
     >
       {/* A half-hour slot is one line tall, and the full range spends it all
@@ -276,7 +296,9 @@ function Slot({
       <span aria-hidden className="cal-slot__title">
         {item.title}
       </span>
-      {showSync && item.syncState === "FAILED" && <span className="sr-only">Google sync failed</span>}
+      {showSync && item.syncState === "FAILED" && (
+        <span className="sr-only">Google sync failed</span>
+      )}
     </button>
   );
 }
@@ -295,10 +317,15 @@ function AllDayChip({
     <button
       type="button"
       className="cal-chip"
-      style={{ ...kindStyle(item.kind), marginTop: 0 }}
-      data-internal={item.visibility === "INTERNAL" ? "true" : undefined}
+      style={{ ...itemStyle(item), marginTop: 0 }}
+      data-internal={item.visibility === "INTERNAL" && !item.task ? "true" : undefined}
+      data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
       aria-expanded={open}
-      aria-label={itemLabel(item, KIND_META[item.kind].label, VISIBILITY_META[item.visibility].label)}
+      aria-label={itemLabel(
+        item,
+        KIND_META[item.kind].label,
+        VISIBILITY_META[item.visibility].label,
+      )}
       onClick={(event) => onOpen(item, event.currentTarget)}
     >
       <span className="cal-chip__line">
@@ -306,9 +333,11 @@ function AllDayChip({
         <span aria-hidden className="cal-chip__title">
           {item.title}
         </span>
-        <span aria-hidden className="cal-chip__marks">
-          <VisIcon className="size-3" />
-        </span>
+        {!item.task && (
+          <span aria-hidden className="cal-chip__marks">
+            <VisIcon className="size-3" />
+          </span>
+        )}
       </span>
     </button>
   );
