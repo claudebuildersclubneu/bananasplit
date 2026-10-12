@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { CodeBoxes, cleanCode } from "@/components/brand/code-boxes";
 import { pill } from "@/components/brand/pill";
-import { JOIN_CODE_LENGTH, LEGACY_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
+import { JOIN_CODE_LENGTH, SHORT_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
 import { cn } from "@/lib/utils";
 
 import { checkInviteCodeAction, joinWithInviteCodeAction, type CheckCodeResult } from "./actions";
@@ -16,16 +16,16 @@ function emptyCode(length = JOIN_CODE_LENGTH): string[] {
   return Array.from({ length }, () => "");
 }
 
-/** ?code= from an admin's shared link: six boxes, or eight for a legacy code. */
+/** ?code= from an admin's shared link: eight boxes, or six for an older short code. */
 function initialBoxes(initialCode: string): string[] {
   const chars = cleanCode(initialCode);
   const length =
-    chars.length === LEGACY_JOIN_CODE_LENGTH ? LEGACY_JOIN_CODE_LENGTH : JOIN_CODE_LENGTH;
+    chars.length === SHORT_JOIN_CODE_LENGTH ? SHORT_JOIN_CODE_LENGTH : JOIN_CODE_LENGTH;
   return Array.from({ length }, (_, i) => chars[i] ?? "");
 }
 
 /**
- * Enter the club's code in six boxes (design: App screens, 03). Once every
+ * Enter the club's code in eight boxes, XXXX-XXXX (design: App screens, 03). Once every
  * box is filled the club is looked up on the server (the code, the verified
  * email and the club's allowed domain) and shown before anyone joins.
  */

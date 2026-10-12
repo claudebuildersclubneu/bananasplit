@@ -54,7 +54,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
             <li className="flex items-start gap-2.5">
               <ArrowRight className="mt-[3px]" />
               <span>
-                Codes are 6 letters and numbers, like <b>ROBO26</b>.
+                Codes are 8 letters and numbers, like <b>RPKA-YWSF</b>.
               </span>
             </li>
           </ul>

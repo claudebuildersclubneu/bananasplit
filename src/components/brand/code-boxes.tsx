@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 
-import { LEGACY_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
+import { JOIN_CODE_LENGTH, SHORT_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
 import { cn } from "@/lib/utils";
 
 /** Letters and digits only, upper-cased. */
@@ -16,7 +16,8 @@ export function cleanCode(text: string): string {
  * Backspace in an empty box clears the one before and moves back; the arrow
  * keys move between boxes; focusing a box selects it; a paste anywhere fills
  * the boxes from the start. `value` has one entry per box ("" when empty);
- * a pasted legacy XXXX-XXXX code comes back as eight entries, and the
+ * eight boxes show as two groups of four (RPKA-YWSF), and a pasted
+ * six-character code (an older short code) comes back as six entries: the
  * boxes follow the array's length.
  */
 export function CodeBoxes({
@@ -46,8 +47,8 @@ export function CodeBoxes({
     if (!text) return;
     e.preventDefault();
     const size =
-      text.length === LEGACY_JOIN_CODE_LENGTH && length < LEGACY_JOIN_CODE_LENGTH
-        ? LEGACY_JOIN_CODE_LENGTH
+      text.length === SHORT_JOIN_CODE_LENGTH || text.length === JOIN_CODE_LENGTH
+        ? text.length
         : length;
     const next = Array.from({ length: size }, (_, k) => text[k] ?? "");
     onChange(next);
@@ -61,7 +62,13 @@ export function CodeBoxes({
       onPaste={onPaste}
       className={cn("flex gap-2.5", length > 6 && "gap-2")}
     >
-      {value.map((char, i) => (
+      {value.map((char, i) => [
+        // Eight characters read as two groups of four, like the code itself.
+        length === JOIN_CODE_LENGTH && i === 4 && (
+          <span key="dash" aria-hidden="true" className="text-ink-faint self-center text-[26px]">
+            -
+          </span>
+        ),
         <input
           key={i}
           ref={(el) => {
@@ -114,8 +121,8 @@ export function CodeBoxes({
             char ? "border-ink bg-paper" : "border-ink/16 bg-cream",
             invalid && "border-destructive",
           )}
-        />
-      ))}
+        />,
+      ])}
     </div>
   );
 }

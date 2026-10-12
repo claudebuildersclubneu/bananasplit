@@ -63,11 +63,13 @@ busy times (B5). That org's admins, and you, always do.
 There are two ways in, and both are checked against the organization before
 anyone joins:
 
-1. **Invite code.** Each org has one shareable six-character code (like
-   `ROBO26`) and a link that fills it in (`/onboarding/join?code=...`). The
-   person types or pastes it into six boxes; once all six are in, the page
-   shows which club it belongs to (name, logo, member count), then they press
-   **Join**. The server checks that:
+1. **Invite code.** Each org has one shareable eight-character code (like
+   `RPKA-YWSF`) and a link that fills it in (`/onboarding/join?code=...`).
+   The person types or pastes it into eight boxes, in two groups of four;
+   once all eight are in, the page shows which club it belongs to (name,
+   logo, member count), then they press **Join**. Six-character codes (like
+   `ROBO26`), issued for a short while, still work when pasted or opened from
+   their link. The server checks that:
    - their email is verified;
    - the code matches an org, the org isn't being deleted, and the code is
      turned on;
