@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { signInPath } from "@/lib/auth/callback-url";
 import { getSession } from "@/lib/auth/session";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { authDb } from "@/server/db/clients";
@@ -14,9 +15,15 @@ function resultUrl(token: string, result: string): string {
   return `/verify-email/${encodeURIComponent(token)}?result=${result}`;
 }
 
-/** Confirms the address behind `token` (single use), then shows the outcome. */
+/**
+ * Confirms the address behind `token` for the signed-in account (single
+ * use), then shows the outcome. Signed out, it asks for a log-in first and
+ * comes back here.
+ */
 export async function confirmEmailAction(token: string): Promise<void> {
-  const outcome = await consumeVerificationToken(token);
+  const session = await getSession();
+  if (!session) redirect(signInPath(`/verify-email/${encodeURIComponent(token)}`));
+  const outcome = await consumeVerificationToken(token, session.user.id);
   redirect(resultUrl(token, outcome.ok ? "ok" : outcome.reason));
 }
 

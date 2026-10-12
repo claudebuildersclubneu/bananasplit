@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { setActiveOrgCookie } from "@/lib/active-org-cookie";
 import { requireUser } from "@/lib/auth/session";
+import { getClientIp } from "@/lib/request-ip";
 import { orgLogoUrl } from "@/lib/org-logo";
 import { checkJoinCode, joinWithCode } from "@/server/onboarding/join-code";
 
@@ -29,7 +30,7 @@ export type CheckCodeResult =
 
 export async function checkInviteCodeAction(code: string): Promise<CheckCodeResult> {
   const user = await requireUser();
-  const result = await checkJoinCode(user, typeof code === "string" ? code : "");
+  const result = await checkJoinCode(user, typeof code === "string" ? code : "", await getClientIp());
   if (!result.ok) return { ok: false, error: result.message };
   return {
     ok: true,
@@ -46,7 +47,7 @@ export async function checkInviteCodeAction(code: string): Promise<CheckCodeResu
 
 export async function joinWithInviteCodeAction(code: string): Promise<{ error?: string }> {
   const user = await requireUser();
-  const result = await joinWithCode(user, typeof code === "string" ? code : "");
+  const result = await joinWithCode(user, typeof code === "string" ? code : "", await getClientIp());
   if (!result.ok) return { error: result.message };
   await setActiveOrgCookie(result.orgId);
   redirect(`/app/${result.orgSlug}`);

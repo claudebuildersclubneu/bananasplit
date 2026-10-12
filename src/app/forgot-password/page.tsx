@@ -1,38 +1,19 @@
-import Link from "next/link";
-
-import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
-import { pill } from "@/components/brand/pill";
-import { CONTACT_HREF } from "@/lib/brand/links";
+import { AuthCard } from "@/components/brand/auth-card";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
-import { cn } from "@/lib/utils";
+import { PASSWORD_RESET_TTL_MINUTES } from "@/server/email/password-reset";
 
-export const metadata = { title: "Forgot your password · Bananasplit" };
+import { ForgotPasswordForm } from "./forgot-password-form";
 
-/**
- * Where the log-in form's "Forgot?" goes. There is no emailed password
- * reset yet, so this says so plainly and points at the ways back in.
- */
+export const metadata = { title: "Reset your password · Bananasplit" };
+
+/** Where the log-in form's "Forgot?" goes: ask for an emailed reset link. */
 export default function ForgotPasswordPage() {
-  const googleEnabled = googleSignInEnabled();
   return (
     <AuthCard>
-      <AuthTitle
-        title="Forgot your password?"
-        description="We can't reset passwords by email yet."
+      <ForgotPasswordForm
+        expiresMinutes={PASSWORD_RESET_TTL_MINUTES}
+        googleEnabled={googleSignInEnabled()}
       />
-      <ul className="text-ink-muted m-0 flex list-disc flex-col gap-2 pl-5 text-[15px] leading-normal">
-        {googleEnabled && <li>If you signed up with Google, log in with Google instead.</li>}
-        <li>
-          Otherwise,{" "}
-          <a href={CONTACT_HREF} className="font-semibold underline">
-            contact us
-          </a>{" "}
-          from your account&apos;s email and we&apos;ll help you back in.
-        </li>
-      </ul>
-      <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
-        Back to log in
-      </Link>
     </AuthCard>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { requireUser } from "@/lib/auth/session";
@@ -28,6 +29,10 @@ function renewal() {
  * never submits (see CheckoutForm).
  */
 export default async function CheckoutPage({ searchParams }: PageProps<"/checkout">) {
+  // The card fields are a visual stand-in for Stripe's Payment Element. On
+  // the production deployment the page doesn't exist until billing is
+  // connected, so nobody types a real card number into our own inputs.
+  if (process.env.VERCEL_ENV === "production" && process.env.BILLING_ENABLED !== "true") notFound();
   const user = await requireUser();
   const params = await searchParams;
   const plan = isClubPlanId(params.plan) ? params.plan : "society";

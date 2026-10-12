@@ -1,9 +1,9 @@
-/**
- * The sign-up form's three-segment meter. A rough guide for the person
- * typing, not a rule: the server only enforces the length (sign-up/actions).
- */
+import { PASSWORD_MIN_LENGTH } from "./password-policy";
 
-export const PASSWORD_MIN_LENGTH = 8;
+/**
+ * The three-segment meter on the sign-up and reset forms. A rough guide for
+ * the person typing, not a rule: the server enforces password-policy.ts.
+ */
 
 export interface PasswordStrength {
   /** Segments filled, 0-3. */

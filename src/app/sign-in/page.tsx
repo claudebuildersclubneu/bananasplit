@@ -27,7 +27,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 /** Log in: the auth card with "Welcome back." (design: App screens, 01). */
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   const session = await auth();
-  const { error, callbackUrl: rawCallbackUrl } = await searchParams;
+  const { error, callbackUrl: rawCallbackUrl, notice } = await searchParams;
   const errorCode = typeof error === "string" ? error : undefined;
   // Where to go after signing in: a same-origin relative path only.
   const callbackUrl = safeCallbackUrl(rawCallbackUrl);
@@ -47,6 +47,9 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   return (
     <AuthCard>
       <AuthTitle title="Welcome back." description="Log in to your club workspace." />
+      {notice === "password-reset" && !errorMessage && (
+        <FormMessage tone="info">Your password is changed. Log in with the new one.</FormMessage>
+      )}
       {errorMessage && <FormMessage>{errorMessage}</FormMessage>}
       {googleEnabled && (
         <>

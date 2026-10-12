@@ -55,6 +55,17 @@ describe("export registry catalog", () => {
     expect(EXPORT_TABLES.find((t) => t.model === "PollVote")?.omit).toEqual(["userId"]);
   });
 
+  it("keeps what only one person can see out of the export", () => {
+    // The export reads past the row policies, so a private note or file
+    // must be filtered here, or an owner would download another member's.
+    const byModel = new Map(EXPORT_TABLES.map((t) => [t.model, t]));
+    for (const model of ["Note", "OrgFile"]) {
+      expect(byModel.get(model)?.where).toEqual({ visibility: "ORGANIZATION", deletedAt: null });
+    }
+    expect(byModel.has("Notification")).toBe(false);
+    expect(EXPORT_EXCLUDED.Notification).toBeTruthy();
+  });
+
   it("marks individual ballots as privacy-gated", () => {
     expect(
       EXPORT_TABLES.filter((t) => t.ballotRows)

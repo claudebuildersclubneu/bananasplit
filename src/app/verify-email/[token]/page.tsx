@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { pill } from "@/components/brand/pill";
+import { signInPath } from "@/lib/auth/callback-url";
 import { getSession } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { peekVerificationToken } from "@/server/email/verification";
@@ -14,6 +15,9 @@ import { confirmEmailAction, resendVerificationAction } from "./actions";
  * mail scanner that prefetches links cannot use it up.
  */
 export const dynamic = "force-dynamic";
+
+/** The token is in the URL: never pass it on to another site as a referrer. */
+export const metadata = { title: "Confirm your email · Bananasplit", referrer: "no-referrer" as const };
 
 const RESULTS = {
   ok: {
@@ -32,6 +36,11 @@ const RESULTS = {
   resent: {
     title: "Check your inbox.",
     description: "We sent a new confirmation link. It may take a minute to arrive.",
+  },
+  "wrong-account": {
+    title: "This link is for another account.",
+    description:
+      "You're logged in as someone else. Log out, then log in with the account you signed up with and open the link again.",
   },
   limited: {
     title: "Too many requests.",
@@ -100,6 +109,24 @@ export default async function VerifyEmailPage({
       <Shell title={copy.title} description={copy.description}>
         {resendButton}
         {continueLink}
+      </Shell>
+    );
+  }
+
+  // The link only confirms for the account it was sent to: signed out, log
+  // in first (and come back here).
+  if (!session) {
+    return (
+      <Shell
+        title="Log in to confirm."
+        description="Log in with the account you signed up with, and you'll come straight back here to confirm your email."
+      >
+        <Link
+          href={signInPath(`/verify-email/${encodeURIComponent(token)}`)}
+          className={cn(pill({ raised: true }), "w-full")}
+        >
+          Log in
+        </Link>
       </Shell>
     );
   }

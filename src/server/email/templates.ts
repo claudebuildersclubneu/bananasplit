@@ -166,6 +166,46 @@ export function verifyEmailEmail(input: {
   });
 }
 
+/** The link from "Forgot your password?". Says nothing about the account itself. */
+export function passwordResetEmail(input: {
+  name?: string | null;
+  resetUrl: string;
+  expiresMinutes: number;
+}): RenderedEmail {
+  const greeting = input.name ? `Hi ${input.name},` : "Hi,";
+  const body = `Someone asked to reset the password for your ${PRODUCT} account. The link works once and expires in ${input.expiresMinutes} minutes.`;
+  return layout({
+    subject: `Reset your ${PRODUCT} password`,
+    bodyHtml: paragraph(greeting) + paragraph(body),
+    bodyText: `${greeting}
+
+${body}`,
+    cta: { label: "Set a new password", url: input.resetUrl },
+    footer: "If you didn't ask for this, ignore this email: your password stays the same.",
+  });
+}
+
+/** Sent after a password reset, so a change the owner didn't make doesn't go unnoticed. */
+export function passwordChangedEmail(input: {
+  name?: string | null;
+  resetUrl: string;
+}): RenderedEmail {
+  const greeting = input.name ? `Hi ${input.name},` : "Hi,";
+  const body = `The password for your ${PRODUCT} account was just changed, and every device that was signed in has been signed out.`;
+  const notYou = "If you didn't do this, reset your password now and tell your club's admins.";
+  return layout({
+    subject: `Your ${PRODUCT} password was changed`,
+    bodyHtml: paragraph(greeting) + paragraph(body) + paragraph(notYou),
+    bodyText: `${greeting}
+
+${body}
+
+${notYou}`,
+    cta: { label: "Reset my password", url: input.resetUrl },
+    footer: `You're receiving this because the password changed on your ${PRODUCT} account.`,
+  });
+}
+
 /** Settings > Integrations > Email: 'Send test email'. */
 export function testEmail(input: { orgName: string; senderLabel: string }): RenderedEmail {
   return layout({

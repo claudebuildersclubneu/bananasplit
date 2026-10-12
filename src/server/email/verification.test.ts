@@ -130,10 +130,21 @@ describe("email verification", () => {
     expect(await peekVerificationToken(token)).toBe("valid");
     expect(await peekVerificationToken(token)).toBe("valid");
 
-    expect(await consumeVerificationToken(token)).toEqual({ ok: true, email: "new@example.edu" });
+    expect(await consumeVerificationToken(token, "u1")).toEqual({ ok: true, email: "new@example.edu" });
     expect(store.users[0].emailVerified).toBeInstanceOf(Date);
     expect(await peekVerificationToken(token)).toBe("invalid");
-    expect(await consumeVerificationToken(token)).toEqual({ ok: false, reason: "invalid" });
+    expect(await consumeVerificationToken(token, "u1")).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("only the account the link was sent for can use it, and a refusal doesn't spend it", async () => {
+    store.users.push({ id: "u2", email: "someone-else@example.edu", name: null, emailVerified: null });
+    await run("u1");
+    const token = tokenFromLastMail();
+    expect(await consumeVerificationToken(token, "u2")).toEqual({ ok: false, reason: "wrong-account" });
+    expect(await consumeVerificationToken(token, "nobody")).toEqual({ ok: false, reason: "wrong-account" });
+    expect(store.users[0].emailVerified).toBeNull();
+    expect(await peekVerificationToken(token)).toBe("valid");
+    expect(await consumeVerificationToken(token, "u1")).toEqual({ ok: true, email: "new@example.edu" });
   });
 
   it("a new link replaces the old one, and an expired link is refused", async () => {
@@ -146,7 +157,7 @@ describe("email verification", () => {
 
     store.tokens[0].expires = new Date(Date.now() - 1000);
     expect(await peekVerificationToken(second)).toBe("expired");
-    expect(await consumeVerificationToken(second)).toEqual({ ok: false, reason: "expired" });
+    expect(await consumeVerificationToken(second, "u1")).toEqual({ ok: false, reason: "expired" });
     expect(store.users[0].emailVerified).toBeNull();
   });
 
@@ -179,7 +190,7 @@ describe("email verification", () => {
     await run("gone");
     expect(store.sent).toHaveLength(0);
     expect(await peekVerificationToken("short")).toBe("invalid");
-    expect(await consumeVerificationToken("../../etc/passwd-and-more-chars")).toEqual({
+    expect(await consumeVerificationToken("../../etc/passwd-and-more-chars", "u1")).toEqual({
       ok: false,
       reason: "invalid",
     });

@@ -51,7 +51,7 @@ describe("Google sign-in gate (0A Fix 4(d))", () => {
         passwordHash: { not: null },
         user: { email: "victim@example.edu", emailVerified: null },
       },
-      data: { passwordHash: null },
+      data: { passwordHash: null, sessionVersion: { increment: 1 } },
     });
   });
 

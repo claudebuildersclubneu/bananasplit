@@ -104,7 +104,10 @@ describe("static policy for every other route", () => {
       "/sign-up",
       "/verify-email/tok",
       "/onboarding",
+      "/onboarding/join",
       "/checkout",
+      "/forgot-password",
+      "/reset-password/tok",
     ]) {
       expect(regex.test(path), path).toBe(false);
       expect(isNonceRoute(path), path).toBe(true);
@@ -184,6 +187,8 @@ describe("mode and headers", () => {
       "/verify-email",
       "/onboarding",
       "/checkout",
+      "/forgot-password",
+      "/reset-password",
     ]);
   });
 });

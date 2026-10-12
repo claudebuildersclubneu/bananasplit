@@ -60,6 +60,8 @@ const GRANTS = {
   OrgSlugHistory: ["", "", ""],
   OrgTheme: ["SIUD", "SIUD", ""],
   Organization: ["SU", "SIUD", ""],
+  // Password-reset links: identity plane only, like UserCredential.
+  PasswordResetToken: ["", "", "SIUD"],
   // A member's own pins and recent pages in one org (owner-only).
   Pin: ["SIUD", "", ""],
   // Question polls: UPDATE is a column grant (closedAt, closesAt) for the
@@ -101,6 +103,7 @@ const NO_ORG_ID = [
   "Account",
   "OrgCreationCode",
   "Organization",
+  "PasswordResetToken",
   "RateLimitBucket",
   "Session",
   // Keys carry the org ({kind}/{orgId}/...); the purge deletes by prefix.

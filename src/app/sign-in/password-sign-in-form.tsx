@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
 
@@ -9,6 +9,8 @@ import { passwordSignInAction } from "./actions";
 
 export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | null }) {
   const [state, formAction, isPending] = useActionState(passwordSignInAction, {});
+  // Controlled, so React's reset after the action doesn't wipe what was typed.
+  const [email, setEmail] = useState("");
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -21,6 +23,8 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
           required
           autoComplete="email"
           placeholder="you@school.edu"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
       </BrandField>
       <BrandField

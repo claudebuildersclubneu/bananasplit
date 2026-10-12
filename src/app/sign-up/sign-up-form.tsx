@@ -5,9 +5,9 @@ import { useActionState, useState } from "react";
 
 import { AuthTitle } from "@/components/brand/auth-card";
 import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
+import { NewPasswordField } from "@/components/brand/new-password-field";
 import { pill } from "@/components/brand/pill";
 import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
-import { PASSWORD_MIN_LENGTH, passwordStrength } from "@/lib/auth/password-strength";
 import { cn } from "@/lib/utils";
 
 import { signUpAction } from "./actions";
@@ -15,8 +15,9 @@ import { signUpAction } from "./actions";
 /** `google`: the "Sign up with Google" button and divider, above the fields (not once it's sent). */
 export function SignUpForm({ google }: { google?: React.ReactNode }) {
   const [state, formAction, isPending] = useActionState(signUpAction, {});
-  const [password, setPassword] = useState("");
-  const strength = passwordStrength(password);
+  // Controlled, so React's reset after the action doesn't wipe what was typed.
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
 
   if (state.checkEmail) {
     return (
@@ -55,6 +56,8 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             autoComplete="name"
             placeholder="Maya Chen"
             className="h-12"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
         </BrandField>
         <BrandField id="email" label="School email">
@@ -66,39 +69,11 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             autoComplete="email"
             placeholder="you@school.edu"
             className="h-12"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </BrandField>
-        <BrandField id="password" label="Password">
-          <BrandInput
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={PASSWORD_MIN_LENGTH}
-            autoComplete="new-password"
-            placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
-            className="h-12"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-describedby="password-strength"
-          />
-          <span id="password-strength" className="flex items-center gap-1.5" aria-live="polite">
-            {[1, 2, 3].map((n) => (
-              <span
-                key={n}
-                aria-hidden="true"
-                className={cn(
-                  "h-1 flex-1 rounded-[2px]",
-                  n <= strength.score ? "bg-banana" : "bg-straw",
-                )}
-              />
-            ))}
-            <span className="text-ink-soft ml-1.5 min-w-12 text-[12px]">
-              {strength.label && <span className="sr-only">Password strength: </span>}
-              {strength.label}
-            </span>
-          </span>
-        </BrandField>
+        <NewPasswordField inputClassName="h-12" />
         {state.error && <FormMessage>{state.error}</FormMessage>}
         <PrimaryButton type="submit" disabled={isPending}>
           {isPending ? "Creating account…" : "Create account"}

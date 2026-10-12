@@ -47,13 +47,18 @@ export async function signUp(page: Page, user: TestUser): Promise<void> {
 const MAIL_DIR = path.join(process.cwd(), ".data", "mail");
 
 /**
- * The token from the newest verification email sent to `email`, read from
- * the dev mail sink. The verify-email job sends it right after sign-up (or
- * after "Send a new link"), so this waits for it to appear. Requires the
+ * The token from the newest email sent to `email` that links to
+ * `/<route>/<token>`, read from the dev mail sink. Jobs send right after the
+ * request that queued them, so this waits for it to appear. Requires the
  * sink: RESEND_API_KEY empty and EMAIL_DELIVERY unset or "sink".
  */
-export async function readVerificationToken(email: string, timeoutMs = 30_000): Promise<string> {
+async function readMailedToken(
+  email: string,
+  route: "verify-email" | "reset-password",
+  timeoutMs: number,
+): Promise<string> {
   const address = email.trim().toLowerCase();
+  const link = new RegExp(`/${route}/([A-Za-z0-9_-]{20,200})`);
   // Sink files are named by ISO timestamp; only look at the last 10 minutes.
   const oldest = new Date(Date.now() - 10 * 60 * 1000).toISOString().replace(/[:.]/g, "-");
   const deadline = Date.now() + timeoutMs;
@@ -75,14 +80,24 @@ export async function readVerificationToken(email: string, timeoutMs = 30_000): 
         continue; // still being written
       }
       if (message.to?.trim().toLowerCase() !== address) continue;
-      const match = /\/verify-email\/([A-Za-z0-9_-]{20,200})/.exec(message.text ?? "");
+      const match = link.exec(message.text ?? "");
       if (match) return match[1]!;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(
-    `No verification email for ${email} in ${MAIL_DIR}. The e2e run needs the dev mail sink (RESEND_API_KEY empty).`,
+    `No ${route} email for ${email} in ${MAIL_DIR}. The e2e run needs the dev mail sink (RESEND_API_KEY empty).`,
   );
+}
+
+/** The token from the newest verification email sent to `email`. */
+export function readVerificationToken(email: string, timeoutMs = 30_000): Promise<string> {
+  return readMailedToken(email, "verify-email", timeoutMs);
+}
+
+/** The token from the newest password reset email sent to `email`. */
+export function readPasswordResetToken(email: string, timeoutMs = 30_000): Promise<string> {
+  return readMailedToken(email, "reset-password", timeoutMs);
 }
 
 /**

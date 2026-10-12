@@ -6,7 +6,7 @@ import { z } from "zod";
 import { credentialsSignIn, SIGN_IN_UNAVAILABLE_MESSAGE } from "@/lib/auth/credentials-sign-in";
 import { emailVerificationRequired } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
-import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password-strength";
+import { newPasswordSchema } from "@/lib/auth/password-policy";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { signUpPerIpLimit } from "@/lib/auth/ip-limits";
 import { getClientIp } from "@/lib/request-ip";
@@ -26,10 +26,7 @@ const signUpSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(80),
   // Stored as lower(btrim()), like every email (0a_normalize_emails).
   email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address")),
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
-    .max(72),
+  password: newPasswordSchema,
 });
 
 export interface SignUpState {
