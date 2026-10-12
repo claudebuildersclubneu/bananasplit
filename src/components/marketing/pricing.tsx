@@ -55,7 +55,7 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       href: "/sign-up",
       lead: "Everything to run the club:",
       items: [
-        "Tasks in five views",
+        "Tasks in four views",
         "Calendar with availability polls and RSVPs",
         "Live notes and 25 GB of club storage",
         "Finance board and receipt reimbursements",
@@ -146,10 +146,13 @@ export function Pricing() {
   const copy = COPY[audience];
 
   return (
-    <section id="pricing" className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 py-32">
+    <section
+      id="pricing"
+      className="mx-auto flex max-w-[1240px] flex-col gap-8 px-6 py-20 sm:gap-10 sm:py-32"
+    >
       <div className="flex flex-col items-center gap-[18px] text-center">
         <SectionTitle>{copy.title}</SectionTitle>
-        <p className="text-ink-muted max-w-[540px] text-[17px] leading-[1.55] text-pretty">
+        <p className="text-ink-muted max-w-[540px] text-[16px] leading-[1.55] text-pretty sm:text-[17px]">
           {copy.intro}
         </p>
         <div
@@ -185,11 +188,11 @@ export function Pricing() {
 
       {audience === "clubs" && <SchoolsPanel />}
 
-      <div className="text-ink-muted flex flex-wrap justify-center gap-x-7 gap-y-2 text-[14px]">
+      <div className="text-ink-muted flex flex-col items-center gap-1.5 text-[14px] sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-7 sm:gap-y-2">
         {PROMISES.map((promise, i) => (
           <Fragment key={promise}>
             {i > 0 && (
-              <span aria-hidden="true" className="text-dusk">
+              <span aria-hidden="true" className="text-dusk hidden sm:inline">
                 ·
               </span>
             )}
@@ -205,7 +208,7 @@ function TierCard({ tier }: { tier: Tier }) {
   return (
     <div
       className={cn(
-        "relative flex flex-col gap-5 rounded-[28px] border p-8 tabular-nums",
+        "relative flex flex-col gap-5 rounded-[28px] border p-6 tabular-nums sm:p-8",
         tier.featured
           ? "border-banana/90 bg-paper shadow-featured"
           : "border-ink/10 bg-transparent",
@@ -224,7 +227,7 @@ function TierCard({ tier }: { tier: Tier }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-2.5">
-          <span className="font-heading text-[64px] leading-none tracking-[-0.04em]">
+          <span className="font-heading text-[52px] leading-none tracking-[-0.04em] sm:text-[64px]">
             {tier.price}
           </span>
           <span className="text-ink-muted text-[15px] leading-[1.3]">{tier.per}</span>
@@ -242,10 +245,10 @@ function TierCard({ tier }: { tier: Tier }) {
       >
         {tier.cta}
       </SiteLink>
-      <div className="border-ink/10 flex flex-col gap-3 border-t pt-5">
+      <div className="border-ink/10 flex flex-col gap-2.5 border-t pt-5 sm:gap-3">
         <span className="text-ink-soft text-[13px] font-bold">{tier.lead}</span>
         {tier.items.map((item) => (
-          <div key={item} className="flex gap-2.5 text-[15px] leading-[1.45]">
+          <div key={item} className="flex gap-2.5 text-[14px] leading-[1.45] sm:text-[15px]">
             <span className="bg-butter text-honey mt-px grid size-5 flex-none place-items-center rounded-full text-[11px] font-extrabold">
               ✓
             </span>

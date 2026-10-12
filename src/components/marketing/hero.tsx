@@ -8,13 +8,14 @@ const GOING: readonly Avatar[] = [{ tone: "bg-banana" }, { tone: "bg-wheat" }, {
 
 /**
  * A proof card floating over the screenshot. There's no room for them on
- * narrow screens, so they only show from 760px (CSS, not a resize listener).
+ * narrow screens (they'd cover the screenshot), so they only show from 1024px
+ * (CSS, not a resize listener).
  */
 function FloatCard({ className, children }: { className: string; children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "border-ink/8 bg-paper shadow-float absolute hidden items-center gap-3 rounded-2xl border px-4 py-3.5 text-left min-[760px]:flex",
+        "border-ink/8 bg-paper shadow-float absolute hidden items-center gap-3 rounded-2xl border px-4 py-3.5 text-left lg:flex",
         className,
       )}
     >
@@ -34,9 +35,10 @@ function CardText({ title, detail }: { title: string; detail: string }) {
 }
 
 /**
- * The headline over a cream-to-banana gradient, then the product in a
- * browser frame with a phone overlapping its bottom-right corner. The
- * section crops the phone's last 32px.
+ * The headline over a cream-to-banana gradient, then the product: the
+ * Overview in a browser frame with Tasks on a phone overlapping its
+ * bottom-right corner, the section cropping the phone's last 32px. On
+ * phones only the phone shows, centred, its lower part cropped.
  */
 export function Hero() {
   return (
@@ -59,8 +61,8 @@ export function Hero() {
           </a>
         </div>
 
-        <div className="relative mt-8 w-full px-[clamp(0px,5vw,72px)]">
-          <div className="border-ink/12 bg-paper shadow-browser overflow-hidden rounded-t-[18px] border border-b-0">
+        <div className="relative mt-4 w-full px-[clamp(0px,5vw,72px)] sm:mt-8">
+          <div className="border-ink/12 bg-paper shadow-browser hidden overflow-hidden rounded-t-[18px] border border-b-0 sm:block">
             <div className="border-ink/8 flex h-10 items-center gap-[7px] border-b px-4">
               <span className="bg-chrome size-2.5 rounded-full" />
               <span className="bg-chrome size-2.5 rounded-full" />
@@ -69,14 +71,19 @@ export function Hero() {
                 bananasplit.fyi
               </span>
             </div>
-            <Screenshot label="screenshot: Overview board, desktop" className="aspect-[16/8.5]" />
+            <Screenshot
+              src="/marketing/overview.webp"
+              alt="A club's Overview: pinned pages, my tasks and upcoming meetings"
+              sizes="(min-width: 1240px) 1100px, 90vw"
+              className="aspect-[16/8.5]"
+            />
           </div>
 
           <FloatCard className="top-[18%] left-0">
             <span className="bg-butter text-honey grid size-[34px] place-items-center rounded-[10px] text-[15px] font-extrabold">
               ✓
             </span>
-            <CardText title="Venue booked" detail="Maya · Spring showcase" />
+            <CardText title="Venue booked" detail="Maya · Fall Showcase" />
           </FloatCard>
           <FloatCard className="top-[56%] left-[3%]">
             <AvatarStack avatars={GOING} itemClassName="border-paper size-[26px]" overlap="-ml-2" />
@@ -92,15 +99,16 @@ export function Hero() {
             </span>
           </FloatCard>
 
-          <div className="bg-ink shadow-phone absolute right-[clamp(0px,2vw,24px)] -bottom-8 aspect-[9/18] w-[clamp(140px,21vw,270px)] rounded-[clamp(30px,4vw,44px)] p-[clamp(6px,0.8vw,9px)]">
+          <div className="bg-ink shadow-phone relative mx-auto -mb-[38%] aspect-[9/18] w-[min(240px,70vw)] rounded-[38px] p-2 sm:absolute sm:right-[clamp(0px,2vw,24px)] sm:-bottom-8 sm:mx-0 sm:mb-0 sm:w-[clamp(140px,21vw,270px)] sm:rounded-[clamp(30px,4vw,44px)] sm:p-[clamp(6px,0.8vw,9px)]">
             <Screenshot
-              label="mobile"
-              chip="sm"
-              className="relative size-full rounded-[clamp(24px,3.3vw,36px)]"
+              src="/marketing/tasks-phone.webp"
+              alt="Tasks on a phone: what's due today, tomorrow and this week"
+              sizes="270px"
+              className="size-full rounded-[30px] sm:rounded-[clamp(24px,3.3vw,36px)]"
             >
               <span
                 aria-hidden="true"
-                className="bg-void absolute top-[clamp(7px,1vw,11px)] left-1/2 h-[clamp(14px,1.9vw,24px)] w-[34%] -translate-x-1/2 rounded-full"
+                className="bg-void absolute top-2.5 left-1/2 h-5 w-[34%] -translate-x-1/2 rounded-full sm:top-[clamp(7px,1vw,11px)] sm:h-[clamp(14px,1.9vw,24px)]"
               />
             </Screenshot>
           </div>

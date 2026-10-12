@@ -115,15 +115,6 @@
   }
 }
 
-/* Screenshot placeholders: cream and stripe at 135 degrees. */
-@utility bg-stripes {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--color-stripe) 0 10px,
-    var(--color-cream) 10px 20px
-  );
-}
-
 /* A receipt's ruled lines. */
 @utility bg-receipt {
   background: repeating-linear-gradient(

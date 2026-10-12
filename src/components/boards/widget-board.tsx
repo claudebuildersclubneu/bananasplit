@@ -337,7 +337,8 @@ export function WidgetBoard({
                   setOverId(null);
                 }}
               >
-                <header className="flex min-h-11 items-center gap-2 border-b px-4 py-2">
+                {/* While editing, a narrow widget's controls wrap below its title. */}
+                <header className="flex min-h-11 flex-wrap items-center gap-2 border-b px-4 py-2">
                   {editing && (
                     <span
                       draggable
@@ -372,7 +373,7 @@ export function WidgetBoard({
                     {m.title}
                   </h2>
                   {editing && (
-                    <div className="ms-auto flex shrink-0 items-center gap-1">
+                    <div className="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
                       <Segmented
                         label={`${m.title} width`}
                         value={String(w.w)}

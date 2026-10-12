@@ -17,7 +17,8 @@ const REPLACED_APPS = [
   "Google Drive",
 ] as const;
 
-const TASK_VIEWS = ["Week", "Board", "Table", "Calendar", "Team"] as const;
+/** Tasks' three layouts, plus due dates on the club calendar. */
+const TASK_VIEWS = ["Board", "Week", "Table", "Calendar"] as const;
 
 const CHAT_RESULTS = [
   "Event added: Spring Showcase, Apr 12",
@@ -58,9 +59,19 @@ const TEAMS = ["Events", "Treasury"] as const;
 /** The white tiles: paper, a hairline and the soft card shadow. */
 const PAPER_TILE = "rounded-[28px] border border-ink/8 bg-paper shadow-card";
 
+/**
+ * On phones the tiles are one swipeable row instead of a long stack: each
+ * tile is most of the screen wide, so the next one peeks in, and snaps into
+ * place.
+ */
+const SLIDE = "max-sm:w-[86%] max-sm:flex-none max-sm:snap-start";
+
+/** A row of tiles; on phones its tiles join the one swipeable row. */
+const ROW = "flex flex-wrap gap-4 max-sm:contents";
+
 /** The two-column tiles: copy beside a sample, stacked once two 260px columns don't fit. */
 const SPLIT_TILE =
-  "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-center gap-7 p-[clamp(28px,3vw,40px)]";
+  "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-center gap-7 p-[clamp(24px,3vw,40px)] max-sm:content-start max-sm:gap-5";
 
 /** Each tile surface's label colour. */
 const LABEL_TONES = {
@@ -110,20 +121,26 @@ function TileTitle({
   );
 }
 
-/** "Every scoop your club needs.": the apps it replaces, then a bento of features. */
+/**
+ * "Every scoop your club needs.": the apps it replaces, then a bento of
+ * features (a swipeable row on phones).
+ */
 export function FeatureBoard() {
   return (
-    <section id="features" className="mx-auto flex max-w-[1240px] flex-col gap-14 px-6 pt-32 pb-28">
+    <section
+      id="features"
+      className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 pt-20 pb-16 sm:gap-14 sm:pt-32 sm:pb-28"
+    >
       <SectionIntro title="Every scoop your club needs." className="max-w-[380px] text-pretty">
         Most clubs juggle seven apps, each with its own login and member list. Bananasplit puts
         events, money and data in one workspace with one member list and one bill.
       </SectionIntro>
 
-      <div className="-mt-6 flex flex-wrap items-center gap-2">
+      <div className="-mt-4 flex flex-wrap items-center gap-1.5 sm:-mt-6 sm:gap-2">
         {REPLACED_APPS.map((app) => (
           <span
             key={app}
-            className="bg-sand text-ink-faint rounded-full px-3 py-1.5 text-[14px] line-through"
+            className="bg-sand text-ink-faint rounded-full px-2.5 py-1 text-[13px] line-through sm:px-3 sm:py-1.5 sm:text-[14px]"
           >
             {app}
           </span>
@@ -131,29 +148,29 @@ export function FeatureBoard() {
         <span className="text-core flex px-1">
           <ArrowRight />
         </span>
-        <span className="bg-ink text-cream inline-flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-2 text-[14px] font-bold">
+        <span className="bg-ink text-cream inline-flex items-center gap-2 rounded-full py-1 pr-3 pl-1.5 text-[13px] font-bold sm:py-1.5 sm:pr-3.5 sm:pl-2 sm:text-[14px]">
           <CoreMark size={18} />
           One workspace
         </span>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-4 max-sm:-mx-6 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-6 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-6 max-sm:pb-1">
+        <div className={ROW}>
           <OverviewTile />
-          <div className="flex flex-[1_1_300px] flex-col gap-4">
+          <div className="flex flex-[1_1_300px] flex-col gap-4 max-sm:contents">
             <TasksTile />
             <CalendarTile />
           </div>
         </div>
-        <div className="flex flex-wrap gap-4">
+        <div className={ROW}>
           <EventsTile />
           <AiTile />
         </div>
-        <div className="flex flex-wrap gap-4">
+        <div className={ROW}>
           <NotesTile />
           <DatabasesTile />
         </div>
-        <div className="flex flex-wrap gap-4">
+        <div className={ROW}>
           <CustomizationTile />
           <PeopleTile />
         </div>
@@ -168,21 +185,23 @@ function OverviewTile() {
     <div
       className={cn(
         PAPER_TILE,
-        "flex flex-[2_1_520px] flex-col gap-4 overflow-hidden p-[clamp(28px,3vw,40px)]",
+        SLIDE,
+        "flex flex-[2_1_520px] flex-col gap-4 overflow-hidden p-[clamp(24px,3vw,40px)]",
       )}
     >
       <TileTitle>Overview</TileTitle>
-      <h3 className="font-heading max-w-[520px] text-[clamp(30px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
+      <h3 className="font-heading max-w-[520px] text-[clamp(28px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
         Everyone opens to what matters to them.
       </h3>
-      <p className="text-ink-muted max-w-[460px] text-[16px] leading-[1.55] text-pretty">
+      <p className="text-ink-muted max-w-[460px] text-[15px] leading-[1.55] text-pretty sm:text-[16px]">
         Each member arranges a home board of widgets: tasks due this week, the next meeting, pinned
         notes, files and people.
       </p>
       <Screenshot
-        label="screenshot: Overview widgets"
-        chip="md"
-        className="border-ink/10 mt-auto -mr-[clamp(28px,3vw,40px)] -mb-[clamp(28px,3vw,40px)] ml-[clamp(28px,3vw,40px)] aspect-[16/8] rounded-tl-[14px] border-t border-l"
+        src="/marketing/overview-widgets.webp"
+        alt="Overview widgets: my week at a glance, open polls and upcoming events"
+        sizes="(min-width: 1240px) 760px, (min-width: 640px) 60vw, 80vw"
+        className="border-ink/10 mt-auto -mr-[clamp(24px,3vw,40px)] -mb-[clamp(24px,3vw,40px)] ml-[clamp(12px,3vw,40px)] aspect-[16/8] rounded-tl-[14px] border-t border-l max-sm:aspect-[4/3]"
       />
     </div>
   );
@@ -190,7 +209,12 @@ function OverviewTile() {
 
 function TasksTile() {
   return (
-    <div className="bg-banana relative flex flex-[1_0_auto] flex-col gap-2 overflow-hidden rounded-[28px] p-8">
+    <div
+      className={cn(
+        SLIDE,
+        "bg-banana relative flex flex-[1_0_auto] flex-col gap-2 overflow-hidden rounded-[28px] p-6 sm:p-8",
+      )}
+    >
       <span
         aria-hidden="true"
         className="bg-glow-cream absolute -top-10 -right-10 size-[180px] rounded-full"
@@ -200,7 +224,7 @@ function TasksTile() {
       </TileTitle>
       <div className="relative mt-auto flex items-end gap-3.5">
         <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
-          5
+          {TASK_VIEWS.length}
         </span>
         <span className="pb-0.5 text-[19px] leading-[1.25] font-semibold">
           ways to see
@@ -227,7 +251,7 @@ function TasksTile() {
 
 function CalendarTile() {
   return (
-    <div className={cn(PAPER_TILE, "flex flex-[1_0_auto] flex-col gap-2.5 p-8")}>
+    <div className={cn(PAPER_TILE, SLIDE, "flex flex-[1_0_auto] flex-col gap-2.5 p-6 sm:p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
       <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
         Find a time, then put it on everyone&apos;s calendar.
@@ -242,7 +266,7 @@ function CalendarTile() {
 /** RSVPs and events, with a sample event card. */
 function EventsTile() {
   return (
-    <div className={cn(PAPER_TILE, SPLIT_TILE, "flex-[1.6_1_460px]")}>
+    <div className={cn(PAPER_TILE, SPLIT_TILE, SLIDE, "flex-[1.6_1_460px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle replaces="Luma">RSVPs and events</TileTitle>
         <h3 className="font-heading text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.025em] text-balance">
@@ -253,8 +277,8 @@ function EventsTile() {
           your member list, so you can see who keeps coming back.
         </p>
       </div>
-      <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[20px] border p-[18px]">
-        <div className="bg-event-cover flex h-24 items-end rounded-xl p-3">
+      <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[20px] border p-[18px] max-sm:gap-3 max-sm:p-3.5">
+        <div className="bg-event-cover flex h-24 items-end rounded-xl p-3 max-sm:hidden">
           <span className="bg-paper/85 rounded-md px-2 py-[3px] font-mono text-[11px] font-medium">
             FRI · 7:00 PM
           </span>
@@ -263,10 +287,10 @@ function EventsTile() {
           <span className="text-[17px] font-bold">Spring Showcase</span>
           <span className="text-ink-soft text-[13px]">Student Union, Room 204</span>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <AvatarStack avatars={RSVPS} itemClassName="border-cream size-6" overlap="-ml-2" />
-          <span className="text-[13px] font-semibold">86 going</span>
-          <span className="text-ink-soft text-[13px]">· 12 on waitlist</span>
+          <span className="text-[13px] font-semibold whitespace-nowrap">86 going</span>
+          <span className="text-ink-soft text-[13px] whitespace-nowrap">· 12 on waitlist</span>
         </div>
         <span className="bg-ink text-cream rounded-full p-[11px] text-center text-[14px] font-semibold">
           RSVP
@@ -279,7 +303,12 @@ function EventsTile() {
 /** The dark tile: a typed request turned into an event and tasks. */
 function AiTile() {
   return (
-    <div className="bg-ink text-cream relative flex flex-[1_1_320px] flex-col gap-3.5 overflow-hidden rounded-[28px] p-8">
+    <div
+      className={cn(
+        SLIDE,
+        "bg-ink text-cream relative flex flex-[1_1_320px] flex-col gap-3.5 overflow-hidden rounded-[28px] p-6 sm:p-8",
+      )}
+    >
       <span
         aria-hidden="true"
         className="bg-glow-banana absolute -top-20 -right-20 size-[280px] rounded-full"
@@ -311,8 +340,14 @@ function AiTile() {
 
 function NotesTile() {
   return (
-    <div className={cn(PAPER_TILE, "flex min-h-80 flex-[1_1_280px] flex-col gap-3 p-8")}>
-      <TileTitle replaces="Google Drive">Notes and storage</TileTitle>
+    <div
+      className={cn(
+        PAPER_TILE,
+        SLIDE,
+        "flex flex-[1_1_280px] flex-col gap-3 p-6 sm:min-h-80 sm:p-8",
+      )}
+    >
+      <TileTitle replaces="Google Drive">Files and notes</TileTitle>
       <AvatarStack
         avatars={EDITORS}
         itemClassName="border-paper grid size-[34px] place-items-center text-[13px] font-bold"
@@ -323,7 +358,7 @@ function NotesTile() {
         Edit together, live.
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
-        Meeting notes, templates, files and club storage that stay put when officers graduate.
+        Meeting notes, templates, uploads and club storage that stay put when officers graduate.
       </p>
     </div>
   );
@@ -331,7 +366,12 @@ function NotesTile() {
 
 function DatabasesTile() {
   return (
-    <div className="bg-sand flex flex-[1.5_1_400px] flex-col gap-3.5 rounded-[28px] p-8">
+    <div
+      className={cn(
+        SLIDE,
+        "bg-sand flex flex-[1.5_1_400px] flex-col gap-3.5 rounded-[28px] p-6 sm:p-8",
+      )}
+    >
       <TileTitle tone="sand" replaces="Airtable and spreadsheets">
         Databases
       </TileTitle>
@@ -358,7 +398,7 @@ function DatabasesTile() {
 /** The club's theme, and what each member pins for themselves. */
 function CustomizationTile() {
   return (
-    <div className={cn(PAPER_TILE, SPLIT_TILE, "flex-[2_1_520px]")}>
+    <div className={cn(PAPER_TILE, SPLIT_TILE, SLIDE, "flex-[2_1_520px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle>Customization</TileTitle>
         <h3 className="font-heading text-[clamp(30px,3.2vw,44px)] leading-[1.05] tracking-[-0.025em] text-balance">
@@ -382,7 +422,7 @@ function CustomizationTile() {
             ))}
           </div>
         </div>
-        <div className="bg-cream flex flex-col gap-2 rounded-[18px] p-4">
+        <div className="bg-cream flex flex-col gap-2 rounded-[18px] p-4 max-sm:hidden">
           <span className="text-ink-soft text-[12px] font-bold">Pinned for you</span>
           <div className="flex flex-wrap gap-1.5">
             {PINNED.map((pin) => (
@@ -403,7 +443,12 @@ function CustomizationTile() {
 /** People, with a mini org chart: the president over two teams. */
 function PeopleTile() {
   return (
-    <div className="bg-butter flex min-h-80 flex-[1_1_260px] flex-col gap-3 rounded-[28px] p-8">
+    <div
+      className={cn(
+        SLIDE,
+        "bg-butter flex flex-[1_1_260px] flex-col gap-3 rounded-[28px] p-6 sm:min-h-80 sm:p-8",
+      )}
+    >
       <TileTitle tone="butter">People</TileTitle>
       <div className="mt-5 flex flex-col items-center">
         <span className="bg-ink text-cream rounded-full px-3 py-1.5 text-[13px] font-bold">

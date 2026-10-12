@@ -27,27 +27,47 @@ const FAQS = [
   },
 ] as const;
 
-/** The title on the left, questions and answers on the right, each pair side by side. */
+/**
+ * The title on the left, the questions on the right. Each question opens its
+ * answer (a native <details>, so it works without JavaScript and with the
+ * keyboard); they share a name, so opening one closes the one before.
+ */
 export function Faq() {
   return (
     <section
       id="faq"
-      className="mx-auto flex max-w-[1240px] flex-wrap gap-x-16 gap-y-12 px-6 pb-32"
+      className="mx-auto flex max-w-[1240px] flex-wrap gap-x-16 gap-y-8 px-6 pb-20 sm:gap-y-12 sm:pb-32"
     >
       <div className="flex flex-[1_1_280px] flex-col gap-[18px]">
         <SectionTitle>FAQs</SectionTitle>
       </div>
-      <dl className="flex min-w-0 flex-[2_1_560px] flex-col">
+      <div className="border-ink/12 flex min-w-0 flex-[2_1_560px] flex-col border-b">
         {FAQS.map((faq) => (
-          <div
-            key={faq.q}
-            className="border-ink/12 grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-x-10 gap-y-2.5 border-t py-6"
-          >
-            <dt className="text-[18px] leading-[1.4] font-bold">{faq.q}</dt>
-            <dd className="text-ink-muted text-[16px] leading-[1.6] text-pretty">{faq.a}</dd>
-          </div>
+          <details key={faq.q} name="faq" className="group border-ink/12 border-t">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[17px] leading-[1.4] font-bold sm:py-6 sm:text-[18px] [&::-webkit-details-marker]:hidden">
+              {faq.q}
+              <span
+                aria-hidden="true"
+                className="border-ink/14 group-hover:bg-sand group-open:bg-sand grid size-8 flex-none place-items-center rounded-full border transition-[transform,background-color] group-open:rotate-45"
+              >
+                <svg
+                  viewBox="0 0 12 12"
+                  className="size-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                >
+                  <path d="M6 1v10M1 6h10" />
+                </svg>
+              </span>
+            </summary>
+            <p className="text-ink-muted max-w-[640px] pb-6 text-[16px] leading-[1.6] text-pretty sm:pe-14">
+              {faq.a}
+            </p>
+          </details>
         ))}
-      </dl>
+      </div>
     </section>
   );
 }

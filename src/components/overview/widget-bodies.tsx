@@ -109,7 +109,7 @@ export function TaskStats({
         return (
           <Link key={c.label} href={c.href} className="hover:bg-muted/50 rounded-lg border p-2.5">
             <span className="eyebrow text-muted-foreground flex items-center gap-1.5">
-              <Icon className={cn("size-3.5", c.value > 0 && c.tone)} aria-hidden="true" />
+              <Icon className={cn("size-3.5 shrink-0", c.value > 0 && c.tone)} aria-hidden="true" />
               {c.label}
             </span>
             <span className={cn("numeral mt-1.5 block text-5xl", c.value > 0 && c.tone)}>
@@ -205,7 +205,7 @@ export function PollList({
               <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{p.title}</span>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground block text-xs">
                   {p.kind === "question" ? "Question" : "Find a time"} ·{" "}
                   {p.closesAt
                     ? `Closes ${formatDistanceToNow(p.closesAt, { addSuffix: true })}`
