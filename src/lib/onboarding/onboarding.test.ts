@@ -98,19 +98,27 @@ describe("availability", () => {
 });
 
 describe("join codes", () => {
-  it("generates XXXX-XXXX codes with no look-alike characters", () => {
+  it("generates six-character codes with no look-alike characters", () => {
     for (let i = 0; i < 50; i++) {
       const code = generateJoinCode();
+      expect(code).toMatch(/^[A-Z0-9]{6}$/);
       expect(code).toMatch(JOIN_CODE_RE);
       expect(code).not.toMatch(/[01OILU]/);
     }
   });
 
   it("normalizes what people type", () => {
+    expect(normalizeJoinCode(" robo26 ")).toBe("ROBO26");
+    expect(normalizeJoinCode("ro-bo 26")).toBe("ROBO26");
+    expect(normalizeJoinCode("abc")).toBeNull();
+    expect(normalizeJoinCode("abcdefg")).toBeNull();
+    expect(normalizeJoinCode("abcd-efgh-ijkl")).toBeNull();
+  });
+
+  it("still accepts the earlier XXXX-XXXX codes", () => {
     expect(normalizeJoinCode(" abcd efgh ")).toBe("ABCD-EFGH");
     expect(normalizeJoinCode("abcd-efgh")).toBe("ABCD-EFGH");
-    expect(normalizeJoinCode("abc")).toBeNull();
-    expect(normalizeJoinCode("abcd-efgh-ijkl")).toBeNull();
+    expect(JOIN_CODE_RE.test("ABCD-EFGH")).toBe(true);
   });
 
   it("matches an email to the org's domain and its subdomains only", () => {

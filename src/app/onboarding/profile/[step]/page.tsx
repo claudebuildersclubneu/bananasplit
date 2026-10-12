@@ -1,37 +1,32 @@
 import {
-  ArrowLeft,
   BadgeCheck,
   BookOpen,
   Building2,
-  CalendarClock,
   CalendarX,
-  ClipboardCheck,
   GraduationCap,
   KeyRound,
   Link2,
   Palette,
-  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import {
-  ChoiceTileBody,
-  choiceTileClass,
-  OnboardingFrame,
-  StepCard,
-} from "@/components/onboarding/step-card";
+  PreviewHeader,
+  PreviewTile,
+  SetupCard,
+  SetupShell,
+  StepFooter,
+  StepIntro,
+} from "@/components/onboarding/setup-shell";
+import { ChoiceTileBody, choiceTileClass } from "@/components/onboarding/step-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { requireUser } from "@/lib/auth/session";
 import { blockedHoursPerWeek } from "@/lib/availability";
-import {
-  isProfileStep,
-  PROFILE_STEP_TITLES,
-  PROFILE_STEPS,
-  type ProfileStep,
-} from "@/lib/onboarding/steps";
+import { isProfileStep, PROFILE_STEPS, type ProfileStep } from "@/lib/onboarding/steps";
 import { timeZoneLabel } from "@/lib/profile/timezone";
 import { personalPalettes, previewTokens } from "@/lib/theme/personal";
 import { THEME_PRESETS } from "@/lib/theme/presets";
@@ -46,24 +41,43 @@ import { ThemeStep } from "../theme-step";
 
 export const dynamic = "force-dynamic";
 
-/** Each step's icon and the line under its title. */
-const META: Record<ProfileStep, { icon: LucideIcon; description: string }> = {
-  basics: { icon: UserRound, description: "How you'll show up to your teammates." },
-  school: { icon: GraduationCap, description: "What you study, and what you do in the club." },
-  bio: {
-    icon: Link2,
-    description: "A line about you and where to find you. The link type is detected from the URL.",
+/** The stepper's short names, in order. */
+const STEP_NAMES: Record<ProfileStep, string> = {
+  basics: "About you",
+  school: "School",
+  bio: "Bio",
+  theme: "Theme",
+  availability: "Availability",
+  review: "Review",
+};
+
+/** Each step's question and the line under it. */
+const META: Record<ProfileStep, { title: string; description: string }> = {
+  basics: { title: "Tell us about you.", description: "How you'll show up to your teammates." },
+  school: {
+    title: "What do you study?",
+    description: "What you study, and what you do in the club.",
   },
-  theme: { icon: Palette, description: "Only changes your view. Each theme has a light and a dark set." },
+  bio: {
+    title: "A line about you.",
+    description: "And where to find you. The link type is detected from the URL.",
+  },
+  theme: {
+    title: "Pick your colours.",
+    description: "Only changes your view. Each theme has a light and a dark set.",
+  },
   availability: {
-    icon: CalendarClock,
+    title: "When can't you meet?",
     description: "Mark the hours you can't meet. Teammates only ever see “busy,” never why.",
   },
   review: {
-    icon: ClipboardCheck,
-    description: "Everything look right? You can change any of it later on your profile.",
+    title: "Everything look right?",
+    description: "You can change any of it later on your profile.",
   },
 };
+
+/** The theme and availability editors need the card's full width. */
+const WIDE: ReadonlySet<ProfileStep> = new Set(["theme", "availability"]);
 
 /**
  * Profile setup (onboarding Flow A): one step per page, so the flow
@@ -81,21 +95,84 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
   const meta = META[step];
 
   return (
-    <OnboardingFrame wide={step === "theme" || step === "availability"}>
-      {!profile.emailVerified && step === "basics" && (
-        <VerifyEmailNotice
-          email={profile.email}
-          action="join or create an organization. You can set up your profile in the meantime"
-        />
-      )}
-      <StepCard
-        step={{ index, total: PROFILE_STEPS.length }}
-        title={PROFILE_STEP_TITLES[step]}
-        description={meta.description}
-      >
-        <StepBody step={step} profile={profile} />
-      </StepCard>
-    </OnboardingFrame>
+    <SetupShell
+      subject="your profile"
+      steps={PROFILE_STEPS.map((s) => STEP_NAMES[s])}
+      current={index}
+      exit={
+        <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
+      }
+    >
+      <SetupCard preview={WIDE.has(step) ? undefined : <ProfilePreview profile={profile} />}>
+        <StepIntro index={index} total={PROFILE_STEPS.length} title={meta.title}>
+          {meta.description}
+        </StepIntro>
+        {!profile.emailVerified && step === "basics" && (
+          <div className="mt-4">
+            <VerifyEmailNotice
+              email={profile.email}
+              action="join or start a club. You can set up your profile in the meantime"
+            />
+          </div>
+        )}
+        <div className="mt-[22px] flex flex-1 flex-col">
+          <StepBody step={step} profile={profile} />
+        </div>
+      </SetupCard>
+    </SetupShell>
+  );
+}
+
+/**
+ * The preview: the member card teammates will see, from what's saved so
+ * far. It fills in as each step saves.
+ */
+function ProfilePreview({ profile }: { profile: OnboardingProfile }) {
+  const subtitle = [profile.pronouns, zoneShort(profile.timezone)].filter(Boolean).join(" · ");
+  const school = [profile.major, profile.gradYear ? `Class of ${profile.gradYear}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <>
+      <PreviewHeader meta="Your profile card" />
+      <PreviewTile className="gap-3.5 p-5">
+        <div className="flex items-center gap-3">
+          <UserAvatar
+            user={{
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+              avatar: profile.avatar,
+            }}
+            size="lg"
+            className="shrink-0"
+          />
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="truncate text-[16px] font-bold">{profile.name ?? profile.email}</span>
+            {subtitle && <span className="text-ink-soft text-[13px]">{subtitle}</span>}
+          </span>
+        </div>
+        {profile.preferredTitle && (
+          <span className="bg-oat w-fit rounded-full px-2.5 py-1 text-[12px] font-semibold">
+            {profile.preferredTitle}
+          </span>
+        )}
+        {school && <span className="text-ink-muted text-[14px]">{school}</span>}
+        {profile.bio && (
+          <p className="text-ink-muted m-0 text-[14px] leading-[1.5] whitespace-pre-line">
+            {profile.bio}
+          </p>
+        )}
+        {profile.links.length > 0 && (
+          <span className="text-ink-soft text-[13px]">
+            {profile.links.length} {profile.links.length === 1 ? "link" : "links"}
+          </span>
+        )}
+      </PreviewTile>
+      <p className="text-ink-faint m-0 mt-auto text-[12px] leading-[1.5]">
+        Your card fills in as you go. Change any of it later on your profile.
+      </p>
+    </>
   );
 }
 
@@ -104,14 +181,27 @@ function StepBody({ step, profile }: { step: ProfileStep; profile: OnboardingPro
     case "basics":
       return (
         <BasicsStep
-          user={{ name: profile.name, email: profile.email, image: profile.image, avatar: profile.avatar }}
-          initial={{ name: profile.name ?? "", pronouns: profile.pronouns ?? "", timezone: profile.timezone }}
+          user={{
+            name: profile.name,
+            email: profile.email,
+            image: profile.image,
+            avatar: profile.avatar,
+          }}
+          initial={{
+            name: profile.name ?? "",
+            pronouns: profile.pronouns ?? "",
+            timezone: profile.timezone,
+          }}
         />
       );
     case "school":
       return (
         <SchoolStep
-          initial={{ major: profile.major, gradYear: profile.gradYear, preferredTitle: profile.preferredTitle }}
+          initial={{
+            major: profile.major,
+            gradYear: profile.gradYear,
+            preferredTitle: profile.preferredTitle,
+          }}
         />
       );
     case "bio":
@@ -141,7 +231,8 @@ function zoneShort(zone: string | null): string {
 function Review({ profile }: { profile: OnboardingProfile }) {
   const theme = profile.themePreference;
   const palettes = theme ? personalPalettes(theme) : null;
-  const colors = palettes && theme ? previewTokens(palettes, theme.mode === "light" ? "light" : "dark") : null;
+  const colors =
+    palettes && theme ? previewTokens(palettes, theme.mode === "light" ? "light" : "dark") : null;
   const themeName = theme
     ? theme.preset === "custom"
       ? "Custom"
@@ -169,7 +260,9 @@ function Review({ profile }: { profile: OnboardingProfile }) {
       label: "Theme",
       value: (
         <span className="inline-flex items-center gap-1.5">
-          {colors && <span className="size-2.5 rounded-full" style={{ background: colors.primary }} />}
+          {colors && (
+            <span className="size-2.5 rounded-full" style={{ background: colors.primary }} />
+          )}
           {themeName}
           {modeName ? ` · ${modeName}` : ""}
         </span>
@@ -179,10 +272,15 @@ function Review({ profile }: { profile: OnboardingProfile }) {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="bg-muted/40 flex items-center gap-3.5 rounded-xl border p-3.5">
         <UserAvatar
-          user={{ name: profile.name, email: profile.email, image: profile.image, avatar: profile.avatar }}
+          user={{
+            name: profile.name,
+            email: profile.email,
+            image: profile.image,
+            avatar: profile.avatar,
+          }}
           size="lg"
           className="ring-background shrink-0 ring-2"
         />
@@ -234,8 +332,8 @@ function Review({ profile }: { profile: OnboardingProfile }) {
                 <ChoiceTileBody
                   icon={KeyRound}
                   primary
-                  title="Join with invite code"
-                  detail="Your club's admin shared a code or a link, or emailed you an invite."
+                  title="Join with a club code"
+                  detail="An officer shared a code or a link, or emailed you an invite."
                 />
               </button>
             </form>
@@ -243,21 +341,15 @@ function Review({ profile }: { profile: OnboardingProfile }) {
               <button type="submit" className={choiceTileClass}>
                 <ChoiceTileBody
                   icon={Building2}
-                  title="Create an organization"
-                  detail="Start a new workspace for your club. You'll be its admin."
+                  title="Start a new club"
+                  detail="Set up a workspace for your club. You'll be its admin."
                 />
               </button>
             </form>
           </>
         )}
       </div>
-      <Link
-        href="/onboarding/profile/availability"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-      >
-        <ArrowLeft className="size-3.5" aria-hidden="true" />
-        Back
-      </Link>
+      <StepFooter back={{ href: "/onboarding/profile/availability" }}>{null}</StepFooter>
     </div>
   );
 }

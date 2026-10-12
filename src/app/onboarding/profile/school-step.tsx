@@ -91,7 +91,7 @@ export function SchoolStep({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="grid gap-1.5">
         <FieldLabel htmlFor="ob-major" icon={BookOpen}>
           Major
@@ -151,7 +151,8 @@ export function SchoolStep({
             shape="box"
             selected={yearOther}
             onClick={() => {
-              if (yearOther && gradYear !== null && laterYears.includes(gradYear)) setGradYear(null);
+              if (yearOther && gradYear !== null && laterYears.includes(gradYear))
+                setGradYear(null);
               setYearOther(!yearOther);
             }}
           >
@@ -159,7 +160,11 @@ export function SchoolStep({
           </Chip>
         </div>
         {yearOther && (
-          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Later graduation years">
+          <div
+            className="grid grid-cols-4 gap-1.5"
+            role="group"
+            aria-label="Later graduation years"
+          >
             {laterYears.map((y) => (
               <Chip
                 key={y}
@@ -181,11 +186,20 @@ export function SchoolStep({
         </FieldLabel>
         <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="ob-role-label">
           {ROLE_CHOICES.map((r) => (
-            <Chip key={r} icon={ROLE_ICONS[r]} selected={role === r} onClick={() => setRole(role === r ? "" : r)}>
+            <Chip
+              key={r}
+              icon={ROLE_ICONS[r]}
+              selected={role === r}
+              onClick={() => setRole(role === r ? "" : r)}
+            >
               {r}
             </Chip>
           ))}
-          <Chip icon={PenLine} selected={role === OTHER} onClick={() => setRole(role === OTHER ? "" : OTHER)}>
+          <Chip
+            icon={PenLine}
+            selected={role === OTHER}
+            onClick={() => setRole(role === OTHER ? "" : OTHER)}
+          >
             Something else
           </Chip>
         </div>

@@ -87,7 +87,7 @@ export function BioStep({ initial }: { initial: { bio: string | null; links: Pro
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="grid gap-1.5">
         <FieldLabel htmlFor="ob-bio" icon={NotebookPen} aside={`${bio.length}/${SETUP_BIO_MAX}`}>
           Bio

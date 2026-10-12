@@ -26,6 +26,41 @@ export function GoogleSignInButton({ redirectTo }: { redirectTo?: string | null 
   );
 }
 
+/**
+ * The same sign-in on Bananasplit's own pages (src/components/brand): a 50px
+ * outline pill with the design's monochrome "G" mark. `label` is "Continue
+ * with Google" on /sign-in and "Sign up with Google" on /sign-up.
+ */
+export function BrandGoogleButton({
+  redirectTo,
+  label = "Continue with Google",
+}: {
+  redirectTo?: string | null;
+  label?: string;
+}) {
+  return (
+    <form
+      action={async () => {
+        "use server";
+        await signIn("google", redirectTo ? { redirectTo } : undefined);
+      }}
+    >
+      <button
+        type="submit"
+        className="bg-paper border-ink/16 hover:bg-cream flex h-[50px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-full border text-[15px] font-semibold transition-colors"
+      >
+        <span
+          aria-hidden="true"
+          className="border-ink grid size-5 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold"
+        >
+          G
+        </span>
+        {label}
+      </button>
+    </form>
+  );
+}
+
 /** The "or" between the Google button and the email form. */
 export function AuthOrDivider() {
   return (

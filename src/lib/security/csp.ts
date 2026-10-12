@@ -44,6 +44,7 @@ export const NONCE_ROUTE_PREFIXES = [
   "/sign-up",
   "/verify-email",
   "/onboarding",
+  "/checkout",
 ] as const;
 
 export function isNonceRoute(pathname: string): boolean {
@@ -75,10 +76,7 @@ export function sentryOrigin(env: NodeJS.ProcessEnv = process.env): string | nul
 }
 
 /** Vercel Blob's public store (logos, avatars) and Google profile photos. */
-const IMAGE_HOSTS = [
-  "https://*.public.blob.vercel-storage.com",
-  "https://*.googleusercontent.com",
-];
+const IMAGE_HOSTS = ["https://*.public.blob.vercel-storage.com", "https://*.googleusercontent.com"];
 
 /** The Google sign-in form POST redirects to accounts.google.com. */
 const FORM_TARGETS = ["https://accounts.google.com"];
@@ -168,5 +166,4 @@ export const NOT_FRAMABLE_SOURCE = `/((?!${FRAMABLE}).*)`;
  * next.config.ts `source` for the static CSP: every path EXCEPT the nonce
  * routes (so a matched route never carries two policies).
  */
-export const STATIC_CSP_SOURCE =
-  `/((?!app/|app$|poll/|poll$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|${FRAMABLE}).*)`;
+export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|${FRAMABLE}).*)`;

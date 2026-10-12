@@ -47,7 +47,7 @@ export function BasicsStep({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-1 flex-col gap-5">
       <AvatarEditor user={user} compact />
 
       <div className="grid gap-1.5">

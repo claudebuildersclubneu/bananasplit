@@ -1,19 +1,19 @@
 "use client";
 
-import {
-  CalendarRange,
-  ChartColumn,
-  ChartPie,
-  Check,
-  CircleCheck,
-  Handshake,
-  Hourglass,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
-import { ContinueButton, FieldError } from "@/components/onboarding/step-card";
+import { brandInputClass } from "@/components/brand/fields";
+import {
+  ContinuePill,
+  PreviewHeader,
+  PreviewTile,
+  SetupCard,
+  StepBody,
+  StepError,
+  StepFooter,
+  StepIntro,
+} from "@/components/onboarding/setup-shell";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FINANCE_CARDS } from "@/lib/finance/dashboard-cards";
 import { fiscalYearFor, MONTHS } from "@/lib/onboarding/org";
@@ -21,13 +21,6 @@ import { cn } from "@/lib/utils";
 import type { FinanceSetupState } from "@/server/onboarding/org-setup";
 
 import { goToNextOrgStep, saveFinanceStepAction } from "./actions";
-
-const CARD_ICONS: Record<string, LucideIcon> = {
-  categories: ChartPie,
-  runway: Hourglass,
-  sponsorships: Handshake,
-  burn: ChartColumn,
-};
 
 function todayIn(tz: string): string {
   try {
@@ -51,18 +44,27 @@ function formatDay(key: string): string {
   });
 }
 
+/** Bar heights for the preview's empty chart, as in the home page's widget. */
+const BARS = [82, 64, 90, 38, 56, 44] as const;
+
 /**
- * B4 · Finance reports: which sections the finance dashboard shows, and
- * the fiscal year, which creates the first budget period.
+ * B4 · Finance: which reports the finance board shows, and the fiscal year,
+ * which can start the first budget period.
  */
 export function FinanceStep({
   orgId,
   orgSlug,
+  index,
+  total,
+  backHref,
   state,
   timezone,
 }: {
   orgId: string;
   orgSlug: string;
+  index: number;
+  total: number;
+  backHref: string;
   state: FinanceSetupState;
   timezone: string;
 }) {
@@ -93,14 +95,61 @@ export function FinanceStep({
     });
   }
 
+  const shown = FINANCE_CARDS.filter((c) => cards.includes(c.id));
+
   return (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <span className="text-sm font-medium">On the finance dashboard</span>
-        <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Reports on the finance dashboard">
+    <SetupCard
+      preview={
+        <>
+          <PreviewHeader meta="Finance board" />
+          <PreviewTile className="gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex flex-col gap-1">
+                <span className="text-ink-soft text-[13px]">Left this term</span>
+                <span className="font-display text-[36px] leading-none tracking-[-0.03em] tabular-nums">
+                  $0
+                </span>
+              </span>
+              <span className="bg-oat text-ink-muted rounded-full px-2.5 py-1 text-[11px] font-bold">
+                {fy.label}
+              </span>
+            </div>
+            <div className="flex h-16 items-end gap-2" aria-hidden="true">
+              {BARS.map((h, i) => (
+                <span
+                  key={i}
+                  className={cn("flex-1 rounded-md", i === 4 ? "bg-banana" : "bg-straw")}
+                  style={{ height: `${h}%` }}
+                />
+              ))}
+            </div>
+          </PreviewTile>
+          {shown.map((card) => (
+            <PreviewTile key={card.id} className="gap-1">
+              <span className="text-[14px] font-semibold">{card.title}</span>
+              <span className="text-ink-soft text-[12px] leading-normal">{card.detail}</span>
+            </PreviewTile>
+          ))}
+          {shown.length === 0 && (
+            <p className="text-ink-faint m-0 text-[12px]">
+              Pick at least one report for the board.
+            </p>
+          )}
+        </>
+      }
+    >
+      <StepIntro index={index} total={total} title="What should the treasurer see?">
+        Pick the reports on your finance board, and when your club&apos;s year starts.
+      </StepIntro>
+
+      <StepBody className="gap-5">
+        <div
+          className="grid gap-2 sm:grid-cols-2"
+          role="group"
+          aria-label="Reports on the finance board"
+        >
           {FINANCE_CARDS.map((card) => {
             const on = cards.includes(card.id);
-            const Icon = CARD_ICONS[card.id];
             return (
               <button
                 key={card.id}
@@ -109,44 +158,37 @@ export function FinanceStep({
                 aria-checked={on}
                 onClick={() => toggle(card.id)}
                 className={cn(
-                  "focus-visible:ring-ring/50 relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all outline-none focus-visible:ring-3 active:scale-[0.99]",
-                  on ? "border-warning/50 bg-warning/5" : "hover:border-foreground/25",
+                  "bg-paper flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                  on ? "border-ink" : "border-ink/10 hover:border-ink/25",
                 )}
               >
-                <Icon
-                  className={cn("mt-0.5 size-4 shrink-0 transition-colors", on ? "text-warning" : "text-muted-foreground")}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1 pr-5">
-                  <span className="block text-sm font-medium">{card.title}</span>
-                  <span className="text-muted-foreground block text-xs leading-snug">{card.detail}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold">{card.title}</span>
+                  <span className="text-ink-soft text-[13px] leading-snug">{card.detail}</span>
                 </span>
                 <span
                   className={cn(
-                    "absolute top-3 right-3 grid size-4 place-items-center rounded-full border transition-colors",
-                    on && "border-warning bg-warning text-warning-foreground",
+                    "mt-0.5 grid size-5 flex-none place-items-center rounded-full border-[1.5px]",
+                    on ? "bg-ink border-ink text-cream" : "border-ink/22",
                   )}
                 >
-                  {on && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
+                  {on && <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />}
                 </span>
               </button>
             );
           })}
         </div>
-      </div>
 
-      <div className="space-y-2">
-        <span className="flex items-center gap-1.5 text-sm font-medium">
-          <CalendarRange className="text-muted-foreground size-3.5" aria-hidden="true" />
-          Fiscal year
-        </span>
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Starts</span>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="fy-start" className="text-[14px] font-semibold">
+            Your year starts
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
             <select
+              id="fy-start"
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              className={cn(brandInputClass, "h-11 w-auto cursor-pointer pr-3")}
             >
               {MONTHS.map((m, i) => (
                 <option key={m} value={i + 1}>
@@ -154,46 +196,51 @@ export function FinanceStep({
                 </option>
               ))}
             </select>
-          </label>
-          <span className="bg-muted inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium">
-            {fy.label}
-            <span className="text-muted-foreground font-normal">
-              {formatDay(fy.startsOn)} – {formatDay(fy.endsOn)}
+            <span className="bg-oat rounded-full px-3 py-1.5 text-[13px] font-semibold">
+              {fy.label}
+              <span className="text-ink-soft font-normal">
+                {" "}
+                · {formatDay(fy.startsOn)} – {formatDay(fy.endsOn)}
+              </span>
             </span>
-          </span>
+          </div>
         </div>
 
         {state.activePeriod ? (
-          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <CircleCheck className="text-success size-3.5" aria-hidden="true" />
+          <p className="text-ink-soft m-0 text-[13px]">
             Budget period in use: {state.activePeriod.label}. Change it on the Budget page.
           </p>
         ) : state.canManageFinance ? (
-          <label className="hover:bg-muted/40 flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors">
+          <label className="bg-oat flex cursor-pointer items-start gap-3 rounded-[14px] px-4 py-3">
             <Checkbox
               checked={createPeriod}
               onCheckedChange={(v) => setCreatePeriod(v === true)}
               className="mt-0.5"
             />
-            <span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <Wallet className="text-muted-foreground size-3.5" aria-hidden="true" />
-                Start the {fy.label} budget now
-              </span>
-              <span className="text-muted-foreground block text-xs">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[14px] font-semibold">Start the {fy.label} budget now</span>
+              <span className="text-ink-soft text-[13px]">
                 With the usual categories at $0. The treasurer sets the amounts on the Budget page.
               </span>
             </span>
           </label>
         ) : (
-          <p className="text-muted-foreground text-xs">The owner or treasurer starts the budget period.</p>
+          <p className="text-ink-soft m-0 text-[13px]">
+            The owner or treasurer starts the budget period.
+          </p>
         )}
-      </div>
+      </StepBody>
 
-      <FieldError message={error ?? undefined} />
-      <div className="flex border-t pt-4">
-        <ContinueButton pending={pending} onClick={submit} disabled={cards.length === 0} />
-      </div>
-    </div>
+      <StepError message={error} />
+      <StepFooter
+        back={{ href: backHref }}
+        skip={{
+          onClick: () => start(() => goToNextOrgStep(orgSlug, "finance")),
+          disabled: pending,
+        }}
+      >
+        <ContinuePill pending={pending} onClick={submit} disabled={cards.length === 0} />
+      </StepFooter>
+    </SetupCard>
   );
 }

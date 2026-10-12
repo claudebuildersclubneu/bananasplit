@@ -2,6 +2,7 @@ import { TZDate } from "@date-fns/tz";
 import { z } from "zod";
 
 import { FINANCE_CARD_IDS } from "@/lib/finance/dashboard-cards";
+import { LABEL_COLOR_PALETTE } from "@/lib/label-colors";
 import { localDateKey } from "@/lib/tasks/dates";
 
 /**
@@ -74,6 +75,39 @@ export const labelsInputSchema = z
   .strict();
 
 export type LabelsInput = z.input<typeof labelsInputSchema>;
+
+/** B3: the org's task labels, as the setup step leaves them. */
+export const MAX_SETUP_LABELS = 12;
+
+export const taskLabelsInputSchema = z
+  .object({
+    labels: z
+      .array(
+        z
+          .object({
+            /** An existing label's id; null for a new one. */
+            id: z.string().min(1).max(100).nullable(),
+            name: z
+              .string()
+              .transform((s) => s.replace(/\s+/g, " ").trim())
+              .pipe(
+                z
+                  .string()
+                  .min(1, "Give every label a name.")
+                  .max(40, "Keep label names under 40 characters."),
+              ),
+            color: z.enum(LABEL_COLOR_PALETTE),
+          })
+          .strict(),
+      )
+      .max(
+        MAX_SETUP_LABELS,
+        `Add up to ${MAX_SETUP_LABELS} labels here. You can add more in Settings.`,
+      ),
+  })
+  .strict();
+
+export type TaskLabelsInput = z.input<typeof taskLabelsInputSchema>;
 
 // ---------------------------------------------------------------- B4 finance
 

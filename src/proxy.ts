@@ -106,5 +106,12 @@ export const config = {
         { type: "header", key: "purpose", value: "prefetch" },
       ],
     },
+    {
+      source: "/checkout",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
   ],
 };

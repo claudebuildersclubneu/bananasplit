@@ -1,92 +1,109 @@
 "use client";
 
-import {
-  CalendarDays,
-  Cog,
-  Crown,
-  Database,
-  DollarSign,
-  EyeOff,
-  Shapes,
-  ShieldCheck,
-  UserCheck,
-  Users,
-  UsersRound,
-  Vote,
-  type LucideIcon,
-} from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
-import { ContinueButton, FieldError } from "@/components/onboarding/step-card";
-import { Input } from "@/components/ui/input";
-import { DATA_TAGS, VISIBILITY_OPTIONS, type DataTag, type VisibilityValue } from "@/lib/onboarding/org";
+import {
+  ContinuePill,
+  DotChip,
+  PreviewHeader,
+  PreviewTile,
+  SetupCard,
+  StepBody,
+  StepError,
+  StepFooter,
+  StepIntro,
+} from "@/components/onboarding/setup-shell";
+import { LABEL_COLOR_PALETTE, type LabelColor } from "@/lib/label-colors";
+import { MAX_SETUP_LABELS } from "@/lib/onboarding/org";
 import { cn } from "@/lib/utils";
-import type { DataSourceRow } from "@/server/onboarding/org-setup";
+import type { TaskLabelsSetup } from "@/server/onboarding/org-setup";
 
 import { goToNextOrgStep, saveLabelsStepAction } from "./actions";
 
-const TAGS: Record<DataTag, { icon: LucideIcon; tone: string }> = {
-  Finance: { icon: DollarSign, tone: "border-warning/40 bg-warning/10 text-warning" },
-  People: { icon: Users, tone: "border-chart-1/40 bg-chart-1/10 text-chart-1" },
-  Operations: { icon: Cog, tone: "border-success/40 bg-success/10 text-success" },
-  Events: { icon: CalendarDays, tone: "border-chart-5/40 bg-chart-5/10 text-chart-5" },
-  Other: { icon: Shapes, tone: "border-foreground/20 bg-muted text-foreground" },
-};
+interface Row {
+  key: string;
+  id: string | null;
+  name: string;
+  color: LabelColor;
+  taskCount: number | null;
+}
 
-const KIND_ICONS: Record<string, LucideIcon> = {
-  SESSIONS: CalendarDays,
-  ATTENDANCE: UserCheck,
-  SIGNUPS: Users,
-  BALLOTS: Vote,
-  PEOPLE: UsersRound,
-};
+/** A new club's starting labels, in the brand's four tones. */
+const SUGGESTED = ["Events", "Projects", "Sponsors", "Outreach"] as const;
 
-const VISIBILITY_ICONS: Record<VisibilityValue, LucideIcon> = {
-  MEMBERS: Users,
-  ADMINS: ShieldCheck,
-  OWNER: Crown,
-  HIDDEN: EyeOff,
-};
+/** The preview's stand-in tasks while the club has none of its own. */
+const SAMPLE_TASKS = [
+  "Book a room for the first meeting",
+  "Order supplies for the build",
+  "Email sponsors about spring",
+  "Plan the campus info table",
+] as const;
+
+const AVATAR_TONES = ["bg-wheat", "bg-ink", "bg-dusk", "bg-spot"] as const;
+
+function asColor(color: string): LabelColor {
+  return (LABEL_COLOR_PALETTE as readonly string[]).includes(color)
+    ? (color as LabelColor)
+    : LABEL_COLOR_PALETTE[0];
+}
 
 /**
- * B3 · Label sources: a label and a tag for every database, and who can see
- * each tag's data (the databases' member visibility, enforced by RLS).
+ * B3 · Labels: the club's task labels (design: App screens, 05). Keep,
+ * rename, recolour, remove or add; a new club starts with four suggestions.
+ * The preview shows the newest tasks, or sample ones, wearing the labels.
  */
 export function LabelsStep({
   orgId,
   orgSlug,
-  sources,
+  index,
+  total,
+  backHref,
+  setup,
 }: {
   orgId: string;
   orgSlug: string;
-  sources: DataSourceRow[];
+  index: number;
+  total: number;
+  backHref: string;
+  setup: TaskLabelsSetup;
 }) {
-  const [rows, setRows] = useState(
-    sources.map((s) => ({ id: s.id, key: s.key, kind: s.kind, name: s.name, tag: s.tag })),
+  const fresh = setup.labels.length === 0;
+  const [rows, setRows] = useState<Row[]>(() =>
+    fresh
+      ? SUGGESTED.map((name, i) => ({
+          key: `new-${i}`,
+          id: null,
+          name,
+          color: LABEL_COLOR_PALETTE[i],
+          taskCount: null,
+        }))
+      : setup.labels.map((l) => ({ key: l.id, ...l, color: asColor(l.color) })),
   );
-  const initialVisibility = useMemo(() => {
-    const out: Partial<Record<DataTag, VisibilityValue>> = {};
-    for (const s of sources) if (!out[s.tag]) out[s.tag] = s.memberVisibility as VisibilityValue;
-    return out;
-  }, [sources]);
-  const [visibility, setVisibility] = useState(initialVisibility);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const added = useRef(0);
+  const list = useRef<HTMLUListElement>(null);
 
-  const tagsInUse = DATA_TAGS.filter((t) => rows.some((r) => r.tag === t));
-
-  function update(i: number, patch: Partial<(typeof rows)[number]>) {
-    setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  function update(key: string, patch: Partial<Row>) {
+    setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
-  function submit() {
+  function add() {
+    const key = `added-${added.current++}`;
+    const used = new Set(rows.map((r) => r.color));
+    const color = LABEL_COLOR_PALETTE.find((c) => !used.has(c)) ?? LABEL_COLOR_PALETTE[0];
+    setRows([...rows, { key, id: null, name: "", color, taskCount: null }]);
+    setTimeout(
+      () => list.current?.querySelector<HTMLInputElement>(`[data-key="${key}"]`)?.focus(),
+      0,
+    );
+  }
+
+  function save() {
     setError(null);
     start(async () => {
-      const vis: Partial<Record<DataTag, VisibilityValue>> = {};
-      for (const t of tagsInUse) vis[t] = visibility[t] ?? "MEMBERS";
       const result = await saveLabelsStepAction(orgId, {
-        sources: rows.map((r) => ({ id: r.id, name: r.name, tag: r.tag })),
-        visibility: vis,
+        labels: rows.map((r) => ({ id: r.id, name: r.name, color: r.color })),
       });
       if (!result.ok) {
         setError(result.error);
@@ -96,103 +113,126 @@ export function LabelsStep({
     });
   }
 
+  const named = rows.filter((r) => r.name.trim());
+  const preview =
+    setup.tasks.length > 0
+      ? setup.tasks.map((t) => ({
+          title: t.title,
+          label: rows.find((r) => r.id && t.labelIds.includes(r.id) && r.name.trim()),
+        }))
+      : SAMPLE_TASKS.map((title, i) => ({
+          title,
+          label: named.length ? named[i % named.length] : undefined,
+        }));
+
   return (
-    <div className="space-y-5">
-      <ul className="grid gap-2">
-        {rows.map((row, i) => {
-          const KindIcon = KIND_ICONS[row.kind] ?? Database;
-          return (
-            <li key={row.id} className="space-y-2.5 rounded-xl border p-3">
-              <div className="flex items-center gap-3">
-                <KindIcon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <Input
-                    aria-label={`Label for ${row.key}`}
-                    value={row.name}
-                    maxLength={60}
-                    placeholder="Add a label…"
-                    onChange={(e) => update(i, { name: e.target.value })}
-                    className="h-8 font-medium"
-                  />
-                </div>
-                <span className="text-muted-foreground hidden font-mono text-[11px] sm:block">{row.key}</span>
-              </div>
-              <div className="flex flex-wrap gap-1" role="radiogroup" aria-label={`Tag for ${row.key}`}>
-                {DATA_TAGS.map((t) => {
-                  const on = row.tag === t;
-                  const Icon = TAGS[t].icon;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => update(i, { tag: t })}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                        on ? cn(TAGS[t].tone, "font-medium") : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <Icon className="size-3" aria-hidden="true" />
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </li>
-          );
-        })}
-        {rows.length === 0 && <p className="text-muted-foreground text-sm">No databases yet.</p>}
-      </ul>
-
-      {tagsInUse.length > 0 && (
-        <div className="space-y-2">
-          <div>
-            <span className="text-sm font-medium">Who can see what</span>
-            <p className="text-muted-foreground text-xs">
-              Applies to every source with that tag. Owners and admins always see everything.
+    <SetupCard
+      preview={
+        <>
+          <PreviewHeader meta="This week · Board" />
+          {preview.map((task, i) => (
+            <PreviewTile key={`${task.title}-${i}`}>
+              <span className="text-[14px] font-semibold">{task.title}</span>
+              <span className="flex items-center justify-between gap-3">
+                {task.label ? (
+                  <DotChip color={task.label.color}>{task.label.name}</DotChip>
+                ) : (
+                  <span className="text-ink-faint text-[12px]">No label</span>
+                )}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-[22px] flex-none rounded-full",
+                    AVATAR_TONES[i % AVATAR_TONES.length],
+                  )}
+                />
+              </span>
+            </PreviewTile>
+          ))}
+          {setup.tasks.length === 0 && (
+            <p className="text-ink-faint m-0 mt-auto text-[12px]">
+              Sample tasks, to show how labels look.
             </p>
-          </div>
-          <div className="divide-y rounded-xl border">
-            {tagsInUse.map((tag) => {
-              const TagIcon = TAGS[tag].icon;
-              const current = visibility[tag] ?? "MEMBERS";
-              const VisIcon = VISIBILITY_ICONS[current];
-              return (
-                <label key={tag} className="flex items-center gap-3 px-3 py-2.5">
-                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-md border", TAGS[tag].tone)}>
-                    <TagIcon className="size-3.5" aria-hidden="true" />
-                  </span>
-                  <span className="flex-1 text-sm font-medium">{tag}</span>
-                  <span className="relative">
-                    <VisIcon
-                      className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
-                      aria-hidden="true"
-                    />
-                    <select
-                      aria-label={`Who can see ${tag}-tagged data`}
-                      value={current}
-                      onChange={(e) => setVisibility({ ...visibility, [tag]: e.target.value as VisibilityValue })}
-                      className="border-input bg-background h-9 rounded-md border pr-2 pl-8 text-sm"
-                    >
-                      {VISIBILITY_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
+          )}
+        </>
+      }
+    >
+      <StepIntro index={index} total={total} title="How does your club sort its work?">
+        {fresh
+          ? "Labels group your club's tasks. We suggested four to start. Keep, rename or add your own."
+          : "Labels group your club's tasks. Here are the ones you have. Keep, rename or add your own."}
+      </StepIntro>
 
-      <FieldError message={error ?? undefined} />
-      <div className="flex border-t pt-4">
-        <ContinueButton pending={pending} onClick={submit} disabled={rows.some((r) => !r.name.trim())} />
-      </div>
-    </div>
+      <StepBody>
+        <ul ref={list} className="m-0 flex list-none flex-col gap-2 p-0">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="bg-paper border-ink/10 focus-within-banana flex h-[50px] items-center gap-3 rounded-xl border px-4"
+            >
+              <button
+                type="button"
+                aria-label={`Change the colour of ${row.name || "this label"}`}
+                title="Change colour"
+                onClick={() => {
+                  const i = LABEL_COLOR_PALETTE.indexOf(row.color);
+                  update(row.key, {
+                    color: LABEL_COLOR_PALETTE[(i + 1) % LABEL_COLOR_PALETTE.length],
+                  });
+                }}
+                className="grid size-5 flex-none cursor-pointer place-items-center rounded-full border-none bg-transparent p-0"
+              >
+                <span className="size-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+              </button>
+              <input
+                data-key={row.key}
+                aria-label="Label name"
+                value={row.name}
+                maxLength={40}
+                placeholder="Name this label"
+                onChange={(e) => update(row.key, { name: e.target.value })}
+                className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none"
+              />
+              <span className="text-ink-soft flex-none text-[13px]">
+                {row.taskCount === null
+                  ? "New"
+                  : `${row.taskCount} ${row.taskCount === 1 ? "item" : "items"}`}
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove ${row.name || "this label"}`}
+                onClick={() => setRows(rows.filter((r) => r.key !== row.key))}
+                className="text-ink-ghost hover:text-ink flex-none cursor-pointer border-none bg-transparent p-0 text-[18px] leading-none"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+          {rows.length < MAX_SETUP_LABELS && (
+            <li>
+              <button
+                type="button"
+                onClick={add}
+                className="border-ink/25 text-ink-muted hover:bg-cream flex h-[50px] w-full cursor-pointer items-center rounded-xl border border-dashed bg-transparent px-4 text-left text-[15px] font-semibold transition-colors"
+              >
+                + Add a label
+              </button>
+            </li>
+          )}
+        </ul>
+      </StepBody>
+
+      <StepError message={error} />
+      <StepFooter
+        back={{ href: backHref }}
+        skip={{ onClick: () => start(() => goToNextOrgStep(orgSlug, "labels")), disabled: pending }}
+      >
+        <ContinuePill
+          pending={pending}
+          onClick={save}
+          disabled={rows.some((r) => !r.name.trim())}
+        />
+      </StepFooter>
+    </SetupCard>
   );
 }

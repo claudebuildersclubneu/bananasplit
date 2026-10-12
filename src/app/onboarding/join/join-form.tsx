@@ -1,188 +1,163 @@
 "use client";
 
-import { ArrowRight, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import { FieldError } from "@/components/onboarding/step-card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CodeBoxes, cleanCode } from "@/components/brand/code-boxes";
+import { primaryPillClass } from "@/components/brand/fields";
+import { JOIN_CODE_LENGTH, LEGACY_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
+import { cn } from "@/lib/utils";
 
 import { checkInviteCodeAction, joinWithInviteCodeAction, type CheckCodeResult } from "./actions";
 
-type Checked = Extract<CheckCodeResult, { ok: true }>;
+type Found = Extract<CheckCodeResult, { ok: true }>;
 
-/** "ab cd-efgh" -> "ABCD-EFGH" as they type. */
-function formatCode(raw: string): string {
-  const s = raw
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 8);
-  return s.length > 4 ? `${s.slice(0, 4)}-${s.slice(4)}` : s;
+function emptyCode(length = JOIN_CODE_LENGTH): string[] {
+  return Array.from({ length }, () => "");
+}
+
+/** ?code= from an admin's shared link: six boxes, or eight for a legacy code. */
+function initialBoxes(initialCode: string): string[] {
+  const chars = cleanCode(initialCode);
+  const length =
+    chars.length === LEGACY_JOIN_CODE_LENGTH ? LEGACY_JOIN_CODE_LENGTH : JOIN_CODE_LENGTH;
+  return Array.from({ length }, (_, i) => chars[i] ?? "");
 }
 
 /**
- * Enter the code, see which organization it belongs to (verified against
- * that org on the server: the code, your verified email and the org's
- * allowed domain), then join it.
+ * Enter the club's code in six boxes (design: App screens, 03). Once every
+ * box is filled the club is looked up on the server (the code, the verified
+ * email and the club's allowed domain) and shown before anyone joins.
  */
-export function JoinForm({ initialCode, email }: { initialCode: string; email: string }) {
-  const [code, setCode] = useState(formatCode(initialCode));
-  const [checked, setChecked] = useState<Checked | null>(null);
+export function JoinForm({ initialCode }: { initialCode: string }) {
+  const [code, setCode] = useState(() => initialBoxes(initialCode));
+  const [found, setFound] = useState<Found | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, startCheck] = useTransition();
   const [joining, startJoin] = useTransition();
+  // The code the latest lookup was for, so a stale answer is dropped.
+  const latest = useRef("");
+  const boxes = useRef<HTMLDivElement>(null);
 
-  function check() {
-    setError(null);
+  const value = code.join("");
+  const complete = code.every(Boolean);
+  const empty = code.every((c) => !c);
+
+  useEffect(() => {
+    latest.current = complete ? value : "";
+    if (!complete) return;
     startCheck(async () => {
-      const result = await checkInviteCodeAction(code);
-      if (!result.ok) {
-        setChecked(null);
+      const result = await checkInviteCodeAction(value);
+      if (latest.current !== value) return;
+      if (result.ok) {
+        setFound(result);
+        setError(null);
+      } else {
+        setFound(null);
         setError(result.error);
-        return;
       }
-      setChecked(result);
     });
+  }, [complete, value]);
+
+  function edit(next: string[]) {
+    setCode(next);
+    setFound(null);
+    setError(null);
   }
 
   function join() {
     setError(null);
     startJoin(async () => {
-      const result = await joinWithInviteCodeAction(code);
+      const result = await joinWithInviteCodeAction(value);
       if (result?.error) setError(result.error);
     });
   }
 
-  if (checked) {
-    const { org } = checked;
-    return (
-      <div className="space-y-4">
-        <div className="bg-muted/40 flex items-center gap-3 rounded-xl border p-3">
-          {org.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
-            <img src={org.logoUrl} alt="" className="size-10 rounded-lg object-cover" />
-          ) : (
-            <span className="heading bg-background grid size-10 place-items-center rounded-lg border text-sm">
-              {org.name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((w) => w[0]?.toUpperCase())
-                .join("")}
-            </span>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{org.name}</div>
-            <div className="text-muted-foreground text-xs">
-              {org.memberCount} {org.memberCount === 1 ? "member" : "members"} · /app/{org.slug}
-            </div>
-          </div>
-        </div>
-        <p className="text-muted-foreground flex items-start gap-2 text-xs">
-          <ShieldCheck className="text-success mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>
-            Code verified with {org.name}
-            {org.allowedDomain ? `, and ${email} is on its @${org.allowedDomain} list` : ""}.
-            You&apos;ll join as a member; an admin can change your role.
-          </span>
-        </p>
-        <FieldError message={error ?? undefined} />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="text-muted-foreground"
-            onClick={() => setChecked(null)}
-          >
-            Different code
-          </Button>
-          {checked.alreadyMember ? (
-            <Button asChild className="flex-1 font-semibold">
-              <Link href={`/app/${org.slug}`}>You&apos;re already a member · Open</Link>
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="lg"
-              className="group flex-1 font-semibold"
-              onClick={join}
-              disabled={joining}
-            >
-              {joining ? (
-                <>
-                  <Loader2 className="animate-spin" aria-hidden="true" />
-                  Joining…
-                </>
-              ) : (
-                <>
-                  Join {org.name}
-                  <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const org = found?.org;
+  const ready = Boolean(org) && !checking;
 
   return (
-    <form
-      className="space-y-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        check();
-      }}
-    >
-      <div className="grid gap-1.5">
-        <Label htmlFor="invite-code" className="text-xs">
-          Invite code
-        </Label>
-        <div className="relative">
-          <KeyRound
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2"
-            aria-hidden="true"
-          />
-        <Input
-          id="invite-code"
-          value={code}
-          onChange={(e) => {
-            setCode(formatCode(e.target.value));
-            setError(null);
-          }}
-          placeholder="ABCD-EFGH"
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          className="h-12 text-center font-mono text-xl tracking-[0.25em] uppercase"
-          aria-invalid={Boolean(error) || undefined}
-          autoFocus
-        />
-        </div>
-        <p className="text-muted-foreground text-xs">
-          Ask an admin of your organization for its code.
-        </p>
+    <>
+      <div ref={boxes}>
+        <CodeBoxes value={code} onChange={edit} invalid={Boolean(error)} autoFocus={!complete} />
       </div>
-      <FieldError message={error ?? undefined} />
-      <Button
-        type="submit"
-        size="lg"
-        className="group w-full font-semibold"
-        disabled={checking || code.length !== 9}
-      >
-        {checking ? (
-          <>
-            <Loader2 className="animate-spin" aria-hidden="true" />
-            Checking with the organization…
-          </>
-        ) : (
-          <>
-            Check code
-            <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-          </>
-        )}
-      </Button>
-    </form>
+
+      {org && ready && (
+        <div className="bg-cream border-ink/8 flex items-center gap-3.5 rounded-2xl border px-4 py-3.5">
+          {org.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
+            <img src={org.logoUrl} alt="" className="size-11 flex-none rounded-xl object-cover" />
+          ) : (
+            <span className="bg-pine text-cream font-display grid size-11 flex-none place-items-center rounded-xl text-[20px]">
+              {org.name.trim()[0]?.toUpperCase()}
+            </span>
+          )}
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[16px] font-bold">{org.name}</span>
+            <span className="text-ink-soft text-[13px]">
+              {org.memberCount} {org.memberCount === 1 ? "member" : "members"} ·{" "}
+              {found.alreadyMember ? "you're already a member" : "you'll join as Member"}
+            </span>
+          </span>
+          <span className="bg-leaf text-leaf-ink flex-none rounded-full px-2.5 py-[5px] text-[12px] font-bold">
+            ✓ Found
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-destructive m-0 text-[14px]">
+          {error}
+        </p>
+      )}
+      {empty && !error && (
+        <span className="text-ink-soft text-[14px]">
+          Tip: you can paste the whole code into the first box.
+        </span>
+      )}
+
+      {org && ready && found.alreadyMember ? (
+        <Link href={`/app/${org.slug}`} className={cn(primaryPillClass, "shadow-none")}>
+          Open {org.name}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={join}
+          disabled={!ready || joining}
+          aria-live="polite"
+          className={cn(
+            "h-[52px] rounded-full border-none text-[16px] font-semibold transition-colors",
+            ready
+              ? "bg-ink text-cream hover:bg-ink-hover cursor-pointer"
+              : "bg-sand text-ink-faint",
+          )}
+        >
+          {joining
+            ? "Joining…"
+            : ready && org
+              ? `Join ${org.name}`
+              : complete && checking
+                ? "Finding your club…"
+                : `Enter all ${code.length} characters`}
+        </button>
+      )}
+
+      <div className="text-ink-muted flex justify-between gap-4 text-[14px]">
+        <Link href="/onboarding/organization" className="text-ink-muted font-semibold">
+          Starting a new club instead?
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            edit(emptyCode());
+            setTimeout(() => boxes.current?.querySelector("input")?.focus(), 0);
+          }}
+          className="text-ink-muted cursor-pointer border-none bg-transparent p-0 font-semibold"
+        >
+          Clear
+        </button>
+      </div>
+    </>
   );
 }

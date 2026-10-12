@@ -1,18 +1,14 @@
-import { EventKind, EventVisibility, MemberVisibility, Prisma } from "@/generated/prisma/client";
+import { EventKind, EventVisibility, Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/auth/permissions";
 import { FINANCE_CARD_IDS } from "@/lib/finance/dashboard-cards";
 import {
-  DATA_TAGS,
   MEETING_WEEKS_AHEAD,
-  defaultTagForKind,
   describeMeeting,
   financeInputSchema,
   fiscalYearFor,
-  isDataTag,
-  labelsInputSchema,
   meetingOccurrences,
+  taskLabelsInputSchema,
   teamsInputSchema,
-  type DataTag,
 } from "@/lib/onboarding/org";
 import { localDateKey } from "@/lib/tasks/dates";
 import { writeOrgAuditLog } from "@/server/audit";
@@ -29,7 +25,7 @@ import { DEFAULT_CATEGORY_NAMES } from "@/lib/finance/default-categories";
  * step writes to the features that already exist, so what the admin sets
  * here is exactly what the app shows afterwards:
  *
- *   B3 labels   DatabaseDefinition.name / .tag / .memberVisibility
+ *   B3 labels   the org's task labels (Label), as in Settings > Labels
  *   B4 finance  OrgSettings.financeDashboardCards and the first BudgetPeriod
  *   B5 teams    a published org chart, the team meetings on the calendar and
  *               OrgSettings.showMemberAvailability
@@ -50,69 +46,90 @@ export class StepFailure extends Error {
 
 // ---------------------------------------------------------------- B3
 
-export interface DataSourceRow {
+export interface TaskLabelRow {
   id: string;
-  key: string;
   name: string;
-  kind: string;
-  tag: DataTag;
-  memberVisibility: MemberVisibility;
+  color: string;
+  /** Tasks carrying the label that the admin can see. */
+  taskCount: number;
 }
 
-export async function loadDataSources(
+export interface TaskLabelsSetup {
+  labels: TaskLabelRow[];
+  /** The newest few tasks, for the step's preview. */
+  tasks: { id: string; title: string; labelIds: string[] }[];
+}
+
+export async function loadTaskLabels(
   ctx: Pick<OrgContext, "db" | "organizationId">,
-): Promise<DataSourceRow[]> {
-  const rows = await ctx.db.databaseDefinition.findMany({
-    where: { organizationId: ctx.organizationId, archivedAt: null },
-    select: { id: true, key: true, name: true, kind: true, tag: true, memberVisibility: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+): Promise<TaskLabelsSetup> {
+  const labels = await ctx.db.label.findMany({
+    where: { organizationId: ctx.organizationId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, color: true, _count: { select: { tasks: true } } },
   });
-  return rows.map((r) => ({ ...r, tag: isDataTag(r.tag) ? r.tag : defaultTagForKind(r.kind) }));
+  const tasks = await ctx.db.task.findMany({
+    where: { organizationId: ctx.organizationId, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    take: 4,
+    select: { id: true, title: true, labels: { select: { labelId: true } } },
+  });
+  return {
+    labels: labels.map(({ _count, ...l }) => ({ ...l, taskCount: _count.tasks })),
+    tasks: tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      labelIds: t.labels.map((l) => l.labelId),
+    })),
+  };
 }
 
-export async function saveDataLabels(ctx: OrgContext, raw: unknown): Promise<StepResult> {
-  requirePermission(ctx, "databases.write");
-  requirePermission(ctx, "privacy.write");
-  const parsed = labelsInputSchema.safeParse(raw);
+/**
+ * The org's task labels as the admin left them: rows with an id are renamed
+ * or recoloured, rows without one are created, and labels missing from the
+ * list are deleted (their tasks simply lose that label).
+ */
+export async function saveTaskLabels(ctx: OrgContext, raw: unknown): Promise<StepResult> {
+  requirePermission(ctx, "labels.write");
+  const parsed = taskLabelsInputSchema.safeParse(raw);
   if (!parsed.success)
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the labels." };
-  const { sources, visibility } = parsed.data;
+  const { labels } = parsed.data;
 
-  const known = await ctx.db.databaseDefinition.findMany({
-    where: {
-      organizationId: ctx.organizationId,
-      archivedAt: null,
-      id: { in: sources.map((s) => s.id) },
-    },
+  const existing = await ctx.db.label.findMany({
+    where: { organizationId: ctx.organizationId },
     select: { id: true },
   });
-  const knownIds = new Set(known.map((k) => k.id));
-  for (const source of sources) {
-    if (!knownIds.has(source.id)) continue;
-    const tag = source.tag;
-    const vis = tag ? visibility[tag] : undefined;
-    await ctx.db.databaseDefinition.update({
-      where: { id: source.id },
-      data: {
-        name: source.name,
-        tag,
-        ...(vis ? { memberVisibility: vis as MemberVisibility } : {}),
-      },
-      select: { id: true },
+  const existingIds = new Set(existing.map((l) => l.id));
+  const kept = new Set(labels.flatMap((l) => (l.id && existingIds.has(l.id) ? [l.id] : [])));
+  const removed = existing.filter((l) => !kept.has(l.id)).map((l) => l.id);
+
+  if (removed.length > 0) {
+    await ctx.db.label.deleteMany({
+      where: { organizationId: ctx.organizationId, id: { in: removed } },
     });
+  }
+  let created = 0;
+  for (const label of labels) {
+    if (label.id && kept.has(label.id)) {
+      await ctx.db.label.updateMany({
+        where: { id: label.id, organizationId: ctx.organizationId },
+        data: { name: label.name, color: label.color },
+      });
+    } else {
+      await ctx.db.label.create({
+        data: { organizationId: ctx.organizationId, name: label.name, color: label.color },
+        select: { id: true },
+      });
+      created++;
+    }
   }
   await writeOrgAuditLog(ctx.db, {
     organizationId: ctx.organizationId,
-    action: "databases.labelled",
-    targetType: "DatabaseDefinition",
-    diff: {
-      sources: sources.length,
-      visibility: Object.fromEntries(
-        DATA_TAGS.filter((t) => visibility[t]).map((t) => [t, visibility[t]]),
-      ),
-    },
+    action: "labels.set_up",
+    targetType: "Label",
+    diff: { created, kept: kept.size, removed: removed.length },
   });
-  invalidate([tags.databases(ctx.organizationId), tags.reports(ctx.organizationId)]);
   return { ok: true };
 }
 

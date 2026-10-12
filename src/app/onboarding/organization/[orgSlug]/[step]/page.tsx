@@ -1,48 +1,36 @@
-import { Network, PiggyBank, Plug, Tags, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { OnboardingFrame, StepCard } from "@/components/onboarding/step-card";
+import { exitClass, SetupCard, SetupShell, StepIntro } from "@/components/onboarding/setup-shell";
 import { can } from "@/lib/auth/permissions";
-import { isOrgStep, ORG_STEP_COUNT, ORG_STEPS, type OrgStep } from "@/lib/onboarding/steps";
+import { absoluteAppUrl } from "@/lib/app-url";
+import {
+  isOrgStep,
+  ORG_STEP_COUNT,
+  ORG_STEP_NAMES,
+  ORG_STEPS,
+  orgStepHref,
+  previousOrgStep,
+} from "@/lib/onboarding/steps";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
-import { loadDataSources, loadFinanceSetup, loadTeamsSetup } from "@/server/onboarding/org-setup";
+import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
+import { loadFinanceSetup, loadTaskLabels, loadTeamsSetup } from "@/server/onboarding/org-setup";
 import { loadSetupState } from "@/server/setup/progress";
 
 import { DataStep, type DataConnection } from "../data-step";
 import { FinanceStep } from "../finance-step";
+import { InviteStep } from "../invite-step";
 import { LabelsStep } from "../labels-step";
 import { TeamsStep } from "../teams-step";
 
 export const dynamic = "force-dynamic";
 
-const META: Record<OrgStep, { icon: LucideIcon; title: string; description: string }> = {
-  data: {
-    icon: Plug,
-    title: "Connect your data",
-    description: "The services your portal reads from and writes to. Each is tested before it counts, and keys are stored encrypted.",
-  },
-  labels: {
-    icon: Tags,
-    title: "Label your data",
-    description: "Name each table and tag what it’s for, then decide who can see each kind.",
-  },
-  finance: {
-    icon: PiggyBank,
-    title: "Finance reports",
-    description: "Pick what the finance dashboard shows, and when your year starts.",
-  },
-  teams: {
-    icon: Network,
-    title: "Teams and calendars",
-    description: "Your teams become the org chart, and their meetings go on the calendar.",
-  },
-};
-
 /**
- * Org setup B2-B5 (onboarding Flow B), for an OWNER/ADMIN of the org. One
- * step per page under the org's own URL, so the flow survives a refresh and
- * can be picked up later.
+ * Club setup B2-B6 (onboarding Flow B), for an OWNER/ADMIN of the club, in
+ * the one step screen (design: App screens, 05). One step per page under
+ * the club's own URL, so the flow survives a refresh and can be picked up
+ * later; "Save and exit" goes to the club, since each step saves as it
+ * continues.
  */
 export default async function OrgSetupStepPage({
   params,
@@ -50,34 +38,43 @@ export default async function OrgSetupStepPage({
   const { orgSlug, step } = await params;
   if (!isOrgStep(step)) notFound();
   const { organization, role, user } = await getOrgContextBySlug(orgSlug);
-  const meta = META[step];
+  // B1 is step 1; B2 is the first of ORG_STEPS.
   const index = ORG_STEPS.indexOf(step) + 2;
+  const total = ORG_STEP_COUNT;
+  const previous = previousOrgStep(step);
+  const backHref = previous
+    ? orgStepHref(organization.slug, previous)
+    : `/app/${organization.slug}`;
 
-  const card = (body: React.ReactNode) => (
-    <OnboardingFrame wide>
-      <StepCard
-        tone="warning"
-        step={{ index, total: ORG_STEP_COUNT }}
-        title={meta.title}
-        description={meta.description}
-      >
-        {body}
-      </StepCard>
-    </OnboardingFrame>
+  const shell = (body: React.ReactNode) => (
+    <SetupShell
+      subject={organization.name}
+      steps={ORG_STEP_NAMES}
+      current={index}
+      exit={
+        <Link href={`/app/${organization.slug}`} className={exitClass}>
+          Save and exit
+        </Link>
+      }
+    >
+      {body}
+    </SetupShell>
   );
 
   if (!can({ role }, "settings.general.write")) {
-    return card(
-      <p className="text-muted-foreground text-sm">
-        Organization setup is for owners and admins.{" "}
-        <Link href={`/app/${organization.slug}`} className="underline underline-offset-4">
+    return shell(
+      <SetupCard>
+        <StepIntro index={index} total={total} title="Setup is for the club's admins.">
+          Ask an owner or admin of {organization.name} to finish it.
+        </StepIntro>
+        <Link href={`/app/${organization.slug}`} className="mt-6 font-semibold underline">
           Go to {organization.name}
         </Link>
-      </p>,
+      </SetupCard>,
     );
   }
 
-  const base = { orgId: organization.id, orgSlug: organization.slug };
+  const base = { orgId: organization.id, orgSlug: organization.slug, index, total, backHref };
 
   switch (step) {
     case "data": {
@@ -92,21 +89,48 @@ export default async function OrgSetupStepPage({
         detail: connectionDetail(s.step.id, s.config, s.last4),
         lastError: s.lastError,
       }));
-      return card(
+      return shell(
         <DataStep {...base} connections={connections} connectedCount={state.connectedCount} />,
       );
     }
     case "labels": {
-      const sources = await withOrgTx(organization.id, (ctx) => loadDataSources(ctx));
-      return card(<LabelsStep {...base} sources={sources} />);
+      const setup = await withOrgTx(organization.id, (ctx) => loadTaskLabels(ctx));
+      return shell(<LabelsStep {...base} setup={setup} />);
     }
     case "finance": {
       const state = await withOrgTx(organization.id, (ctx) => loadFinanceSetup(ctx));
-      return card(<FinanceStep {...base} state={state} timezone={organization.timezone} />);
+      return shell(<FinanceStep {...base} state={state} timezone={organization.timezone} />);
     }
     case "teams": {
       const state = await withOrgTx(organization.id, (ctx) => loadTeamsSetup(ctx));
-      return card(<TeamsStep {...base} state={state} currentUserId={user.id} />);
+      return shell(<TeamsStep {...base} state={state} currentUserId={user.id} />);
+    }
+    case "invite": {
+      const canInvite = can({ role }, "members.invite");
+      const { code, invites } = await withOrgTx(organization.id, async ({ db }) => ({
+        code: canInvite ? await getOrCreateJoinCode(db, organization.id, user.id) : null,
+        invites: canInvite
+          ? await db.invitation.findMany({
+              where: {
+                organizationId: organization.id,
+                acceptedAt: null,
+                expiresAt: { gt: new Date() },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 20,
+              select: { email: true, role: true },
+            })
+          : [],
+      }));
+      return shell(
+        <InviteStep
+          {...base}
+          me={{ name: user.name, email: user.email }}
+          code={code?.enabled ? code.code : null}
+          joinUrl={absoluteAppUrl("/onboarding/join")}
+          invites={invites}
+        />,
+      );
     }
   }
 }

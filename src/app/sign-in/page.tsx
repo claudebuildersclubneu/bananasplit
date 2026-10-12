@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 
-import { AuthFrame } from "@/components/auth/auth-frame";
-import { AuthOrDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
+import { AuthCard, AuthHeadline, AuthTitle } from "@/components/brand/auth-card";
+import { FormMessage, OrDivider } from "@/components/brand/fields";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
 
 import { PasswordSignInForm } from "./password-sign-in-form";
+
+export const metadata = { title: "Log in · Bananasplit" };
 
 /**
  * Auth.js sends its errors here (pages.error). The remaining ways a Google
@@ -22,6 +24,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   SessionEnded: "You were signed out because that account no longer exists here. Sign in again.",
 };
 
+/** Log in: the auth card with "Welcome back." (design: App screens, 01). */
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   const session = await auth();
   const { error, callbackUrl: rawCallbackUrl } = await searchParams;
@@ -42,32 +45,16 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const googleEnabled = googleSignInEnabled();
 
   return (
-    <AuthFrame>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="text-2xl">Sign in to Bananasplit</CardTitle>
-          <CardDescription>
-            {googleEnabled
-              ? "Use your Google account or your email and password."
-              : "Use your email and password."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {errorMessage && (
-            <p className="text-destructive text-sm" role="alert">
-              {errorMessage}
-            </p>
-          )}
-          {googleEnabled && (
-            <>
-              <GoogleSignInButton redirectTo={callbackUrl} />
-              <AuthOrDivider />
-            </>
-          )}
-
-          <PasswordSignInForm callbackUrl={callbackUrl} />
-        </CardContent>
-      </Card>
-    </AuthFrame>
+    <AuthCard panel={<AuthHeadline>Running your club shouldn&apos;t be bananas.</AuthHeadline>}>
+      <AuthTitle title="Welcome back." description="Log in to your club workspace." />
+      {errorMessage && <FormMessage>{errorMessage}</FormMessage>}
+      {googleEnabled && (
+        <>
+          <BrandGoogleButton redirectTo={callbackUrl} />
+          <OrDivider />
+        </>
+      )}
+      <PasswordSignInForm callbackUrl={callbackUrl} />
+    </AuthCard>
   );
 }

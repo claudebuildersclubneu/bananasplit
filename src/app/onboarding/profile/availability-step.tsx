@@ -17,7 +17,7 @@ export function AvailabilityStep({ initial }: { initial: Availability }) {
   const ruleError = Object.entries(errors).find(([k]) => k.startsWith("rules"))?.[1];
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 flex-col gap-4">
       <AvailabilityEditor value={value} onChange={setValue} />
       <FieldError message={errors.form ?? ruleError ?? errors.blocks} />
       <StepNav

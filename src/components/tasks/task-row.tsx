@@ -21,6 +21,7 @@ import {
 import { accessSubjectOf, useTasks } from "./tasks-context";
 import { TaskItemMenu } from "./task-item-menu";
 import type { TaskItem } from "./types";
+import { labelTextColor } from "@/lib/label-colors";
 
 /**
  * One task as a list row — the Week, the Team lanes and the request queue
@@ -88,7 +89,7 @@ export function TaskRow({
           {task.labels.slice(0, 3).map(({ label }) => (
             <Badge
               key={label.id}
-              style={{ backgroundColor: label.color, color: "white" }}
+              style={{ backgroundColor: label.color, color: labelTextColor(label.color) }}
               className="border-0"
             >
               {label.name}

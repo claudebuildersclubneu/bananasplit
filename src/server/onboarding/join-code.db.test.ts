@@ -102,7 +102,7 @@ describe("invite codes against the local database", () => {
     if (!reachable) return;
     const first = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
     const again = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
-    expect(first.code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(first.code).toMatch(/^[A-Z0-9]{6}$/);
     expect(again.code).toBe(first.code);
     expect(first.enabled).toBe(true);
   });
@@ -111,7 +111,10 @@ describe("invite codes against the local database", () => {
     if (!reachable) return;
     const { code } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
 
-    const check = await checkJoinCode(joiner, code.toLowerCase().replace("-", " "));
+    const check = await checkJoinCode(
+      joiner,
+      ` ${code.toLowerCase().slice(0, 3)} ${code.toLowerCase().slice(3)} `,
+    );
     expect(check).toMatchObject({
       ok: true,
       alreadyMember: false,

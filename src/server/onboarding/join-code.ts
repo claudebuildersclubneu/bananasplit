@@ -48,7 +48,7 @@ const joinCodeSelect = {
   rotatedAt: true,
 } satisfies Prisma.OrgJoinCodeSelect;
 
-/** Five tries at a fresh code; a collision in 8.5e11 is not expected at all. */
+/** Five tries at a fresh code; a collision in 7.3e8 is rare and simply retried. */
 async function insertWithFreshCode(db: TxClient, organizationId: string, userId: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {

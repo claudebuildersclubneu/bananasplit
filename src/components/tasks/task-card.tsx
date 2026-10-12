@@ -14,6 +14,7 @@ import {
   isTaskPrivate,
 } from "./task-badges";
 import type { TaskItem } from "./types";
+import { labelTextColor } from "@/lib/label-colors";
 
 export type TaskCardData = Pick<
   TaskItem,
@@ -76,7 +77,7 @@ export function TaskCard({ task, todayKey }: { task: TaskCardData; todayKey: str
           {task.labels.map(({ label }) => (
             <Badge
               key={label.id}
-              style={{ backgroundColor: label.color, color: "white" }}
+              style={{ backgroundColor: label.color, color: labelTextColor(label.color) }}
               className="border-0"
             >
               {label.name}
