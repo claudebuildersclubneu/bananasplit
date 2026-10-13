@@ -60,7 +60,8 @@ export async function getOnboardingProfile(userId: string): Promise<OnboardingPr
     });
     if (!user) return null;
     const memberships = await db.membership.findMany({
-      where: { userId, organization: { deletedAt: null } },
+      // Clubs only: a personal RSVP space doesn't make someone a club member.
+      where: { userId, organization: { deletedAt: null, kind: "CLUB" } },
       select: { organization: { select: { name: true, slug: true } } },
       orderBy: { joinedAt: "asc" },
     });

@@ -25,12 +25,13 @@ const FEATURES = [
 ] as const;
 
 /** The small white widgets under the balance. */
-const WIDGET = "flex flex-[1_1_220px] flex-col gap-3 rounded-[22px] bg-paper p-5";
+const WIDGET = "flex flex-[1_1_220px] flex-col gap-3 rounded-[22px] bg-paper p-5 max-sm:p-4";
 
 /**
  * The dark panel, inset from the page edges and lit by two banana glows:
  * the pitch beside a mock of the treasurer's widget board, then four
- * feature columns.
+ * feature columns. Phones skip the category widget and put the features
+ * two to a row.
  */
 export function Finance() {
   return (
@@ -40,9 +41,9 @@ export function Finance() {
           <span className="bg-glow-banana-22 absolute -top-[200px] -right-[160px] size-[620px] rounded-full" />
           <span className="bg-glow-banana-10 absolute -bottom-[240px] -left-[160px] size-[520px] rounded-full" />
         </div>
-        <div className="relative mx-auto flex max-w-[1240px] flex-col gap-[clamp(48px,6vw,72px)] px-6 py-[clamp(72px,9vw,120px)]">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,440px),1fr))] items-center gap-14">
-            <div className="flex flex-col gap-6">
+        <div className="relative mx-auto flex max-w-[1240px] flex-col gap-[clamp(40px,6vw,72px)] px-6 py-[clamp(56px,9vw,120px)]">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,440px),1fr))] items-center gap-10 sm:gap-14">
+            <div className="flex flex-col gap-5 sm:gap-6">
               <span className="bg-banana text-ink self-start rounded-full px-3 py-[5px] text-[13px] font-bold">
                 Finance
               </span>
@@ -50,7 +51,7 @@ export function Finance() {
                 Know where every dollar went,{" "}
                 <span className="text-banana">and how long the rest will last.</span>
               </h2>
-              <p className="text-dusk max-w-[500px] text-[18px] leading-[1.6] text-pretty">
+              <p className="text-dusk max-w-[500px] text-[16px] leading-[1.6] text-pretty sm:text-[18px]">
                 Treasurers get a widget board with charts they can arrange themselves. Members
                 submit reimbursements with a photo of the receipt.
               </p>
@@ -82,7 +83,7 @@ export function Finance() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">
-                <div className={WIDGET}>
+                <div className={cn(WIDGET, "max-sm:hidden")}>
                   <span className="text-ink-soft text-[13px]">Spent by category</span>
                   {CATEGORIES.map((category) => (
                     <div key={category.name} className="flex items-center gap-2.5 text-[13px]">
@@ -109,14 +110,18 @@ export function Finance() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,170px),1fr))] gap-x-8 gap-y-6">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-[repeat(auto-fit,minmax(170px,1fr))] sm:gap-x-8 sm:gap-y-6">
             {FEATURES.map((feature) => (
               <div
                 key={feature.title}
                 className="border-cream/16 flex flex-col gap-1.5 border-t pt-4"
               >
-                <span className="text-[16px] font-bold">{feature.title}</span>
-                <span className="text-ink-ghost text-[15px] leading-[1.5]">{feature.body}</span>
+                <span className="text-[15px] leading-[1.3] font-bold sm:text-[16px]">
+                  {feature.title}
+                </span>
+                <span className="text-ink-ghost text-[14px] leading-[1.5] sm:text-[15px]">
+                  {feature.body}
+                </span>
               </div>
             ))}
           </div>

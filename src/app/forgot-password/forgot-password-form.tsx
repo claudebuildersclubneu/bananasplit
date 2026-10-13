@@ -57,7 +57,7 @@ export function ForgotPasswordForm({
             required
             autoComplete="email"
             autoFocus
-            placeholder="you@school.edu"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />

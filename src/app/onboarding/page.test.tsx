@@ -63,9 +63,14 @@ beforeEach(() => {
 });
 
 describe("OnboardingPage", () => {
-  it("sends someone who hasn't finished profile setup to its first step", async () => {
+  it("asks a new account what it's for: free event pages, or a club (profile setup first)", async () => {
     mocks.profile.mockResolvedValue(profile({ onboardedAt: null }));
-    await expect(render()).rejects.toMatchObject({ url: "/onboarding/profile/basics" });
+    const html = await render();
+    expect(html).toContain("What are you here for?");
+    expect(html).toContain('href="/rsvp/new"');
+    expect(html).toContain('href="/onboarding/profile/basics"');
+    // Nothing about joining or creating until the club path is chosen.
+    expect(html).not.toContain("Join with a club code");
   });
 
   it("sends a member straight to their organization", async () => {

@@ -339,7 +339,7 @@ function TaskSearch({
       hint="/"
       placeholder="Search tasks"
       aria-label="Search tasks by title"
-      className="max-w-56"
+      className="sm:max-w-56"
       onKeyDown={(e) => {
         if (e.key === "Enter") onCommit(draft.trim());
         if (e.key === "Escape") {

@@ -92,12 +92,21 @@ export const STORAGE_KINDS = {
     contentTypes: IMAGE_TYPES,
     description: "Org logos, re-encoded WebP variants: logos/{orgId}/{randomId}/s{size}.webp",
   },
+  "event-covers": {
+    store: "public",
+    scope: "org",
+    maxUploadBytes: MAX_UPLOAD_BYTES,
+    contentTypes: IMAGE_TYPES,
+    description:
+      "RSVP page cover images, re-encoded square WebP crops: event-covers/{orgId}/{randomId}/s{size}.webp",
+  },
   avatars: {
     store: "public",
     scope: "user",
     maxUploadBytes: MAX_UPLOAD_BYTES,
     contentTypes: IMAGE_TYPES,
-    description: "Profile pictures, re-encoded WebP variants: avatars/{userId}/{randomId}/s{size}.webp",
+    description:
+      "Profile pictures, re-encoded WebP variants: avatars/{userId}/{randomId}/s{size}.webp",
   },
 } as const satisfies Record<string, StorageKind>;
 

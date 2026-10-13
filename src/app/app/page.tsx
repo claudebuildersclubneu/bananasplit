@@ -15,7 +15,8 @@ export default async function AppIndexPage() {
   const activeOrgId = await getActiveOrgId();
 
   const slug = await withUserTx(user.id, async ({ db }) => {
-    const live = { userId: user.id, organization: { deletedAt: null } };
+    // Clubs only: free RSVP pages live at /rsvp, not in the suite.
+    const live = { userId: user.id, organization: { deletedAt: null, kind: "CLUB" as const } };
     if (activeOrgId) {
       const active = await db.membership.findFirst({
         where: { ...live, organizationId: activeOrgId },

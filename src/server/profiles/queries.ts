@@ -52,24 +52,36 @@ export interface ViewerPrefs {
  * every request (not from the JWT), so a name or picture change shows at
  * once without signing in again. Deduped per request.
  */
-export const getShellUser = cache(async (userId: string, fallbackEmail: string): Promise<ShellUserRecord> => {
-  const row = await getShellRow(userId);
-  if (!row) return { name: null, email: fallbackEmail, image: null, avatar: null };
-  return { name: row.name, email: row.email, image: row.image, avatar: row.avatar };
-});
+export const getShellUser = cache(
+  async (userId: string, fallbackEmail: string): Promise<ShellUserRecord> => {
+    const row = await getShellRow(userId);
+    if (!row) return { name: null, email: fallbackEmail, image: null, avatar: null };
+    return { name: row.name, email: row.email, image: row.image, avatar: row.avatar };
+  },
+);
 
 /** Profile-setup state and personal theme, from the same per-request read. */
 export const getViewerPrefs = cache(async (userId: string): Promise<ViewerPrefs> => {
   const row = await getShellRow(userId);
   // A missing row (deleted mid-session) never traps anyone in setup.
-  return { onboardedAt: row ? row.onboardedAt : new Date(0), themePreference: row?.themePreference ?? null };
+  return {
+    onboardedAt: row ? row.onboardedAt : new Date(0),
+    themePreference: row?.themePreference ?? null,
+  };
 });
 
 const getShellRow = cache((userId: string) =>
   withUserTx(userId, ({ db }) =>
     db.user.findUnique({
       where: { id: userId },
-      select: { name: true, email: true, image: true, avatar: true, onboardedAt: true, themePreference: true },
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        avatar: true,
+        onboardedAt: true,
+        themePreference: true,
+      },
     }),
   ),
 );
@@ -130,7 +142,7 @@ export async function getOwnProfile(userId: string): Promise<OwnProfile | null> 
     });
     if (!user) return null;
     const memberships = await db.membership.findMany({
-      where: { userId },
+      where: { userId, organization: { kind: "CLUB" } },
       select: {
         role: true,
         title: true,
@@ -245,7 +257,10 @@ export interface PersonProfile extends PersonSummary {
  * page turns null into notFound(), so a person page never confirms that a
  * user exists outside the org.
  */
-export async function getOrgPerson(organizationId: string, userId: string): Promise<PersonProfile | null> {
+export async function getOrgPerson(
+  organizationId: string,
+  userId: string,
+): Promise<PersonProfile | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userId)) return null;
   return withOrgTx(organizationId, async ({ db }) => {
     const membership = await db.membership.findUnique({
@@ -271,10 +286,15 @@ export async function getOrgPerson(organizationId: string, userId: string): Prom
  * must share busy times unless the viewer is one of its admins. null when
  * the viewer may not see them.
  */
-export async function getPersonBusyHours(organizationId: string, userId: string): Promise<string[] | null> {
+export async function getPersonBusyHours(
+  organizationId: string,
+  userId: string,
+): Promise<string[] | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userId)) return null;
   return withOrgTx(organizationId, async ({ db }) => {
-    const rows = await db.$queryRaw<{ busy: string[] | null }[]>`SELECT app.member_busy_hours(${userId}) AS busy`;
+    const rows = await db.$queryRaw<
+      { busy: string[] | null }[]
+    >`SELECT app.member_busy_hours(${userId}) AS busy`;
     return rows[0]?.busy ?? null;
   });
 }

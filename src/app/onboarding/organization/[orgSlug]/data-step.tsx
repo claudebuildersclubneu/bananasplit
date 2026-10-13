@@ -44,8 +44,10 @@ const STATUS: Record<SetupStepStatus, { text: string; chip: string; dot: string 
 
 /**
  * B2 · Connect data: the club's real connections (the guided setup's
- * services), each tested by that flow before it shows as Connected.
- * Continue unlocks once one works; Skip marks the rest skipped.
+ * services), each tested by that flow before it shows as Connected. All
+ * optional: the club's data is stored in Bananasplit whether or not it
+ * connects anything, so Continue always works (with nothing connected it
+ * marks the step skipped, as Skip did).
  */
 export function DataStep({
   orgId,
@@ -105,8 +107,9 @@ export function DataStep({
       }
     >
       <StepIntro index={index} total={total} title="Connect the tools your club already uses.">
-        Each one is tested before it counts, and keys are stored encrypted. You can connect more
-        later in the Admin panel.
+        Optional. Your club&apos;s data is stored in Bananasplit from day one, walled off so only
+        your club can see it. Connect something only if you already keep data elsewhere; each one is
+        tested first and keys are stored encrypted.
       </StepIntro>
 
       <StepBody>
@@ -153,12 +156,13 @@ export function DataStep({
       </StepBody>
 
       <StepError message={error} />
-      <StepFooter skip={{ onClick: skip, disabled: pending, label: "Skip for now" }}>
+      <StepFooter>
         <ContinuePill
           pending={pending}
           pendingLabel="One moment…"
-          disabled={connectedCount === 0}
-          onClick={() => start(() => goToNextOrgStep(orgSlug, "data"))}
+          onClick={() =>
+            connectedCount === 0 ? skip() : start(() => goToNextOrgStep(orgSlug, "data"))
+          }
         />
       </StepFooter>
     </SetupCard>

@@ -11,6 +11,7 @@ import { BackLink } from "@/components/back-link";
 import { BallotResultsView } from "@/components/databases/ballot-results-view";
 import { DatabaseMenu } from "@/components/databases/database-menu";
 import { DataTable } from "@/components/databases/data-table";
+import { DatabaseGrid } from "@/components/databases/custom/database-grid";
 import {
   AttendancePanel,
   BallotPanel,
@@ -42,6 +43,7 @@ import {
   loadSignupDetail,
 } from "@/server/databases/details";
 import { fmtDate } from "@/server/databases/format";
+import { loadCustomDatabase } from "@/server/databases/custom";
 import { sourceFor } from "@/server/databases/sources";
 import {
   canViewBallotRows,
@@ -112,6 +114,43 @@ export default async function DatabaseViewPage({
   const sp = (await searchParams) as SearchParams;
   const { organization } = await getOrgContextBySlug(orgSlug);
   const rowId = typeof sp.row === "string" ? sp.row : undefined;
+
+  // A club-made database: the editable grid instead of a built-in's table.
+  const trash = sp.trash === "1";
+  let custom;
+  try {
+    custom = await withOrgTx(organization.id, async (ctx) => {
+      const def = await ctx.db.databaseDefinition.findFirst({
+        where: { organizationId: organization.id, key: dbKey, kind: "CUSTOM", archivedAt: null },
+        select: { id: true },
+      });
+      if (!def) return null;
+      return loadCustomDatabase(
+        { db: ctx.db, organizationId: organization.id, userId: ctx.userId, role: ctx.role },
+        dbKey,
+        { trash },
+      );
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) notFound();
+    throw error;
+  }
+  if (custom) {
+    const members = (await getOrgMembersForPicker(organization.id)).map((m) => ({
+      id: m.id,
+      name: m.name ?? "Member",
+    }));
+    return (
+      <DatabaseGrid
+        orgId={organization.id}
+        orgSlug={orgSlug}
+        database={custom}
+        members={members}
+        trash={trash}
+        timezone={organization.timezone}
+      />
+    );
+  }
 
   let page;
   try {

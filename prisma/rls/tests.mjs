@@ -1364,7 +1364,10 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
     "owner",
     null,
     async (q) => ({
-      policies: await count(q, `SELECT count(*) n FROM pg_policies WHERE 'app_legacy' = ANY(roles)`),
+      policies: await count(
+        q,
+        `SELECT count(*) n FROM pg_policies WHERE 'app_legacy' = ANY(roles)`,
+      ),
       tables: await count(
         q,
         `SELECT count(*) n FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
@@ -1935,8 +1938,10 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // C4: reads "Task"/"TaskAssignee" without RLS so the task-visibility
         // policies cannot recurse into themselves. Answers only about
         // app.user_id().
+        "can_edit_database",
         "can_read_task",
         "can_view_ballot_rows",
+        "can_view_database",
         "can_view_rows",
         "cancel_job",
         "claim_jobs",
@@ -1956,6 +1961,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "member_org_id",
         "member_role",
         "membership_history",
+        // Free RSVP pages: "Save to a club" moves the caller's own event
+        // into a club they run (OWNER/ADMIN), its rows following the FKs.
+        "move_personal_event",
         "org_by_join_code",
         "org_has_members",
         "org_has_other_owner",
@@ -1968,12 +1976,20 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "poll_vote_counts",
         "prune_jobs",
         "prune_rate_limit_buckets",
+        // Free events' guest lists, 30 days after they end (maintenance).
+        "purge_personal_rsvp_guests",
         "purge_unverified_users",
         "rate_limit_hit",
         "redeem_org_creation_code",
         "refresh_contact_rollups",
         "refresh_lapsed",
         "resolve_org_slug",
+        // A bring list claim's item and sign-up are on the same event.
+        "rsvp_claim_same_event",
+        // Public RSVP pages: the org and event behind a live page's code.
+        "rsvp_page",
+        // A guest's ticket: its page, event and sign-up, for door check-in.
+        "rsvp_ticket",
         "secret_delete",
         "secret_read",
         "secret_write",
@@ -2064,6 +2080,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "AvailabilityPoll:DELETE",
         "AvailabilityPoll:INSERT",
         "AvailabilityPoll:UPDATE",
+        // Club-made database rows: app.can_edit_database is the role check.
+        "DatabaseRecord:INSERT",
+        "DatabaseRecord:UPDATE",
         "EventAttendee:DELETE",
         "EventAttendee:INSERT",
         "EventAttendee:UPDATE",
@@ -2167,6 +2186,12 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       pending_invitations_for_me: "u",
       poll_org_id: "s",
       purge_unverified_users: "a",
+      rsvp_page: "s",
+      rsvp_ticket: "s",
+      rsvp_claim_same_event: "",
+      move_personal_event: "u",
+      purge_personal_rsvp_guests: "s",
+      organization_kind_guard: "",
       rate_limit_hit: "sa",
       secret_delete: "s",
       secret_read: "s",
@@ -2223,6 +2248,11 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       // grant; only the table owner fires them).
       can_read_task: "us",
       task_visibility_inherit: "",
+      // Club-made databases: the per-database policy predicates (member path
+      // only), and the trigger that keeps fields and rows on CUSTOM ones.
+      can_view_database: "u",
+      can_edit_database: "u",
+      assert_custom_database: "",
       // Onboarding: "Join with invite code" (verified callers only)
       org_by_join_code: "u",
       // Another member's busy hours: never the rules, and only as the org allows

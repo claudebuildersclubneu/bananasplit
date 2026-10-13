@@ -39,6 +39,8 @@ export type CspMode = "enforce" | "report-only";
 export const NONCE_ROUTE_PREFIXES = [
   "/app",
   "/poll",
+  "/e",
+  "/rsvp",
   "/invite",
   "/sign-in",
   "/sign-up",
@@ -80,6 +82,9 @@ export function sentryOrigin(env: NodeJS.ProcessEnv = process.env): string | nul
 /** Vercel Blob's public store (logos, avatars) and Google profile photos. */
 const IMAGE_HOSTS = ["https://*.public.blob.vercel-storage.com", "https://*.googleusercontent.com"];
 
+/** The map on a public RSVP page (/e/[slug]) is Google Maps' keyless embed. */
+const FRAME_SOURCES = ["https://www.google.com"];
+
 /** The Google sign-in form POST redirects to accounts.google.com. */
 const FORM_TARGETS = ["https://accounts.google.com"];
 
@@ -102,6 +107,7 @@ function sharedDirectives(env: NodeJS.ProcessEnv): string[] {
     `img-src 'self' blob: data: ${IMAGE_HOSTS.join(" ")}`,
     // FullCalendar ships its icon font inline as a data: URI in its CSS.
     "font-src 'self' data:",
+    `frame-src ${FRAME_SOURCES.join(" ")}`,
     `connect-src ${connect.join(" ")}`,
     `form-action 'self' ${FORM_TARGETS.join(" ")}`,
     "frame-ancestors 'none'",
@@ -156,6 +162,21 @@ export const STATIC_SECURITY_HEADERS: { key: string; value: string }[] = [
 ];
 
 /**
+ * Door mode (an RSVP page's check-in screen) scans tickets with the
+ * phone's camera, so its two routes let this origin use the camera; every
+ * other page keeps camera=() from STATIC_SECURITY_HEADERS. next.config.ts
+ * lists these after the static headers, and the later value wins.
+ */
+export const DOOR_MODE_SOURCES = [
+  "/app/:orgSlug/calendar/:eventId/rsvp/door",
+  "/rsvp/:eventId/door",
+] as const;
+export const DOOR_PERMISSIONS_HEADER = {
+  key: "Permissions-Policy",
+  value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+};
+
+/**
  * X-Frame-Options: DENY, on every path except the Notes files route, whose
  * PDFs the in-app preview shows in a same-origin frame (that route sends
  * SAMEORIGIN and its own frame-ancestors 'self').
@@ -168,4 +189,4 @@ export const NOT_FRAMABLE_SOURCE = `/((?!${FRAMABLE}).*)`;
  * next.config.ts `source` for the static CSP: every path EXCEPT the nonce
  * routes (so a matched route never carries two policies).
  */
-export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;
+export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|e/|e$|rsvp/|rsvp$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;

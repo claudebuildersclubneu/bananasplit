@@ -419,6 +419,8 @@ export interface OrgContextBySlug {
     timezone: string;
     logo: Prisma.JsonValue | null;
     activeOrgChartVersionId: string | null;
+    /** PERSONAL: someone's free RSVP space, which has no suite (/rsvp instead). */
+    kind: "CLUB" | "PERSONAL";
   };
   role: Role;
   /** Every live org the user belongs to, by name. */
@@ -461,10 +463,12 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
           timezone: true,
           logo: true,
           activeOrgChartVersionId: true,
+          kind: true,
         },
       });
+      // Clubs only: a personal RSVP space is never a club to switch to.
       const memberships = await db.membership.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, organization: { kind: "CLUB" } },
         select: {
           role: true,
           organization: {

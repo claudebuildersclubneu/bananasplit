@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Create your account", "Enter your club code", "You're in"] as const;
+const STEPS = ["Create your account", "Choose event pages or a club", "You're in"] as const;
 
 /**
- * The three steps to joining a club, under the headline on the sign-up
- * panel: numbered 22px dots, the current one ink with a yellow numeral, the
- * rest translucent cream.
+ * The three steps in, under the headline on the sign-up panel: one account
+ * for everyone, then the choice. Numbered 22px dots, the current one ink
+ * with a yellow numeral, the rest translucent cream.
  */
 export function JoinSteps({ current }: { current: 1 | 2 | 3 }) {
   return (

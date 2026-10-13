@@ -46,6 +46,8 @@ describe("nonce policy (0A Fix 13)", () => {
     expect(policy.get("base-uri")).toBe("'self'");
     expect(policy.get("form-action")).toBe("'self' https://accounts.google.com");
     expect(policy.get("font-src")).toBe("'self' data:");
+    // Only Google Maps' keyless embed (public RSVP pages) may be framed.
+    expect(policy.get("frame-src")).toBe("https://www.google.com");
     expect(policy.get("img-src")).toContain("https://*.public.blob.vercel-storage.com");
     expect(policy.has("upgrade-insecure-requests")).toBe(true);
     expect(policy.get("report-uri")).toBe("/api/csp-report");
@@ -99,6 +101,11 @@ describe("static policy for every other route", () => {
       "/app",
       "/app/claude-builders-club/tasks",
       "/poll/abc",
+      "/e/k3x9p2qa",
+      "/e/k3x9p2qa/manage",
+      "/e/k3x9p2qa/t/abcdefghjkmn",
+      "/rsvp",
+      "/rsvp/new",
       "/invite/tok",
       "/sign-in",
       "/sign-up",
@@ -112,7 +119,7 @@ describe("static policy for every other route", () => {
       expect(regex.test(path), path).toBe(false);
       expect(isNonceRoute(path), path).toBe(true);
     }
-    for (const path of ["/", "/application", "/api/health", "/api/public/cbc/events"]) {
+    for (const path of ["/", "/application", "/events", "/api/health", "/api/public/cbc/events"]) {
       expect(regex.test(path), path).toBe(true);
       expect(isNonceRoute(path), path).toBe(false);
     }
@@ -181,6 +188,8 @@ describe("mode and headers", () => {
     expect([...NONCE_ROUTE_PREFIXES]).toEqual([
       "/app",
       "/poll",
+      "/e",
+      "/rsvp",
       "/invite",
       "/sign-in",
       "/sign-up",

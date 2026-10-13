@@ -29,8 +29,15 @@ const GRANTS = {
   ContactTermStats: ["S", "SIUD", ""],
   DataSourceSyncState: ["S", "SIUD", ""],
   DatabaseDefinition: ["SIU", "SIUD", ""],
+  // Club-made databases: rows and fields, guarded per database by
+  // app.can_view_database / app.can_edit_database.
+  DatabaseField: ["SIUD", "SIUD", ""],
+  DatabaseRecord: ["SIUD", "SIUD", ""],
   Event: ["SIUD", "SIUD", ""],
   EventAttendee: ["SIUD", "SIUD", ""],
+  // RSVP page sign-ups: owners/admins in the suite (row policy), the public
+  // page and the reminder jobs on the service path.
+  EventRegistration: ["SIUD", "SIUD", ""],
   EventLinkLog: ["SI", "SI", ""],
   FinanceAuditLog: ["S", "S", ""],
   Invitation: ["SIUD", "SIUD", ""],
@@ -75,6 +82,10 @@ const GRANTS = {
   Project: ["SIUD", "SIUD", ""],
   RateLimitBucket: ["", "", ""],
   Receipt: ["SID", "SID", ""],
+  // An RSVP page's bring list: owners/admins in the suite (row policy), the
+  // public page's claims on the service path. Claims are insert/delete.
+  RsvpItem: ["SIUD", "SIUD", ""],
+  RsvpItemClaim: ["SID", "SID", ""],
   RecentVisit: ["SIUD", "", ""],
   Session: ["", "", "SIUD"],
   Signup: ["SIUD", "SIUD", ""],
@@ -150,6 +161,11 @@ const NEW_TENANT_TABLES = [
   "Poll",
   "PollOption",
   "PollVote",
+  "EventRegistration",
+  "DatabaseField",
+  "DatabaseRecord",
+  "RsvpItem",
+  "RsvpItemClaim",
 ];
 
 /**
@@ -165,8 +181,12 @@ async function seedPrivateTask(q) {
   // Asks for ORG on purpose: the inheritance trigger must overrule it.
   await q(`INSERT INTO "Task" ("id","organizationId","title","rank","createdById","parentTaskId","visibility","updatedAt")
            VALUES ('t_priv_sub','org_A','Private subtask','z1','u_memberA','t_priv','ORG',now())`);
-  await q(`INSERT INTO "TaskAssignee" ("organizationId","taskId","userId") VALUES ('org_A','t_priv','u_bothAB')`);
-  await q(`INSERT INTO "TaskLabel" ("organizationId","taskId","labelId") VALUES ('org_A','t_priv','l_A')`);
+  await q(
+    `INSERT INTO "TaskAssignee" ("organizationId","taskId","userId") VALUES ('org_A','t_priv','u_bothAB')`,
+  );
+  await q(
+    `INSERT INTO "TaskLabel" ("organizationId","taskId","labelId") VALUES ('org_A','t_priv','l_A')`,
+  );
   await q(`INSERT INTO "TaskComment" ("id","organizationId","taskId","authorId","body")
            VALUES ('tc_priv','org_A','t_priv','u_memberA','secret')`);
   await q(`INSERT INTO "TaskMention" ("id","organizationId","taskId","sourceKey","mentionedUserId","mentionedById")
@@ -1945,7 +1965,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         comment: await count(q, `SELECT count(*) n FROM "TaskComment" WHERE "taskId" = 't_priv'`),
         mention: await count(q, `SELECT count(*) n FROM "TaskMention" WHERE "taskId" = 't_priv'`),
         activity: await count(q, `SELECT count(*) n FROM "TaskActivity" WHERE "taskId" = 't_priv'`),
-        collaborator: await count(q, `SELECT count(*) n FROM "TaskAssignee" WHERE "taskId" = 't_priv'`),
+        collaborator: await count(
+          q,
+          `SELECT count(*) n FROM "TaskAssignee" WHERE "taskId" = 't_priv'`,
+        ),
         label: await count(q, `SELECT count(*) n FROM "TaskLabel" WHERE "taskId" = 't_priv'`),
         // A notification addressed to this very member still hides the title.
         notification: await count(q, `SELECT count(*) n FROM "Notification" WHERE "id" = 'n_priv'`),
@@ -2735,7 +2758,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.delete = await tryq(q, `DELETE FROM "OrgFile"`);
       await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.treas_sees = await count(q, `SELECT count(*) n FROM "OrgFile"`);
-      s.treas_renames = await rc(q, `UPDATE "OrgFile" SET "name" = 'Mine now.pdf' WHERE "id" = 'f_1'`);
+      s.treas_renames = await rc(
+        q,
+        `UPDATE "OrgFile" SET "name" = 'Mine now.pdf' WHERE "id" = 'f_1'`,
+      );
       await q(`SELECT app.set_context('u_adminA','org_A')`);
       s.admin_sees = await count(q, `SELECT count(*) n FROM "OrgFile"`);
       s.admin_removes = await rc(q, `UPDATE "OrgFile" SET "deletedAt" = now() WHERE "id" = 'f_1'`);
@@ -2791,7 +2817,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.admin_deletes = await rc(q, `DELETE FROM "NoteFolder" WHERE "id" = 'fo_1'`);
       // The (private) note is still there for its author, out of the folder.
       await q(`SELECT app.set_context('u_memberA','org_A')`);
-      s.note_kept = await count(q, `SELECT count(*) n FROM "Note" WHERE "id" = 'n_fo' AND "folderId" IS NULL`);
+      s.note_kept = await count(
+        q,
+        `SELECT count(*) n FROM "Note" WHERE "id" = 'n_fo' AND "folderId" IS NULL`,
+      );
       return s;
     },
     {
@@ -2837,9 +2866,18 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `INSERT INTO "PollOption" ("id","organizationId","pollId","label","addedById") VALUES ('qo_1','org_A','qp_1','Here','u_memberA'),('qo_2','org_A','qp_1','There','u_memberA')`,
       );
-      s.creator_closes = await rc(q, `UPDATE "Poll" SET "closedAt" = app.utc_now() WHERE "id" = 'qp_1'`);
-      s.creator_flips_anonymous = await tryq(q, `UPDATE "Poll" SET "anonymous" = true WHERE "id" = 'qp_1'`);
-      s.creator_rewords = await tryq(q, `UPDATE "Poll" SET "question" = 'Other' WHERE "id" = 'qp_1'`);
+      s.creator_closes = await rc(
+        q,
+        `UPDATE "Poll" SET "closedAt" = app.utc_now() WHERE "id" = 'qp_1'`,
+      );
+      s.creator_flips_anonymous = await tryq(
+        q,
+        `UPDATE "Poll" SET "anonymous" = true WHERE "id" = 'qp_1'`,
+      );
+      s.creator_rewords = await tryq(
+        q,
+        `UPDATE "Poll" SET "question" = 'Other' WHERE "id" = 'qp_1'`,
+      );
       await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.member_sees = await count(q, `SELECT count(*) n FROM "Poll" WHERE "id" = 'qp_1'`);
       s.member_reopens = await rc(q, `UPDATE "Poll" SET "closedAt" = NULL WHERE "id" = 'qp_1'`);
@@ -2850,11 +2888,17 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.admin_removes_option = await rc(q, `DELETE FROM "PollOption" WHERE "id" = 'qo_2'`);
       await q(`SELECT app.set_context('u_memberB','org_B')`);
       s.other_org_sees = await count(q, `SELECT count(*) n FROM "Poll" WHERE "id" = 'qp_1'`);
-      s.other_org_options = await count(q, `SELECT count(*) n FROM "PollOption" WHERE "pollId" = 'qp_1'`);
+      s.other_org_options = await count(
+        q,
+        `SELECT count(*) n FROM "PollOption" WHERE "pollId" = 'qp_1'`,
+      );
       s.other_org_deletes = await rc(q, `DELETE FROM "Poll" WHERE "id" = 'qp_1'`);
       await q(`SELECT app.set_context('u_adminA','org_A')`);
       s.admin_deletes = await rc(q, `DELETE FROM "Poll" WHERE "id" = 'qp_1'`);
-      s.options_gone = await count(q, `SELECT count(*) n FROM "PollOption" WHERE "pollId" = 'qp_1'`);
+      s.options_gone = await count(
+        q,
+        `SELECT count(*) n FROM "PollOption" WHERE "pollId" = 'qp_1'`,
+      );
       return s;
     },
     {
@@ -2932,11 +2976,20 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.other_org = await tryq(q, qvote("qv_5", "qp_B", "qo_B1", "u_memberA", "org_B"));
       await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.member_votes = await rc(q, qvote("qv_6", "qp_v", "qo_v2", "u_treasA"));
-      s.sees_every_vote = await count(q, `SELECT count(*) n FROM "PollVote" WHERE "pollId" = 'qp_v'`);
-      s.withdraws_others = await rc(q, `DELETE FROM "PollVote" WHERE "pollId" = 'qp_v' AND "userId" = 'u_memberA'`);
+      s.sees_every_vote = await count(
+        q,
+        `SELECT count(*) n FROM "PollVote" WHERE "pollId" = 'qp_v'`,
+      );
+      s.withdraws_others = await rc(
+        q,
+        `DELETE FROM "PollVote" WHERE "pollId" = 'qp_v' AND "userId" = 'u_memberA'`,
+      );
       s.update = await tryq(q, `UPDATE "PollVote" SET "optionId" = 'qo_v1' WHERE "id" = 'qv_6'`);
       await q(`SELECT app.set_context('u_memberA','org_A')`);
-      s.creator_closes = await rc(q, `UPDATE "Poll" SET "closedAt" = app.utc_now() WHERE "id" = 'qp_v'`);
+      s.creator_closes = await rc(
+        q,
+        `UPDATE "Poll" SET "closedAt" = app.utc_now() WHERE "id" = 'qp_v'`,
+      );
       await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.vote_when_closed = await tryq(q, qvote("qv_7", "qp_v", "qo_v1", "u_treasA"));
       s.withdraw_when_closed = await rc(q, `DELETE FROM "PollVote" WHERE "id" = 'qv_6'`);
@@ -3070,7 +3123,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     A("u_memberA"),
     async (q) => ({
       read: await tryq(q, `SELECT 1 FROM "StoredBlob"`),
-      put: await tryq(q, `SELECT app.blob_put('private','files/org_A/x','text/plain','\\x61'::bytea)`),
+      put: await tryq(
+        q,
+        `SELECT app.blob_put('private','files/org_A/x','text/plain','\\x61'::bytea)`,
+      ),
       get: await tryq(q, `SELECT * FROM app.blob_get('private','files/org_A/x')`),
       del: await tryq(q, `SELECT app.blob_delete('private', ARRAY['files/org_A/x'])`),
       list: await tryq(q, `SELECT * FROM app.blob_list('private','files/',NULL,10)`),
@@ -3085,14 +3141,42 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     async (q) => {
       const v = async (sql) => (await q(sql)).rows[0];
       return {
-        first: (await v(`SELECT app.blob_put('private','files/org_A/f1','text/plain','\\x6869'::bytea) AS r`)).r,
-        again: (await v(`SELECT app.blob_put('private','files/org_A/f1','text/plain','\\x00'::bytea) AS r`)).r,
-        body: (await v(`SELECT encode("body",'escape') AS r FROM app.blob_get('private','files/org_A/f1')`)).r,
-        other_store: await count(q, `SELECT count(*) n FROM app.blob_get('public','files/org_A/f1')`),
-        listed: await count(q, `SELECT count(*) n FROM app.blob_list('private','files/org_A/',NULL,10)`),
-        traversal: await tryq(q, `SELECT app.blob_put('private','files/../x','text/plain','\\x00'::bytea)`),
-        bad_store: await tryq(q, `SELECT app.blob_put('elsewhere','files/org_A/f2','text/plain','\\x00'::bytea)`),
-        deleted: (await v(`SELECT app.blob_delete('private', ARRAY['files/org_A/f1','files/org_A/nope']) AS r`)).r,
+        first: (
+          await v(
+            `SELECT app.blob_put('private','files/org_A/f1','text/plain','\\x6869'::bytea) AS r`,
+          )
+        ).r,
+        again: (
+          await v(
+            `SELECT app.blob_put('private','files/org_A/f1','text/plain','\\x00'::bytea) AS r`,
+          )
+        ).r,
+        body: (
+          await v(
+            `SELECT encode("body",'escape') AS r FROM app.blob_get('private','files/org_A/f1')`,
+          )
+        ).r,
+        other_store: await count(
+          q,
+          `SELECT count(*) n FROM app.blob_get('public','files/org_A/f1')`,
+        ),
+        listed: await count(
+          q,
+          `SELECT count(*) n FROM app.blob_list('private','files/org_A/',NULL,10)`,
+        ),
+        traversal: await tryq(
+          q,
+          `SELECT app.blob_put('private','files/../x','text/plain','\\x00'::bytea)`,
+        ),
+        bad_store: await tryq(
+          q,
+          `SELECT app.blob_put('elsewhere','files/org_A/f2','text/plain','\\x00'::bytea)`,
+        ),
+        deleted: (
+          await v(
+            `SELECT app.blob_delete('private', ARRAY['files/org_A/f1','files/org_A/nope']) AS r`,
+          )
+        ).r,
       };
     },
     {
@@ -3114,7 +3198,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     "app_auth",
     null,
     async (q) => ({
-      put: await tryq(q, `SELECT app.blob_put('private','files/org_A/x','text/plain','\\x61'::bytea)`),
+      put: await tryq(
+        q,
+        `SELECT app.blob_put('private','files/org_A/x','text/plain','\\x61'::bytea)`,
+      ),
       get: await tryq(q, `SELECT * FROM app.blob_get('private','files/org_A/x')`),
     }),
     { value: { put: "42501", get: "42501" } },
@@ -3170,11 +3257,15 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     "app_user",
     B("u_ownerB"),
     async (q) => {
-      await q(`INSERT INTO "OrgJoinCode" ("organizationId","code","allowedDomain") VALUES ('org_B','WXYZ-2345','example.edu')`);
+      await q(
+        `INSERT INTO "OrgJoinCode" ("organizationId","code","allowedDomain") VALUES ('org_B','WXYZ-2345','example.edu')`,
+      );
       await q(`SELECT app.set_context('u_invitee','')`);
       const s = {};
       s.verified = (
-        await q(`SELECT "orgSlug" IS NOT NULL AS ok, "allowedDomain" FROM app.org_by_join_code(' wxyz-2345 ')`)
+        await q(
+          `SELECT "orgSlug" IS NOT NULL AS ok, "allowedDomain" FROM app.org_by_join_code(' wxyz-2345 ')`,
+        )
       ).rows;
       s.unknown = await count(q, `SELECT count(*) n FROM app.org_by_join_code('AAAA-AAAA')`);
       s.direct_table = await count(q, `SELECT count(*) n FROM "OrgJoinCode"`);
@@ -3213,9 +3304,15 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     "app_service",
     { org: "org_A" },
     async (q) => ({
-      insert: await tryq(q, `INSERT INTO "OrgJoinCode" ("organizationId","code") VALUES ('org_A','QQQQ-QQQQ')`),
+      insert: await tryq(
+        q,
+        `INSERT INTO "OrgJoinCode" ("organizationId","code") VALUES ('org_A','QQQQ-QQQQ')`,
+      ),
       delete: await tryq(q, `DELETE FROM "OrgJoinCode"`),
-      update_other_org: await rc(q, `UPDATE "OrgJoinCode" SET "useCount" = "useCount" + 1 WHERE "organizationId" = 'org_B'`),
+      update_other_org: await rc(
+        q,
+        `UPDATE "OrgJoinCode" SET "useCount" = "useCount" + 1 WHERE "organizationId" = 'org_B'`,
+      ),
     }),
     { value: { insert: "42501", delete: "42501", update_other_org: 0 } },
   );
@@ -3250,8 +3347,14 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       );
       s.own_reads = await count(q, `SELECT count(*) n FROM "UserAvailability"`);
       await q(`SELECT app.set_context('u_adminA','org_A')`);
-      s.admin_reads_member = await count(q, `SELECT count(*) n FROM "UserAvailability" WHERE "userId" = 'u_memberA'`);
-      s.admin_updates_member = await rc(q, `UPDATE "UserAvailability" SET "busy" = '{}' WHERE "userId" = 'u_memberA'`);
+      s.admin_reads_member = await count(
+        q,
+        `SELECT count(*) n FROM "UserAvailability" WHERE "userId" = 'u_memberA'`,
+      );
+      s.admin_updates_member = await rc(
+        q,
+        `UPDATE "UserAvailability" SET "busy" = '{}' WHERE "userId" = 'u_memberA'`,
+      );
       s.bad_busy = await tryq(
         q,
         `INSERT INTO "UserAvailability" ("userId","busy") VALUES ('u_adminA',ARRAY['9-99'])`,
@@ -3275,8 +3378,12 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     "owner",
     null,
     async (q) => {
-      await q(`INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_memberA','{"secret":"Therapy"}',ARRAY['1-9','2-10'])`);
-      await q(`INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_bothAB','{}',ARRAY['0-8'])`);
+      await q(
+        `INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_memberA','{"secret":"Therapy"}',ARRAY['1-9','2-10'])`,
+      );
+      await q(
+        `INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_bothAB','{}',ARRAY['0-8'])`,
+      );
       const busy = async (user, org, target) => {
         await q(`SELECT app.set_context($1, $2)`, [user, org]);
         return (await q(`SELECT app.member_busy_hours($1) AS b`, [target])).rows[0]?.b ?? null;
@@ -3287,7 +3394,9 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.other_org = await busy("u_memberB", "org_B", "u_memberA");
       s.shared_member_via_b = await busy("u_memberB", "org_B", "u_bothAB");
       s.no_row = await busy("u_treasA", "org_A", "u_adminA");
-      await q(`UPDATE "OrgSettings" SET "showMemberAvailability" = false WHERE "organizationId" = 'org_A'`);
+      await q(
+        `UPDATE "OrgSettings" SET "showMemberAvailability" = false WHERE "organizationId" = 'org_A'`,
+      );
       s.hidden_member = await busy("u_treasA", "org_A", "u_memberA");
       s.hidden_admin = await busy("u_adminA", "org_A", "u_memberA");
       s.hidden_self = await busy("u_memberA", "org_A", "u_memberA");
@@ -3328,7 +3437,13 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       return s;
     },
     {
-      value: { member_tag: 0, member_settings: 0, admin_tag: true, admin_settings: 1, bad_tag: "23514" },
+      value: {
+        member_tag: 0,
+        member_settings: 0,
+        admin_tag: true,
+        admin_settings: 1,
+        bad_tag: "23514",
+      },
     },
   );
   await tcase(
@@ -3370,5 +3485,48 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       return claimed;
     },
     { value: ["gcal"] },
+  );
+  await tcase(
+    "P-RSVP-FREE-01",
+    "Free RSVP pages: bring lists are owners' and admins' in the suite; a club can't become a personal space; only a space's owner moves its events out",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      s.admin_adds_line = await rc(
+        q,
+        `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_1','org_A','e_A','Chips')`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_sees_lines = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
+      s.member_adds_line = await tryq(
+        q,
+        `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_2','org_A','e_A','Ice')`,
+      );
+      // A club's event is no one's free event: nothing moves.
+      s.member_moves = await tryv(q, `SELECT app.move_personal_event('e_A','org_A')`);
+      s.member_purges = await tryv(q, `SELECT app.purge_personal_rsvp_guests(30)`);
+      await q(`SELECT app.set_context('u_ownerA','org_A')`);
+      s.owner_moves_club_event = await tryv(q, `SELECT app.move_personal_event('e_A','org_B')`);
+      s.owner_flips_kind = await tryq(
+        q,
+        `UPDATE "Organization" SET "kind" = 'PERSONAL', "personalOwnerId" = 'u_ownerA' WHERE "id" = 'org_A'`,
+      );
+      await q(`SELECT app.set_context('u_memberB','org_B')`);
+      s.other_org_sees = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
+      return s;
+    },
+    {
+      value: {
+        admin_adds_line: 1,
+        member_sees_lines: 0,
+        member_adds_line: "42501",
+        member_moves: false,
+        member_purges: "error:42501",
+        owner_moves_club_event: false,
+        owner_flips_kind: "42501",
+        other_org_sees: 0,
+      },
+    },
   );
 });

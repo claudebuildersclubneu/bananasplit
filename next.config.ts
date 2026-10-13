@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
 import {
+  DOOR_MODE_SOURCES,
+  DOOR_PERMISSIONS_HEADER,
   buildStaticCsp,
   cspHeaderName,
   cspMode,
@@ -20,6 +22,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: STATIC_SECURITY_HEADERS },
+      // Door mode scans tickets with the camera (the later header wins).
+      ...DOOR_MODE_SOURCES.map((source) => ({ source, headers: [DOOR_PERMISSIONS_HEADER] })),
       // Every path but the Notes files route (its PDFs preview in a same-origin frame).
       { source: NOT_FRAMABLE_SOURCE, headers: [FRAME_DENY_HEADER] },
       {

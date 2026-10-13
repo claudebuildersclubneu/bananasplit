@@ -1,10 +1,11 @@
 "use client";
 
-import { ChevronDown, Globe, TriangleAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronDown, Globe, Ticket, TriangleAlert } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { createEvent, deleteEvent, updateEvent } from "@/app/app/[orgSlug]/calendar/actions";
+import { turnOnRsvpPage } from "@/app/app/[orgSlug]/calendar/[eventId]/rsvp/actions";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ConferenceProvider, EventKind, EventVisibility } from "@/generated/prisma/enums";
@@ -131,16 +138,16 @@ function usesMoreDetails(event: EventFormEvent | null): boolean {
   if (!event) return false;
   return Boolean(
     event.description ||
-      event.hostUserId ||
-      event.hostName ||
-      event.rsvpUrl ||
-      event.publicNote ||
-      event.stampSlot ||
-      event.capacityFull ||
-      event.featured ||
-      event.conferenceUrl ||
-      event.conferenceProvider !== ConferenceProvider.NONE ||
-      event.attendeeIds.length > 0,
+    event.hostUserId ||
+    event.hostName ||
+    event.rsvpUrl ||
+    event.publicNote ||
+    event.stampSlot ||
+    event.capacityFull ||
+    event.featured ||
+    event.conferenceUrl ||
+    event.conferenceProvider !== ConferenceProvider.NONE ||
+    event.attendeeIds.length > 0,
   );
 }
 
@@ -166,15 +173,26 @@ function EventForm({
   // A club runs workshops; the type is the one field whose common answer is
   // knowable, so it starts there instead of on "Other".
   const [kind, setKind] = useState<EventKind>(event?.kind ?? EventKind.WORKSHOP);
-  const [visibility, setVisibility] = useState<EventVisibility>(event?.visibility ?? EventVisibility.INTERNAL);
+  const [visibility, setVisibility] = useState<EventVisibility>(
+    event?.visibility ?? EventVisibility.INTERNAL,
+  );
   const [allDay, setAllDay] = useState(event?.allDay ?? defaultAllDay ?? false);
-  const initial = initialTimes(event, defaultStart, event?.allDay ?? defaultAllDay ?? false, timeZone);
+  const initial = initialTimes(
+    event,
+    defaultStart,
+    event?.allDay ?? defaultAllDay ?? false,
+    timeZone,
+  );
   const [startValue, setStartValue] = useState(initial.start);
   const [endValue, setEndValue] = useState(initial.end);
   const [location, setLocation] = useState(event?.location ?? "");
-  const [provider, setProvider] = useState<ConferenceProvider>(event?.conferenceProvider ?? ConferenceProvider.NONE);
+  const [provider, setProvider] = useState<ConferenceProvider>(
+    event?.conferenceProvider ?? ConferenceProvider.NONE,
+  );
   const [conferenceUrl, setConferenceUrl] = useState(event?.conferenceUrl ?? "");
-  const [host, setHost] = useState<string>(event?.hostUserId ?? (event?.hostName ? GUEST_HOST : NO_HOST));
+  const [host, setHost] = useState<string>(
+    event?.hostUserId ?? (event?.hostName ? GUEST_HOST : NO_HOST),
+  );
   const [hostName, setHostName] = useState(event?.hostName ?? "");
   const [rsvpUrl, setRsvpUrl] = useState(event?.rsvpUrl ?? "");
   const [capacityFull, setCapacityFull] = useState(event?.capacityFull ?? false);
@@ -184,6 +202,9 @@ function EventForm({
   const [attendeeIds, setAttendeeIds] = useState<string[]>(event?.attendeeIds ?? []);
   const [notifyAttendees, setNotifyAttendees] = useState(true);
   const [showMore, setShowMore] = useState(() => usesMoreDetails(event));
+  // New events only: also turn on a public RSVP page and go set it up.
+  const [withRsvpPage, setWithRsvpPage] = useState(false);
+  const params = useParams<{ orgSlug?: string }>();
 
   const isPublic = visibility === EventVisibility.PUBLIC;
 
@@ -191,7 +212,11 @@ function EventForm({
     setAllDay(next);
     if (next) {
       setStartValue(startValue.slice(0, 10));
-      setEndValue(endValue.slice(0, 10) < startValue.slice(0, 10) ? startValue.slice(0, 10) : endValue.slice(0, 10));
+      setEndValue(
+        endValue.slice(0, 10) < startValue.slice(0, 10)
+          ? startValue.slice(0, 10)
+          : endValue.slice(0, 10),
+      );
     } else {
       const start = new Date(`${startValue.slice(0, 10)}T18:00`);
       setStartValue(toDateTimeLocalValue(start));
@@ -243,7 +268,10 @@ function EventForm({
     submitEvent.preventDefault();
     if (isPending || !title.trim()) return;
     setError(null);
-    if (!allDay && (Number.isNaN(new Date(startValue).getTime()) || Number.isNaN(new Date(endValue).getTime()))) {
+    if (
+      !allDay &&
+      (Number.isNaN(new Date(startValue).getTime()) || Number.isNaN(new Date(endValue).getTime()))
+    ) {
       setError("Enter a valid start and end time.");
       return;
     }
@@ -252,9 +280,20 @@ function EventForm({
       return;
     }
     startTransition(async () => {
-      const result = event ? await updateEvent(orgId, event.id, payload()) : await createEvent(orgId, payload());
+      const result = event
+        ? await updateEvent(orgId, event.id, payload())
+        : await createEvent(orgId, payload());
       if (result?.error) {
         setError(result.error);
+        return;
+      }
+      if (!event && withRsvpPage && result.eventId && params.orgSlug) {
+        const page = await turnOnRsvpPage(orgId, result.eventId);
+        onOpenChange(false);
+        // The event exists either way; the RSVP screen offers the page again if this failed.
+        router.push(
+          `/app/${params.orgSlug}/calendar/${result.eventId}/rsvp${page.error ? "" : "?new=1"}`,
+        );
         return;
       }
       onOpenChange(false);
@@ -358,8 +397,9 @@ function EventForm({
           >
             <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
             <span>
-              Public events are world-readable: the title, description, location and RSVP link appear on the club
-              website, the public events feed and the public Google Calendar. Attendees and meeting links never do.
+              Public events are world-readable: the title, description, location and RSVP link
+              appear on the club website, the public events feed and the public Google Calendar.
+              Attendees and meeting links never do.
             </span>
           </p>
         )}
@@ -405,7 +445,9 @@ function EventForm({
             </div>
           </div>
           <p className="text-muted-foreground text-xs">
-            {allDay ? `All-day events are whole days in ${timeZone}.` : "Times are in your own timezone."}
+            {allDay
+              ? `All-day events are whole days in ${timeZone}.`
+              : "Times are in your own timezone."}
           </p>
         </fieldset>
 
@@ -420,6 +462,26 @@ function EventForm({
           />
         </div>
 
+        {!event && (
+          <label
+            htmlFor="event-rsvp-page"
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+              withRsvpPage ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+            )}
+          >
+            <Ticket aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+            <span className="min-w-0 flex-1 space-y-0.5">
+              <span className="block text-sm font-medium">Take RSVPs with a public page</span>
+              <span className="text-muted-foreground block text-xs leading-relaxed">
+                Anyone with the link signs up with their name, email and phone. You&apos;ll set the
+                spots, cover and privacy next.
+              </span>
+            </span>
+            <Switch id="event-rsvp-page" checked={withRsvpPage} onCheckedChange={setWithRsvpPage} />
+          </label>
+        )}
+
         <div>
           <button
             type="button"
@@ -428,7 +490,10 @@ function EventForm({
             aria-controls={moreId}
             onClick={() => setShowMore((v) => !v)}
           >
-            <ChevronDown aria-hidden className={cn("size-4 transition-transform", showMore && "rotate-180")} />
+            <ChevronDown
+              aria-hidden
+              className={cn("size-4 transition-transform", showMore && "rotate-180")}
+            />
             {showMore ? "Fewer details" : "More details"}
             {!showMore && (
               <span className="text-muted-foreground/80 ml-1 text-xs font-normal">
@@ -490,7 +555,11 @@ function EventForm({
                 </legend>
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
                   <div className="flex items-center gap-2">
-                    <Switch id="event-full" checked={capacityFull} onCheckedChange={setCapacityFull} />
+                    <Switch
+                      id="event-full"
+                      checked={capacityFull}
+                      onCheckedChange={setCapacityFull}
+                    />
                     <Label htmlFor="event-full">Full (hide the RSVP button)</Label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -589,7 +658,12 @@ function EventForm({
       {confirmEl}
       <DialogFooter className="flex items-center justify-between sm:justify-between">
         {event ? (
-          <Button type="button" variant="ghost" onClick={() => void handleDelete()} disabled={isPending}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void handleDelete()}
+            disabled={isPending}
+          >
             Delete
           </Button>
         ) : (

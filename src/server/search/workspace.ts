@@ -738,7 +738,7 @@ const DATABASE_KIND: Record<string, string> = {
   SIGNUPS: "Sign-ups",
   SESSIONS: "Sessions",
   PEOPLE: "People",
-  CUSTOM: "Custom",
+  CUSTOM: "Club database",
 };
 
 async function searchDatabases(ctx: Ctx): Promise<SearchGroup> {
@@ -754,10 +754,19 @@ async function searchDatabases(ctx: Ctx): Promise<SearchGroup> {
       ]),
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { key: true, name: true, kind: true, tag: true },
+    select: { id: true, key: true, name: true, kind: true, tag: true },
     take: ctx.pool,
   });
-  const hits = rows.map((d) =>
+  // A club-made database is listed only to those who may open it.
+  const visible = [];
+  for (const d of rows) {
+    if (d.kind === "CUSTOM") {
+      const ok = await db.$queryRaw<{ ok: boolean }[]>`SELECT app.can_view_database(${d.id}) AS ok`;
+      if (ok[0]?.ok !== true) continue;
+    }
+    visible.push(d);
+  }
+  const hits = visible.map((d) =>
     hit("database", d.key, {
       title: d.name,
       href: `${ctx.base}/databases/${d.key}`,
@@ -937,7 +946,9 @@ const RECENT_KIND: Record<string, SearchKind> = {
 /** The sidebar section an address under `base` is in: the most specific one (Polls over Calendar). */
 function sectionOf(href: string, base: string): SectionId | null {
   const path = href.split(/[?#]/)[0].slice(base.length);
-  const match = SECTIONS.flatMap((s) => [s.path, ...(s.also ?? [])].map((p) => ({ id: s.id, path: p })))
+  const match = SECTIONS.flatMap((s) =>
+    [s.path, ...(s.also ?? [])].map((p) => ({ id: s.id, path: p })),
+  )
     .filter((s) => s.path && (path === s.path || path.startsWith(`${s.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0];
   return match?.id ?? null;

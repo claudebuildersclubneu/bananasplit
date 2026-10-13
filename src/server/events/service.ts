@@ -17,6 +17,11 @@ import { invalidate } from "@/server/cache/invalidate";
 import { publicEvents, reports } from "@/server/cache/tags";
 import type { TxClient, TxKind } from "@/server/db/context";
 import { enqueueJob } from "@/server/jobs/enqueue";
+import {
+  notifyEventCancelled,
+  resetRsvpReminders,
+  scheduleRsvpReminders,
+} from "@/server/rsvp/service";
 import { markReportsDataChanged } from "@/server/reports/data-version";
 
 /**
@@ -107,11 +112,7 @@ const optionalText = (max: number) =>
     .nullish()
     .transform((v) => (v ? v : null));
 
-const httpUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine(isHttpUrl, "Links must be http(s) URLs.");
+const httpUrl = z.string().trim().max(2000).refine(isHttpUrl, "Links must be http(s) URLs.");
 
 const eventFields = {
   title: z.string().trim().min(1, "Title is required").max(200),
@@ -175,6 +176,7 @@ export const EVENT_SELECT = {
   capacityFull: true,
   featured: true,
   publicNote: true,
+  rsvpEnabled: true,
   createdById: true,
   deletedAt: true,
   mergedIntoId: true,
@@ -198,7 +200,10 @@ export interface EventSaveResult {
  * PUBLIC, not deleted, not merged into another event, ended at most a day
  * ago and starting within 400 days.
  */
-export function publicEventsWhere(organizationId: string, now: Date = new Date()): Prisma.EventWhereInput {
+export function publicEventsWhere(
+  organizationId: string,
+  now: Date = new Date(),
+): Prisma.EventWhereInput {
   return {
     organizationId,
     visibility: EventVisibility.PUBLIC,
@@ -233,9 +238,11 @@ function checkShape(e: EventShape): void {
   if (Number.isNaN(e.startsAt.getTime()) || Number.isNaN(e.endsAt.getTime())) {
     throw new EventValidationError("Enter a valid start and end time.");
   }
-  if (e.endsAt < e.startsAt) throw new EventValidationError("End time must be after the start time.");
+  if (e.endsAt < e.startsAt)
+    throw new EventValidationError("End time must be after the start time.");
   if (e.conferenceProvider === ConferenceProvider.NONE) {
-    if (e.conferenceUrl) throw new EventValidationError("Remove the link or choose a conferencing provider.");
+    if (e.conferenceUrl)
+      throw new EventValidationError("Remove the link or choose a conferencing provider.");
     return;
   }
   if (!e.conferenceUrl) throw new EventValidationError("Paste a meeting link for this provider.");
@@ -248,12 +255,16 @@ function checkShape(e: EventShape): void {
   if (url.protocol !== "https:") throw new EventValidationError("Meeting links must use https.");
 }
 
-async function checkHost(ctx: EventServiceContext, hostUserId: string | null | undefined): Promise<void> {
+async function checkHost(
+  ctx: EventServiceContext,
+  hostUserId: string | null | undefined,
+): Promise<void> {
   if (!hostUserId) return;
   const member = await ctx.db.membership.count({
     where: { organizationId: ctx.organizationId, userId: hostUserId },
   });
-  if (member === 0) throw new EventValidationError("The host must be a member of this organization.");
+  if (member === 0)
+    throw new EventValidationError("The host must be a member of this organization.");
 }
 
 interface Integrations {
@@ -265,7 +276,9 @@ async function loadIntegrations(ctx: EventServiceContext): Promise<Integrations>
   const rows = await ctx.db.orgIntegration.findMany({
     where: {
       organizationId: ctx.organizationId,
-      provider: { in: [IntegrationProvider.GOOGLE_CALENDAR, IntegrationProvider.NETLIFY_BUILD_HOOK] },
+      provider: {
+        in: [IntegrationProvider.GOOGLE_CALENDAR, IntegrationProvider.NETLIFY_BUILD_HOOK],
+      },
       status: IntegrationStatus.CONNECTED,
     },
     select: { provider: true, config: true },
@@ -273,7 +286,10 @@ async function loadIntegrations(ctx: EventServiceContext): Promise<Integrations>
   const google = rows.find((r) => r.provider === IntegrationProvider.GOOGLE_CALENDAR);
   const internal = (google?.config as { internalCalendarId?: unknown } | null)?.internalCalendarId;
   return {
-    google: { connected: Boolean(google), hasInternalCalendar: typeof internal === "string" && internal.length > 0 },
+    google: {
+      connected: Boolean(google),
+      hasInternalCalendar: typeof internal === "string" && internal.length > 0,
+    },
     buildHook: rows.some((r) => r.provider === IntegrationProvider.NETLIFY_BUILD_HOOK),
   };
 }
@@ -317,6 +333,22 @@ async function afterSave(
       runAt: new Date(Date.now() + 60_000),
     });
   }
+  // A move also forgets which reminders went out (they were for the old
+  // time), even while the page is off, so turning it back on reminds again.
+  const moved = before !== null && before.startsAt.getTime() !== after.startsAt.getTime();
+  if (moved && action !== "event.deleted") {
+    await resetRsvpReminders(ctx.db, ctx.organizationId, after.id);
+  }
+  // An RSVP page's guests: reminders follow the start time, and a deleted
+  // event tells them it's off (not a merge: mergeEvents won't merge away a
+  // live page that people signed up on).
+  if (after.rsvpEnabled) {
+    if (action === "event.deleted") {
+      if (!after.mergedIntoId) await notifyEventCancelled(ctx.db, ctx.organizationId, after.id);
+    } else if (!before || moved) {
+      await scheduleRsvpReminders(ctx.db, after);
+    }
+  }
   await writeOrgAuditLog(ctx.db, {
     organizationId: ctx.organizationId,
     action,
@@ -326,7 +358,9 @@ async function afterSave(
       title: after.title,
       kind: after.kind,
       visibility: after.visibility,
-      ...(before && before.visibility !== after.visibility ? { visibilityBefore: before.visibility } : {}),
+      ...(before && before.visibility !== after.visibility
+        ? { visibilityBefore: before.visibility }
+        : {}),
     },
   });
   const tags = [reports(ctx.organizationId)];
@@ -356,7 +390,8 @@ export async function createEvent(
       ...data,
       organizationId: ctx.organizationId,
       createdById: ctx.userId,
-      conferenceUrl: data.conferenceProvider === ConferenceProvider.NONE ? null : data.conferenceUrl,
+      conferenceUrl:
+        data.conferenceProvider === ConferenceProvider.NONE ? null : data.conferenceUrl,
       hostName: data.hostUserId ? null : data.hostName,
       suiteEditedAt: (options.origin ?? "suite") === "suite" ? new Date() : null,
       syncVersion: 1,
@@ -464,6 +499,8 @@ export interface MergeEventsResult {
  *   3. Copies the loser's website session link, term and stamp slot onto the
  *      survivor where the survivor has none. Two Events linked to different
  *      website sessions cannot be merged: the sync would recreate the loser.
+ *      Nor can a loser whose RSVP page is on with people signed up: its
+ *      sign-ups (EventRegistration) don't move, so its page would go dark.
  *   4. Soft-deletes the loser with mergedIntoId (its Google mirror is removed
  *      by the gcal job), recomputes the rollups, records the merge in
  *      EventLinkLog and OrgAuditLog, and invalidates reports (and the public
@@ -503,6 +540,22 @@ export async function mergeEvents(
     );
   }
   const org = ctx.organizationId;
+  // Sign-ups don't move with a merge, and a merged-away event's page,
+  // tickets and guest links stop working with no email to anyone. So a live
+  // page that people signed up on has to be the one that stays.
+  const loserPage = await ctx.db.event.count({
+    where: {
+      id: loser.id,
+      organizationId: org,
+      rsvpEnabled: true,
+      registrations: { some: { status: { in: ["GOING", "WAITLIST"] } } },
+    },
+  });
+  if (loserPage > 0) {
+    throw new EventMergeError(
+      "People have signed up on the RSVP page of the session you're merging away, and merging would take their page down. Merge the other way round to keep it, or turn its RSVP page off first.",
+    );
+  }
 
   // 1. Check-ins.
   const survivorContacts = new Set(
@@ -545,14 +598,19 @@ export async function mergeEvents(
   // 2. RSVPs, notes, transactions, ballot links, link log, polls.
   const survivorAttendees = new Set(
     (
-      await ctx.db.eventAttendee.findMany({ where: { eventId: survivor.id }, select: { userId: true } })
+      await ctx.db.eventAttendee.findMany({
+        where: { eventId: survivor.id },
+        select: { userId: true },
+      })
     ).map((a) => a.userId),
   );
   const loserAttendees = await ctx.db.eventAttendee.findMany({
     where: { eventId: loser.id },
     select: { userId: true },
   });
-  const moveAttendees = loserAttendees.filter((a) => !survivorAttendees.has(a.userId)).map((a) => a.userId);
+  const moveAttendees = loserAttendees
+    .filter((a) => !survivorAttendees.has(a.userId))
+    .map((a) => a.userId);
   if (moveAttendees.length) {
     await ctx.db.eventAttendee.updateMany({
       where: { eventId: loser.id, userId: { in: moveAttendees } },
@@ -572,7 +630,9 @@ export async function mergeEvents(
     where: { organizationId: org, linkedEventId: loser.id },
     data: { linkedEventId: survivor.id },
   });
-  const survivorPoll = await ctx.db.availabilityPoll.count({ where: { finalizedEventId: survivor.id } });
+  const survivorPoll = await ctx.db.availabilityPoll.count({
+    where: { finalizedEventId: survivor.id },
+  });
   if (survivorPoll === 0) {
     await ctx.db.availabilityPoll.updateMany({
       where: { organizationId: org, finalizedEventId: loser.id },
@@ -588,7 +648,8 @@ export async function mergeEvents(
     survivorPatch.sourceSessionId = loserLink.sourceSessionId;
   }
   if (!survivor.term && loser.term) survivorPatch.term = loser.term;
-  if (survivor.stampSlot === null && loser.stampSlot !== null) survivorPatch.stampSlot = loser.stampSlot;
+  if (survivor.stampSlot === null && loser.stampSlot !== null)
+    survivorPatch.stampSlot = loser.stampSlot;
   await ctx.db.event.update({
     where: { id: survivor.id },
     data: { ...survivorPatch, needsReview: false },
@@ -596,7 +657,11 @@ export async function mergeEvents(
 
   // 4. Soft-delete the loser (its mirror goes through the usual delete path).
   const integrations = await loadIntegrations(ctx);
-  const googleSync = needsGoogleSync(integrations, { visibility: loser.visibility, deleted: true }, loser);
+  const googleSync = needsGoogleSync(
+    integrations,
+    { visibility: loser.visibility, deleted: true },
+    loser,
+  );
   const deleted = await ctx.db.event.update({
     where: { id: loser.id },
     data: {
@@ -610,7 +675,11 @@ export async function mergeEvents(
   });
   const tags = await afterSave(ctx, "event.deleted", loser, deleted, integrations, googleSync);
 
-  const source = loserLink?.sourceSessionId ? "SUPABASE" : loserLink?.googleEventId ? "GOOGLE" : "SUITE";
+  const source = loserLink?.sourceSessionId
+    ? "SUPABASE"
+    : loserLink?.googleEventId
+      ? "GOOGLE"
+      : "SUITE";
   await ctx.db.eventLinkLog.create({
     data: {
       organizationId: org,
@@ -624,7 +693,8 @@ export async function mergeEvents(
 
   const contacts = [...new Set(loserRows.map((r) => r.contactId))];
   if (contacts.length) {
-    await ctx.db.$queryRaw`SELECT app.refresh_contact_rollups(${org}, ${contacts}::text[])::text AS ok`;
+    await ctx.db
+      .$queryRaw`SELECT app.refresh_contact_rollups(${org}, ${contacts}::text[])::text AS ok`;
     await ctx.db.$queryRaw`SELECT app.refresh_lapsed(${org}) AS n`;
   }
   await markReportsDataChanged({ db: ctx.db, organizationId: org });

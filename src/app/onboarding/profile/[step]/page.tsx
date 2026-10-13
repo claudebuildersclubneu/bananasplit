@@ -118,6 +118,16 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
         <div className="mt-[22px] flex flex-1 flex-col">
           <StepBody step={step} profile={profile} />
         </div>
+        {step === "basics" && (
+          // Profile setup is for club members; someone who only wants event
+          // pages doesn't need it (/rsvp never asks for it).
+          <p className="text-ink-muted mt-4 mb-0 text-[14px]">
+            Only here to make an event page?{" "}
+            <Link href="/rsvp" className="text-ink font-semibold">
+              Skip to free event pages
+            </Link>
+          </p>
+        )}
       </SetupCard>
     </SetupShell>
   );

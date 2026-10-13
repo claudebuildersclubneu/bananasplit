@@ -84,6 +84,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
     }
     throw error;
   }
+  // A personal space (free RSVP pages) has no suite: its home is /rsvp.
+  if (ctx.organization.kind === "PERSONAL") redirect("/rsvp");
   const orgs: OrgSummary[] = [
     ...ctx.memberships.map((m) => ({
       slug: m.slug,

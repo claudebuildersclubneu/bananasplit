@@ -183,7 +183,7 @@ export function InviteStep({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="officer@school.edu"
+              placeholder="officer@example.com"
               autoComplete="off"
               className={cn(brandInputClass, "min-w-0 flex-[1_1_220px]")}
             />

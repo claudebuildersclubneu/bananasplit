@@ -38,7 +38,7 @@ export async function signUp(page: Page, user: TestUser): Promise<void> {
   await page.context().setExtraHTTPHeaders({ "x-real-ip": testClientIp() });
   await page.goto("/sign-up");
   await page.getByLabel("Full name").fill(user.name);
-  await page.getByLabel("School email").fill(user.email);
+  await page.getByLabel("Email", { exact: true }).fill(user.email);
   await page.getByLabel("Password", { exact: true }).fill(user.password);
   await page.getByRole("button", { name: "Create account" }).click();
 }
@@ -121,6 +121,11 @@ export async function verifyEmail(page: Page, email: string): Promise<void> {
  * button); "create" on B1, /onboarding/organization.
  */
 export async function completeProfileSetup(page: Page, next: "join" | "create"): Promise<void> {
+  // A new account first chooses event pages or a club (/onboarding).
+  await page.waitForURL(/\/onboarding(\/profile\/basics)?$/);
+  if (!/\/profile\/basics$/.test(new URL(page.url()).pathname)) {
+    await page.getByRole("link", { name: /Join or start a club/ }).click();
+  }
   await page.waitForURL(/\/onboarding\/profile\/basics/);
   for (const step of ["school", "bio", "theme", "availability", "review"]) {
     await page.getByRole("button", { name: /^(Continue|Use .+)$/ }).click();
@@ -146,7 +151,8 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/onboarding\/organization\/[^/]+\/data$/);
   const slug = new URL(page.url()).pathname.split("/")[3]!;
-  await page.getByRole("button", { name: "Skip for now" }).click();
+  // Connecting data is optional: the club's data is stored in Bananasplit either way.
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/labels$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/finance$/);

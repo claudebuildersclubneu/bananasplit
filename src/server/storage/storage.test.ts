@@ -29,7 +29,14 @@ import { readUpload, UploadError, uploadErrorResponse } from "./upload";
 
 describe("storage kinds and keys", () => {
   it("every org-scoped kind is enumerated for the purge", () => {
-    expect([...ORG_SCOPED_KINDS].sort()).toEqual(["exports", "files", "logos", "org-chart", "receipts"]);
+    expect([...ORG_SCOPED_KINDS].sort()).toEqual([
+      "event-covers",
+      "exports",
+      "files",
+      "logos",
+      "org-chart",
+      "receipts",
+    ]);
     expect(STORAGE_KINDS.avatars.scope).toBe("user");
     expect(STORAGE_KINDS.receipts.store).toBe("private");
     expect(STORAGE_KINDS.logos.store).toBe("public");
@@ -119,7 +126,9 @@ describe("storage kinds and keys", () => {
 
   it("uses the local driver without tokens, and the database on Vercel", () => {
     expect(driverFor("private", {}).name).toBe("local");
-    expect(driverFor("public", { BLOB_PUBLIC_READ_WRITE_TOKEN: "vercel_blob_rw_x_y" }).name).toBe("vercel-blob");
+    expect(driverFor("public", { BLOB_PUBLIC_READ_WRITE_TOKEN: "vercel_blob_rw_x_y" }).name).toBe(
+      "vercel-blob",
+    );
     // Vercel's filesystem is read-only: no Blob store means Postgres, not an error.
     expect(driverFor("private", { VERCEL: "1" }).name).toBe("database");
     expect(driverFor("public", { VERCEL: "1" }).name).toBe("database");
@@ -134,18 +143,24 @@ describe("storage kinds and keys", () => {
     const oneStore = { VERCEL: "1", BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_x_y" };
     expect(publicIsProxied(oneStore)).toBe(true);
     expect(driverFor("public", oneStore).name).toBe("vercel-blob");
-    expect(publicIsProxied({ ...oneStore, BLOB_PUBLIC_READ_WRITE_TOKEN: "vercel_blob_rw_p_q" })).toBe(false);
+    expect(
+      publicIsProxied({ ...oneStore, BLOB_PUBLIC_READ_WRITE_TOKEN: "vercel_blob_rw_p_q" }),
+    ).toBe(false);
     expect(publicIsProxied({})).toBe(false);
   });
 });
 
 describe("Vercel Blob with the database behind it", () => {
-  function memoryDriver(name: BlobDriver["name"], opts: { failPuts?: boolean; failReads?: boolean } = {}) {
+  function memoryDriver(
+    name: BlobDriver["name"],
+    opts: { failPuts?: boolean; failReads?: boolean } = {},
+  ) {
     const blobs = new Map<string, { body: Buffer; contentType: string }>();
     const driver: BlobDriver = {
       name,
       async put(store, key, body, options) {
-        if (opts.failPuts) throw new Error("Vercel Blob: Cannot use private access on a public store");
+        if (opts.failPuts)
+          throw new Error("Vercel Blob: Cannot use private access on a public store");
         if (blobs.has(key)) throw new Error("This blob already exists");
         blobs.set(key, { body, contentType: options.contentType });
         return { key, url: store === "public" ? `https://store.example/${key}` : null };
@@ -176,10 +191,17 @@ describe("Vercel Blob with the database behind it", () => {
     expect(store.blobs.has("logos/o1/a/s64.webp")).toBe(true);
     expect(db.blobs.size).toBe(0);
     // An existing key is a real error, never a reason to write elsewhere.
-    await expect(both.put("public", "logos/o1/a/s64.webp", Buffer.from("b"), opts)).rejects.toThrow(/already exists/);
+    await expect(both.put("public", "logos/o1/a/s64.webp", Buffer.from("b"), opts)).rejects.toThrow(
+      /already exists/,
+    );
 
-    const refusing = withDatabaseFallback(memoryDriver("vercel-blob", { failPuts: true }).driver, db.driver);
-    await refusing.put("private", "files/o1/f1", Buffer.from("pdf"), { contentType: "application/pdf" });
+    const refusing = withDatabaseFallback(
+      memoryDriver("vercel-blob", { failPuts: true }).driver,
+      db.driver,
+    );
+    await refusing.put("private", "files/o1/f1", Buffer.from("pdf"), {
+      contentType: "application/pdf",
+    });
     expect(db.blobs.get("files/o1/f1")?.body.toString()).toBe("pdf");
   });
 
@@ -187,12 +209,18 @@ describe("Vercel Blob with the database behind it", () => {
     const store = memoryDriver("vercel-blob");
     const db = memoryDriver("database");
     db.blobs.set("avatars/u1/x/s64.webp", { body: Buffer.from("old"), contentType: "image/webp" });
-    store.blobs.set("avatars/u1/y/s64.webp", { body: Buffer.from("new"), contentType: "image/webp" });
+    store.blobs.set("avatars/u1/y/s64.webp", {
+      body: Buffer.from("new"),
+      contentType: "image/webp",
+    });
     const both = withDatabaseFallback(store.driver, db.driver);
     expect((await both.get("public", "avatars/u1/x/s64.webp"))?.body.toString()).toBe("old");
     expect((await both.get("public", "avatars/u1/y/s64.webp"))?.body.toString()).toBe("new");
     expect(await both.get("public", "avatars/u1/z/s64.webp")).toBeNull();
-    const failing = withDatabaseFallback(memoryDriver("vercel-blob", { failReads: true }).driver, db.driver);
+    const failing = withDatabaseFallback(
+      memoryDriver("vercel-blob", { failReads: true }).driver,
+      db.driver,
+    );
     expect((await failing.get("public", "avatars/u1/x/s64.webp"))?.body.toString()).toBe("old");
 
     await both.delete("public", ["avatars/u1/x/s64.webp", "avatars/u1/y/s64.webp"]);
@@ -202,8 +230,10 @@ describe("Vercel Blob with the database behind it", () => {
   it("lists the store, then the database, page by page", async () => {
     const store = memoryDriver("vercel-blob");
     const db = memoryDriver("database");
-    for (const k of ["files/o1/a", "files/o1/b", "files/o1/c"]) store.blobs.set(k, { body: Buffer.from(k), contentType: "text/plain" });
-    for (const k of ["files/o1/d", "files/o1/e", "files/o2/z"]) db.blobs.set(k, { body: Buffer.from(k), contentType: "text/plain" });
+    for (const k of ["files/o1/a", "files/o1/b", "files/o1/c"])
+      store.blobs.set(k, { body: Buffer.from(k), contentType: "text/plain" });
+    for (const k of ["files/o1/d", "files/o1/e", "files/o2/z"])
+      db.blobs.set(k, { body: Buffer.from(k), contentType: "text/plain" });
     const both = withDatabaseFallback(store.driver, db.driver);
     const seen: string[] = [];
     let cursor: string | undefined;
@@ -250,7 +280,9 @@ describe("local driver", () => {
   });
 });
 
-function multipart(parts: { name: string; filename?: string; type?: string; body: Buffer | string }[]) {
+function multipart(
+  parts: { name: string; filename?: string; type?: string; body: Buffer | string }[],
+) {
   const boundary = "----cbc-test-boundary";
   const chunks: Buffer[] = [];
   for (const part of parts) {
@@ -272,7 +304,11 @@ describe("readUpload", () => {
       { name: "file", filename: "r.pdf", type: "application/pdf", body: "%PDF-1.7 hello" },
     ]);
     const upload = await readUpload(
-      new Request("http://x/upload", { method: "POST", body: mp.body, headers: { "content-type": mp.type } }),
+      new Request("http://x/upload", {
+        method: "POST",
+        body: mp.body,
+        headers: { "content-type": mp.type },
+      }),
     );
     expect(upload.fields).toEqual({ transactionId: "tx_1" });
     expect(upload.file.filename).toBe("r.pdf");
@@ -287,7 +323,10 @@ describe("readUpload", () => {
     const request = new Request("http://x/upload", {
       method: "POST",
       body,
-      headers: { "content-type": "multipart/form-data; boundary=x", "content-length": String(5 * 1024 * 1024) },
+      headers: {
+        "content-type": "multipart/form-data; boundary=x",
+        "content-length": String(5 * 1024 * 1024),
+      },
       duplex: "half",
     } as RequestInit);
     const error = await readUpload(request).catch((e: unknown) => e);
@@ -309,10 +348,18 @@ describe("readUpload", () => {
   });
 
   it("refuses a non-multipart body and a missing file", async () => {
-    const json = new Request("http://x", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
+    const json = new Request("http://x", {
+      method: "POST",
+      body: "{}",
+      headers: { "content-type": "application/json" },
+    });
     expect(((await readUpload(json).catch((e) => e)) as UploadError).status).toBe(415);
     const mp = multipart([{ name: "other", body: "x" }]);
-    const empty = new Request("http://x", { method: "POST", body: mp.body, headers: { "content-type": mp.type } });
+    const empty = new Request("http://x", {
+      method: "POST",
+      body: mp.body,
+      headers: { "content-type": mp.type },
+    });
     expect(((await readUpload(empty).catch((e) => e)) as UploadError).status).toBe(400);
   });
 });
