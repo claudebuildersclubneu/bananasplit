@@ -153,15 +153,15 @@ export function PollForm({
         setError(result.error);
         return;
       }
-      router.push(`/app/${orgSlug}/calendar/polls/${result.pollId}`);
+      router.push(`/app/${orgSlug}/calendar/find-a-time/${result.pollId}`);
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-8" noValidate>
       <div className="space-y-3">
-        <BackLink href={`/app/${orgSlug}/calendar/polls`} label="Polls" />
-        {/* Named as the New poll menu and the command palette name it. */}
+        <BackLink href={`/app/${orgSlug}/calendar/find-a-time`} label="Find a time" />
+        {/* Named as the sidebar section and the command palette name it. */}
         <PageHeader
           title="Find a time"
           description="Offer some days and hours; people mark when they're free, and an admin schedules the best time."
@@ -396,7 +396,7 @@ export function PollForm({
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" asChild>
-            <Link href={`/app/${orgSlug}/calendar/polls`}>Cancel</Link>
+            <Link href={`/app/${orgSlug}/calendar/find-a-time`}>Cancel</Link>
           </Button>
           <Button type="submit" disabled={isPending || !canSubmit}>
             {isPending && <Loader2 aria-hidden className="size-4 animate-spin" />}

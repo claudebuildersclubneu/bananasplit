@@ -20,7 +20,11 @@ in the club's People and Attendance databases.
   and kept when the page is turned off and on again, so a shared link
   survives. Pages aren't indexed by search engines.
 - **In the suite:**
-  - _Calendar › RSVP pages_ lists every event that has one.
+  - **RSVPs** (a sidebar section in every club and in Personal,
+    `/app/{slug}/calendar/rsvp`): owners and admins see every event with a
+    page, with sign-ups at a glance; everyone else sees the club's events
+    taking sign-ups, each opening its public page. Everyone sees their own
+    tickets there too (in Personal, from every space).
   - Each event's page has an **RSVP page** card.
   - _New event_ has **Take RSVPs with a public page**, which creates the
     page and opens its settings.
@@ -31,7 +35,7 @@ in the club's People and Attendance databases.
       export to CSV.
     - **Page settings:** cover image, background, spots, waitlist, open or
       closed, directions, and privacy.
-- Owners and admins only (`events.write`).
+- Managing a page is for owners and admins only (`events.write`).
 
 ## What the page shows
 

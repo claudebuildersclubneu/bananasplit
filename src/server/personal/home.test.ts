@@ -246,13 +246,13 @@ describe("shapePersonalHome", () => {
     );
     expect(data.pollsWaiting.map((p) => [p.id, p.kind, p.title, p.href])).toEqual([
       ["q1", "question", "Pizza or tacos?", "/app/robotics/calendar/polls/q1"],
-      ["a1", "availability", "Kickoff time", "/app/robotics/calendar/polls/a1"],
+      ["a1", "availability", "Kickoff time", "/app/robotics/calendar/find-a-time/a1"],
     ]);
     expect(data.ownPolls).toEqual([
       expect.objectContaining({
         id: "mine",
         respondents: 4,
-        href: "/app/me-abc/calendar/polls/mine",
+        href: "/app/me-abc/calendar/find-a-time/mine",
       }),
     ]);
   });

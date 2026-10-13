@@ -284,7 +284,7 @@ describe("org overview", () => {
     );
     expect(html.indexOf("Pizza or tacos?")).toBeLessThan(html.indexOf("Exec sync time"));
     expect(html).toContain('href="/app/cbc/calendar/polls/qp_1"');
-    expect(html).toContain('href="/app/cbc/calendar/polls/ap_1"');
+    expect(html).toContain('href="/app/cbc/calendar/find-a-time/ap_1"');
     expect(html).toContain("Question · Open");
     expect(html).toContain("Find a time · Open");
   });

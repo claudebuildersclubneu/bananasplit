@@ -1,4 +1,5 @@
 import { describePath, type PinKind } from "@/lib/pins/pages";
+import { pollHref } from "@/lib/polls/paths";
 import type { TxClient } from "@/server/db/context";
 
 /**
@@ -31,6 +32,8 @@ const PAGES = [
   "/tasks?view=updates",
   "/tasks?view=intake",
   "/calendar",
+  "/calendar/find-a-time",
+  "/calendar/rsvp",
   "/calendar/polls",
   "/notes",
   "/notes?tab=files",
@@ -172,15 +175,15 @@ export async function searchPinnables(
     take: 4,
   });
   const polls = [
-    ...timePolls.map((p) => ({ id: p.id, label: p.title, createdAt: p.createdAt, detail: "Find a time" })),
-    ...questionPolls.map((p) => ({ id: p.id, label: p.question, createdAt: p.createdAt, detail: "Question poll" })),
+    ...timePolls.map((p) => ({ id: p.id, kind: "availability" as const, label: p.title, createdAt: p.createdAt, detail: "Find a time" })),
+    ...questionPolls.map((p) => ({ id: p.id, kind: "question" as const, label: p.question, createdAt: p.createdAt, detail: "Question poll" })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   groups.push({
     id: "polls",
     label: "Polls",
     items: polls
       .slice(0, PER_KIND)
-      .map((p) => ({ href: `${base}/calendar/polls/${p.id}`, label: p.label, kind: "event" as const, detail: p.detail })),
+      .map((p) => ({ href: pollHref(base, p.kind, p.id), label: p.label, kind: "event" as const, detail: p.detail })),
   });
 
   const databases = await db.databaseDefinition.findMany({

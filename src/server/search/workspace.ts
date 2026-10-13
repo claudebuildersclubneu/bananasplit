@@ -6,6 +6,7 @@ import { DELETED_TRANSACTION_REASON } from "@/lib/finance/deleted";
 import { formatCents, parseDollarsToCents } from "@/lib/finance/money";
 import { formatFinanceDate } from "@/lib/finance/stats";
 import { SECTIONS, type SectionId } from "@/lib/nav/sidebar";
+import { pollHref } from "@/lib/polls/paths";
 import { ago } from "@/lib/relative-time";
 import {
   containsPatterns,
@@ -573,7 +574,7 @@ async function searchPolls(ctx: Ctx): Promise<SearchGroup> {
       createdAt: p.createdAt,
       hit: hit("poll", p.id, {
         title: p.title,
-        href: `${ctx.base}/calendar/polls/${p.id}`,
+        href: pollHref(ctx.base, "availability", p.id),
         detail: excerptAround(p.description, q.folded) ?? "Find a time",
         meta: p.finalizedEventId ? "Scheduled" : closed(p.closesAt) ? "Closed" : "Open",
         score: scoreFields(

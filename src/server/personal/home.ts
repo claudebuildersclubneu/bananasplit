@@ -14,9 +14,11 @@ import { isPaused, type SpaceInfo } from "@/lib/billing/space";
 import { DUE_SOON_DAYS, UPCOMING_DAYS } from "@/lib/personal/home-windows";
 import { profileStepHref, type ProfileStep } from "@/lib/onboarding/steps";
 import { parseStoredLinks } from "@/lib/profile/links";
+import { pollHref } from "@/lib/polls/paths";
 import { addDaysToKey, effectiveTimezone, fromDateKey, localDateKey } from "@/lib/tasks/dates";
 import { NotFoundError } from "@/lib/auth/errors";
 import { withOrgTx, withUserTx, type TxClient } from "@/server/db/context";
+import { myRsvpRegistrations, type RegistrationRow } from "@/server/rsvp/my-registrations";
 import { findPendingInvitationsForMe, type PendingInvitation } from "@/server/settings/invitations";
 import { taskFilterWhere } from "@/server/tasks/queries";
 
@@ -254,20 +256,7 @@ export interface SpaceDigest {
   }[];
 }
 
-export interface RegistrationRow {
-  registrationId: string;
-  status: RegistrationStatus;
-  ticketCode: string;
-  eventId: string;
-  title: string;
-  startsAt: Date;
-  endsAt: Date;
-  allDay: boolean;
-  rsvpSlug: string;
-  spaceKind: OrgKind;
-  spaceName: string;
-  spaceTimezone: string;
-}
+export type { RegistrationRow };
 
 export interface PersonalHomeRaw {
   user: {
@@ -545,14 +534,7 @@ async function readRaw(userId: string, now: Date): Promise<PersonalHomeRaw> {
         return null;
       }
     }),
-    withUserTx(
-      userId,
-      ({ db }) =>
-        db.$queryRaw<RegistrationRow[]>`
-        SELECT "registrationId", "status", "ticketCode", "eventId", "title", "startsAt",
-               "endsAt", "allDay", "rsvpSlug", "spaceKind", "spaceName", "spaceTimezone"
-          FROM app.my_rsvp_registrations(${RSVP_LIMIT}::integer)`,
-    ),
+    myRsvpRegistrations(userId, RSVP_LIMIT),
     // Pending invites are listed only for a verified address (0A Fix 4).
     emailVerified ? findPendingInvitationsForMe(userId) : Promise.resolve([]),
   ]);
@@ -672,7 +654,7 @@ export function shapePersonalHome(raw: PersonalHomeRaw, now: Date): PersonalHome
         kind: "availability",
         title: p.title,
         closesAt: p.closesAt,
-        href: `${base}/calendar/polls/${p.id}`,
+        href: pollHref(base, "availability", p.id),
         sortAt: p.closesAt?.getTime() ?? Number.MAX_SAFE_INTEGER,
       });
     }
@@ -688,7 +670,7 @@ export function shapePersonalHome(raw: PersonalHomeRaw, now: Date): PersonalHome
       });
     }
     for (const p of digest.ownPolls) {
-      ownPolls.push({ space: ref, ...p, href: `${base}/calendar/polls/${p.id}` });
+      ownPolls.push({ space: ref, ...p, href: pollHref(base, "availability", p.id) });
     }
     if (space.kind === "PERSONAL") {
       hosting = digest.hosted.map((h) => ({

@@ -7,7 +7,8 @@ import { withSystemOrgTx } from "@/server/db/context";
 
 /**
  * The guest page for an availability poll opened at its in-app address
- * (/app/{slug}/calendar/polls/{pollId}) by someone who isn't a member of the
+ * (/app/{slug}/calendar/find-a-time/{pollId}, or the /polls/ address it had
+ * before Find a time was its own section) by someone who isn't a member of the
  * poll's org: signed out, or signed in without a membership there. That
  * address is what an organizer copies from the address bar, and without
  * this a guest would go through sign-in, sign-up and onboarding just to say
@@ -22,7 +23,10 @@ import { withSystemOrgTx } from "@/server/db/context";
  */
 export async function guestPollRedirect(orgSlug: string): Promise<string | null> {
   const pathname = ((await headers()).get(CALLBACK_HEADER) ?? "").split("?")[0];
-  const match = /^\/app\/([a-z0-9-]+)\/calendar\/polls\/([A-Za-z0-9_-]{1,100})\/?$/.exec(pathname);
+  const match =
+    /^\/app\/([a-z0-9-]+)\/calendar\/(?:polls|find-a-time)\/([A-Za-z0-9_-]{1,100})\/?$/.exec(
+      pathname,
+    );
   if (!match || match[1] !== orgSlug) return null;
   const pollId = match[2];
 

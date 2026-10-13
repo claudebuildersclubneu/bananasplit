@@ -2,6 +2,7 @@
 
 import {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   Database,
@@ -43,6 +44,7 @@ export interface SidebarPin {
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   Database,
@@ -211,11 +213,14 @@ export function SidebarNav({
   sections,
   orgId,
   pins = [],
+  spaces,
   onNavigate,
 }: {
   sections: NavSection[];
   orgId: string;
   pins?: SidebarPin[];
+  /** Personal and the clubs (SpaceList), at the foot, always in view. */
+  spaces?: React.ReactNode;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -240,6 +245,7 @@ export function SidebarNav({
         ))}
         <PinnedList pins={pins} orgId={orgId} pathname={pathname} onNavigate={onNavigate} />
       </div>
+      {spaces && <div className="border-sidebar-border mt-3 border-t pt-3">{spaces}</div>}
       <div className="border-sidebar-border mt-3 border-t pt-3">
         {/* The platform's signature, under the club's own nav: quiet, and the way back to the home page. */}
         <Link

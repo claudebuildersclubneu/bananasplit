@@ -412,9 +412,9 @@ export function buildCatalog(input: CatalogInput): CatalogEntry[] {
         "when2meet",
       ],
       icon: "CalendarPlus",
-      command: { type: "href", href: `${base}/calendar/polls/new` },
+      command: { type: "href", href: `${base}/calendar/find-a-time/new` },
     },
-    "polls",
+    "find-a-time",
   );
   action(
     {

@@ -2,11 +2,13 @@
 
 import {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   Database,
   Eye,
   EyeOff,
+  FolderOpen,
   GripVertical,
   LayoutDashboard,
   Loader2,
@@ -14,6 +16,7 @@ import {
   Network,
   NotebookText,
   RotateCcw,
+  Ticket,
   Users,
   Wallet,
   type LucideIcon,
@@ -30,12 +33,15 @@ import { saveSidebarAction } from "./actions";
 
 const ICONS: Record<string, LucideIcon> = {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CheckSquare,
   Database,
+  FolderOpen,
   LayoutDashboard,
   Network,
   NotebookText,
+  Ticket,
   Users,
   Wallet,
 };

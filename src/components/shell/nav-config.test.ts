@@ -17,6 +17,8 @@ describe("sidebar navigation", () => {
       "Overview",
       "Tasks",
       "Calendar",
+      "Find a time",
+      "RSVPs",
       "Files",
       "People",
       "Polls",
@@ -63,6 +65,45 @@ describe("sidebar navigation", () => {
     expect(active("Calendar", "/app/cbc/calendar/polls/abc")).toBe(false);
     expect(active("Calendar", "/app/cbc/calendar/sync")).toBe(true);
     expect(active("Polls", "/app/cbc/calendar")).toBe(false);
+    expect(active("Find a time", "/app/cbc/calendar/find-a-time/new")).toBe(true);
+    expect(active("Find a time", "/app/cbc/calendar/find-a-time/p1")).toBe(true);
+    expect(active("Calendar", "/app/cbc/calendar/find-a-time")).toBe(false);
+    expect(active("RSVPs", "/app/cbc/calendar/rsvp")).toBe(true);
+    expect(active("Calendar", "/app/cbc/calendar/rsvp")).toBe(false);
+    // An event's own RSVP page is part of that event, on the Calendar.
+    expect(active("Calendar", "/app/cbc/calendar/e1/rsvp")).toBe(true);
+  });
+
+  it("puts sections added since a club saved its sidebar after Calendar, hidden with what they came from", () => {
+    // A sidebar saved before Find a time and RSVPs: Calendar moved under Club, Polls hidden.
+    const saved = {
+      groups: [
+        { id: "main", label: null },
+        { id: "club", label: "Club" },
+        { id: "data", label: "Data" },
+      ],
+      items: [
+        { id: "overview", group: "main", hidden: false, label: null },
+        { id: "tasks", group: "main", hidden: false, label: null },
+        { id: "notes", group: "main", hidden: false, label: null },
+        { id: "calendar", group: "club", hidden: false, label: "Events" },
+        { id: "people", group: "club", hidden: false, label: null },
+        { id: "polls", group: "club", hidden: true, label: null },
+        { id: "databases", group: "data", hidden: false, label: null },
+        { id: "finance", group: "data", hidden: false, label: null },
+      ],
+    };
+    const club = resolveSidebar(saved).find((g) => g.id === "club")!;
+    expect(club.items.map((i) => i.label)).toEqual([
+      "Events",
+      "Find a time",
+      "RSVPs",
+      "People",
+      "Polls",
+    ]);
+    expect(club.items.find((i) => i.id === "find-a-time")!.hidden).toBe(true);
+    expect(club.items.find((i) => i.id === "rsvps")!.hidden).toBe(false);
+    expect(links(saved).map((i) => i.label)).not.toContain("Find a time");
   });
 
   it("follows the org's sidebar: hidden, renamed, moved and reordered sections", () => {
@@ -111,14 +152,20 @@ describe("the sidebar in each space", () => {
   const nav = (space: Space, showLocked = false) =>
     navSections("me", visibleSidebar(null), { space, showLocked }).flatMap((s) => s.items);
 
-  it("gives Personal its own five: Home, Tasks, Calendar, Polls and Events", () => {
+  it("gives Personal its own five: Home, Tasks, Calendar, Find a time and RSVPs", () => {
     const items = nav(PERSONAL, true);
-    expect(items.map((i) => i.label)).toEqual(["Home", "Tasks", "Calendar", "Polls", "Events"]);
+    expect(items.map((i) => i.label)).toEqual([
+      "Home",
+      "Tasks",
+      "Calendar",
+      "Find a time",
+      "RSVPs",
+    ]);
     expect(items.map((i) => i.href)).toEqual([
       "/app/me",
       "/app/me/tasks",
       "/app/me/calendar",
-      "/app/me/calendar/polls",
+      "/app/me/calendar/find-a-time",
       "/app/me/calendar/rsvp",
     ]);
     expect(items.some((i) => i.locked)).toBe(false);
@@ -129,8 +176,9 @@ describe("the sidebar in each space", () => {
         path,
         all,
       );
-    expect(is("Events", "/app/me/calendar/rsvp/e1")).toBe(true);
+    expect(is("RSVPs", "/app/me/calendar/rsvp/e1")).toBe(true);
     expect(is("Calendar", "/app/me/calendar/rsvp/e1")).toBe(false);
+    expect(is("Find a time", "/app/me/calendar/find-a-time/p1")).toBe(true);
     expect(is("Home", "/app/me/tasks")).toBe(false);
   });
 

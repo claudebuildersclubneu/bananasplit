@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   Bell,
+  CalendarClock,
   CalendarDays,
   CalendarRange,
   CircleCheck,
@@ -10,6 +11,7 @@ import {
   Plus,
   Ticket,
   UserRound,
+  Users,
   Vote,
   type LucideIcon,
 } from "lucide-react";
@@ -44,14 +46,17 @@ import type {
 } from "@/server/personal/home";
 
 import { DueTaskRow } from "./due-task-row";
+import { PersonalShortcuts } from "./personal-shortcuts";
 
 /**
  * The Personal space's home (/app/{personal slug}): the Personal dashboard
  * of docs/features/personal-and-clubs.md. Invites and "Finish your profile"
  * first, then your clubs, when you meet next and what's due on the left;
- * your RSVPs and polls on the right. Every list says what goes in it and
- * how to put something there when it's empty. Data: loadPersonalHome
- * (src/server/personal/home.ts).
+ * your RSVPs and polls on the right. It uses the whole width, as a club's
+ * Overview does, and every block is the same card (HomeCard: icon, title,
+ * a link to its page), so the two columns' headings line up. Every list
+ * says what goes in it and how to put something there when it's empty.
+ * Data: loadPersonalHome (src/server/personal/home.ts).
  */
 export function PersonalHome({
   data,
@@ -71,7 +76,7 @@ export function PersonalHome({
   }).format(now);
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <p className="eyebrow text-muted-foreground mb-2">{dateLine}</p>
@@ -83,20 +88,7 @@ export function PersonalHome({
             Your clubs, plans and to-dos in one place. Only you can see Personal.
           </p>
         </div>
-        <nav aria-label="Personal" className="flex flex-wrap items-center gap-1">
-          <Button asChild size="sm" variant="ghost">
-            <Link href={`${base}/tasks`}>Tasks</Link>
-          </Button>
-          <Button asChild size="sm" variant="ghost">
-            <Link href={`${base}/calendar`}>Calendar</Link>
-          </Button>
-          <Button asChild size="sm" variant="ghost">
-            <Link href={`${base}/calendar/polls`}>Polls</Link>
-          </Button>
-          <Button asChild size="sm" variant="ghost">
-            <Link href={`${base}/calendar/rsvp`}>Event pages</Link>
-          </Button>
-        </nav>
+        <PersonalShortcuts base={base} />
       </header>
 
       {data.pendingInvites.length > 0 && (
@@ -125,13 +117,13 @@ export function PersonalHome({
         <FinishProfileCard href={data.finishProfileHref} gaps={data.profileGaps} />
       )}
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <div className="space-y-8 lg:col-span-2">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <ClubsSection data={data} now={now} />
           <UpcomingSection data={data} now={now} base={base} />
           <DueSoonSection data={data} base={base} />
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <RsvpsCard data={data} now={now} base={base} />
           <PollsCard data={data} now={now} base={base} />
         </div>
@@ -171,6 +163,48 @@ function SectionTitle({
       </h2>
       {action}
     </div>
+  );
+}
+
+/**
+ * One block of the dashboard: a card with an icon and title, and the page
+ * it comes from (or what to do) on the right, as on a club's Overview.
+ */
+function HomeCard({
+  id,
+  icon: Icon,
+  title,
+  action,
+  children,
+}: {
+  id: string;
+  icon: LucideIcon;
+  title: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card role="region" aria-labelledby={id}>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">
+          <h2 id={id} className="flex items-center gap-2">
+            <Icon className="text-muted-foreground size-4" aria-hidden="true" />
+            {title}
+          </h2>
+        </CardTitle>
+        {action && <CardAction>{action}</CardAction>}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+/** A card's link to the page its list comes from. */
+function CardLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="text-muted-foreground text-sm hover:underline">
+      {children}
+    </Link>
   );
 }
 
@@ -225,46 +259,28 @@ function FinishProfileCard({ href, gaps }: { href: string; gaps: ProfileGap[] })
 function ClubsSection({ data, now }: { data: PersonalHomeData; now: Date }) {
   const hasClubs = data.clubs.length > 0;
   return (
-    <section aria-labelledby="clubs-heading" className="space-y-3">
-      <SectionTitle id="clubs-heading" icon={UserRound}>
-        Your clubs
-      </SectionTitle>
-      {!hasClubs && (
+    <HomeCard id="clubs-heading" icon={Users} title="Your clubs">
+      {hasClubs ? (
+        <ul className="divide-y">
+          {data.clubs.map((club) => (
+            <li key={club.id}>
+              <ClubRow club={club} viewerZone={data.timeZone} now={now} />
+            </li>
+          ))}
+        </ul>
+      ) : (
         <p className="text-muted-foreground max-w-prose text-sm">
           A club shares one calendar, task board and set of polls. Joining is always free: ask an
           officer for your club&apos;s code, or start one and invite your people.
         </p>
       )}
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {data.clubs.map((club) => (
-          <li key={club.id}>
-            <ClubCard club={club} viewerZone={data.timeZone} now={now} />
-          </li>
-        ))}
-        <li>
-          <JoinClubCard prominent={!hasClubs} />
-        </li>
-        <li>
-          <Link
-            href="/onboarding/organization"
-            className="hover:border-foreground/30 hover:bg-muted/40 flex h-full min-h-28 flex-col justify-between gap-3 rounded-xl border border-dashed p-4 transition-colors"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <Plus className="size-4" aria-hidden="true" />
-              Start a club
-            </span>
-            <span className="text-muted-foreground text-xs">
-              Set up your club&apos;s calendar, tasks and members. Free for 30 days.
-            </span>
-          </Link>
-        </li>
-      </ul>
       {data.moreClubs > 0 && (
-        <p className="text-muted-foreground text-xs">
-          And {data.moreClubs} more: switch to them from the club menu in the sidebar.
+        <p className="text-muted-foreground pt-2 text-xs">
+          And {data.moreClubs} more: switch to them from Personal &amp; clubs in the sidebar.
         </p>
       )}
-    </section>
+      <JoinOrStart prominent={!hasClubs} />
+    </HomeCard>
   );
 }
 
@@ -273,7 +289,7 @@ function roleLine(club: PersonalHomeClub): string {
   return club.title ? `${club.title} · ${role}` : role;
 }
 
-function ClubCard({
+function ClubRow({
   club,
   viewerZone,
   now,
@@ -286,43 +302,36 @@ function ClubCard({
   return (
     <Link
       href={`/app/${club.slug}`}
-      className="bg-card ring-foreground/10 hover:ring-foreground/25 group flex h-full flex-col gap-3 rounded-xl p-4 ring-1 transition-shadow"
+      className="hover:bg-accent/50 group -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors"
     >
-      <span className="flex items-center gap-3">
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
-          <img src={logo} alt="" width={36} height={36} className="size-9 rounded-lg" />
-        ) : (
-          <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg text-xs font-semibold">
-            {club.name.slice(0, 2).toUpperCase()}
-          </span>
-        )}
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="truncate font-medium">{club.name}</span>
-            {club.paused && <Badge variant="secondary">Paused</Badge>}
-          </span>
-          <span className="text-muted-foreground block truncate text-xs">{roleLine(club)}</span>
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
+        <img src={logo} alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg" />
+      ) : (
+        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg text-xs font-semibold">
+          {club.name.slice(0, 2).toUpperCase()}
         </span>
-        <ArrowRight
-          className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
-          aria-hidden="true"
-        />
-      </span>
-      <span className="text-muted-foreground flex items-start gap-1.5 text-xs">
-        <CalendarDays className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-        {club.nextMeeting ? (
-          <span className="min-w-0">
-            <span className="text-foreground">{club.nextMeeting.title}</span>
-            <span className="block">
+      )}
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{club.name}</span>
+          {club.paused && <Badge variant="secondary">Paused</Badge>}
+        </span>
+        <span className="text-muted-foreground block truncate text-xs">{roleLine(club)}</span>
+        <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
+          <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
+          {club.nextMeeting ? (
+            <span className="truncate">
+              <span className="text-foreground">{club.nextMeeting.title}</span>
+              {" · "}
               {formatEventWhen(club.nextMeeting, { viewer: viewerZone, org: club.timeZone }, now)}
             </span>
-          </span>
-        ) : (
-          <span>No meeting on the calendar</span>
-        )}
+          ) : (
+            <span>No meeting on the calendar</span>
+          )}
+        </span>
       </span>
-      <span className="text-muted-foreground mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <span className="text-muted-foreground hidden shrink-0 flex-col items-end gap-1 text-xs sm:flex">
         <span className="inline-flex items-center gap-1">
           <ListChecks className="size-3.5" aria-hidden="true" />
           {club.openTasks === 0
@@ -336,44 +345,56 @@ function ClubCard({
           </span>
         )}
       </span>
+      <ArrowRight
+        className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+        aria-hidden="true"
+      />
     </Link>
   );
 }
 
-/** Join with a code, right here: the join page checks it and shows the club first. */
-function JoinClubCard({ prominent }: { prominent: boolean }) {
+/**
+ * Join with a code, right here (the join page checks it and shows the club
+ * first), or start one: the card's last row, under the clubs.
+ */
+function JoinOrStart({ prominent }: { prominent: boolean }) {
   return (
-    <form
-      action="/onboarding/join"
-      method="get"
-      className={
-        prominent
-          ? "border-primary/30 bg-primary/5 flex h-full min-h-28 flex-col justify-between gap-3 rounded-xl border p-4"
-          : "flex h-full min-h-28 flex-col justify-between gap-3 rounded-xl border border-dashed p-4"
-      }
-    >
+    <div className="mt-3 space-y-1.5 border-t pt-3">
       <label htmlFor="join-code" className="flex items-center gap-2 text-sm font-medium">
         <KeyRound className="size-4" aria-hidden="true" />
         Join a club
       </label>
-      <span className="flex gap-2">
-        <Input
-          id="join-code"
-          name="code"
-          placeholder="Club code"
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={20}
-          className="h-8 font-mono uppercase placeholder:font-sans placeholder:normal-case"
-        />
-        <Button type="submit" size="sm" variant={prominent ? "default" : "outline"}>
-          Join
-        </Button>
-      </span>
-      <span className="text-muted-foreground text-xs">
-        You&apos;ll see the club before you join. Joining is free.
-      </span>
-    </form>
+      <div className="flex flex-wrap items-center gap-2">
+        <form action="/onboarding/join" method="get" className="flex gap-2">
+          <Input
+            id="join-code"
+            name="code"
+            placeholder="Club code"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={20}
+            aria-describedby="join-code-hint"
+            className="h-8 w-40 font-mono uppercase placeholder:font-sans placeholder:normal-case"
+          />
+          <Button type="submit" size="sm" variant={prominent ? "default" : "outline"}>
+            Join
+          </Button>
+        </form>
+        <span className="inline-flex items-center gap-2">
+          <span className="text-muted-foreground px-1 text-sm">or</span>
+          <Button asChild size="sm" variant="ghost">
+            <Link href="/onboarding/organization">
+              <Plus aria-hidden="true" />
+              Start a club
+            </Link>
+          </Button>
+        </span>
+      </div>
+      <p id="join-code-hint" className="text-muted-foreground text-xs">
+        You&apos;ll see the club before you join, and joining is free. A club you start is free for
+        30 days.
+      </p>
+    </div>
   );
 }
 
@@ -381,21 +402,16 @@ function JoinClubCard({ prominent }: { prominent: boolean }) {
 
 function UpcomingSection({ data, now, base }: { data: PersonalHomeData; now: Date; base: string }) {
   return (
-    <section aria-labelledby="upcoming-heading" className="space-y-3">
-      <SectionTitle
-        id="upcoming-heading"
-        icon={CalendarDays}
-        action={
-          <Link href={`${base}/calendar`} className="text-muted-foreground text-sm hover:underline">
-            Your calendar
-          </Link>
-        }
-      >
-        When you meet next
-      </SectionTitle>
+    <HomeCard
+      id="upcoming-heading"
+      icon={CalendarDays}
+      title="When you meet next"
+      action={<CardLink href={`${base}/calendar`}>Calendar</CardLink>}
+    >
       {data.upcoming.length === 0 ? (
         <EmptyState
           size="compact"
+          className="py-0"
           title={`Nothing in the next ${UPCOMING_DAYS} days`}
           description={
             data.clubs.length > 0
@@ -409,7 +425,7 @@ function UpcomingSection({ data, now, base }: { data: PersonalHomeData; now: Dat
           }
         />
       ) : (
-        <ul className="bg-card ring-foreground/10 divide-y rounded-xl ring-1">
+        <ul className="divide-y">
           {data.upcoming.map((event) => {
             const tile = dateTile(
               event.startsAt,
@@ -419,7 +435,7 @@ function UpcomingSection({ data, now, base }: { data: PersonalHomeData; now: Dat
               <li key={`${event.space.id}:${event.id}`}>
                 <Link
                   href={event.href}
-                  className="hover:bg-muted/40 flex items-center gap-4 px-4 py-3 transition-colors"
+                  className="hover:bg-accent/50 -mx-2 flex items-center gap-4 rounded-md px-2 py-2.5 transition-colors"
                 >
                   <span className="bg-muted grid w-11 shrink-0 place-items-center rounded-lg py-1.5 text-center">
                     <span className="eyebrow text-muted-foreground">{tile.month}</span>
@@ -442,6 +458,10 @@ function UpcomingSection({ data, now, base }: { data: PersonalHomeData; now: Dat
                       )}
                     </span>
                     <span className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
+                      {/* On a phone the space goes here, leaving the title its row. */}
+                      <span className="max-w-32 shrink-0 truncate sm:hidden">
+                        {event.space.name} ·
+                      </span>
                       <span className="shrink-0">{KIND_META[event.kind].label}</span>
                       {event.location && (
                         <>
@@ -452,14 +472,16 @@ function UpcomingSection({ data, now, base }: { data: PersonalHomeData; now: Dat
                       )}
                     </span>
                   </span>
-                  <SpaceTag name={event.space.name} />
+                  <span className="hidden sm:contents">
+                    <SpaceTag name={event.space.name} />
+                  </span>
                 </Link>
               </li>
             );
           })}
         </ul>
       )}
-    </section>
+    </HomeCard>
   );
 }
 
@@ -474,21 +496,16 @@ const BUCKETS: { key: DueBucket; label: string }[] = [
 function DueSoonSection({ data, base }: { data: PersonalHomeData; base: string }) {
   const more = data.dueSoonTotal - data.dueSoon.length;
   return (
-    <section aria-labelledby="due-heading" className="space-y-3">
-      <SectionTitle
-        id="due-heading"
-        icon={ListChecks}
-        action={
-          <Link href={`${base}/tasks`} className="text-muted-foreground text-sm hover:underline">
-            Your tasks
-          </Link>
-        }
-      >
-        Due soon
-      </SectionTitle>
+    <HomeCard
+      id="due-heading"
+      icon={ListChecks}
+      title="Due soon"
+      action={<CardLink href={`${base}/tasks`}>Tasks</CardLink>}
+    >
       {data.dueSoon.length === 0 ? (
         <EmptyState
           size="compact"
+          className="py-0"
           title="Nothing due this week"
           description="Your own tasks and the ones you're on in your clubs show here when they're due within a week, or overdue."
           action={
@@ -501,7 +518,7 @@ function DueSoonSection({ data, base }: { data: PersonalHomeData; base: string }
           }
         />
       ) : (
-        <div className="bg-card ring-foreground/10 space-y-3 rounded-xl px-4 py-3 ring-1">
+        <div className="space-y-3">
           {BUCKETS.map(({ key, label }) => {
             const tasks = data.dueSoon.filter((t) => t.bucket === key);
             if (tasks.length === 0) return null;
@@ -542,7 +559,7 @@ function DueSoonSection({ data, base }: { data: PersonalHomeData; base: string }
           )}
         </div>
       )}
-    </section>
+    </HomeCard>
   );
 }
 
@@ -551,22 +568,13 @@ function DueSoonSection({ data, base }: { data: PersonalHomeData; base: string }
 function RsvpsCard({ data, now, base }: { data: PersonalHomeData; now: Date; base: string }) {
   const empty = data.rsvps.length === 0 && data.hosting.length === 0;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Ticket className="text-muted-foreground size-4" aria-hidden="true" />
-          Your RSVPs
-        </CardTitle>
-        <CardAction>
-          <Link
-            href={`${base}/calendar/rsvp`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            Event pages
-          </Link>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <HomeCard
+      id="rsvps-heading"
+      icon={Ticket}
+      title="Your RSVPs"
+      action={<CardLink href={`${base}/calendar/rsvp`}>RSVPs</CardLink>}
+    >
+      <div className="space-y-4">
         {empty ? (
           <EmptyState
             size="compact"
@@ -659,8 +667,8 @@ function RsvpsCard({ data, now, base }: { data: PersonalHomeData; now: Date; bas
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </HomeCard>
   );
 }
 
@@ -676,33 +684,26 @@ function closesLine(closesAt: Date | null, now: Date): string {
 function PollsCard({ data, now, base }: { data: PersonalHomeData; now: Date; base: string }) {
   const empty = data.pollsWaiting.length === 0 && data.ownPolls.length === 0;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Vote className="text-muted-foreground size-4" aria-hidden="true" />
-          Polls
-        </CardTitle>
-        <CardAction>
-          <Link
-            href={`${base}/calendar/polls`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            Your polls
+    <HomeCard
+      id="polls-heading"
+      icon={Vote}
+      title="Polls"
+      action={
+        <Button asChild size="xs" variant="outline">
+          <Link href={`${base}/calendar/find-a-time/new`}>
+            <CalendarClock aria-hidden="true" />
+            Find a time
           </Link>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </Button>
+      }
+    >
+      <div className="space-y-4">
         {empty ? (
           <EmptyState
             size="compact"
             className="py-0"
             title="No polls waiting"
-            description="Polls in your clubs that need your answer show here. To find a time with anyone, send a poll: they answer from a link, no account needed."
-            action={
-              <Button asChild size="sm" variant="outline">
-                <Link href={`${base}/calendar/polls/new`}>Find a time</Link>
-              </Button>
-            }
+            description="Polls in your clubs that need your answer show here. To find a time with anyone, send a find-a-time poll: they answer from a link, no account needed."
           />
         ) : (
           <>
@@ -739,7 +740,11 @@ function PollsCard({ data, now, base }: { data: PersonalHomeData; now: Date; bas
             )}
             {data.ownPolls.length > 0 && (
               <div>
-                <h3 className="eyebrow text-muted-foreground">Yours</h3>
+                <h3 className="eyebrow text-muted-foreground">
+                  <Link href={`${base}/calendar/find-a-time`} className="hover:underline">
+                    Your find-a-time polls
+                  </Link>
+                </h3>
                 <ul className="divide-y">
                   {data.ownPolls.map((p) => (
                     <li key={`${p.space.id}:${p.id}`}>
@@ -767,7 +772,7 @@ function PollsCard({ data, now, base }: { data: PersonalHomeData; now: Date; bas
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </HomeCard>
   );
 }
