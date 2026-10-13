@@ -5,9 +5,11 @@ import { CalendarDays, CheckCircle2, LayoutDashboard, ListTodo, TriangleAlert } 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { accentScaleStyle, type AccentScale } from "@/lib/theme/accent";
 import { tokenStyle } from "@/lib/theme/css";
 import type { TokenMap } from "@/lib/theme/derive";
 import { orgInitials } from "@/lib/theme/logo";
+import { styleDeclarations, TEXT_SIZE_ZOOM, type ThemeStyle } from "@/lib/theme/style";
 import type { ColorMode } from "@/lib/theme/types";
 import { cn } from "@/lib/utils";
 
@@ -27,14 +29,20 @@ const CHART_CLASSES = [
  * components (a Radix portal would escape the wrapper and show the live
  * theme instead). The `dark` class on the wrapper turns on the `dark:`
  * variants inside it. The same derive() output is what the save stores and
- * the layout renders, so the preview equals the saved result.
+ * the layout renders, so the preview equals the saved result. The accent
+ * scale (bg-banana, bg-butter, text-honey ...) and Look and feel (corners,
+ * fonts; text size as a zoom, since rem cannot be scoped) are set the same way.
  */
 export function ThemePreview({
   tokens,
+  accents,
+  style,
   mode,
   orgName,
 }: {
   tokens: TokenMap;
+  accents: AccentScale;
+  style: ThemeStyle;
   mode: ColorMode;
   orgName: string;
 }) {
@@ -49,7 +57,13 @@ export function ThemePreview({
           "bg-background text-foreground overflow-hidden rounded-xl border text-sm",
           mode === "dark" && "dark",
         )}
-        style={{ ...tokenStyle(tokens), colorScheme: mode }}
+        style={{
+          ...tokenStyle(tokens),
+          ...accentScaleStyle(accents),
+          ...styleDeclarations(style),
+          colorScheme: mode,
+          zoom: TEXT_SIZE_ZOOM[style.textSize],
+        }}
         // Mock controls: nothing here is a real control, so keep it out of
         // the tab order and the accessibility tree's interactive roles.
         inert
@@ -78,7 +92,9 @@ export function ThemePreview({
 
           <div className="min-w-0 space-y-3 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-auto text-sm font-semibold">Weekly meeting</span>
+              <span className="font-heading mr-auto text-base [font-weight:var(--heading-weight,400)]">
+                Weekly meeting
+              </span>
               <Button size="sm" variant="outline">
                 Edit
               </Button>
@@ -144,8 +160,11 @@ export function ThemePreview({
               <span className="bg-accent text-accent-foreground rounded-md px-2 py-1">
                 Highlighted item
               </span>
-              <span className="bg-brand-accent text-brand-accent-foreground rounded-md px-2 py-1 font-medium">
+              <span className="bg-banana text-banana-ink rounded-md px-2 py-1 font-medium">
                 Accent fill
+              </span>
+              <span className="bg-butter text-honey rounded-full px-2 py-1 font-semibold">
+                12 going
               </span>
               <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
                 Muted panel

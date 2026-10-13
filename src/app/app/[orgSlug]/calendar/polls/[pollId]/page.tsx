@@ -9,6 +9,7 @@ import { buildPollView } from "@/lib/polls/poll-view";
 import { buildQuestionPollView } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadQuestionPollSource } from "@/server/polls/question-polls";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { getPollMemberNames, getPollSource } from "../../queries";
 import { AvailabilityPollActions } from "./poll-actions";
@@ -21,6 +22,8 @@ export default async function PollDetailPage({
   params,
 }: PageProps<"/app/[orgSlug]/calendar/polls/[pollId]">) {
   const { orgSlug, pollId } = await params;
+  const planLock = await planGate(orgSlug, "polls");
+  if (planLock) return planLock;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const loaded = await withOrgTx(org.id, async ({ db }) => {
     const poll = await getPollSource(db, org.id, pollId);

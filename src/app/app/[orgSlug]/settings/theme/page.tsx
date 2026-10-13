@@ -5,6 +5,7 @@ import { parsePersonalTheme } from "@/lib/theme/personal";
 import { CUSTOM_PRESET_ID, findPreset } from "@/lib/theme/presets";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { getViewerPrefs } from "@/server/profiles/queries";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 
@@ -21,6 +22,8 @@ export default async function ThemeSettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/theme">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "themes");
+  if (planLock) return planLock;
   const { organization, role, theme: row, user } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "theme.write")) {
     return <SettingsNoAccess title="Theme" who="owners and admins" />;
@@ -40,8 +43,8 @@ export default async function ThemeSettingsPage({
       <div className="space-y-1">
         <h1 className="page-title">Theme</h1>
         <p className="text-muted-foreground max-w-prose text-sm">
-          Colours, logo and light or dark mode for everyone in {organization.name}, including the
-          org&apos;s public poll and invite pages. Changes apply as soon as you save.
+          Colours, look and feel, logo and light or dark mode for everyone in {organization.name},
+          including the org&apos;s public poll and invite pages. Changes apply as soon as you save.
         </p>
       </div>
       {personalName && (
@@ -64,6 +67,7 @@ export default async function ThemeSettingsPage({
           logoDisplay: theme.logoDisplay,
           light: theme.light,
           dark: theme.dark,
+          style: theme.style,
         }}
         isDefault={theme.isDefault}
         personalThemeName={personalName}

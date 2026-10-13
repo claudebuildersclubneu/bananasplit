@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { exitClass, SetupCard, SetupShell, StepIntro } from "@/components/onboarding/setup-shell";
 import { can } from "@/lib/auth/permissions";
 import { absoluteAppUrl } from "@/lib/app-url";
+import { bringSections } from "@/lib/onboarding/bring";
 import {
   isOrgStep,
   ORG_STEP_COUNT,
@@ -15,8 +16,11 @@ import {
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
 import { loadFinanceSetup, loadTaskLabels, loadTeamsSetup } from "@/server/onboarding/org-setup";
+import { readBring } from "@/server/personal/bring-cookie";
+import { bringableIds, loadBringable } from "@/server/personal/move";
 import { loadSetupState } from "@/server/setup/progress";
 
+import { BringStep } from "../bring-step";
 import { DataStep, type DataConnection } from "../data-step";
 import { FinanceStep } from "../finance-step";
 import { InviteStep } from "../invite-step";
@@ -26,7 +30,7 @@ import { TeamsStep } from "../teams-step";
 export const dynamic = "force-dynamic";
 
 /**
- * Club setup B2-B6 (onboarding Flow B), for an OWNER/ADMIN of the club, in
+ * Club setup B2-B7 (onboarding Flow B), for an OWNER/ADMIN of the club, in
  * the one step screen (design: App screens, 05). One step per page under
  * the club's own URL, so the flow survives a refresh and can be picked up
  * later; "Save and exit" goes to the club, since each step saves as it
@@ -34,10 +38,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function OrgSetupStepPage({
   params,
+  searchParams,
 }: PageProps<"/onboarding/organization/[orgSlug]/[step]">) {
   const { orgSlug, step } = await params;
   if (!isOrgStep(step)) notFound();
   const { organization, role, user } = await getOrgContextBySlug(orgSlug);
+  // Club setup is for clubs: a Personal space has no team, labels or invites.
+  if (organization.kind === "PERSONAL") notFound();
   // B1 is step 1; B2 is the first of ORG_STEPS.
   const index = ORG_STEPS.indexOf(step) + 2;
   const total = ORG_STEP_COUNT;
@@ -129,6 +136,28 @@ export default async function OrgSetupStepPage({
           code={code?.enabled ? code.code : null}
           joinUrl={absoluteAppUrl("/onboarding/join")}
           invites={invites}
+        />,
+      );
+    }
+    case "bring": {
+      // ?from=move: Move to a club, for a club that's already set up.
+      // ?bring={id}: the item to start ticked (else one remembered by
+      // "Start a club with this"); only one of the user's own items counts.
+      const query = await searchParams;
+      const fromMove = query.from === "move";
+      const done = fromMove ? `/app/${organization.slug}` : `/app/${organization.slug}?welcome=1`;
+      const bringable = await loadBringable(user.id);
+      if (!bringable || bringable.total === 0) redirect(done);
+      const wanted = (typeof query.bring === "string" ? query.bring : null) ?? (await readBring());
+      const preselected = wanted && bringableIds(bringable).has(wanted) ? [wanted] : [];
+      return shell(
+        <BringStep
+          {...base}
+          backHref={fromMove ? null : backHref}
+          clubName={organization.name}
+          sections={bringSections(bringable)}
+          preselected={preselected}
+          welcome={!fromMove}
         />,
       );
     }

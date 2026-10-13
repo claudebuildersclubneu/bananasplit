@@ -12,4 +12,5 @@ export const saveBoardAction = withOrgAction(
     const types = board === "overview" ? OVERVIEW_WIDGET_TYPES : FINANCE_WIDGET_TYPES;
     return saveBoard(ctx.db, ctx.organizationId, ctx.userId, board, layout, types);
   },
+  { whenPaused: "allow" },
 );

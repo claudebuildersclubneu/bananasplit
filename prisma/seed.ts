@@ -128,10 +128,11 @@ async function main() {
   await prisma.organization.deleteMany({ where: { slug: { in: ORG_SLUGS } } });
 
   const orgA = await prisma.organization.create({
-    data: { name: "Robotics Club", slug: "robotics-club" },
+    // The demo clubs are on Society, so every feature has something to show.
+    data: { name: "Robotics Club", slug: "robotics-club", plan: "SOCIETY" },
   });
   const orgB = await prisma.organization.create({
-    data: { name: "Debate Society", slug: "debate-society" },
+    data: { name: "Debate Society", slug: "debate-society", plan: "SOCIETY" },
   });
 
   // --- Memberships ---
@@ -758,7 +759,7 @@ async function main() {
     cbcUsers[person.key] = user.id;
   }
   const cbc = await prisma.organization.create({
-    data: { name: CBC_ORG.name, slug: CBC_ORG.slug, timezone: CBC_ORG.timezone },
+    data: { name: CBC_ORG.name, slug: CBC_ORG.slug, timezone: CBC_ORG.timezone, plan: "SOCIETY" },
   });
   await prisma.membership.createMany({
     data: CBC_PEOPLE.map((p) => ({

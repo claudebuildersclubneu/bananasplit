@@ -3488,7 +3488,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-RSVP-FREE-01",
-    "Free RSVP pages: bring lists are owners' and admins' in the suite; a club can't become a personal space; only a space's owner moves its events out",
+    "RSVP pages: bring lists are owners' and admins' in the suite; a club can't become a Personal space",
     "app_user",
     A("u_adminA"),
     async (q) => {
@@ -3503,14 +3503,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_2','org_A','e_A','Ice')`,
       );
-      // A club's event is no one's free event: nothing moves.
-      s.member_moves = await tryv(q, `SELECT app.move_personal_event('e_A','org_A')`);
-      s.member_purges = await tryv(q, `SELECT app.purge_personal_rsvp_guests(30)`);
       await q(`SELECT app.set_context('u_ownerA','org_A')`);
-      s.owner_moves_club_event = await tryv(q, `SELECT app.move_personal_event('e_A','org_B')`);
       s.owner_flips_kind = await tryq(
         q,
-        `UPDATE "Organization" SET "kind" = 'PERSONAL', "personalOwnerId" = 'u_ownerA' WHERE "id" = 'org_A'`,
+        `UPDATE "Organization" SET "kind" = 'PERSONAL' WHERE "id" = 'org_A'`,
       );
       await q(`SELECT app.set_context('u_memberB','org_B')`);
       s.other_org_sees = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
@@ -3521,12 +3517,365 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         admin_adds_line: 1,
         member_sees_lines: 0,
         member_adds_line: "42501",
-        member_moves: false,
-        member_purges: "error:42501",
-        owner_moves_club_event: false,
         owner_flips_kind: "42501",
         other_org_sees: 0,
       },
     },
   );
+
+  // Personal spaces and club trials (20261013170000_personal_spaces_and_trials).
+  // The service path makes a Personal space the way ensurePersonalSpace does;
+  // nobody, its owner included, adds a second member, an invitation or a
+  // join code, and kind stays put.
+  await tcase(
+    "P-PERSONAL-01",
+    "a Personal space has one member (its owner), no invitations or join code, and a fixed kind",
+    "app_service",
+    { user: "u_invitee", org: "org_P" },
+    async (q) => {
+      const s = {};
+      s.space = await tryq(
+        q,
+        `INSERT INTO "Organization" ("id","name","slug","kind","personalOwnerId","plan")
+         VALUES ('org_P','Invitee''s space','me-fixture01','PERSONAL','u_invitee','FREE')`,
+      );
+      s.owner_joins = await tryq(
+        q,
+        `INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES ('m_P1','u_invitee','org_P','OWNER')`,
+      );
+      s.second_member = await tryq(
+        q,
+        `INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES ('m_P2','u_memberB','org_P','MEMBER')`,
+      );
+      s.invitation = await tryq(
+        q,
+        `INSERT INTO "Invitation" ("id","organizationId","email","role","token","expiresAt","invitedById")
+         VALUES ('inv_P','org_P','x@example.edu','MEMBER','${"p".repeat(64)}', now() + interval '1 day','u_invitee')`,
+      );
+      s.join_code = await tryq(
+        q,
+        `INSERT INTO "OrgJoinCode" ("organizationId","code") VALUES ('org_P','PPPP-PPPP')`,
+      );
+      s.becomes_club = await tryq(
+        q,
+        `UPDATE "Organization" SET "kind" = 'CLUB', "personalOwnerId" = NULL, "plan" = 'TRIAL' WHERE "id" = 'org_P'`,
+      );
+      s.plan = (
+        await q(`SELECT "plan"::text p FROM "Organization" WHERE "id" = 'org_P'`)
+      ).rows[0]?.p;
+      return s;
+    },
+    {
+      value: {
+        space: 1,
+        owner_joins: 1,
+        second_member: "23514",
+        invitation: "23514",
+        // app_service has no way to a join code at all (RLS); P-PERSONAL-04
+        // shows the trigger refusing it even for the table owner.
+        join_code: "42501",
+        becomes_club: "42501",
+        plan: "FREE",
+      },
+    },
+  );
+  await tcase(
+    "P-PERSONAL-04",
+    "even the table owner can't give a Personal space a second member, an invitation or a join code",
+    "owner",
+    null,
+    async (q) => {
+      const s = {};
+      await q(
+        `INSERT INTO "Organization" ("id","name","slug","kind","personalOwnerId")
+         VALUES ('org_P','Invitee''s space','me-fixture01','PERSONAL','u_invitee')`,
+      );
+      s.plan = (
+        await q(`SELECT "plan"::text p FROM "Organization" WHERE "id" = 'org_P'`)
+      ).rows[0]?.p;
+      s.not_owner_first = await tryq(
+        q,
+        `INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES ('m_P0','u_memberB','org_P','OWNER')`,
+      );
+      s.owner_joins = await tryq(
+        q,
+        `INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES ('m_P1','u_invitee','org_P','OWNER')`,
+      );
+      s.second_member = await tryq(
+        q,
+        `INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES ('m_P2','u_memberB','org_P','MEMBER')`,
+      );
+      s.invitation = await tryq(
+        q,
+        `INSERT INTO "Invitation" ("id","organizationId","email","role","token","expiresAt","invitedById")
+         VALUES ('inv_P','org_P','x@example.edu','MEMBER','${"p".repeat(64)}', now() + interval '1 day','u_invitee')`,
+      );
+      s.join_code = await tryq(
+        q,
+        `INSERT INTO "OrgJoinCode" ("organizationId","code") VALUES ('org_P','PPPP-PPPP')`,
+      );
+      return s;
+    },
+    {
+      value: {
+        plan: "FREE",
+        not_owner_first: "23514",
+        owner_joins: 1,
+        second_member: "23514",
+        invitation: "23514",
+        join_code: "23514",
+      },
+    },
+  );
+  await tcase(
+    "P-PERSONAL-02",
+    "a new club starts on a 30-day trial: not on a paid plan, not a longer trial, not Personal's plan",
+    "app_service",
+    { user: "u_invitee", org: "org_N" },
+    async (q) => {
+      const s = {};
+      s.paid = await tryq(
+        q,
+        `INSERT INTO "Organization" ("id","name","slug","plan") VALUES ('org_N','New club','fx-new','SOCIETY')`,
+      );
+      s.long_trial = await tryq(
+        q,
+        `INSERT INTO "Organization" ("id","name","slug","plan","trialEndsAt")
+         VALUES ('org_N','New club','fx-new','TRIAL', now() + interval '90 days')`,
+      );
+      s.free_club = await tryq(
+        q,
+        `INSERT INTO "Organization" ("id","name","slug","plan") VALUES ('org_N','New club','fx-new','FREE')`,
+      );
+      s.club = await tryq(
+        q,
+        `INSERT INTO "Organization" ("id","name","slug") VALUES ('org_N','New club','fx-new')`,
+      );
+      const row = (
+        await q(
+          `SELECT "plan"::text p, round(extract(epoch FROM "trialEndsAt" - app.utc_now()) / 86400) d
+             FROM "Organization" WHERE "id" = 'org_N'`,
+        )
+      ).rows[0];
+      s.plan = row?.p;
+      s.days = Number(row?.d);
+      return s;
+    },
+    {
+      value: {
+        paid: "42501",
+        long_trial: "42501",
+        free_club: "42501",
+        club: 1,
+        plan: "TRIAL",
+        days: 30,
+      },
+    },
+  );
+  await tcase(
+    "P-PERSONAL-03",
+    "an OWNER moves a club off its trial to Club or Society, never back to a trial or to Free, and can't move the trial's end",
+    "app_user",
+    A("u_ownerA"),
+    async (q) => {
+      const s = {};
+      s.extend_trial = await tryq(
+        q,
+        `UPDATE "Organization" SET "trialEndsAt" = now() + interval '1 year' WHERE "id" = 'org_A'`,
+      );
+      s.to_free = await tryq(q, `UPDATE "Organization" SET "plan" = 'FREE' WHERE "id" = 'org_A'`);
+      s.to_society = await tryq(
+        q,
+        `UPDATE "Organization" SET "plan" = 'SOCIETY' WHERE "id" = 'org_A'`,
+      );
+      s.back_to_trial = await tryq(
+        q,
+        `UPDATE "Organization" SET "plan" = 'TRIAL' WHERE "id" = 'org_A'`,
+      );
+      s.to_club = await tryq(q, `UPDATE "Organization" SET "plan" = 'CLUB' WHERE "id" = 'org_A'`);
+      await q(`SELECT app.set_context('u_adminA','org_A')`);
+      s.admin_to_society = await tryq(
+        q,
+        `UPDATE "Organization" SET "plan" = 'SOCIETY' WHERE "id" = 'org_A'`,
+      );
+      return s;
+    },
+    {
+      value: {
+        extend_trial: "42501",
+        to_free: "42501",
+        to_society: 1,
+        back_to_trial: "42501",
+        to_club: 1,
+        admin_to_society: "42501",
+      },
+    },
+  );
+  // "Bring anything in?" (20261013190000_move_personal_items): the club
+  // creator moves Personal items into a club they run, one way, ids kept.
+  // Personal spaces with items are made (committed) as the owner first, and
+  // removed at the end; each case rolls back its own move.
+  const own = (sql) => clients.owner.query(sql);
+  await own(`
+    INSERT INTO "Organization" ("id","name","slug","kind","personalOwnerId","plan") VALUES
+      ('org_PA','Admin''s space','me-fxpa000001','PERSONAL','u_adminA','FREE'),
+      ('org_PB','Owner B''s space','me-fxpb000001','PERSONAL','u_ownerB','FREE'),
+      ('org_PM','Both''s space','me-fxpm000001','PERSONAL','u_bothAB','FREE');
+    INSERT INTO "Membership" ("id","userId","organizationId","role") VALUES
+      ('m_PA','u_adminA','org_PA','OWNER'),
+      ('m_PB','u_ownerB','org_PB','OWNER'),
+      ('m_PM','u_bothAB','org_PM','OWNER');
+    INSERT INTO "Event" ("id","organizationId","title","startsAt","endsAt","createdById","hostUserId","visibility","updatedAt","rsvpEnabled","rsvpSlug") VALUES
+      ('e_PA','org_PA','Picnic',now() + interval '3 days',now() + interval '3 days 2 hours','u_adminA','u_adminA','PUBLIC',now(),true,'pafixt01'),
+      ('e_PB','org_PB','B party',now() + interval '3 days',now() + interval '3 days 2 hours','u_ownerB',NULL,'INTERNAL',now(),false,NULL),
+      ('e_PM','org_PM','M party',now() + interval '3 days',now() + interval '3 days 2 hours','u_bothAB',NULL,'INTERNAL',now(),false,NULL);
+    INSERT INTO "EventRegistration" ("id","organizationId","eventId","name","email","phone","inviteCode","ticketCode","updatedAt") VALUES
+      ('r_PA','org_PA','e_PA','Guest One','guest1@example.com','+15550000001','inv001','tktpa0000001',now());
+    INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_PA','org_PA','e_PA','Chips');
+    INSERT INTO "RsvpItemClaim" ("organizationId","itemId","registrationId") VALUES ('org_PA','ri_PA','r_PA');
+    INSERT INTO "Job" ("id","organizationId","kind","dedupeKey","payload") VALUES
+      ('j_PA','org_PA','rsvp-email','rsvp-email:r_PA:registered','{"registrationId":"r_PA","template":"registered"}');
+    INSERT INTO "AvailabilityPoll" ("id","organizationId","title","timezone","durationMinutes","createdById") VALUES
+      ('ap_PA','org_PA','When?','UTC',60,'u_adminA');
+    INSERT INTO "PollSlot" ("id","organizationId","pollId","startsAt","endsAt") VALUES
+      ('ps_PA','org_PA','ap_PA',now(),now() + interval '1 hour');
+    INSERT INTO "PollResponse" ("id","organizationId","pollId","slotId","guestName","guestKeyHash","availability","updatedAt") VALUES
+      ('pr_PA','org_PA','ap_PA','ps_PA','Guest',repeat('g',64),'YES',now());
+    INSERT INTO "Poll" ("id","organizationId","question","createdById","updatedAt") VALUES
+      ('qp_PA','org_PA','Tacos?','u_adminA',now());
+    INSERT INTO "PollOption" ("id","organizationId","pollId","label") VALUES ('po_PA','org_PA','qp_PA','Yes');
+    INSERT INTO "PollVote" ("id","organizationId","pollId","optionId","userId") VALUES ('pv_PA','org_PA','qp_PA','po_PA','u_adminA');
+    INSERT INTO "Project" ("id","organizationId","name") VALUES ('pj_PA','org_PA','Errands');
+    INSERT INTO "Task" ("id","organizationId","projectId","parentTaskId","title","rank","createdById","ownerId","updatedAt") VALUES
+      ('t_PA','org_PA','pj_PA',NULL,'Book the room','a0','u_adminA','u_adminA',now());
+    INSERT INTO "Task" ("id","organizationId","projectId","parentTaskId","title","rank","createdById","ownerId","updatedAt") VALUES
+      ('t_PA_sub','org_PA',NULL,'t_PA','Call them','a1','u_adminA','u_adminA',now());
+    INSERT INTO "Label" ("id","organizationId","name","color") VALUES
+      ('l_PA','org_PA','label a','#000000'),
+      ('l_PA2','org_PA','Urgent','#ff0000');
+    INSERT INTO "TaskLabel" ("organizationId","taskId","labelId") VALUES ('org_PA','t_PA','l_PA'),('org_PA','t_PA','l_PA2');
+    INSERT INTO "TaskAssignee" ("organizationId","taskId","userId") VALUES ('org_PA','t_PA','u_adminA');
+    INSERT INTO "TaskComment" ("id","organizationId","taskId","authorId","body") VALUES ('tc_PA','org_PA','t_PA','u_adminA','note');
+  `);
+  const MOVE = `SELECT app.move_personal_items($1, $2, $3::text[], $4::text[], $5::text[], $6::text[]) AS r`;
+  await tcase(
+    "P-MOVE-01",
+    "moving Personal items into a club you run keeps ids and moves every child row",
+    "app_user",
+    { user: "u_adminA", org: "" },
+    async (q) => {
+      const s = {};
+      s.result = (
+        await q(MOVE, ["org_PA", "org_A", ["e_PA"], ["ap_PA"], ["qp_PA"], ["t_PA"]])
+      ).rows[0].r;
+      // The function points app.org_id at the club only while it runs.
+      s.org_after = (await q(`SELECT current_setting('app.org_id', true) o`)).rows[0].o;
+      await q(`SELECT app.set_context('u_adminA','org_A')`);
+      const orgOf = async (table, id) =>
+        (await q(`SELECT "organizationId" o FROM "${table}" WHERE "id" = $1`, [id])).rows[0]?.o ??
+        null;
+      s.event = await orgOf("Event", "e_PA");
+      s.registration = await orgOf("EventRegistration", "r_PA");
+      s.item = await orgOf("RsvpItem", "ri_PA");
+      s.claims = await count(
+        q,
+        `SELECT count(*) n FROM "RsvpItemClaim" WHERE "organizationId" = 'org_A' AND "itemId" = 'ri_PA'`,
+      );
+      s.poll = await orgOf("AvailabilityPoll", "ap_PA");
+      s.slot = await orgOf("PollSlot", "ps_PA");
+      s.response = await orgOf("PollResponse", "pr_PA");
+      s.qpoll = await orgOf("Poll", "qp_PA");
+      s.vote = await orgOf("PollVote", "pv_PA");
+      s.task = await orgOf("Task", "t_PA");
+      s.subtask = await orgOf("Task", "t_PA_sub");
+      s.sub_parent =
+        (await q(`SELECT "parentTaskId" p FROM "Task" WHERE "id" = 't_PA_sub'`)).rows[0]?.p ?? null;
+      s.project =
+        (await q(`SELECT "projectId" p FROM "Task" WHERE "id" = 't_PA'`)).rows[0]?.p ?? null;
+      // "label a" matches org A's "Label A"; "Urgent" is made in org A.
+      s.labels = (
+        await q(
+          `SELECT l."name" FROM "TaskLabel" tl JOIN "Label" l ON l."id" = tl."labelId"
+            WHERE tl."taskId" = 't_PA' AND tl."organizationId" = 'org_A' ORDER BY 1`,
+        )
+      ).rows.map((r) => r.name);
+      s.comment = await orgOf("TaskComment", "tc_PA");
+      const ev = (
+        await q(`SELECT "visibility"::text v, "rsvpSlug" s FROM "Event" WHERE "id" = 'e_PA'`)
+      ).rows[0];
+      s.visibility = ev?.v ?? null;
+      s.slug = ev?.s ?? null;
+      return s;
+    },
+    {
+      value: {
+        result: { polls: 1, tasks: 2, events: 1, questionPolls: 1 },
+        org_after: "",
+        event: "org_A",
+        registration: "org_A",
+        item: "org_A",
+        claims: 1,
+        poll: "org_A",
+        slot: "org_A",
+        response: "org_A",
+        qpoll: "org_A",
+        vote: "org_A",
+        task: "org_A",
+        subtask: "org_A",
+        sub_parent: "t_PA",
+        project: null,
+        labels: ["Label A", "Urgent"],
+        comment: "org_A",
+        visibility: "INTERNAL",
+        slug: "pafixt01",
+      },
+    },
+  );
+  await tcase(
+    "P-MOVE-02",
+    "the move refuses someone else's space, a club you only belong to or aren't in, Personal to Personal, a club as the source, and ids that aren't yours",
+    "app_user",
+    { user: "u_adminA", org: "" },
+    async (q) => {
+      const s = {};
+      const tryMove = async (user, args) => {
+        await q(`SELECT app.set_context($1,'')`, [user]);
+        return tryv(q, MOVE, args);
+      };
+      s.cross_user = await tryMove("u_ownerB", ["org_PA", "org_B", ["e_PA"], [], [], []]);
+      s.member_not_admin = await tryMove("u_bothAB", ["org_PM", "org_A", ["e_PM"], [], [], []]);
+      s.not_in_club = await tryMove("u_adminA", ["org_PA", "org_B", ["e_PA"], [], [], []]);
+      s.personal_to_own = await tryMove("u_adminA", ["org_PA", "org_PA", ["e_PA"], [], [], []]);
+      s.personal_to_other = await tryMove("u_adminA", ["org_PA", "org_PB", ["e_PA"], [], [], []]);
+      s.club_as_source = await tryMove("u_adminA", ["org_A", "org_A", ["e_A"], [], [], []]);
+      s.foreign_event = await tryMove("u_adminA", ["org_PA", "org_A", ["e_PB"], [], [], []]);
+      s.club_task = await tryMove("u_adminA", ["org_PA", "org_A", [], [], [], ["t_A"]]);
+      await q(`SELECT app.set_context('u_adminA','org_PA')`);
+      s.event_org =
+        (await q(`SELECT "organizationId" o FROM "Event" WHERE "id" = 'e_PA'`)).rows[0]?.o ?? null;
+      return s;
+    },
+    {
+      value: {
+        cross_user: "error:42501",
+        member_not_admin: "error:42501",
+        not_in_club: "error:42501",
+        personal_to_own: "error:42501",
+        personal_to_other: "error:42501",
+        club_as_source: "error:42501",
+        foreign_event: "error:22023",
+        club_task: "error:22023",
+        event_org: "org_PA",
+      },
+    },
+  );
+  await tcase(
+    "P-MOVE-03",
+    "only app_user may call the move",
+    "app_service",
+    { user: "u_adminA", org: "org_PA" },
+    (q) => tryv(q, MOVE, ["org_PA", "org_A", ["e_PA"], [], [], []]),
+    { value: "error:42501" },
+  );
+  await own(`DELETE FROM "Organization" WHERE "id" IN ('org_PA','org_PB','org_PM')`);
 });

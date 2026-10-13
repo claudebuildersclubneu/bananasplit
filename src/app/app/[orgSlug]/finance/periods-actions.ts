@@ -9,6 +9,10 @@ import { fromDateValue } from "@/lib/finance/periods";
 import { withOrgAction } from "@/server/db/context";
 import { ensureActivePeriod } from "@/server/finance/periods";
 
+/** Every action here belongs to finance (withOrgAction's space check). */
+const financeAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "finance" });
+
 /**
  * Budget periods and categories (0C). Each runs in one withOrgAction
  * transaction as app_user, checks finance.manage (OWNER or TREASURER; a
@@ -31,7 +35,10 @@ const periodInputSchema = z.object({
   endsOn: z.string(),
 });
 
-function parseRange(startsOnRaw: string, endsOnRaw: string): { startsOn: Date; endsOn: Date } | { error: string } {
+function parseRange(
+  startsOnRaw: string,
+  endsOnRaw: string,
+): { startsOn: Date; endsOn: Date } | { error: string } {
   const startsOn = fromDateValue(startsOnRaw);
   const endsOn = fromDateValue(endsOnRaw);
   if (!startsOn) return { error: "Pick a start date." };
@@ -45,7 +52,7 @@ function parseRange(startsOnRaw: string, endsOnRaw: string): { startsOn: Date; e
  * previous active period's categories with allocations zeroed out — the new
  * treasurer sets fresh numbers rather than inheriting last year's budget.
  */
-export const createBudgetPeriod = withOrgAction(
+export const createBudgetPeriod = financeAction(
   async (ctx, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -100,14 +107,14 @@ export const createBudgetPeriod = withOrgAction(
  * One click from an empty Finance page: this school year with the starter
  * categories (or the period the org already has, made active).
  */
-export const startBudget = withOrgAction(async (ctx): Promise<ActionResult> => {
+export const startBudget = financeAction(async (ctx): Promise<ActionResult> => {
   requirePermission(ctx, "finance.manage");
   const period = await ensureActivePeriod(ctx.db, ctx.organizationId);
   return { periodId: period.id };
 });
 
 /** Renames a period or moves its dates. Transactions keep their period. */
-export const updateBudgetPeriod = withOrgAction(
+export const updateBudgetPeriod = financeAction(
   async (ctx, periodId: string, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const period = await ctx.db.budgetPeriod.findFirst({
@@ -133,7 +140,7 @@ export const updateBudgetPeriod = withOrgAction(
  * categories go with it. Deleting the active period activates the latest
  * remaining one.
  */
-export const deleteBudgetPeriod = withOrgAction(
+export const deleteBudgetPeriod = financeAction(
   async (ctx, periodId: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -142,8 +149,12 @@ export const deleteBudgetPeriod = withOrgAction(
       select: { id: true, isActive: true },
     });
     if (!period) return { error: "Budget period not found." };
-    const transactions = await ctx.db.transaction.count({ where: { organizationId, budgetPeriodId: periodId } });
-    const sponsorships = await ctx.db.sponsorship.count({ where: { organizationId, budgetPeriodId: periodId } });
+    const transactions = await ctx.db.transaction.count({
+      where: { organizationId, budgetPeriodId: periodId },
+    });
+    const sponsorships = await ctx.db.sponsorship.count({
+      where: { organizationId, budgetPeriodId: periodId },
+    });
     if (transactions > 0 || sponsorships > 0) {
       const what = [
         transactions > 0 ? `${transactions} transaction${transactions === 1 ? "" : "s"}` : null,
@@ -151,7 +162,9 @@ export const deleteBudgetPeriod = withOrgAction(
       ]
         .filter(Boolean)
         .join(" and ");
-      return { error: `This period has ${what}, so it stays for the records. Make another period active instead.` };
+      return {
+        error: `This period has ${what}, so it stays for the records. Make another period active instead.`,
+      };
     }
     await ctx.db.budgetPeriod.delete({ where: { id: periodId } });
     if (period.isActive) {
@@ -160,13 +173,14 @@ export const deleteBudgetPeriod = withOrgAction(
         orderBy: { endsOn: "desc" },
         select: { id: true },
       });
-      if (next) await ctx.db.budgetPeriod.update({ where: { id: next.id }, data: { isActive: true } });
+      if (next)
+        await ctx.db.budgetPeriod.update({ where: { id: next.id }, data: { isActive: true } });
     }
     return {};
   },
 );
 
-export const setActivePeriod = withOrgAction(
+export const setActivePeriod = financeAction(
   async (ctx, periodId: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -188,7 +202,7 @@ const categoryInputSchema = z.object({
   allocatedCents: z.number().int().min(0).max(1_000_000_000),
 });
 
-export const createCategory = withOrgAction(
+export const createCategory = financeAction(
   async (ctx, periodId: string, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -218,7 +232,7 @@ export const createCategory = withOrgAction(
   },
 );
 
-export const updateCategory = withOrgAction(
+export const updateCategory = financeAction(
   async (ctx, categoryId: string, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
 
@@ -245,7 +259,7 @@ export const updateCategory = withOrgAction(
  * money stays in every total), each change in the finance audit log; a
  * reconciled transaction is locked, so one of those keeps the category.
  */
-export const deleteCategory = withOrgAction(
+export const deleteCategory = financeAction(
   async (ctx, categoryId: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;

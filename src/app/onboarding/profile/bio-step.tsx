@@ -54,7 +54,7 @@ function shortUrl(url: string): string {
     .replace(/\/$/, "");
 }
 
-/** A3 · Bio + links: up to 8 links, the type detected from the URL. */
+/** Step 3 · Bio + links: up to 8 links, the type detected from the URL. */
 export function BioStep({ initial }: { initial: { bio: string | null; links: ProfileLink[] } }) {
   const { pending, errors, saveAndContinue } = useStepSave("bio");
   const [bio, setBio] = useState(initial.bio ?? "");

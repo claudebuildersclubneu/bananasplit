@@ -10,6 +10,10 @@ import { invalidate } from "@/server/cache/invalidate";
 import { reports as reportsTag } from "@/server/cache/tags";
 import { withOrgAction } from "@/server/db/context";
 
+/** Every action here belongs to reports (withOrgAction's space check). */
+const reportsAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { ...options, feature: "reports" });
+
 export type RefreshReportsResult = { ok: true } | { ok: false; error: string };
 
 const REFRESH_LIMIT = 12;
@@ -30,10 +34,11 @@ export async function refreshReports(organizationId: string): Promise<RefreshRep
     REFRESH_LIMIT,
     REFRESH_WINDOW_SECONDS,
   );
-  if (!limit.allowed) return { ok: false, error: `Too many refreshes. Try again ${retryAfterText(limit)}.` };
+  if (!limit.allowed)
+    return { ok: false, error: `Too many refreshes. Try again ${retryAfterText(limit)}.` };
 
   try {
-    await withOrgAction(async (ctx) => {
+    await reportsAction(async (ctx) => {
       requirePermission(ctx, "reports.view");
       invalidate([reportsTag(ctx.organizationId)], { mode: "action" });
     })(organizationId);

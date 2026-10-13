@@ -1,8 +1,6 @@
 import { appUrl } from "@/lib/app-url";
-import { avatarSource } from "@/lib/avatar";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { orgLogoUrl } from "@/lib/org-logo";
-import { parseStoredLinks } from "@/lib/profile/links";
 import { resolveRsvpBackground, type RsvpBackground } from "@/lib/rsvp/backgrounds";
 import { rsvpCover, type RsvpCover } from "@/lib/rsvp/cover";
 import {
@@ -123,10 +121,6 @@ export interface RsvpPageData {
   online: boolean;
   org: { name: string; logoUrl: string | null };
   host: string | null;
-  /** A free page: hosted by a person, not a club. */
-  personal: boolean;
-  /** Free pages: who made it. */
-  hostPerson: { name: string; avatarUrl: string | null; instagramUrl: string | null } | null;
   cost: RsvpPageCost | null;
   items: RsvpPageItem[];
   /** "Maya Patel" when the visitor came through a guest's invite link. */
@@ -187,8 +181,7 @@ export async function loadRsvpPage(
         rsvpCostCents: true,
         rsvpCostNote: true,
         rsvpPayTo: true,
-        createdBy: { select: { name: true, email: true, avatar: true, image: true, links: true } },
-        organization: { select: { name: true, logo: true, timezone: true, kind: true } },
+        organization: { select: { name: true, logo: true, timezone: true } },
       },
     });
     if (!e || !e.rsvpEnabled) return null;
@@ -331,7 +324,6 @@ export async function loadRsvpPage(
           }));
 
     const ended = e.endsAt <= now;
-    const personal = e.organization.kind === "PERSONAL";
     const placed = placeRegistration(
       { capacity: e.rsvpCapacity, waitlist: e.rsvpWaitlist, closed: e.rsvpClosed },
       counts.going,
@@ -359,16 +351,6 @@ export async function loadRsvpPage(
       online,
       org: { name: e.organization.name, logoUrl: orgLogoUrl(e.organization.logo, 64) },
       host: e.host?.name ?? e.hostName ?? null,
-      personal,
-      hostPerson: personal
-        ? {
-            name: e.createdBy.name?.trim() || e.organization.name,
-            avatarUrl: avatarSource(e.createdBy, 36)?.src ?? null,
-            // The Instagram link on their Bananasplit profile, if they added one.
-            instagramUrl:
-              parseStoredLinks(e.createdBy.links).find((l) => l.kind === "instagram")?.url ?? null,
-          }
-        : null,
       cost,
       items,
       invitedBy: inviter && inviter.id !== viewerRow?.id ? displayName(inviter.name) : null,

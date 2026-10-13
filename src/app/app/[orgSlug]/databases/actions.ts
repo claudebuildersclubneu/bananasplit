@@ -44,6 +44,10 @@ import {
 import { markReportsDataChanged } from "@/server/reports/data-version";
 import { requestSync } from "@/server/sync/enqueue";
 
+/** Every action here belongs to databases (withOrgAction's space check). */
+const databasesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { ...options, feature: "databases" });
+
 /**
  * Server Actions of the Databases section. Each returns { error } for an
  * expected failure (validation, permission, a row that is gone) and throws
@@ -134,7 +138,7 @@ async function sessionInput(organizationId: string, form: SessionForm) {
   };
 }
 
-const createSessionTx = withOrgAction(
+const createSessionTx = databasesAction(
   async (ctx, input: Awaited<ReturnType<typeof sessionInput>>) => {
     await assertCanEdit(ctx, DatabaseKind.SESSIONS);
     const { event } = await createEvent(ctx, input);
@@ -147,7 +151,7 @@ export async function createSessionAction(organizationId: string, form: SessionF
   return run(async () => createSessionTx(organizationId, await sessionInput(organizationId, form)));
 }
 
-const updateSessionTx = withOrgAction(
+const updateSessionTx = databasesAction(
   async (ctx, eventId: string, input: Awaited<ReturnType<typeof sessionInput>>) => {
     await assertCanEdit(ctx, DatabaseKind.SESSIONS);
     await updateEvent(ctx, eventId, input);
@@ -166,7 +170,7 @@ export async function updateSessionAction(
   );
 }
 
-const deleteSessionTx = withOrgAction(async (ctx, eventId: string) => {
+const deleteSessionTx = databasesAction(async (ctx, eventId: string) => {
   await assertCanEdit(ctx, DatabaseKind.SESSIONS);
   await deleteEvent(ctx, eventId);
   await markReportsDataChanged(ctx);
@@ -177,7 +181,7 @@ export async function deleteSessionAction(organizationId: string, eventId: strin
 }
 
 /** Clears the needsReview flag: the admin confirmed the session is not a duplicate. */
-const dismissReviewTx = withOrgAction(async (ctx, eventId: string) => {
+const dismissReviewTx = databasesAction(async (ctx, eventId: string) => {
   await assertCanEdit(ctx, DatabaseKind.SESSIONS);
   const updated = await ctx.db.event.updateMany({
     where: { id: eventId, organizationId: ctx.organizationId },
@@ -193,7 +197,7 @@ export async function dismissReviewAction(organizationId: string, eventId: strin
 /** Authorizes an admin for a service-path write and returns the acting user. */
 async function authorizeServiceWrite(organizationId: string, kind: DatabaseKind) {
   const user = await requireUser();
-  const role = await withOrgAction(async (ctx) => {
+  const role = await databasesAction(async (ctx) => {
     await assertCanEdit(ctx, kind);
     return ctx.role;
   })(organizationId);
@@ -221,7 +225,7 @@ export async function mergeSessionsAction(
 
 // ---- Attendance -------------------------------------------------------------------
 
-const addAttendanceTx = withOrgAction(
+const addAttendanceTx = databasesAction(
   async (ctx, input: Parameters<typeof addManualAttendance>[1]) =>
     (await addManualAttendance(ctx, input)).id,
 );
@@ -233,7 +237,7 @@ export async function addAttendanceAction(
   return run(() => addAttendanceTx(organizationId, input));
 }
 
-const suppressAttendanceTx = withOrgAction((ctx, id: string, suppressed: boolean) =>
+const suppressAttendanceTx = databasesAction((ctx, id: string, suppressed: boolean) =>
   setAttendanceSuppressed(ctx, id, suppressed),
 );
 
@@ -245,13 +249,13 @@ export async function setAttendanceSuppressedAction(
   return run(() => suppressAttendanceTx(organizationId, id, suppressed));
 }
 
-const deleteAttendanceTx = withOrgAction((ctx, id: string) => deleteAttendance(ctx, id));
+const deleteAttendanceTx = databasesAction((ctx, id: string) => deleteAttendance(ctx, id));
 
 export async function deleteAttendanceAction(organizationId: string, id: string) {
   return run(() => deleteAttendanceTx(organizationId, id));
 }
 
-const renameAttendanceTx = withOrgAction((ctx, id: string, name: string | null) =>
+const renameAttendanceTx = databasesAction((ctx, id: string, name: string | null) =>
   setAttendanceNameOverride(ctx, id, name),
 );
 
@@ -265,7 +269,7 @@ export async function setAttendanceNameAction(
 
 // ---- Signups ------------------------------------------------------------------------
 
-const addSignupTx = withOrgAction(
+const addSignupTx = databasesAction(
   async (ctx, input: Parameters<typeof addManualSignup>[1]) =>
     (await addManualSignup(ctx, input)).id,
 );
@@ -277,7 +281,7 @@ export async function addSignupAction(
   return run(() => addSignupTx(organizationId, input));
 }
 
-const addedToListTx = withOrgAction((ctx, ids: string[], added: boolean) =>
+const addedToListTx = databasesAction((ctx, ids: string[], added: boolean) =>
   setSignupsAddedToList(ctx, ids, added),
 );
 
@@ -285,7 +289,7 @@ export async function setSignupsAddedAction(organizationId: string, ids: string[
   return run(() => addedToListTx(organizationId, ids, added));
 }
 
-const suppressSignupTx = withOrgAction((ctx, id: string, suppressed: boolean) =>
+const suppressSignupTx = databasesAction((ctx, id: string, suppressed: boolean) =>
   setSignupSuppressed(ctx, id, suppressed),
 );
 
@@ -297,7 +301,7 @@ export async function setSignupSuppressedAction(
   return run(() => suppressSignupTx(organizationId, id, suppressed));
 }
 
-const deleteSignupTx = withOrgAction((ctx, id: string) => deleteSignup(ctx, id));
+const deleteSignupTx = databasesAction((ctx, id: string) => deleteSignup(ctx, id));
 
 export async function deleteSignupAction(organizationId: string, id: string) {
   return run(() => deleteSignupTx(organizationId, id));
@@ -305,7 +309,7 @@ export async function deleteSignupAction(organizationId: string, id: string) {
 
 // ---- Contacts -----------------------------------------------------------------------
 
-const renameContactTx = withOrgAction((ctx, id: string, name: string) =>
+const renameContactTx = databasesAction((ctx, id: string, name: string) =>
   renameContact(ctx, id, name),
 );
 
@@ -313,7 +317,7 @@ export async function renameContactAction(organizationId: string, contactId: str
   return run(() => renameContactTx(organizationId, contactId, name));
 }
 
-const linkContactTx = withOrgAction((ctx, id: string, userId: string | null) =>
+const linkContactTx = databasesAction((ctx, id: string, userId: string | null) =>
   linkContactToMember(ctx, id, userId),
 );
 
@@ -384,7 +388,7 @@ export async function searchContactsAction(organizationId: string, q: string) {
 
 // ---- Ballots ----------------------------------------------------------------------------
 
-const importDefinitionTx = withOrgAction(
+const importDefinitionTx = databasesAction(
   (ctx, input: Parameters<typeof importBallotDefinition>[1]) => importBallotDefinition(ctx, input),
 );
 
@@ -407,7 +411,7 @@ export async function importDefinitionAction(
   });
 }
 
-const updateDefinitionTx = withOrgAction(
+const updateDefinitionTx = databasesAction(
   (ctx, id: string, patch: Parameters<typeof updateBallotDefinition>[2]) =>
     updateBallotDefinition(ctx, id, patch),
 );
@@ -446,7 +450,7 @@ export async function updateDefinitionAction(
   });
 }
 
-const suppressBallotTx = withOrgAction((ctx, id: string, suppressed: boolean) =>
+const suppressBallotTx = databasesAction((ctx, id: string, suppressed: boolean) =>
   setBallotSuppressed(ctx, id, suppressed),
 );
 
@@ -460,7 +464,7 @@ export async function setBallotSuppressedAction(
 
 // ---- Website sync -------------------------------------------------------------------------
 
-const syncNowTx = withOrgAction(async (ctx, reconcile: boolean) => {
+const syncNowTx = databasesAction(async (ctx, reconcile: boolean) => {
   requirePermission(ctx, "databases.write");
   const integration = await ctx.db.orgIntegration.findFirst({
     where: { organizationId: ctx.organizationId, provider: IntegrationProvider.SUPABASE_SOURCE },

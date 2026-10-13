@@ -15,7 +15,13 @@ import { loadNoteState, storeNoteState } from "./persistence";
  * on the yjsState column) is P-COLLAB-01 in prisma/rls/phases.mjs.
  */
 
-const db = { note: { findFirst: vi.fn(), updateMany: vi.fn() } };
+const db = {
+  note: { findFirst: vi.fn(), updateMany: vi.fn() },
+  // The space check: a club on a paid plan unless a test says otherwise.
+  organization: {
+    findUnique: vi.fn(async () => ({ kind: "CLUB", plan: "SOCIETY", trialEndsAt: null })),
+  },
+};
 
 function ctxAs(userId: string, role: Role = Role.MEMBER): MemberContext {
   return {
@@ -99,6 +105,21 @@ describe("storeNoteState", () => {
       reason: "forbidden",
     });
     expect(await storeNoteState(ctxAs("treasurer_1", Role.TREASURER), "note_1", live)).toEqual({
+      ok: false,
+      reason: "forbidden",
+    });
+    expect(db.note.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("saves nothing in a paused club (its trial ended), even for the author", async () => {
+    db.organization.findUnique.mockResolvedValueOnce({
+      kind: "CLUB",
+      plan: "TRIAL",
+      trialEndsAt: new Date(Date.now() - 60_000),
+    } as never);
+    db.note.findFirst.mockResolvedValue(row());
+    const live = type(seedNoteState(doc("Minutes")), " edited");
+    expect(await storeNoteState(ctxAs("admin_1", Role.ADMIN), "note_1", live)).toEqual({
       ok: false,
       reason: "forbidden",
     });

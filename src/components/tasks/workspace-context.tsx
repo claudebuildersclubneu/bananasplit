@@ -26,7 +26,10 @@ import {
 
 interface WorkspaceValue {
   query: WorkspaceQuery;
-  layouts: typeof TASK_LAYOUTS;
+  /** The layouts to offer: none on the Free plan, which has the List only. */
+  layouts: readonly (typeof TASK_LAYOUTS)[number][];
+  /** The Free plan's workspace: the List, no layouts, Requests or Sunday update. */
+  simple: boolean;
   scopes: readonly { value: TaskScope; label: string }[];
   filterCount: number;
   setView: (view: TaskView) => void;
@@ -60,11 +63,14 @@ const LAYOUT_LOCAL = ["page", "done", "position", "week", "person", "limit"];
 export function WorkspaceProvider({
   query,
   hasReports,
+  simple = false,
   children,
 }: {
   query: WorkspaceQuery;
   /** Whether "My team" means anything for this person. */
   hasReports: boolean;
+  /** The Free plan: the List view only (src/lib/billing/features.ts). */
+  simple?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -93,7 +99,8 @@ export function WorkspaceProvider({
     const scopes = TASK_SCOPES.filter((s) => s.value !== "team" || hasReports);
     return {
       query,
-      layouts: TASK_LAYOUTS,
+      layouts: simple ? [] : TASK_LAYOUTS,
+      simple,
       scopes,
       filterCount: activeFilterCount(query),
       hrefWith: (next) => write(next),
@@ -107,7 +114,7 @@ export function WorkspaceProvider({
       },
       setFilters: (next) => router.push(write(next)),
     };
-  }, [query, hasReports, router, write]);
+  }, [query, hasReports, simple, router, write]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

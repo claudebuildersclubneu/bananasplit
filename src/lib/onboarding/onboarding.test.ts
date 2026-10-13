@@ -25,12 +25,18 @@ import {
 } from "@/lib/onboarding/org";
 import {
   basicsSchema,
+  clubRoleHref,
+  clubRoleSchema,
   detectLinkKind,
   gradYearChoices,
   joinMajor,
   nextProfileStep,
+  onboardingHref,
+  previousProfileStep,
+  PROFILE_STEPS,
   schoolSchema,
   splitMajor,
+  unfinishedProfileSteps,
 } from "@/lib/onboarding/steps";
 import { applyPersonalTheme, parsePersonalTheme, personalThemeSchema } from "@/lib/theme/personal";
 import { DEFAULT_RESOLVED_THEME } from "@/lib/theme/resolve";
@@ -134,10 +140,35 @@ describe("join codes", () => {
 });
 
 describe("profile setup steps", () => {
-  it("walks the six steps in order", () => {
+  it("runs one flow of five steps, basics first, review last", () => {
+    expect(PROFILE_STEPS).toEqual(["basics", "school", "bio", "availability", "review"]);
+    expect(previousProfileStep("basics")).toBeNull();
     expect(nextProfileStep("basics")).toBe("school");
+    expect(previousProfileStep("school")).toBe("basics");
+    expect(nextProfileStep("school")).toBe("bio");
+    expect(nextProfileStep("bio")).toBe("availability");
     expect(nextProfileStep("availability")).toBe("review");
     expect(nextProfileStep("review")).toBeNull();
+  });
+
+  it("lists the skipped steps for the dashboard's Finish your profile", () => {
+    const empty = { major: null, gradYear: null, bio: null, links: [], blockedHours: 0 };
+    expect(unfinishedProfileSteps(empty)).toEqual(["school", "bio", "availability"]);
+    expect(
+      unfinishedProfileSteps({
+        major: "CS",
+        gradYear: null,
+        bio: null,
+        links: [{}],
+        blockedHours: 12,
+      }),
+    ).toEqual([]);
+  });
+
+  it("carries where sign-up started through /onboarding", () => {
+    expect(onboardingHref(null)).toBe("/onboarding");
+    expect(onboardingHref("/invite/tok")).toBe("/onboarding?callbackUrl=%2Finvite%2Ftok");
+    expect(clubRoleHref("robotics")).toBe("/onboarding/join/robotics");
   });
 
   it("keeps two majors in the one profile field", () => {
@@ -176,12 +207,19 @@ describe("profile setup steps", () => {
       pronouns: "she/her",
       timezone: "America/New_York",
     });
+    expect(schoolSchema.parse({ major: "CS", gradYear: 2027 })).toEqual({
+      major: "CS",
+      gradYear: 2027,
+    });
+    expect(schoolSchema.safeParse({ major: "CS", gradYear: 27 }).success).toBe(false);
+    // The club role is per club now, not part of school.
     expect(
-      schoolSchema.parse({ major: "CS", gradYear: 2027, preferredTitle: "  " }).preferredTitle,
-    ).toBeNull();
-    expect(
-      schoolSchema.safeParse({ major: "CS", gradYear: 27, preferredTitle: null }).success,
+      schoolSchema.safeParse({ major: "CS", gradYear: 2027, preferredTitle: "VP" }).success,
     ).toBe(false);
+    expect(clubRoleSchema.parse({ title: "  Head   of Events " }).title).toBe("Head of Events");
+    expect(clubRoleSchema.parse({ title: "  " }).title).toBeNull();
+    expect(clubRoleSchema.parse({}).title).toBeNull();
+    expect(clubRoleSchema.safeParse({ title: "x".repeat(81) }).success).toBe(false);
   });
 });
 

@@ -33,11 +33,14 @@ export function ExportCard({
   orgSlug,
   exports,
   expiryDays,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
   exports: ExportRow[];
   expiryDays: number;
+  /** A Personal space: only you can download it, and there's no org chart. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -49,12 +52,21 @@ export function ExportCard({
         <h2 id="export-heading" className="font-medium">
           Export all data
         </h2>
-        <p className="text-muted-foreground text-sm">
-          A zip of every table (JSON lines and CSV), uploaded receipts and org chart files. It is
-          prepared in the background and you get a notification when it is ready. Only a signed-in
-          owner can download it, for {expiryDays} days. Integration keys are never included. One
-          export per day.
-        </p>
+        {personal ? (
+          <p className="text-muted-foreground text-sm">
+            A zip of your Personal tasks, calendar, polls and event pages, with their RSVPs and
+            answers (JSON lines and CSV). It is prepared in the background and you get a
+            notification when it is ready. Only you can download it, for {expiryDays} days. One
+            export per day.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            A zip of every table (JSON lines and CSV), uploaded receipts and org chart files. It is
+            prepared in the background and you get a notification when it is ready. Only a signed-in
+            owner can download it, for {expiryDays} days. Integration keys are never included. One
+            export per day.
+          </p>
+        )}
       </div>
       <Button
         variant="outline"

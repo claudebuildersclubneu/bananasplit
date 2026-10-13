@@ -11,6 +11,7 @@ import { can } from "@/lib/auth/permissions";
 import { familyOf, formatBytes } from "@/lib/files/types";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { docxToHtml, FileRejectedError, readNoteFile } from "@/server/notes/files";
+import { planGate } from "@/server/billing/plan-gate";
 
 const MAX_TEXT_CHARS = 200_000;
 const MAX_CSV_ROWS = 200;
@@ -54,6 +55,8 @@ export default async function NoteFilePage({
   params,
 }: PageProps<"/app/[orgSlug]/notes/files/[fileId]">) {
   const { orgSlug, fileId } = await params;
+  const planLock = await planGate(orgSlug, "files");
+  if (planLock) return planLock;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const found = await readNoteFile(org.id, fileId);
   if (!found) notFound();

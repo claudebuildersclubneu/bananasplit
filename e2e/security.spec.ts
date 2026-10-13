@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import {
+  chooseClubRole,
   createOrgViaOnboarding,
   dayButtonName,
   makeUser,
@@ -209,6 +210,7 @@ test("member roles: an admin is never offered OWNER and cannot touch an owner", 
   const adminSession = await newGuest(browser, baseURL);
   await signUpVerified(adminSession.page, admin);
   await adminSession.page.getByRole("button", { name: "Join", exact: true }).click();
+  await chooseClubRole(adminSession.page, orgSlug);
   await expect(adminSession.page).toHaveURL(new RegExp(`/app/${orgSlug}$`));
 
   await adminSession.page.goto(`/app/${orgSlug}/settings/members`);

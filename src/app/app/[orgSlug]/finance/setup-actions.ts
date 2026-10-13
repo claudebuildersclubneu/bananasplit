@@ -2,7 +2,11 @@
 
 import { z } from "zod";
 
-import { TransactionDirection, TransactionKind, TransactionStatus } from "@/generated/prisma/client";
+import {
+  TransactionDirection,
+  TransactionKind,
+  TransactionStatus,
+} from "@/generated/prisma/client";
 import { can } from "@/lib/auth/permissions";
 import { writeFinanceAuditLog } from "@/lib/finance/audit";
 import { DELETED_TRANSACTION_REASON } from "@/lib/finance/deleted";
@@ -11,6 +15,10 @@ import { STARTING_BALANCE_DESCRIPTION } from "@/lib/finance/setup";
 import { withOrgAction } from "@/server/db/context";
 import { ensureActivePeriod } from "@/server/finance/periods";
 import { findStartingBalance } from "@/server/finance/setup";
+
+/** Every action here belongs to finance (withOrgAction's space check). */
+const financeAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "finance" });
 
 /**
  * The finance setup guide's own writes (the period, treasurers and the
@@ -33,7 +41,7 @@ const balanceSchema = z.object({
  * shouldn't flag it) and this action is the only thing that changes it:
  * again with a new amount, or to zero to take it out.
  */
-export const setStartingBalance = withOrgAction(
+export const setStartingBalance = financeAction(
   async (ctx, input: unknown): Promise<{ error?: string; transactionId?: string | null }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     const parsed = balanceSchema.safeParse(input);
@@ -50,7 +58,13 @@ export const setStartingBalance = withOrgAction(
       if (!existing) return { transactionId: null };
       const removed = await ctx.db.transaction.update({
         where: { id: existing.id },
-        data: { voidedAt: now, voidReason: DELETED_TRANSACTION_REASON, reconciledAt: null, reconciledById: null, statementRef: null },
+        data: {
+          voidedAt: now,
+          voidReason: DELETED_TRANSACTION_REASON,
+          reconciledAt: null,
+          reconciledById: null,
+          statementRef: null,
+        },
       });
       await writeFinanceAuditLog(ctx.db, {
         organizationId,
@@ -92,7 +106,12 @@ export const setStartingBalance = withOrgAction(
         ...values,
       },
     });
-    await writeFinanceAuditLog(ctx.db, { organizationId, transactionId: created.id, action: "CREATE", after: created });
+    await writeFinanceAuditLog(ctx.db, {
+      organizationId,
+      transactionId: created.id,
+      action: "CREATE",
+      after: created,
+    });
     return { transactionId: created.id };
   },
 );
@@ -112,15 +131,20 @@ const linesSchema = z
  * re-budgeted, new ones added, and lines left out are removed when no
  * transaction uses them (one that's in use is kept, and counted).
  */
-export const saveBudgetLines = withOrgAction(
+export const saveBudgetLines = financeAction(
   async (ctx, periodId: string, input: unknown): Promise<{ error?: string; kept?: number }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     const parsed = linesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the budget lines." };
+    if (!parsed.success)
+      return { error: parsed.error.issues[0]?.message ?? "Check the budget lines." };
     const names = parsed.data.map((l) => l.name.toLowerCase());
-    if (new Set(names).size !== names.length) return { error: "Two budget lines have the same name." };
+    if (new Set(names).size !== names.length)
+      return { error: "Two budget lines have the same name." };
     const organizationId = ctx.organizationId;
-    const period = await ctx.db.budgetPeriod.findFirst({ where: { id: periodId, organizationId }, select: { id: true } });
+    const period = await ctx.db.budgetPeriod.findFirst({
+      where: { id: periodId, organizationId },
+      select: { id: true },
+    });
     if (!period) return { error: "Budget period not found." };
 
     const current = await ctx.db.budgetCategory.findMany({
@@ -148,7 +172,13 @@ export const saveBudgetLines = withOrgAction(
         });
       } else {
         await ctx.db.budgetCategory.create({
-          data: { organizationId, budgetPeriodId: period.id, name: line.name, allocatedCents: line.allocatedCents, sortOrder: i },
+          data: {
+            organizationId,
+            budgetPeriodId: period.id,
+            name: line.name,
+            allocatedCents: line.allocatedCents,
+            sortOrder: i,
+          },
           select: { id: true },
         });
       }

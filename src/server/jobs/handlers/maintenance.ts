@@ -1,7 +1,6 @@
 import { authDb, serviceDb } from "@/server/db/clients";
 import { withSystemOrgTx } from "@/server/db/context";
 import { NOTE_TRASH_DAYS } from "@/lib/notes/trash";
-import { PERSONAL_GUEST_DAYS } from "@/server/rsvp/personal";
 import { deleteBlobs } from "@/server/storage";
 
 import type { JobHandler } from "../types";
@@ -85,14 +84,7 @@ export const maintenanceJob: JobHandler<unknown> = async () => {
     console.error("[jobs] pruning expired sign-in links failed", error);
     return 0;
   });
-  // Free RSVP pages keep their guest lists PERSONAL_GUEST_DAYS after the
-  // event; clubs keep theirs (docs/features/rsvp.md, "Free pages").
-  const guestLists = await serviceDb.$queryRaw<{ n: number }[]>`
-    SELECT app.purge_personal_rsvp_guests(${PERSONAL_GUEST_DAYS}::int) AS n`.catch((error) => {
-    console.error("[jobs] clearing free events' guest lists failed", error);
-    return [{ n: 0 }];
-  });
   console.info(
-    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s), ${tokens} expired link(s), ${files} deleted file(s) and ${Number(guestLists[0]?.n ?? 0)} free event guest list(s)`,
+    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s), ${tokens} expired link(s) and ${files} deleted file(s)`,
   );
 };

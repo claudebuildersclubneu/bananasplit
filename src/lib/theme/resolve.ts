@@ -1,3 +1,4 @@
+import { withAccent } from "./accent";
 import { deriveDarkRoles, deriveTheme, type DerivedTheme } from "./derive";
 import {
   DEFAULT_PRESET,
@@ -6,6 +7,7 @@ import {
   sameRoles,
   savedPresetId,
 } from "./presets";
+import { DEFAULT_THEME_STYLE, parseThemeStyle, type ThemeStyle } from "./style";
 import {
   LOGO_DISPLAYS,
   THEME_MODES,
@@ -30,6 +32,8 @@ export interface OrgThemeRowLike {
   logoDisplay?: string | null;
   light: unknown;
   dark: unknown;
+  /** {light, dark, style?}: only `style` (Look and feel) is read; tokens are re-derived. */
+  tokens?: unknown;
 }
 
 export interface ResolvedTheme {
@@ -44,6 +48,9 @@ export interface ResolvedTheme {
   dark: ThemeRoles | null;
   /** The dark palette in effect (the org's own, or derived). */
   effectiveDark: ThemeRoles;
+  /** Look and feel: accent override, corners, text size, fonts. */
+  style: ThemeStyle;
+  /** Derived from light / effectiveDark with the style's accent applied. */
   tokens: DerivedTheme;
   /** True when there is no row: the globals.css default applies and nothing is injected. */
   isDefault: boolean;
@@ -66,12 +73,30 @@ export const DEFAULT_RESOLVED_THEME: ResolvedTheme = buildResolved({
   logoDisplay: "LOGO_AND_NAME",
   light: DEFAULT_PRESET.light,
   dark: DEFAULT_PRESET.dark,
+  style: DEFAULT_THEME_STYLE,
   isDefault: true,
 });
 
 function buildResolved(input: Omit<ResolvedTheme, "effectiveDark" | "tokens">): ResolvedTheme {
   const effectiveDark = input.dark ?? deriveDarkRoles(input.light);
-  return { ...input, effectiveDark, tokens: deriveTheme(input.light, effectiveDark) };
+  const effective = withAccent(input.light, effectiveDark, input.style.accent);
+  return { ...input, effectiveDark, tokens: deriveTheme(effective.light, effective.dark) };
+}
+
+/** The palettes the app actually paints with: the theme's, with the style's accent on top. */
+export function effectivePalettes(
+  theme: Pick<ResolvedTheme, "light" | "effectiveDark" | "style">,
+): {
+  light: ThemeRoles;
+  dark: ThemeRoles;
+} {
+  return withAccent(theme.light, theme.effectiveDark, theme.style.accent);
+}
+
+/** The Look and feel stored with a row (OrgTheme.tokens.style); the default when absent. */
+export function rowStyle(tokens: unknown): ThemeStyle {
+  if (!tokens || typeof tokens !== "object" || Array.isArray(tokens)) return DEFAULT_THEME_STYLE;
+  return parseThemeStyle((tokens as Record<string, unknown>).style);
 }
 
 export function resolveTheme(row: OrgThemeRowLike | null | undefined): ResolvedTheme {
@@ -91,6 +116,7 @@ export function resolveTheme(row: OrgThemeRowLike | null | undefined): ResolvedT
     logoDisplay: asLogoDisplay(row.logoDisplay),
     light,
     dark: legacy ? DEFAULT_PRESET.dark : parseRoles(row.dark),
+    style: rowStyle(row.tokens),
     isDefault: false,
   });
 }

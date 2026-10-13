@@ -12,6 +12,7 @@ import { EVENT_KIND_LABELS, fmtDateTime } from "@/server/databases/format";
 import { getDatabase } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { findDuplicatePairs } from "@/server/events/match";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Sessions > Possible duplicates (OWNER/ADMIN): sessions an importer could
@@ -23,6 +24,8 @@ export default async function DuplicatesPage({
   params,
 }: PageProps<"/app/[orgSlug]/databases/[dbKey]/duplicates">) {
   const { orgSlug, dbKey } = await params;
+  const planLock = await planGate(orgSlug, "databases");
+  if (planLock) return planLock;
   const { organization } = await getOrgContextBySlug(orgSlug);
   const tz = organization.timezone;
 

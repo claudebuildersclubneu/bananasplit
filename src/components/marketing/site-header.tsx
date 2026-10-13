@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SignOutLink } from "@/components/auth/sign-out-link";
 import { Logo } from "@/components/brand/logo";
 
 const NAV = [
@@ -7,7 +8,6 @@ const NAV = [
   { label: "Finance", href: "#finance" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
-  { label: "Free event pages", href: "/rsvp" },
 ] as const;
 
 /**
@@ -32,12 +32,15 @@ export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
         </nav>
         <div className="ml-auto flex items-center gap-[18px]">
           {signedIn ? (
-            <Link
-              href="/app"
-              className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
-            >
-              Open your club
-            </Link>
+            <>
+              <SignOutLink className="cursor-pointer text-[14px] font-medium whitespace-nowrap" />
+              <Link
+                href="/app"
+                className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
+              >
+                Open your club
+              </Link>
+            </>
           ) : (
             <>
               <Link href="/sign-in" className="text-[14px] font-medium whitespace-nowrap">

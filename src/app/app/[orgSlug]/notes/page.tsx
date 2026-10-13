@@ -9,6 +9,7 @@ import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
 import { listFolders } from "@/server/notes/folders";
 import { listPins } from "@/server/pins";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { NotesListFilters } from "./notes-list-filters";
 import {
@@ -33,6 +34,8 @@ export default async function NotesPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/notes">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "files");
+  if (planLock) return planLock;
   const query = await searchParams;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   // `tab` narrows the list to one kind; without it, notes and files show together.

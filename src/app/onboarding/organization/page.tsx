@@ -19,7 +19,11 @@ export const metadata = { title: "Set up your club · Bananasplit" };
  */
 export default async function ClubBasicsPage() {
   const user = await requireUser();
-  if (await needsProfileSetup(user.id)) redirect("/onboarding/profile/basics");
+  if (await needsProfileSetup(user.id)) {
+    redirect(
+      `/onboarding/profile/basics?callbackUrl=${encodeURIComponent("/onboarding/organization")}`,
+    );
+  }
   const identity = await getUserIdentity(user.id);
   const policy = orgCreationPolicy(identity);
 

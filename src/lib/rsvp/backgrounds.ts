@@ -1,7 +1,10 @@
 /**
- * The RSVP page's backgrounds (Event.rsvpBackground), all from the brand
- * palette. `tone` says whether the page's own text sits on a light or a dark
- * backdrop; the registration card is always paper, whatever is behind it.
+ * The RSVP page's backgrounds (Event.rsvpBackground): flat colours from the
+ * brand palette, no gradients. The ids are stored, so they keep their old
+ * names: "banana" (the default) is plain cream and "peel" ("Tint") is a soft
+ * tint of the club's accent (butter for Bananasplit's own yellow). `tone`
+ * says whether the page's own text sits on a light or a dark backdrop; the
+ * registration card is always paper, whatever is behind it.
  * "cover" blurs the event's cover image behind the page, and falls back to
  * "banana" when there is no cover. Pure and client-safe.
  */
@@ -15,14 +18,14 @@ export interface RsvpBackground {
 }
 
 export const RSVP_BACKGROUNDS = [
-  { id: "banana", label: "Banana", tone: "light", swatch: "bg-linear-to-b from-cream to-banana" },
-  { id: "cream", label: "Cream", tone: "light", swatch: "bg-cream" },
-  { id: "peel", label: "Peel", tone: "light", swatch: "bg-linear-to-br from-lemon to-gold" },
-  { id: "night", label: "Night", tone: "dark", swatch: "bg-linear-to-br from-night to-stem" },
-  { id: "pine", label: "Pine", tone: "dark", swatch: "bg-linear-to-br from-pine to-night" },
-  { id: "brick", label: "Brick", tone: "dark", swatch: "bg-linear-to-br from-brick to-night" },
-  { id: "navy", label: "Navy", tone: "dark", swatch: "bg-linear-to-br from-navy to-night" },
-  { id: "cover", label: "Cover photo", tone: "dark", swatch: "bg-linear-to-br from-wheat to-spot" },
+  { id: "banana", label: "Cream", tone: "light", swatch: "bg-cream" },
+  { id: "cream", label: "Paper", tone: "light", swatch: "bg-paper" },
+  { id: "peel", label: "Tint", tone: "light", swatch: "bg-butter" },
+  { id: "night", label: "Night", tone: "dark", swatch: "bg-night" },
+  { id: "pine", label: "Pine", tone: "dark", swatch: "bg-[#1d3a32]" },
+  { id: "brick", label: "Brick", tone: "dark", swatch: "bg-[#5c241f]" },
+  { id: "navy", label: "Navy", tone: "dark", swatch: "bg-[#222c4f]" },
+  { id: "cover", label: "Cover photo", tone: "dark", swatch: "bg-spot" },
 ] as const satisfies readonly RsvpBackground[];
 
 export type RsvpBackgroundId = (typeof RSVP_BACKGROUNDS)[number]["id"];

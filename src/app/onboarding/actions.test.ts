@@ -14,8 +14,6 @@ const {
   pendingMock,
   acceptMock,
   cookieMock,
-  cookieStore,
-  moveMock,
 } = vi.hoisted(() => ({
   requireUserMock: vi.fn(),
   redirectMock: vi.fn((url: string) => {
@@ -25,11 +23,7 @@ const {
   pendingMock: vi.fn(),
   acceptMock: vi.fn(),
   cookieMock: vi.fn(),
-  cookieStore: { get: vi.fn(), delete: vi.fn() },
-  moveMock: vi.fn(),
 }));
-vi.mock("next/headers", () => ({ cookies: async () => cookieStore }));
-vi.mock("@/server/rsvp/personal", () => ({ movePersonalEvent: moveMock }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock }));
 vi.mock("@/lib/active-org-cookie", () => ({ setActiveOrgCookie: cookieMock }));
@@ -55,8 +49,6 @@ function form(fields: Record<string, string>) {
 beforeEach(() => {
   vi.clearAllMocks();
   requireUserMock.mockResolvedValue(user);
-  cookieStore.get.mockReturnValue(undefined);
-  moveMock.mockResolvedValue(true);
 });
 
 describe("createOrganizationAction", () => {
@@ -85,29 +77,6 @@ describe("createOrganizationAction", () => {
       ),
     ).rejects.toThrow(/NEXT_REDIRECT \/app\/new-club/);
     expect(cookieMock).toHaveBeenCalledWith("org_new");
-    expect(moveMock).not.toHaveBeenCalled();
-  });
-
-  it("moves a free event waiting on 'Save to a club' into the new club, once", async () => {
-    createOrganizationMock.mockResolvedValue({ ok: true, orgId: "org_new", slug: "new-club" });
-    cookieStore.get.mockReturnValue({ value: "evt_free" });
-    await expect(
-      createOrganizationAction({}, form({ name: "New Club", slug: "new-club" })),
-    ).rejects.toThrow(/NEXT_REDIRECT/);
-    expect(cookieStore.delete).toHaveBeenCalledWith("bs-rsvp-save");
-    // As the signed-in user: the database only moves their own event.
-    expect(moveMock).toHaveBeenCalledWith("user_1", "evt_free", "org_new");
-  });
-
-  it("still finishes creating the club when the move fails", async () => {
-    createOrganizationMock.mockResolvedValue({ ok: true, orgId: "org_new", slug: "new-club" });
-    cookieStore.get.mockReturnValue({ value: "evt_free" });
-    moveMock.mockRejectedValue(new Error("db down"));
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(
-      createOrganizationAction({}, form({ name: "New Club", slug: "new-club" })),
-    ).rejects.toThrow(/NEXT_REDIRECT \/app\/new-club/);
-    error.mockRestore();
   });
 });
 
@@ -120,7 +89,7 @@ describe("joinPendingInvitationAction", () => {
     expect(acceptMock).not.toHaveBeenCalled();
   });
 
-  it("accepts and redirects", async () => {
+  it("accepts, then asks for the role in that club", async () => {
     pendingMock.mockResolvedValue([
       {
         id: "inv_1",
@@ -132,7 +101,7 @@ describe("joinPendingInvitationAction", () => {
     ]);
     acceptMock.mockResolvedValue({ ok: true, orgId: "org_1", orgSlug: "org-one" });
     await expect(joinPendingInvitationAction("inv_1")).rejects.toThrow(
-      /NEXT_REDIRECT \/app\/org-one/,
+      /NEXT_REDIRECT \/onboarding\/join\/org-one/,
     );
     expect(acceptMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "inv_1", organizationId: "org_1" }),

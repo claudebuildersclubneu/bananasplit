@@ -1,19 +1,16 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * /onboarding is where sign-up and sign-in land an account with no org.
- * It is the flowchart's "Profile complete?" decision: profile setup first,
- * an existing member goes straight to their org, and everyone else chooses
- * between joining (invite code or emailed invite) and creating an org. An
- * unverified address gets the "check your email" notice and no way to join
- * or create until the link is followed.
+ * /onboarding is where sign-up and sign-in land
+ * (docs/features/personal-and-clubs.md). It is the flowchart's "Profile
+ * complete?" decision: step 1 of "Your profile" first, for everyone (a club member
+ * included: the club's layout sends anyone not onboarded here), then where
+ * sign-up started, else the Personal space.
  */
 
 const mocks = vi.hoisted(() => ({
   profile: vi.fn(),
-  pendingInvites: vi.fn(),
-  membershipMany: vi.fn(),
+  personalHomeHref: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw Object.assign(new Error(`NEXT_REDIRECT ${url}`), { url });
   }),
@@ -23,25 +20,13 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth/session", () => ({
   requireUser: async () => ({ id: "u1", email: "verify-test@example.edu", name: "Verify Test" }),
 }));
-vi.mock("@/server/db/context", () => ({
-  withUserTx: (_userId: string, fn: (ctx: unknown) => unknown) =>
-    Promise.resolve(fn({ db: { membership: { findMany: mocks.membershipMany } } })),
-}));
 vi.mock("@/server/onboarding/profile", () => ({ getOnboardingProfile: mocks.profile }));
-vi.mock("@/server/settings/invitations", () => ({
-  findPendingInvitationsForMe: mocks.pendingInvites,
-}));
-vi.mock("@/app/verify-email/actions", () => ({ resendVerificationEmailAction: vi.fn() }));
-vi.mock("./pending-invite-card", () => ({
-  PendingInviteCard: ({ invitation }: { invitation: { orgName: string } }) => (
-    <div>Invite to {invitation.orgName}</div>
-  ),
-}));
+vi.mock("@/server/personal/space", () => ({ personalHomeHref: mocks.personalHomeHref }));
 
 const { default: OnboardingPage } = await import("./page");
 
-async function render() {
-  return renderToStaticMarkup(await OnboardingPage()).replace(/&#x27;/g, "'");
+function render(searchParams: Record<string, string> = {}) {
+  return OnboardingPage({ searchParams: Promise.resolve(searchParams) });
 }
 
 function profile(overrides: Record<string, unknown> = {}) {
@@ -58,49 +43,43 @@ function profile(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.membershipMany.mockResolvedValue([]);
-  mocks.pendingInvites.mockResolvedValue([{ id: "inv1", role: "MEMBER", orgName: "Robotics" }]);
+  mocks.personalHomeHref.mockResolvedValue("/app/me-abc");
 });
 
 describe("OnboardingPage", () => {
-  it("asks a new account what it's for: free event pages, or a club (profile setup first)", async () => {
+  it("sends a club member who never did step 1 of the profile there, not back to the club (no loop)", async () => {
+    mocks.profile.mockResolvedValue(
+      profile({ onboardedAt: null, memberships: [{ name: "CBC", slug: "cbc" }] }),
+    );
+    await expect(render()).rejects.toMatchObject({ url: "/onboarding/profile/basics" });
+    expect(mocks.personalHomeHref).not.toHaveBeenCalled();
+  });
+
+  it("sends a new account to step 1 of the profile first, keeping where sign-up started", async () => {
     mocks.profile.mockResolvedValue(profile({ onboardedAt: null }));
-    const html = await render();
-    expect(html).toContain("What are you here for?");
-    expect(html).toContain('href="/rsvp/new"');
-    expect(html).toContain('href="/onboarding/profile/basics"');
-    // Nothing about joining or creating until the club path is chosen.
-    expect(html).not.toContain("Join with a club code");
+    await expect(render({ callbackUrl: "/onboarding/organization" })).rejects.toMatchObject({
+      url: "/onboarding/profile/basics?callbackUrl=%2Fonboarding%2Forganization",
+    });
   });
 
-  it("sends a member straight to their organization", async () => {
-    mocks.profile.mockResolvedValue(profile({ memberships: [{ name: "CBC", slug: "cbc" }] }));
-    await expect(render()).rejects.toMatchObject({ url: "/app/cbc" });
-  });
-
-  it("shows an unverified account the check-your-email notice, and nothing to create or join", async () => {
-    mocks.profile.mockResolvedValue(profile({ emailVerified: false }));
-
-    const html = await render();
-
-    expect(html).toContain("Check your email");
-    expect(html).toContain("verify-test@example.edu");
-    expect(html).toContain("Resend verification email");
-    expect(html).not.toContain('href="/onboarding/join"');
-    expect(html).not.toContain('href="/onboarding/organization"');
-    // Invites are not even looked up for an unverified address.
-    expect(mocks.pendingInvites).not.toHaveBeenCalled();
-  });
-
-  it("offers the invite code, emailed invites and org creation once the address is verified", async () => {
+  it("then opens the Personal space (made on the way if missing)", async () => {
     mocks.profile.mockResolvedValue(profile());
+    await expect(render()).rejects.toMatchObject({ url: "/app/me-abc" });
+    expect(mocks.personalHomeHref).toHaveBeenCalledWith("u1");
+  });
 
-    const html = await render();
+  it("opens Personal for a club member too: switching is from there", async () => {
+    mocks.profile.mockResolvedValue(profile({ memberships: [{ name: "CBC", slug: "cbc" }] }));
+    await expect(render()).rejects.toMatchObject({ url: "/app/me-abc" });
+  });
 
-    expect(html).not.toContain("Check your email");
-    expect(html).toContain("Invite to Robotics");
-    expect(html).toContain('href="/onboarding/join"');
-    expect(html).toContain("Join with a club code");
-    expect(html).toContain('href="/onboarding/organization"');
+  it("returns to where sign-up started, and never off the site", async () => {
+    mocks.profile.mockResolvedValue(profile());
+    await expect(render({ callbackUrl: "/onboarding/join?code=ABCD" })).rejects.toMatchObject({
+      url: "/onboarding/join?code=ABCD",
+    });
+    await expect(render({ callbackUrl: "https://evil.example" })).rejects.toMatchObject({
+      url: "/app/me-abc",
+    });
   });
 });

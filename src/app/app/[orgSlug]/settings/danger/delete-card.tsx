@@ -21,10 +21,13 @@ export function DeleteCard({
   orgId,
   orgName,
   slug,
+  personal = false,
 }: {
   orgId: string;
   orgName: string;
   slug: string;
+  /** A Personal space: it's yours alone, so the copy says so. */
+  personal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -47,29 +50,40 @@ export function DeleteCard({
     >
       <div>
         <h2 id="delete-heading" className="text-destructive font-medium">
-          Delete this organization
+          {personal ? "Delete your Personal space" : "Delete this club"}
         </h2>
-        <p className="text-muted-foreground text-sm">
-          The organization closes for everyone at once and is deleted for good after 30 days:
-          members, tasks, notes, events, finance records, files, integrations and settings. An owner
-          can cancel during those 30 days from the organization&apos;s page. Its URL is never
-          reused. Export your data first if you need it.
-        </p>
+        {personal ? (
+          <p className="text-muted-foreground text-sm">
+            Your Personal space closes at once and is deleted for good after 30 days: your tasks,
+            calendar, polls and event pages, with their RSVPs and answers. Your account and your
+            clubs aren&apos;t affected. You can cancel during those 30 days from its page. Export
+            your data first if you need it.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            The club closes for everyone at once and is deleted for good after 30 days: members,
+            tasks, notes, events, finance records, files, integrations and settings. An owner can
+            cancel during those 30 days from the club&apos;s page. Its URL is never reused. Export
+            your data first if you need it.
+          </p>
+        )}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="destructive">Delete organization</Button>
+          <Button variant="destructive">{personal ? "Delete Personal" : "Delete club"}</Button>
         </DialogTrigger>
         <DialogContent>
           <form onSubmit={submit} className="space-y-4">
             <DialogHeader>
-              <DialogTitle>Delete {orgName}?</DialogTitle>
+              <DialogTitle>
+                {personal ? "Delete your Personal space?" : `Delete ${orgName}?`}
+              </DialogTitle>
               <DialogDescription>
                 Type <span className="text-foreground font-mono">{slug}</span> to confirm.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5">
-              <Label htmlFor="confirm-slug">Organization URL</Label>
+              <Label htmlFor="confirm-slug">{personal ? "Its URL" : "Club URL"}</Label>
               <Input
                 id="confirm-slug"
                 autoComplete="off"
@@ -88,7 +102,7 @@ export function DeleteCard({
                 variant="destructive"
                 disabled={isPending || typed.trim() !== slug}
               >
-                {isPending ? "Deleting…" : "Delete organization"}
+                {isPending ? "Deleting…" : personal ? "Delete Personal" : "Delete club"}
               </Button>
             </DialogFooter>
           </form>

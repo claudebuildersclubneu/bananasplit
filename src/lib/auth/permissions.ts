@@ -26,6 +26,8 @@ export const PERMISSIONS = {
   "settings.general.write": ADMINS,
   "org.slug.write": OWNER,
   "org.logo.write": ADMINS,
+  /** Switch the club's plan (also OWNER-only in the database: organization_guard). */
+  "org.plan.write": OWNER,
   // Members and roles
   "members.view": ALL,
   "members.invite": ADMINS,

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { setActiveOrgCookie } from "@/lib/active-org-cookie";
 import { requireUser } from "@/lib/auth/session";
 import { ACCEPT_ERROR_MESSAGES } from "@/lib/invitations";
+import { clubRoleHref } from "@/lib/onboarding/steps";
 import { acceptInvitation, findInvitationByRawToken } from "@/server/settings/invitations";
 
 export async function acceptInvitationAction(
@@ -22,5 +23,6 @@ export async function acceptInvitationAction(
   }
 
   await setActiveOrgCookie(result.orgId);
-  redirect(`/app/${result.orgSlug}`);
+  // Then the one small club step: "Your role in <club>".
+  redirect(clubRoleHref(result.orgSlug));
 }

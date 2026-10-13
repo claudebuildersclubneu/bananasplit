@@ -20,6 +20,8 @@ const { loadIntegrationPageMock, getGoogleSyncStatusMock, withOrgTxMock } = vi.h
 
 vi.mock("../load", () => ({ loadIntegrationPage: loadIntegrationPageMock }));
 vi.mock("@/server/db/context", () => ({ withOrgTx: withOrgTxMock }));
+// The plan check (src/server/billing/plan-gate.tsx): this club has the feature.
+vi.mock("@/server/billing/plan-gate", () => ({ planGate: async () => null }));
 vi.mock("@/server/google-calendar/requests", () => ({
   getGoogleSyncStatus: getGoogleSyncStatusMock,
 }));

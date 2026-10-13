@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { SpaceBanner } from "@/components/billing/space-banner";
 import { AppShell } from "@/components/shell/app-shell";
 import { navSections } from "@/components/shell/nav-config";
 import type { OrgSummary } from "@/components/shell/types";
@@ -8,6 +9,7 @@ import { OrgBrand } from "@/components/theme/org-brand";
 import { OrgThemeRoot } from "@/components/theme/org-theme-root";
 import { CALLBACK_HEADER } from "@/lib/auth/callback-url";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import { getSession, requireUser } from "@/lib/auth/session";
 import { resolveSidebar, visibleSidebar } from "@/lib/nav/sidebar";
 import { orgLogoUrl } from "@/lib/org-logo";
@@ -84,17 +86,17 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
     }
     throw error;
   }
-  // A personal space (free RSVP pages) has no suite: its home is /rsvp.
-  if (ctx.organization.kind === "PERSONAL") redirect("/rsvp");
   const orgs: OrgSummary[] = [
     ...ctx.memberships.map((m) => ({
       slug: m.slug,
       name: m.name,
+      kind: m.kind,
       logoUrl: orgLogoUrl(m.logo, 64),
     })),
     ...ctx.pendingDeletion.map((m) => ({
       slug: m.slug,
       name: m.name,
+      kind: m.kind,
       logoUrl: orgLogoUrl(m.logo, 64),
       pendingDeletion: true,
     })),
@@ -110,7 +112,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
   // (React cache()), resolved and re-validated as strict hex before render;
   // the member's personal theme (profile setup A4) goes on top of it.
   const theme = applyPersonalTheme(
-    resolveTheme(ctx.theme),
+    // Custom themes are a Society feature: other plans get the default look.
+    resolveTheme(spaceIncludes(ctx.organization, "themes") ? ctx.theme : null),
     parsePersonalTheme(prefs.themePreference),
   );
   const pins = await withOrgTx(ctx.organization.id, ({ db }) =>
@@ -125,7 +128,11 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
         orgs={orgs}
         user={shellUser}
         pins={pins}
-        sections={navSections(ctx.organization.slug, visibleSidebar(ctx.settings?.sidebar))}
+        sections={navSections(ctx.organization.slug, visibleSidebar(ctx.settings?.sidebar), {
+          space: ctx.organization,
+          // Owners and admins see what the plan lacks (locked); members don't.
+          showLocked: can({ role: ctx.role }, "settings.view"),
+        })}
         sectionPaths={resolveSidebar(ctx.settings?.sidebar)
           .flatMap((g) => g.items)
           .map((i) => ({
@@ -140,7 +147,16 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
           }))}
         role={ctx.role}
         isAdmin={can({ role: ctx.role }, "settings.view")}
-        canInvite={can({ role: ctx.role }, "members.invite")}
+        canInvite={
+          ctx.organization.kind !== "PERSONAL" && can({ role: ctx.role }, "members.invite")
+        }
+        banner={
+          <SpaceBanner
+            space={ctx.organization}
+            orgSlug={ctx.organization.slug}
+            canChoosePlan={can({ role: ctx.role }, "settings.view")}
+          />
+        }
         brand={
           <OrgBrand
             name={ctx.organization.name}

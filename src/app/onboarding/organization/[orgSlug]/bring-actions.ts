@@ -1,0 +1,48 @@
+"use server";
+
+import { redirect } from "next/navigation";
+
+import { requireUser } from "@/lib/auth/session";
+import { clearBring, isBringId, rememberBring } from "@/server/personal/bring-cookie";
+import { movedSummary, movePersonalItems } from "@/server/personal/move";
+
+/**
+ * "Bring anything in?" (B7 of club setup, and Move to a club). The move
+ * runs as the signed-in user; app.move_personal_items checks that the
+ * Personal space is theirs and that they own or run the club, so calling
+ * this directly gets the same answers as the page.
+ */
+
+export type BringResult = { ok: true; summary: string } | { ok: false; error: string };
+
+const SLUG = /^[a-z0-9-]{1,60}$/;
+
+/** Moves the ticked items from the user's Personal space into the club. */
+export async function bringIntoClubAction(
+  organizationId: string,
+  selection: unknown,
+): Promise<BringResult> {
+  const user = await requireUser();
+  const result = await movePersonalItems(user.id, organizationId, selection);
+  if (!result.ok) return result;
+  await clearBring();
+  return { ok: true, summary: movedSummary(result.moved) };
+}
+
+/** Skip or Finish: into the club (as its admin after setup). */
+export async function finishBringAction(orgSlug: string, welcome: boolean): Promise<void> {
+  await requireUser();
+  await clearBring();
+  const slug = SLUG.test(orgSlug) ? orgSlug : "";
+  redirect(!slug ? "/app" : welcome ? `/app/${slug}?welcome=1` : `/app/${slug}`);
+}
+
+/**
+ * Move to a club, with no club to move into yet: remember the item, then
+ * start a club. Club setup's last step starts with it ticked.
+ */
+export async function startClubWithItemAction(itemId: string): Promise<void> {
+  await requireUser();
+  if (isBringId(itemId)) await rememberBring(itemId);
+  redirect("/onboarding/organization");
+}

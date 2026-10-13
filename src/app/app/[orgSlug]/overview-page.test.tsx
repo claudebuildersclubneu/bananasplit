@@ -46,7 +46,9 @@ vi.mock("@/app/app/[orgSlug]/calendar/queries", () => ({
   getViewerRsvps: mocks.getViewerRsvps,
 }));
 vi.mock("@/server/pins", () => ({ listPins: mocks.listPins, listRecent: mocks.listRecent }));
-vi.mock("@/app/app/[orgSlug]/notes/queries", () => ({ getRecentNotes: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/app/app/[orgSlug]/notes/queries", () => ({
+  getRecentNotes: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/server/notes/files", () => ({ listNoteFiles: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/server/boards", () => ({ loadSavedBoard: mocks.loadSavedBoard }));
 vi.mock("@/app/app/[orgSlug]/_shell/board-actions", () => ({ saveBoardAction: vi.fn() }));
@@ -56,10 +58,21 @@ vi.mock("@/app/app/[orgSlug]/_shell/pin-actions", () => ({
   togglePinAction: vi.fn(),
   unpinAction: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  redirect: (url: string) => {
+    throw new Error(`redirect:${url}`);
+  },
+}));
 vi.mock("@/server/setup/progress", () => ({ loadSetupState: mocks.loadSetupState }));
 vi.mock("@/server/onboarding/join-code", () => ({ getOrCreateJoinCode: vi.fn() }));
 vi.mock("@/components/onboarding/join-code-card", () => ({ JoinCodeCard: () => null }));
+vi.mock("@/server/personal/home", () => ({
+  loadPersonalHome: vi.fn(async () => ({ firstName: "Viewer", clubs: [], pendingInvites: [] })),
+}));
+vi.mock("@/components/personal/personal-home", () => ({
+  PersonalHome: ({ orgSlug }: { orgSlug: string }) => <p>Personal home of {orgSlug}</p>,
+}));
 
 const { default: OverviewPage } = await import("./page");
 
@@ -68,6 +81,9 @@ const org = {
   id: "org_cbc",
   name: "Claude Builders Club",
   slug: "cbc",
+  kind: "CLUB",
+  plan: "SOCIETY",
+  trialEndsAt: null,
   timezone: "America/New_York",
 };
 const props = {
@@ -105,9 +121,27 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("a Personal space's home", () => {
+  it("is the Personal dashboard, not a club's board", async () => {
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: { ...org, slug: "me-abc", kind: "PERSONAL", plan: "FREE" },
+      role: "OWNER",
+    });
+    const html = await render();
+    expect(html).toContain("Personal home of me-abc");
+    expect(mocks.getMyOpenTasks).not.toHaveBeenCalled();
+    expect(mocks.loadSavedBoard).not.toHaveBeenCalled();
+  });
+});
+
 describe("org overview", () => {
   it("shows no one the club's money, not even a treasurer", async () => {
-    mocks.getOrgContextBySlug.mockResolvedValue({ user: viewer, organization: org, role: "TREASURER" });
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: org,
+      role: "TREASURER",
+    });
     const html = await render();
     expect(html).not.toContain("Money owed to you");
     expect(html).not.toContain("Club balance");
@@ -226,10 +260,20 @@ describe("org overview", () => {
   it("lists open polls of both kinds, newest first", async () => {
     mocks.loadSavedBoard.mockResolvedValue([{ id: "polls", type: "polls", w: 1, h: null }]);
     db.availabilityPoll.findMany.mockResolvedValue([
-      { id: "ap_1", title: "Exec sync time", closesAt: null, createdAt: new Date("2026-10-01T12:00:00Z") },
+      {
+        id: "ap_1",
+        title: "Exec sync time",
+        closesAt: null,
+        createdAt: new Date("2026-10-01T12:00:00Z"),
+      },
     ]);
     db.poll.findMany.mockResolvedValue([
-      { id: "qp_1", question: "Pizza or tacos?", closesAt: null, createdAt: new Date("2026-10-04T12:00:00Z") },
+      {
+        id: "qp_1",
+        question: "Pizza or tacos?",
+        closesAt: null,
+        createdAt: new Date("2026-10-04T12:00:00Z"),
+      },
     ]);
 
     const html = await render();

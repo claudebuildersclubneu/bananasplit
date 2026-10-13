@@ -1,5 +1,6 @@
 import type { AiConnectionInfo } from "@/lib/ai/types";
 import { aiVendor } from "@/lib/ai/vendors";
+import { spaceIncludes } from "@/lib/billing/space";
 import { claudeModelLabel, DEFAULT_CLAUDE_MODEL } from "@/lib/org-chart/models";
 import { assertNoTx, withSystemOrgTx } from "@/server/db/context";
 import { getSecret } from "@/server/secrets";
@@ -19,14 +20,22 @@ import { getSecret } from "@/server/secrets";
  * listAiConnections() says what is available (labels only, no keys) to any
  * member; resolveAiCredentials() decrypts the chosen key for the one request
  * that uses it, outside any transaction, and it is never logged or returned.
- * Reading the integration rows takes the service path because members can't
+ * AI is on the Society plan: other clubs get an empty list (and so no
+ * credentials), whatever is connected. Reading the integration rows takes
+ * the service path because members can't
  * read OrgIntegration (owners and admins manage it); only labels leave here.
  */
 
 export type { AiConnectionId, AiConnectionInfo } from "@/lib/ai/types";
 
 export type AiCredentials =
-  | { id: "claude" | "platform"; protocol: "anthropic"; apiKey: string; model: string; label: string }
+  | {
+      id: "claude" | "platform";
+      protocol: "anthropic";
+      apiKey: string;
+      model: string;
+      label: string;
+    }
   | {
       id: "ai-model";
       protocol: "openai";
@@ -68,17 +77,32 @@ interface IntegrationRow {
   config: unknown;
 }
 
+/** AI is a Society feature (src/lib/billing/space.ts): other spaces get none. */
+async function aiOnPlan(orgId: string): Promise<boolean> {
+  const org = await withSystemOrgTx(orgId, ({ db }) =>
+    db.organization.findUnique({
+      where: { id: orgId },
+      select: { kind: true, plan: true, trialEndsAt: true },
+    }),
+  );
+  return Boolean(org && spaceIncludes(org, "ai"));
+}
+
 async function loadRows(orgId: string): Promise<IntegrationRow[]> {
-  return withSystemOrgTx(orgId, async ({ db }) =>
-    (await db.orgIntegration.findMany({
-      where: { organizationId: orgId, provider: { in: ["CLAUDE", "OPENAI_COMPATIBLE"] } },
-      select: { provider: true, status: true, secretFingerprint: true, config: true },
-    })) as IntegrationRow[],
+  return withSystemOrgTx(
+    orgId,
+    async ({ db }) =>
+      (await db.orgIntegration.findMany({
+        where: { organizationId: orgId, provider: { in: ["CLAUDE", "OPENAI_COMPATIBLE"] } },
+        select: { provider: true, status: true, secretFingerprint: true, config: true },
+      })) as IntegrationRow[],
   );
 }
 
 function configOf(row: IntegrationRow | undefined): Record<string, unknown> {
-  return row?.config && typeof row.config === "object" ? (row.config as Record<string, unknown>) : {};
+  return row?.config && typeof row.config === "object"
+    ? (row.config as Record<string, unknown>)
+    : {};
 }
 
 function usable(row: IntegrationRow | undefined): row is IntegrationRow {
@@ -98,8 +122,12 @@ function aiModelOf(row: IntegrationRow): { vendorId: string; model: string } | n
 }
 
 /** What this club can use, best first. Labels only: no key leaves here. */
-export async function listAiConnections(orgId: string, env: Env = process.env): Promise<AiConnectionInfo[]> {
+export async function listAiConnections(
+  orgId: string,
+  env: Env = process.env,
+): Promise<AiConnectionInfo[]> {
   assertNoTx("listAiConnections");
+  if (!(await aiOnPlan(orgId))) return [];
   const rows = await loadRows(orgId);
   const claude = rows.find((r) => r.provider === "CLAUDE");
   const other = rows.find((r) => r.provider === "OPENAI_COMPATIBLE");
@@ -162,7 +190,13 @@ export async function resolveAiCredentials(
       const apiKey = await getSecret({ orgId, provider: "CLAUDE", kind: "API_KEY" });
       if (!apiKey) return null;
       const row = (await loadRows(orgId)).find((r) => r.provider === "CLAUDE")!;
-      return { id: "claude", protocol: "anthropic", apiKey, model: claudeModelOf(row), label: picked.label };
+      return {
+        id: "claude",
+        protocol: "anthropic",
+        apiKey,
+        model: claudeModelOf(row),
+        label: picked.label,
+      };
     }
     case "ai-model": {
       const apiKey = await getSecret({ orgId, provider: "OPENAI_COMPATIBLE", kind: "API_KEY" });
@@ -184,7 +218,13 @@ export async function resolveAiCredentials(
     case "platform": {
       const apiKey = platformKey(env);
       return apiKey
-        ? { id: "platform", protocol: "anthropic", apiKey, model: platformModel(env), label: picked.label }
+        ? {
+            id: "platform",
+            protocol: "anthropic",
+            apiKey,
+            model: platformModel(env),
+            label: picked.label,
+          }
         : null;
     }
     case "standin":

@@ -75,7 +75,7 @@ export default async function RsvpPagesList({ params }: PageProps<"/app/[orgSlug
                   className="size-14 flex-none rounded-lg object-cover"
                 />
               ) : (
-                <span className="bg-peel font-heading text-ink grid size-14 flex-none place-items-center rounded-lg text-xl">
+                <span className="bg-banana font-heading text-banana-ink grid size-14 flex-none place-items-center rounded-lg text-xl">
                   {e.title.trim()[0]?.toUpperCase() ?? "B"}
                 </span>
               )}

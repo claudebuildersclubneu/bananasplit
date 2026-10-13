@@ -99,6 +99,58 @@ describe("sidebar navigation", () => {
   });
 });
 
+type Space = Parameters<typeof settingsNavItems>[2] & {};
+const PERSONAL: Space = { kind: "PERSONAL", plan: "FREE", trialEndsAt: null };
+const club = (plan: "TRIAL" | "CLUB" | "SOCIETY", trialEndsAt: Date | null = null): Space => ({
+  kind: "CLUB",
+  plan,
+  trialEndsAt,
+});
+
+describe("the sidebar in each space", () => {
+  const nav = (space: Space, showLocked = false) =>
+    navSections("me", visibleSidebar(null), { space, showLocked }).flatMap((s) => s.items);
+
+  it("gives Personal its own five: Home, Tasks, Calendar, Polls and Events", () => {
+    const items = nav(PERSONAL, true);
+    expect(items.map((i) => i.label)).toEqual(["Home", "Tasks", "Calendar", "Polls", "Events"]);
+    expect(items.map((i) => i.href)).toEqual([
+      "/app/me",
+      "/app/me/tasks",
+      "/app/me/calendar",
+      "/app/me/calendar/polls",
+      "/app/me/calendar/rsvp",
+    ]);
+    expect(items.some((i) => i.locked)).toBe(false);
+    const all = items;
+    const is = (label: string, path: string) =>
+      isLinkActive(
+        all.find((i) => i.label === label)!,
+        path,
+        all,
+      );
+    expect(is("Events", "/app/me/calendar/rsvp/e1")).toBe(true);
+    expect(is("Calendar", "/app/me/calendar/rsvp/e1")).toBe(false);
+    expect(is("Home", "/app/me/tasks")).toBe(false);
+  });
+
+  it("gives a club on its trial (running or paused) every section", () => {
+    expect(nav(club("TRIAL", new Date(Date.now() + 86_400_000))).map((i) => i.label)).toEqual(
+      links().map((i) => i.label),
+    );
+    expect(nav(club("TRIAL", new Date(Date.now() - 86_400_000))).map((i) => i.label)).toEqual(
+      links().map((i) => i.label),
+    );
+  });
+
+  it("locks nothing on Club and Society", () => {
+    for (const p of ["CLUB", "SOCIETY"] as const) {
+      expect(nav(club(p), true).some((i) => i.locked)).toBe(false);
+      expect(nav(club(p)).map((i) => i.label)).toEqual(links().map((i) => i.label));
+    }
+  });
+});
+
 describe("Admin panel navigation", () => {
   const labels = (role: Parameters<typeof settingsNavItems>[1]) =>
     settingsNavItems("cbc", role).map((i) => i.label);
@@ -106,6 +158,7 @@ describe("Admin panel navigation", () => {
   it("shows each role the sections it may use", () => {
     expect(labels("OWNER")).toEqual([
       "General",
+      "Plan",
       "Sidebar",
       "Theme",
       "Labels",
@@ -119,6 +172,24 @@ describe("Admin panel navigation", () => {
     expect(labels("ADMIN")).toContain("Audit log");
     expect(labels("MEMBER")).toEqual(["Members"]);
     expect(labels("TREASURER")).toEqual(["Members"]);
+  });
+
+  it("marks the sections a club's plan lacks as locked, and none without a space", () => {
+    const locked = (space?: Space) =>
+      settingsNavItems("cbc", "OWNER", space)
+        .filter((i) => i.locked)
+        .map((i) => i.label);
+    expect(locked()).toEqual([]);
+    expect(locked(club("CLUB"))).toEqual(["Theme", "Audit log"]);
+    expect(locked(club("SOCIETY"))).toEqual([]);
+    expect(locked(club("TRIAL", new Date(Date.now() + 86_400_000)))).toEqual([]);
+  });
+
+  it("gives Personal only its own settings: no members, invitations, plan or team settings", () => {
+    expect(settingsNavItems("me", "OWNER", PERSONAL).map((i) => i.label)).toEqual([
+      "General",
+      "Danger zone",
+    ]);
   });
 
   it("keeps Members active on the invitations page", () => {

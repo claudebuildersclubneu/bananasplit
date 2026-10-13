@@ -12,6 +12,10 @@ import { invalidate } from "@/server/cache/invalidate";
 import { tags } from "@/server/cache/tags";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+/** Every action here belongs to themes (withOrgAction's space check). */
+const themesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "themes" });
+
 /**
  * Settings > Theme (Phase 8). OWNER/ADMIN only: checked here for a clear
  * message, and again by the OrgTheme RLS policies (writes need
@@ -38,12 +42,16 @@ function afterThemeChange(ctx: OrgContext): void {
   ctx.afterCommit(() => refresh());
 }
 
-export const saveOrgTheme = withOrgAction(async (ctx, input: unknown): Promise<SaveThemeResult> => {
+export const saveOrgTheme = themesAction(async (ctx, input: unknown): Promise<SaveThemeResult> => {
   if (!can(ctx, "theme.write")) return { ok: false, error: NO_ACCESS };
 
   const parsed = themeInputSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "Every colour must be a six-digit hex value like #a34a2a." };
+    return {
+      ok: false,
+      error:
+        "Every colour must be a six-digit hex value like #a34a2a, and each option one from the list.",
+    };
   }
   const record = buildThemeRecord(parsed.data);
 
@@ -59,7 +67,9 @@ export const saveOrgTheme = withOrgAction(async (ctx, input: unknown): Promise<S
     logoDisplay: record.logoDisplay,
     light: record.light,
     dark: record.dark ?? Prisma.DbNull,
-    tokens: record.tokens as unknown as Prisma.InputJsonValue,
+    // Look and feel rides with the derived tokens (no column of its own):
+    // resolve.ts reads tokens.style back, and rows without it get the default.
+    tokens: { ...record.tokens, style: record.style } as unknown as Prisma.InputJsonValue,
     contrastWarnings: record.contrastWarnings as unknown as Prisma.InputJsonValue,
     updatedById: ctx.userId,
   };
@@ -81,6 +91,7 @@ export const saveOrgTheme = withOrgAction(async (ctx, input: unknown): Promise<S
         mode: record.mode,
         lockMode: record.lockMode,
         logoDisplay: record.logoDisplay,
+        style: record.style,
       },
       contrastWarnings: record.contrastWarnings.length,
     },
@@ -91,7 +102,7 @@ export const saveOrgTheme = withOrgAction(async (ctx, input: unknown): Promise<S
 });
 
 /** Back to the default theme: deleting the row is the reset (RLS allows it to admins only). */
-export const resetOrgTheme = withOrgAction(async (ctx): Promise<SaveThemeResult> => {
+export const resetOrgTheme = themesAction(async (ctx): Promise<SaveThemeResult> => {
   if (!can(ctx, "theme.write")) return { ok: false, error: NO_ACCESS };
 
   const { count } = await ctx.db.orgTheme.deleteMany({

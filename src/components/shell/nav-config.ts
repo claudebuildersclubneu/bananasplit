@@ -1,9 +1,11 @@
-import { type ResolvedGroup } from "@/lib/nav/sidebar";
+import { spaceIncludes, type SpaceInfo } from "@/lib/billing/space";
+import { SECTION_FEATURES, type ResolvedGroup } from "@/lib/nav/sidebar";
 
 /**
- * The sidebar's links for one org: its sections (in the org's order, under
- * its headings, with its names; Admin panel › Sidebar) as plain data the
- * client sidebar can take. The Admin panel lives in the club menu instead.
+ * The sidebar's links for one space: a club's sections (in the club's
+ * order, under its headings, with its names; Admin panel > Sidebar) as
+ * plain data the client sidebar can take, or a Personal space's fixed few.
+ * The Admin panel lives in the club menu instead.
  */
 
 export interface NavLink {
@@ -19,6 +21,8 @@ export interface NavLink {
    * other link's); otherwise also on the pages below it.
    */
   exact: boolean;
+  /** Not on the club's plan: the link opens the upgrade screen. */
+  locked?: boolean;
 }
 
 export interface NavSection {
@@ -27,19 +31,75 @@ export interface NavSection {
   items: NavLink[];
 }
 
-export function navSections(orgSlug: string, groups: readonly ResolvedGroup[]): NavSection[] {
-  return groups.map((g) => ({
-    id: g.id,
-    label: g.label,
-    items: g.items.map((i) => ({
-      id: i.id,
-      label: i.label,
-      href: `/app/${orgSlug}${i.path}`,
-      icon: i.icon,
-      also: i.also.map((p) => `/app/${orgSlug}${p}`),
-      exact: i.exact,
-    })),
-  }));
+/**
+ * A Personal space's sidebar: Home (the Personal dashboard), Tasks,
+ * Calendar, Polls and Events (its RSVP pages). Not arrangeable: there is no
+ * team to arrange it for.
+ */
+export const PERSONAL_NAV: readonly {
+  id: string;
+  label: string;
+  icon: string;
+  /** Path under /app/{slug}. */
+  path: string;
+  exact: boolean;
+}[] = [
+  { id: "home", label: "Home", icon: "House", path: "", exact: true },
+  { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", exact: false },
+  { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", exact: false },
+  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", exact: false },
+  { id: "events", label: "Events", icon: "Ticket", path: "/calendar/rsvp", exact: false },
+];
+
+/**
+ * With a `space`, sections it lacks are left out, or (`showLocked`, for the
+ * owner and admins, who can switch plans) kept and marked locked. The
+ * Overview is always left out when the space lacks it. A Personal space
+ * gets PERSONAL_NAV whatever `groups` says.
+ */
+export function navSections(
+  orgSlug: string,
+  groups: readonly ResolvedGroup[],
+  options: { space?: SpaceInfo; showLocked?: boolean } = {},
+): NavSection[] {
+  const { space, showLocked = false } = options;
+  if (space?.kind === "PERSONAL") {
+    return [
+      {
+        id: "personal",
+        label: null,
+        items: PERSONAL_NAV.map((i) => ({
+          id: i.id,
+          label: i.label,
+          href: `/app/${orgSlug}${i.path}`,
+          icon: i.icon,
+          also: [],
+          exact: i.exact,
+        })),
+      },
+    ];
+  }
+  return groups
+    .map((g) => ({
+      id: g.id,
+      label: g.label,
+      items: g.items.flatMap((i): NavLink[] => {
+        const locked = space ? !spaceIncludes(space, SECTION_FEATURES[i.id]) : false;
+        if (locked && (!showLocked || i.id === "overview")) return [];
+        return [
+          {
+            id: i.id,
+            label: i.label,
+            href: `/app/${orgSlug}${i.path}`,
+            icon: i.icon,
+            also: i.also.map((p) => `/app/${orgSlug}${p}`),
+            exact: i.exact,
+            ...(locked ? { locked: true } : {}),
+          },
+        ];
+      }),
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 function matchesHref(href: string, exact: boolean, pathname: string): boolean {

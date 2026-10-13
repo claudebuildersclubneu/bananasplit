@@ -3,6 +3,7 @@ import { IntegrationHeader } from "../integration-header";
 import { StatusPanel, TestAndRemove } from "../integration-ui";
 import { loadIntegrationPage } from "../load";
 import { NetlifyForm } from "../provider-forms";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Settings > Integrations > Website build hook (Netlify). The hook URL is a
@@ -13,6 +14,8 @@ export default async function WebsiteIntegrationPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations/website">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "websiteSync");
+  if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "NETLIFY_BUILD_HOOK");
   if (!page) return <SettingsNoAccess title="Website build hook" who="owners and admins" />;
   const { organization, dto, canWrite, canRemove } = page;

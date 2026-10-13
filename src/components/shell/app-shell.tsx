@@ -32,6 +32,7 @@ export function AppShell({
   role = null,
   isAdmin = false,
   canInvite = false,
+  banner,
   children,
 }: {
   orgSlug: string;
@@ -54,6 +55,8 @@ export function AppShell({
   isAdmin?: boolean;
   /** May invite members (the club menu's "Invite people"). */
   canInvite?: boolean;
+  /** Above every page: the club's trial or paused notice (SpaceBanner). */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -66,6 +69,7 @@ export function AppShell({
     <OrgSwitcher
       orgs={orgs}
       activeSlug={orgSlug}
+      user={user}
       brand={brand}
       isAdmin={isAdmin}
       canInvite={canInvite}
@@ -155,6 +159,7 @@ export function AppShell({
             id="main-content"
             className="reveal-page relative isolate min-w-0 flex-1 p-4 md:p-6"
           >
+            {banner}
             <SectionGate orgSlug={orgSlug} sectionPaths={sectionPaths} isAdmin={isAdmin}>
               {children}
             </SectionGate>

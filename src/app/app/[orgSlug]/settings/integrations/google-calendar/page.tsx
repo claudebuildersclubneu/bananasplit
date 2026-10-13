@@ -7,6 +7,7 @@ import {
 } from "@/server/integrations/google-connect";
 import { isGoogleConfigured } from "@/server/integrations/google";
 import { WARNING_BOX } from "@/lib/status-tones";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../../settings-no-access";
 import { IntegrationHeader } from "../integration-header";
@@ -34,6 +35,8 @@ export default async function GoogleCalendarIntegrationPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/settings/integrations/google-calendar">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const sp = await searchParams;
   const page = await loadIntegrationPage(orgSlug, "GOOGLE_CALENDAR");
   if (!page) return <SettingsNoAccess title="Google Calendar" who="owners and admins" />;

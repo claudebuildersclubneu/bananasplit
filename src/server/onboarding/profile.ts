@@ -31,7 +31,7 @@ export interface OnboardingProfile {
   onboardedAt: Date | null;
   /** Whether the account can use its Google photo (it has an OAuth image). */
   hasGooglePhoto: boolean;
-  /** Live orgs the user already belongs to (an emailed invite joined before setup). */
+  /** Live clubs the user already belongs to (an emailed invite joined before setup). */
   memberships: { name: string; slug: string }[];
 }
 
@@ -60,7 +60,7 @@ export async function getOnboardingProfile(userId: string): Promise<OnboardingPr
     });
     if (!user) return null;
     const memberships = await db.membership.findMany({
-      // Clubs only: a personal RSVP space doesn't make someone a club member.
+      // Clubs only: the Personal space is never "a club you're in".
       where: { userId, organization: { deletedAt: null, kind: "CLUB" } },
       select: { organization: { select: { name: true, slug: true } } },
       orderBy: { joinedAt: "asc" },

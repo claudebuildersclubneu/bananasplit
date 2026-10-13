@@ -7,6 +7,7 @@ import { safeTimeZone } from "@/lib/calendar/dates";
 import { isPollOpen } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listQuestionPolls, type QuestionPollSummary } from "@/server/polls/question-polls";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { getOrgPolls } from "../queries";
 
@@ -20,6 +21,8 @@ export default async function PollsListPage({
   params,
 }: PageProps<"/app/[orgSlug]/calendar/polls">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "polls");
+  if (planLock) return planLock;
 
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const { availability, questions } = await withOrgTx(org.id, async ({ db }) => ({

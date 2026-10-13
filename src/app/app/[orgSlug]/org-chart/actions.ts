@@ -20,6 +20,10 @@ import {
   type SaveDraftResult,
 } from "@/server/org-chart/service";
 
+/** Every action here belongs to people (withOrgAction's space check). */
+const peopleAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { ...options, feature: "people" });
+
 /**
  * Org chart Server Actions. Each runs in one withOrgAction transaction
  * (app_user, RLS); writes need orgchart.write (OWNER/ADMIN). OrgChartError
@@ -44,7 +48,7 @@ function rescue<Args extends unknown[], R>(
 
 const id = z.string().min(1).max(100);
 
-const startDraftTx = withOrgAction(async (ctx, from: DraftSource) => {
+const startDraftTx = peopleAction(async (ctx, from: DraftSource) => {
   const versionId = await startDraft(ctx, z.enum(DRAFT_SOURCES).parse(from));
   return { ok: true as const, versionId };
 });
@@ -52,13 +56,19 @@ export async function startDraftAction(organizationId: string, from: DraftSource
   return rescue(startDraftTx)(organizationId, from);
 }
 
-const saveDraftTx = withOrgAction((ctx, input: unknown): Promise<SaveDraftResult> => saveDraft(ctx, input));
+const saveDraftTx = peopleAction((ctx, input: unknown): Promise<SaveDraftResult> =>
+  saveDraft(ctx, input),
+);
 export async function saveDraftAction(organizationId: string, input: unknown) {
   return rescue(saveDraftTx)(organizationId, input);
 }
 
-const publishTx = withOrgAction(
-  (ctx, versionId: string, options: { setTitles?: boolean; expectedEditVersion?: number }): Promise<PublishResult> =>
+const publishTx = peopleAction(
+  (
+    ctx,
+    versionId: string,
+    options: { setTitles?: boolean; expectedEditVersion?: number },
+  ): Promise<PublishResult> =>
     publishDraft(ctx, id.parse(versionId), {
       setTitles: options?.setTitles === true,
       expectedEditVersion:
@@ -73,7 +83,7 @@ export async function publishDraftAction(
   return rescue(publishTx)(organizationId, versionId, options);
 }
 
-const discardTx = withOrgAction(async (ctx, versionId: string) => {
+const discardTx = peopleAction(async (ctx, versionId: string) => {
   await discardDraft(ctx, id.parse(versionId));
   return { ok: true as const };
 });
@@ -81,12 +91,14 @@ export async function discardDraftAction(organizationId: string, versionId: stri
   return rescue(discardTx)(organizationId, versionId);
 }
 
-const rollbackTx = withOrgAction((ctx, versionId: string) => rollbackToVersion(ctx, id.parse(versionId)));
+const rollbackTx = peopleAction((ctx, versionId: string) =>
+  rollbackToVersion(ctx, id.parse(versionId)),
+);
 export async function rollbackAction(organizationId: string, versionId: string) {
   return rescue(rollbackTx)(organizationId, versionId);
 }
 
-const retryTx = withOrgAction(async (ctx, versionId: string) => {
+const retryTx = peopleAction(async (ctx, versionId: string) => {
   await retryParse(ctx, id.parse(versionId));
   return { ok: true as const };
 });
@@ -95,10 +107,13 @@ export async function retryParseAction(organizationId: string, versionId: string
 }
 
 /** The side panel's open tasks for a member (any member may look). */
-const openTasksTx = withOrgAction(async (ctx, userId: string): Promise<OpenTasks> => {
-  requirePermission(ctx, "orgchart.view");
-  return getOpenTasks(ctx, id.parse(userId));
-});
+const openTasksTx = peopleAction(
+  async (ctx, userId: string): Promise<OpenTasks> => {
+    requirePermission(ctx, "orgchart.view");
+    return getOpenTasks(ctx, id.parse(userId));
+  },
+  { whenPaused: "allow" },
+);
 export async function loadOpenTasksAction(organizationId: string, userId: string) {
   return openTasksTx(organizationId, userId);
 }

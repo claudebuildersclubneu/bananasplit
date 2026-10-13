@@ -38,9 +38,9 @@ const AUDIENCES = [
 
 const COPY: Record<Audience, { title: string; intro: string }> = {
   clubs: {
-    title: "Free for event pages. Pay for the club you have.",
+    title: "Free for you. Simple pricing for your club.",
     intro:
-      "Anyone can make RSVP pages for free with just an account: no club, no team. A club workspace is paid per active member, per semester, and guests who just RSVP are always free.",
+      "Personal is free for everyone: your own tasks, calendar, availability polls and RSVP pages, and you can join any club. Clubs pay per active member, per semester, and every new club gets a 30-day free trial, no card. Joining members never pay, and guests who just RSVP are always free.",
   },
   teams: {
     title: "Simple pricing for your team.",
@@ -53,6 +53,11 @@ function createClubHref(signedIn: boolean): string {
   return signedIn
     ? "/onboarding/organization"
     : "/sign-up?callbackUrl=%2Fonboarding%2Forganization";
+}
+
+/** Where Personal's button goes: the app when signed in, else sign-up. */
+function personalHref(signedIn: boolean): string {
+  return signedIn ? "/app" : "/sign-up";
 }
 
 function tiers(audience: Audience, signedIn: boolean): readonly Tier[] {
@@ -83,21 +88,21 @@ function tiers(audience: Audience, signedIn: boolean): readonly Tier[] {
   }
   return [
     {
-      name: "Free",
-      who: "Just you and your event pages. An account, not a club.",
+      name: "Personal",
+      who: "Your own tasks, calendar, availability polls and RSVP pages. Join any club free.",
       price: "$0",
       per: "always",
-      note: "Start a club any time and bring your events.",
-      cta: "Make a free event page",
-      href: "/rsvp",
+      note: "Every account has one.",
+      cta: signedIn ? "Open Personal" : "Sign up free",
+      href: personalHref(signedIn),
     },
     {
       name: CLUB_PLANS.club.name,
       who: "For active clubs with an officer team.",
       price: dollars(CLUB_PLANS.club.perMemberPerSemester),
       per: "per member / semester",
-      note: `A 40-member club pays ${dollars(40 * CLUB_PLANS.club.perMemberPerSemester)} a semester.`,
-      cta: "Create your club",
+      note: "Every new club gets a 30-day free trial, no card.",
+      cta: "Start a club",
       href: club,
     },
     {
@@ -108,35 +113,45 @@ function tiers(audience: Audience, signedIn: boolean): readonly Tier[] {
       price: dollars(CLUB_PLANS.society.perMemberPerSemester),
       per: "per member / semester",
       note: `A 120-member society pays ${dollars(120 * CLUB_PLANS.society.perMemberPerSemester)} a semester.`,
-      cta: "Go Society",
+      cta: "Start a club",
       href: club,
     },
   ];
 }
 
-/** What each plan includes, one column per tier in the same order as the cards. */
+/**
+ * What each plan includes, one column per tier in the same order as the
+ * cards (Personal, Club, Society). The app gates the same features
+ * (src/lib/billing/features.ts, src/lib/billing/space.ts): change the two
+ * together.
+ */
 const SECTIONS: Record<Audience, readonly Section[]> = {
   clubs: [
     {
-      title: "Event pages",
+      title: "Free for everyone",
       rows: [
         { feature: "RSVP pages, sign-ups and waitlists", marks: [true, true, true] },
         { feature: "Reminders by email", marks: [true, true, true] },
         { feature: "QR tickets and check-in at the door", marks: [true, true, true] },
         { feature: "Invite links and a bring list", marks: [true, true, true] },
-        { feature: "Guest lists kept", marks: ["30 days", "Forever", "Forever"] },
+        { feature: "Tasks on a board, a week and a table", marks: [true, true, true] },
+        { feature: "A calendar", marks: [true, true, true] },
+        { feature: "Availability polls", marks: [true, true, true] },
+        { feature: "Join any club", marks: [true, true, true] },
       ],
     },
     {
       title: "Your club",
       rows: [
-        { feature: "A shared workspace for your officers", marks: [false, true, true] },
-        { feature: "Tasks in four views", marks: [false, true, true] },
-        { feature: "Calendar and availability polls", marks: [false, true, true] },
+        { feature: "Members, invitations and roles", marks: [false, true, true] },
+        { feature: "A home page for every member", marks: [false, true, true] },
+        { feature: "Requests and Sunday updates", marks: [false, true, true] },
+        { feature: "Club polls", marks: [false, true, true] },
+        { feature: "Member directory and org chart", marks: [false, true, true] },
         { feature: "Live notes and club storage", marks: [false, "25 GB", "100 GB"] },
         { feature: "Finance board and reimbursements", marks: [false, true, true] },
-        { feature: "Databases with CSV import", marks: [false, true, true] },
-        { feature: "Data connections", marks: [false, "2", "6"] },
+        { feature: "Databases with CSV import, and reports", marks: [false, true, true] },
+        { feature: "Data connections, like Google Calendar", marks: [false, "2", "6"] },
       ],
     },
     {
@@ -149,7 +164,7 @@ const SECTIONS: Record<Audience, readonly Section[]> = {
         },
         { feature: "Sponsorship tracking and runway", marks: [false, false, true] },
         { feature: "Website sync for events and sign-ups", marks: [false, false, true] },
-        { feature: "Audit log and full export", marks: [false, false, true] },
+        { feature: "Audit log", marks: [false, false, true] },
       ],
     },
   ],
@@ -187,9 +202,9 @@ const PROMISES = [
 ] as const;
 
 /**
- * Plans for two audiences behind a segmented toggle: free event pages and
- * the per-member, per-semester club plans (plus the school-wide plan), or
- * per-seat team plans. The cards carry the price and one button each, in
+ * Plans for two audiences behind a segmented toggle: Personal (free) and
+ * the per-member, per-semester club plans with their 30-day trial (plus the
+ * school-wide plan), or per-seat team plans. The cards carry the price and one button each, in
  * line across the row; what each plan includes is one table underneath.
  */
 export function Pricing({ signedIn = false }: { signedIn?: boolean }) {

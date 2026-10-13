@@ -13,6 +13,10 @@ import {
   type ImportOutcome,
 } from "@/server/finance/import";
 
+/** Every action here belongs to finance (withOrgAction's space check). */
+const financeAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "finance" });
+
 /**
  * Finance imports (src/server/finance/import.ts does the work). Owners and
  * treasurers only: the check here gives the message, the BudgetPeriod and
@@ -22,20 +26,21 @@ import {
 
 const NOT_FINANCE = { error: "Only the club's owners and treasurers can import finance records." };
 
-export const importFinanceRecords = withOrgAction(
+export const importFinanceRecords = financeAction(
   async (ctx, input: unknown): Promise<{ error?: string; outcome?: ImportOutcome }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     const parsed = importInputSchema.safeParse(input);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      const row = typeof issue?.path[1] === "number" ? ` (row ${issue.path[1] + 1} of this part)` : "";
+      const row =
+        typeof issue?.path[1] === "number" ? ` (row ${issue.path[1] + 1} of this part)` : "";
       return { error: `${issue?.message ?? "Some rows couldn't be read."}${row}` };
     }
     return { outcome: await importRecords(ctx, parsed.data) };
   },
 );
 
-export const undoFinanceImport = withOrgAction(
+export const undoFinanceImport = financeAction(
   async (ctx, batch: string): Promise<{ error?: string; removed?: number }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     if (!/^[a-z0-9]{8,40}$/.test(batch)) return { error: "That import can't be found." };
@@ -43,20 +48,25 @@ export const undoFinanceImport = withOrgAction(
   },
 );
 
-export const importFinanceBudget = withOrgAction(
-  async (ctx, input: unknown): Promise<{ error?: string; updated?: number; created?: number; periodLabel?: string }> => {
+export const importFinanceBudget = financeAction(
+  async (
+    ctx,
+    input: unknown,
+  ): Promise<{ error?: string; updated?: number; created?: number; periodLabel?: string }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     const parsed = budgetLinesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Some budget lines couldn't be read." };
+    if (!parsed.success)
+      return { error: parsed.error.issues[0]?.message ?? "Some budget lines couldn't be read." };
     return importBudgetLines(ctx, parsed.data);
   },
 );
 
-export const checkImportDuplicates = withOrgAction(
+export const checkImportDuplicates = financeAction(
   async (ctx, keys: unknown): Promise<{ error?: string; duplicates?: string[] }> => {
     if (!can(ctx, "finance.manage")) return NOT_FINANCE;
     const parsed = duplicateKeysSchema.safeParse(keys);
     if (!parsed.success) return { duplicates: [] };
     return { duplicates: await findDuplicates(ctx, parsed.data) };
   },
+  { whenPaused: "allow" },
 );

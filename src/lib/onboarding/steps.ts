@@ -6,32 +6,37 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
 /**
  * The two onboarding flows from the design (docs/features/onboarding-flows.md):
  *
- *   A  Profile setup, once per new member:
- *      A1 basics -> A2 school -> A3 bio -> A4 theme -> A5 availability -> A6 review
- *      then A7: join with an invite code, or create an organization (Flow B).
+ *   A  "Your profile", right after sign-up (docs/features/personal-and-clubs.md):
+ *      basics (photo, name, pronouns, time zone; required, completes
+ *      onboarding) -> school -> bio and links -> when you can't meet ->
+ *      review, then the Personal dashboard. Joining a club adds one small
+ *      club step, "Your role in <club>" (/onboarding/join/[orgSlug]).
  *   B  Create an organization, only for the person creating one:
  *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> B6 invite
- *      -> the org, as admin.
+ *      -> B7 bring (move things in from Personal; skipped when there's
+ *      nothing to bring) -> the org, as admin.
  *
  * Pure and client-safe: the pages, forms and actions share these.
  */
 
-export const PROFILE_STEPS = [
-  "basics",
-  "school",
-  "bio",
-  "theme",
-  "availability",
-  "review",
-] as const;
+/**
+ * "Your profile" (Flow A), one run of five steps right after sign-up.
+ * Step 1 is required (saving it completes onboarding and makes the
+ * Personal space); every later step can be skipped and finished later
+ * from the Personal dashboard.
+ */
+export const PROFILE_STEPS = ["basics", "school", "bio", "availability", "review"] as const;
 export type ProfileStep = (typeof PROFILE_STEPS)[number];
 
+/** The one required step. */
+export const FIRST_PROFILE_STEP = "basics" satisfies ProfileStep;
+
+/** The stepper's short names, in order. */
 export const PROFILE_STEP_TITLES: Record<ProfileStep, string> = {
   basics: "About you",
-  school: "School and role",
+  school: "School",
   bio: "Bio and links",
-  theme: "Pick a theme",
-  availability: "When can't you meet?",
+  availability: "When you can't meet",
   review: "Review",
 };
 
@@ -43,9 +48,16 @@ export function profileStepHref(step: ProfileStep): string {
   return `/onboarding/profile/${step}`;
 }
 
+/**
+ * Where a new account goes after sign-up: /onboarding, carrying where
+ * sign-up started (an already-safe callbackUrl) so step 1 returns there.
+ */
+export function onboardingHref(after?: string | null): string {
+  return after ? `/onboarding?callbackUrl=${encodeURIComponent(after)}` : "/onboarding";
+}
+
 export function nextProfileStep(step: ProfileStep): ProfileStep | null {
-  const i = PROFILE_STEPS.indexOf(step);
-  return PROFILE_STEPS[i + 1] ?? null;
+  return PROFILE_STEPS[PROFILE_STEPS.indexOf(step) + 1] ?? null;
 }
 
 export function previousProfileStep(step: ProfileStep): ProfileStep | null {
@@ -53,13 +65,32 @@ export function previousProfileStep(step: ProfileStep): ProfileStep | null {
   return i > 0 ? PROFILE_STEPS[i - 1] : null;
 }
 
+/**
+ * The profile steps still empty, for the dashboard's "Finish your profile"
+ * card: school (no major and no grad year), bio (no bio and no links),
+ * availability (nothing marked). Basics is always done once onboarded.
+ */
+export function unfinishedProfileSteps(profile: {
+  major: string | null;
+  gradYear: number | null;
+  bio: string | null;
+  links: readonly unknown[];
+  blockedHours: number;
+}): ProfileStep[] {
+  const out: ProfileStep[] = [];
+  if (!profile.major && profile.gradYear === null) out.push("school");
+  if (!profile.bio && profile.links.length === 0) out.push("bio");
+  if (profile.blockedHours === 0) out.push("availability");
+  return out;
+}
+
 // B1 is /onboarding/organization; the rest live under the new org's slug.
-export const ORG_STEPS = ["data", "labels", "finance", "teams", "invite"] as const;
+export const ORG_STEPS = ["data", "labels", "finance", "teams", "invite", "bring"] as const;
 export type OrgStep = (typeof ORG_STEPS)[number];
-/** Six steps in the stepper: B1 plus these five. */
+/** Seven steps in the stepper: B1 plus these six. */
 export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
 
-/** The stepper's names for B1-B6, in order. */
+/** The stepper's names for B1-B7, in order. */
 export const ORG_STEP_NAMES = [
   "Club basics",
   // Optional: a club's data is stored in Bananasplit whether or not it connects anything.
@@ -68,6 +99,8 @@ export const ORG_STEP_NAMES = [
   "Finance",
   "Teams",
   "Invite officers",
+  // "Bring anything in?": events, polls and tasks from the creator's Personal space.
+  "Bring things in",
 ] as const;
 
 export function isOrgStep(value: unknown): value is OrgStep {
@@ -91,7 +124,10 @@ export function previousOrgStep(step: OrgStep): OrgStep | null {
 
 export const PRONOUN_CHOICES = ["he/him", "she/her", "they/them"] as const;
 
-/** The role picker in A2. Stored as the title for the orgs the user joins. */
+/**
+ * The role picker in "Your role in <club>" (the one club step after
+ * joining), stored as that membership's title.
+ */
 export const ROLE_CHOICES = [
   "President",
   "Vice President",
@@ -114,20 +150,26 @@ const { name, pronouns, timezone, major, gradYear, bio } = profileDetailsSchema.
 
 export const basicsSchema = z.object({ name, pronouns, timezone }).strict();
 
-export const schoolSchema = z
-  .object({
-    major,
-    gradYear,
-    preferredTitle: z
-      .string()
-      .transform((s) => s.replace(/\s+/g, " ").trim())
-      .pipe(z.string().max(MAX_TITLE, `Keep your role under ${MAX_TITLE} characters.`))
-      .transform((s) => (s ? s : null))
-      .nullable()
-      .optional()
-      .transform((v) => v ?? null),
-  })
-  .strict();
+/** A title: spaces collapsed, at most MAX_TITLE characters, "" -> null. */
+const titleSchema = z
+  .string()
+  .transform((s) => s.replace(/\s+/g, " ").trim())
+  .pipe(z.string().max(MAX_TITLE, `Keep your role under ${MAX_TITLE} characters.`))
+  .transform((s) => (s ? s : null))
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null);
+
+/** School: about you, not your club role (that's per club, set on joining). */
+export const schoolSchema = z.object({ major, gradYear }).strict();
+
+/** "Your role in <club>": the membership's title. */
+export const clubRoleSchema = z.object({ title: titleSchema }).strict();
+
+/** "Your role in <club>", the one club step after joining (code, link or emailed invite). */
+export function clubRoleHref(orgSlug: string): string {
+  return `/onboarding/join/${encodeURIComponent(orgSlug)}`;
+}
 
 export const bioSchema = z
   .object({

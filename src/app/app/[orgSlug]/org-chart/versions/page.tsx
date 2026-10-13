@@ -16,6 +16,7 @@ import {
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listVersions, type VersionSummary } from "@/server/org-chart/service";
+import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Org chart versions" };
 
@@ -51,6 +52,8 @@ export default async function VersionsPage({
   params,
 }: PageProps<"/app/[orgSlug]/org-chart/versions">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "orgchart.write")) notFound();
 

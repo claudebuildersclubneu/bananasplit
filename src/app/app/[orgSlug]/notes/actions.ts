@@ -10,6 +10,10 @@ import { revokeNoteSessions } from "@/server/collab/revoke";
 import { mintNoteCollabSession, type NoteCollabSession } from "@/server/collab/session";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+/** Every action here belongs to files (withOrgAction's space check). */
+const filesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "files" });
+
 /**
  * Note actions (0C). Each runs in one withOrgAction transaction as app_user,
  * so RLS repeats the rules checked here: PRIVATE notes are visible only to
@@ -81,7 +85,7 @@ function revokeAfterCommit(ctx: OrgContext, noteId: string) {
   ctx.afterCommit(() => revokeNoteSessions(ctx.organizationId, noteId));
 }
 
-export const createNote = withOrgAction(
+export const createNote = filesAction(
   async (ctx, prefill?: { title?: string; eventId?: string }): Promise<ActionResult> => {
     if (prefill?.eventId) {
       const eventError = await assertEventBelongsToOrg(ctx, prefill.eventId);
@@ -120,7 +124,7 @@ const importSchema = z.object({
  * Imported notes (and ones started from a template) start PRIVATE unless
  * the member picked otherwise, optionally in a folder.
  */
-export const importNote = withOrgAction(async (ctx, input: unknown): Promise<ActionResult> => {
+export const importNote = filesAction(async (ctx, input: unknown): Promise<ActionResult> => {
   const parsed = importSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   let contentJson: object;
@@ -159,7 +163,7 @@ export const importNote = withOrgAction(async (ctx, input: unknown): Promise<Act
   return { noteId: note.id };
 });
 
-export const updateNote = withOrgAction(
+export const updateNote = filesAction(
   async (ctx, noteId: string, input: unknown, expectedVersion: number): Promise<ActionResult> => {
     const existing = await ctx.db.note.findFirst({
       where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
@@ -242,7 +246,7 @@ export const updateNote = withOrgAction(
  * wins per field). Bumps the version, so an autosave editor still open on
  * the old one gets the usual conflict instead of overwriting these.
  */
-export const updateNoteDetails = withOrgAction(
+export const updateNoteDetails = filesAction(
   async (ctx, noteId: string, input: unknown): Promise<ActionResult> => {
     const existing = await ctx.db.note.findFirst({
       where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
@@ -290,7 +294,7 @@ export type CollabTokenResult = { session: NoteCollabSession; error?: never } | 
  * last token (the note turned PRIVATE, the caller left the org) is refused
  * here; write permission is canEditNote's.
  */
-export const issueNoteCollabToken = withOrgAction(
+export const issueNoteCollabToken = filesAction(
   async (ctx, noteId: string): Promise<CollabTokenResult> => {
     const config = collabConfig();
     if (!config) return { error: "Live editing is off." };
@@ -302,9 +306,10 @@ export const issueNoteCollabToken = withOrgAction(
     if (!note || !isNoteVisibleTo(ctx.userId, note)) return { error: "Note not found." };
     return { session: mintNoteCollabSession(config, ctx, note) };
   },
+  { whenPaused: "allow" },
 );
 
-export const deleteNote = withOrgAction(async (ctx, noteId: string): Promise<ActionResult> => {
+export const deleteNote = filesAction(async (ctx, noteId: string): Promise<ActionResult> => {
   const existing = await ctx.db.note.findFirst({
     where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
   });
@@ -323,7 +328,7 @@ export const deleteNote = withOrgAction(async (ctx, noteId: string): Promise<Act
   return {};
 });
 
-export const restoreNote = withOrgAction(async (ctx, noteId: string): Promise<ActionResult> => {
+export const restoreNote = filesAction(async (ctx, noteId: string): Promise<ActionResult> => {
   const existing = await ctx.db.note.findFirst({
     where: { id: noteId, organizationId: ctx.organizationId },
   });

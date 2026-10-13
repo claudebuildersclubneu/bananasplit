@@ -1,15 +1,12 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { setActiveOrgCookie } from "@/lib/active-org-cookie";
 import { requireUser } from "@/lib/auth/session";
 import { ACCEPT_ERROR_MESSAGES } from "@/lib/invitations";
-import { orgStepHref } from "@/lib/onboarding/steps";
+import { clubRoleHref, orgStepHref } from "@/lib/onboarding/steps";
 import { acceptInvitation, findPendingInvitationsForMe } from "@/server/settings/invitations";
-import { PENDING_SAVE_COOKIE } from "@/lib/rsvp/save-cookie";
-import { movePersonalEvent } from "@/server/rsvp/personal";
 import { createOrganization, isSlugAvailable } from "@/server/settings/org-creation";
 
 /**
@@ -43,16 +40,6 @@ export async function createOrganizationAction(
   if (!result.ok) return { error: result.error };
 
   await setActiveOrgCookie(result.orgId);
-  // A free event waiting to be saved to this new club moves in now, with
-  // its guests and link (only if it is this person's own; otherwise nothing).
-  const store = await cookies();
-  const pendingEvent = store.get(PENDING_SAVE_COOKIE)?.value;
-  if (pendingEvent) {
-    store.delete(PENDING_SAVE_COOKIE);
-    await movePersonalEvent(user.id, pendingEvent, result.orgId).catch((error: unknown) => {
-      console.error("[onboarding] moving a free event into the new club failed", error);
-    });
-  }
   // From onboarding, org setup continues with B2 (connect data).
   if (field(formData, "flow") === "onboarding") redirect(orgStepHref(result.slug, "data"));
   redirect(`/app/${result.slug}`);
@@ -84,5 +71,6 @@ export async function joinPendingInvitationAction(
   if (!result.ok) return { error: ACCEPT_ERROR_MESSAGES[result.reason] };
 
   await setActiveOrgCookie(result.orgId);
-  redirect(`/app/${result.orgSlug}`);
+  // Then the one small club step: "Your role in <club>".
+  redirect(clubRoleHref(result.orgSlug));
 }

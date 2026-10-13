@@ -10,13 +10,16 @@ import { CoreMark, Logo } from "./logo";
  * with a 12px paper frame, the yellow panel on the left (logo at the top,
  * `panel` at the bottom, a faint cream outline of the mark bleeding off the
  * corner) and the form on the right. Below lg the panel is hidden and the
- * logo sits above the form.
+ * logo sits above the form. `footer` closes the form column: the pages a
+ * signed-in person reaches pass <SignedInAs /> (a server component, so it
+ * can't be imported here: client forms import AuthTitle from this file).
  */
 export function AuthCard({
   panel = <AuthHeadline />,
   children,
   tall = false,
   formClassName,
+  footer,
 }: {
   /** The bottom of the yellow panel; the tagline when not given. */
   panel?: ReactNode;
@@ -25,6 +28,8 @@ export function AuthCard({
   tall?: boolean;
   /** The form column's padding and gap, when a screen differs. */
   formClassName?: string;
+  /** Under the form: the "Signed in as … Sign out" line. */
+  footer?: ReactNode;
 }) {
   return (
     <main className="grid flex-1 grid-cols-1 place-items-center px-4 py-10 sm:px-6">
@@ -55,6 +60,7 @@ export function AuthCard({
             <Logo />
           </Link>
           {children}
+          {footer}
         </div>
       </div>
     </main>

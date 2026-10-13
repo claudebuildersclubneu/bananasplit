@@ -1,5 +1,6 @@
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 import { BallotVisibilityForm, DatabaseVisibilityRow, PrivacyForm } from "./privacy-forms";
@@ -13,6 +14,8 @@ export default async function PrivacySettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/privacy">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "privacy");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "privacy.write")) {
     return <SettingsNoAccess title="Privacy" who="owners and admins" />;

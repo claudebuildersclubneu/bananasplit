@@ -12,6 +12,7 @@ import { PinToggle } from "@/components/pins/pins-context";
 import { peopleHref, personHref } from "@/lib/profile/href";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { listOrgPeople, parsePageParam, parseSearchParam } from "@/server/profiles/queries";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { PeopleTabs } from "./people-tabs";
 
@@ -26,6 +27,8 @@ export default async function PeoplePage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/people">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const query = await searchParams;
   const { organization, user } = await getOrgContextBySlug(orgSlug);
 
