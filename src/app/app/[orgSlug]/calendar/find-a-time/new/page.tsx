@@ -1,0 +1,13 @@
+import { getOrgContextBySlug } from "@/server/db/context";
+import { PollForm } from "@/components/calendar/poll-form";
+import { planGate } from "@/server/billing/plan-gate";
+
+export default async function NewFindATimePage({
+  params,
+}: PageProps<"/app/[orgSlug]/calendar/find-a-time/new">) {
+  const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "polls");
+  if (planLock) return planLock;
+  const { organization: org } = await getOrgContextBySlug(orgSlug);
+  return <PollForm orgId={org.id} orgSlug={orgSlug} defaultTimezone={org.timezone} />;
+}

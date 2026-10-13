@@ -71,7 +71,7 @@ describe("PersonalHome", () => {
     expect(html).toContain("No RSVPs yet");
     expect(html).toContain('href="/app/me-abc/calendar/rsvp"');
     expect(html).toContain("No polls waiting");
-    expect(html).toContain('href="/app/me-abc/calendar/polls/new"');
+    expect(html).toContain('href="/app/me-abc/calendar/find-a-time/new"');
     expect(html).not.toContain("Finish your profile");
     expect(html).not.toContain("invited");
   });

@@ -1,4 +1,4 @@
-import { CalendarSync, Ticket } from "lucide-react";
+import { CalendarClock, CalendarSync, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
@@ -111,11 +111,20 @@ export default async function CalendarPage({
         title="Calendar"
         actions={
           <>
+            {/* Planning a meeting starts here as often as from the sidebar. */}
+            {spaceIncludes(org, "polls") && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/app/${orgSlug}/calendar/find-a-time/new`}>
+                  <CalendarClock aria-hidden="true" />
+                  Find a time
+                </Link>
+              </Button>
+            )}
             {can({ role }, "events.write") && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/app/${orgSlug}/calendar/rsvp`}>
                   <Ticket aria-hidden="true" />
-                  RSVP pages
+                  RSVPs
                 </Link>
               </Button>
             )}

@@ -16,9 +16,10 @@ import { copyGuestPollLink, copyPollLink } from "./copy-link";
 import { PollStatusBadge, type PollStatusTone } from "./poll-status-badge";
 
 /**
- * The polls page's list: both kinds of poll in one list, open ones first.
- * Every label is made on the server (dates in the poll's or the org's
- * zone), so the rows render the same before and after hydration.
+ * A list of polls, open ones first: Polls lists questions and Find a time
+ * its availability polls (`showKind` marks each row's kind, for a list with
+ * both). Every label is made on the server (dates in the poll's or the
+ * org's zone), so the rows render the same before and after hydration.
  */
 
 export type PollKind = "question" | "availability";
@@ -48,10 +49,12 @@ export function PollList({
   orgId,
   open,
   closed,
+  showKind = false,
 }: {
   orgId: string;
   open: PollListItem[];
   closed: PollListItem[];
+  showKind?: boolean;
 }) {
   const router = useRouter();
   const [confirmElement, confirm] = useConfirm();
@@ -78,8 +81,16 @@ export function PollList({
   return (
     <>
       {confirmElement}
-      <Section title="Open" polls={open} empty="No open polls right now." onDelete={remove} />
-      {closed.length > 0 && <Section title="Closed" polls={closed} empty="" onDelete={remove} />}
+      <Section
+        title="Open"
+        polls={open}
+        empty="No open polls right now."
+        showKind={showKind}
+        onDelete={remove}
+      />
+      {closed.length > 0 && (
+        <Section title="Closed" polls={closed} empty="" showKind={showKind} onDelete={remove} />
+      )}
     </>
   );
 }
@@ -88,11 +99,13 @@ function Section({
   title,
   polls,
   empty,
+  showKind,
   onDelete,
 }: {
   title: string;
   polls: PollListItem[];
   empty: string;
+  showKind: boolean;
   onDelete: (poll: PollListItem) => void;
 }) {
   const id = `polls-${title.toLowerCase()}`;
@@ -106,7 +119,12 @@ function Section({
       ) : (
         <ul className="bg-card divide-y overflow-hidden rounded-xl border">
           {polls.map((poll) => (
-            <PollRow key={poll.id} poll={poll} onDelete={() => onDelete(poll)} />
+            <PollRow
+              key={poll.id}
+              poll={poll}
+              showKind={showKind}
+              onDelete={() => onDelete(poll)}
+            />
           ))}
         </ul>
       )}
@@ -114,7 +132,15 @@ function Section({
   );
 }
 
-function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void }) {
+function PollRow({
+  poll,
+  showKind,
+  onDelete,
+}: {
+  poll: PollListItem;
+  showKind: boolean;
+  onDelete: () => void;
+}) {
   const kind = KINDS[poll.kind];
   const Icon = kind.icon;
   return (
@@ -128,10 +154,12 @@ function PollRow({ poll, onDelete }: { poll: PollListItem; onDelete: () => void 
           {poll.title}
         </Link>
         <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-          <Badge variant="outline" className="text-muted-foreground font-normal">
-            <Icon aria-hidden />
-            {kind.label}
-          </Badge>
+          {showKind && (
+            <Badge variant="outline" className="text-muted-foreground font-normal">
+              <Icon aria-hidden />
+              {kind.label}
+            </Badge>
+          )}
           <PollStatusBadge tone={poll.status.tone}>{poll.status.label}</PollStatusBadge>
           <span>{poll.meta}</span>
         </div>

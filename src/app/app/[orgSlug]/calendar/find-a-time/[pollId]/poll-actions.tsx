@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 
-import { deletePoll } from "../actions";
+import { deletePoll } from "../../polls/actions";
 
 /**
  * An availability poll's header: while it's open, one click to invite
@@ -40,7 +40,7 @@ export function AvailabilityPollActions({
 }) {
   const router = useRouter();
   const [confirmElement, confirm] = useConfirm();
-  const href = `/app/${orgSlug}/calendar/polls/${pollId}`;
+  const href = `/app/${orgSlug}/calendar/find-a-time/${pollId}`;
 
   async function remove() {
     const deleted = await confirm({
@@ -53,7 +53,7 @@ export function AvailabilityPollActions({
     });
     if (!deleted) return;
     toast({ title: "Poll deleted", description: title });
-    router.push(`/app/${orgSlug}/calendar/polls`);
+    router.push(`/app/${orgSlug}/calendar/find-a-time`);
   }
 
   return (

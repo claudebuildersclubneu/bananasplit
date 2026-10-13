@@ -56,20 +56,32 @@ dashboard ("Finish your profile" card).
 
 ## Personal dashboard (/app/{personal slug} home)
 
-- Your clubs (cards: name, logo, next meeting, unread), plus Join a club /
-  Start a club.
+- The page uses the full width, like a club's Overview, and every block is
+  the same card (icon, title, a link to its page), so both columns' headings
+  line up. Shortcuts to Tasks, Calendar, Find a time and RSVPs sit on the
+  same muted track as the Tasks layouts.
+- Your clubs (one row each: name, logo, role, next meeting, open tasks,
+  unread), then Join a club (a code, right there) or Start a club.
 - When you meet next: upcoming events across all your clubs and Personal.
 - Your RSVPs: events you're going to (public pages you RSVP'd to with this
   email) and the event pages you host.
 - Due soon: your tasks across Personal and every club (labelled by club).
-- Polls waiting on you, and your own polls' responses.
+- Polls waiting on you, and your own find-a-time polls' responses, with a
+  Find a time button.
 - Finish your profile, when steps were skipped.
 
 ## Switching
 
-The sidebar club switcher lists Personal first (your avatar, "Personal"),
-then your clubs, then Join a club / Start a club. Home (`/app`) opens the
-last space used, else Personal.
+The foot of the sidebar always lists **Personal & clubs**: Personal first
+(your avatar), then your clubs, the one you're in marked; one click
+switches (and is remembered). The menu at the top of the sidebar lists the
+same, then Join a club / Start a club. Home (`/app`) opens the last space
+used, else Personal.
+
+Personal's sidebar: Home, Tasks, Calendar, Find a time, RSVPs. A club's
+default sidebar puts Find a time and RSVPs right under Calendar; a club
+that saved its own sidebar before they existed gets them there too, hidden
+if it had hidden Polls (Find a time) or Calendar (RSVPs).
 
 ## Migration of existing data
 

@@ -33,8 +33,10 @@ export interface NavSection {
 
 /**
  * A Personal space's sidebar: Home (the Personal dashboard), Tasks,
- * Calendar, Polls and Events (its RSVP pages). Not arrangeable: there is no
- * team to arrange it for.
+ * Calendar, Find a time (availability polls anyone answers from a link) and
+ * RSVPs (its event pages and your tickets). No question polls: only members
+ * vote on those, and Personal has one. Not arrangeable: there is no team to
+ * arrange it for.
  */
 export const PERSONAL_NAV: readonly {
   id: string;
@@ -47,8 +49,14 @@ export const PERSONAL_NAV: readonly {
   { id: "home", label: "Home", icon: "House", path: "", exact: true },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", exact: false },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", exact: false },
-  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", exact: false },
-  { id: "events", label: "Events", icon: "Ticket", path: "/calendar/rsvp", exact: false },
+  {
+    id: "find-a-time",
+    label: "Find a time",
+    icon: "CalendarClock",
+    path: "/calendar/find-a-time",
+    exact: false,
+  },
+  { id: "rsvps", label: "RSVPs", icon: "Ticket", path: "/calendar/rsvp", exact: false },
 ];
 
 /**

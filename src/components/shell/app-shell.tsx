@@ -13,6 +13,7 @@ import { PinButton, VisitTracker } from "@/components/shell/pin-button";
 import type { NavSection } from "@/components/shell/nav-config";
 import { SectionGate } from "@/components/shell/section-gate";
 import { SidebarNav, type SidebarPin } from "@/components/shell/sidebar-nav";
+import { SpaceList } from "@/components/shell/space-list";
 import { UserMenu } from "@/components/shell/user-menu";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/toaster";
@@ -99,7 +100,12 @@ export function AppShell({
 
         <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-3 border-r p-3 md:sticky md:top-0 md:flex md:h-screen">
           {clubMenu}
-          <SidebarNav sections={sections} orgId={orgId} pins={pins} />
+          <SidebarNav
+            sections={sections}
+            orgId={orgId}
+            pins={pins}
+            spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} />}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-col">
@@ -128,6 +134,14 @@ export function AppShell({
                     sections={sections}
                     orgId={orgId}
                     pins={pins}
+                    spaces={
+                      <SpaceList
+                        orgs={orgs}
+                        activeSlug={orgSlug}
+                        user={user}
+                        onNavigate={() => setMobileNavOpen(false)}
+                      />
+                    }
                     onNavigate={() => setMobileNavOpen(false)}
                   />
                 </div>

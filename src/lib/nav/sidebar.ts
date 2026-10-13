@@ -14,6 +14,8 @@ export const SECTION_IDS = [
   "overview",
   "tasks",
   "calendar",
+  "find-a-time",
+  "rsvps",
   "notes",
   "people",
   "polls",
@@ -52,9 +54,11 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "overview", label: "Overview", icon: "LayoutDashboard", path: "", exact: true, group: "main", locked: true, description: "Each member's home page." },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", group: "main", description: "Who's doing what, and by when." },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", group: "main", description: "Meetings and events." },
+  { id: "find-a-time", label: "Find a time", icon: "CalendarClock", path: "/calendar/find-a-time", group: "main", description: "Offer some times and see when everyone's free." },
+  { id: "rsvps", label: "RSVPs", icon: "Ticket", path: "/calendar/rsvp", group: "main", description: "Sign-up pages for events, and your tickets." },
   { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", group: "main", description: "Notes, documents and uploads." },
   { id: "people", label: "People", icon: "Users", path: "/people", also: ["/org-chart"], group: "club", description: "The member directory and the org chart." },
-  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club anything, or find a time that works." },
+  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club a question and let people vote." },
   { id: "databases", label: "Databases", icon: "Database", path: "/databases", group: "data", description: "Attendance, sign-ups, votes and reports." },
   { id: "finance", label: "Finance", icon: "Wallet", path: "/finance", group: "data", description: "Budget, transactions and reimbursements." },
 ];
@@ -64,11 +68,23 @@ export const SECTION_FEATURES: Record<SectionId, PlanFeature> = {
   overview: "overview",
   tasks: "tasks",
   calendar: "rsvp",
+  "find-a-time": "polls",
+  rsvps: "rsvp",
   notes: "files",
   people: "people",
   polls: "polls",
   databases: "databases",
   finance: "finance",
+};
+
+/**
+ * Sections split out of an older one: a saved sidebar that hid the older
+ * one hides these too (Find a time was part of Polls; RSVP pages were a
+ * button on the Calendar).
+ */
+const ADDED_FROM: Partial<Record<SectionId, SectionId>> = {
+  "find-a-time": "polls",
+  rsvps: "calendar",
 };
 
 export const DEFAULT_GROUP_LABELS: Record<GroupId, string | null> = { main: null, club: "Club", data: "Data" };
@@ -128,9 +144,18 @@ export function resolveSidebar(raw: unknown): ResolvedGroup[] {
   const saved = new Map<string, NonNullable<typeof config>["items"][number] & { index: number }>(
     config?.items.map((i, index) => [i.id, { ...i, index }]) ?? [],
   );
-  const items: (ResolvedItem & { order: number })[] = SECTIONS.map((def, i) => {
+  const items: (ResolvedItem & { order: number })[] = [];
+  for (const [i, def] of SECTIONS.entries()) {
     const s = saved.get(def.id);
-    return {
+    // Saved order first. A section added since the club saved its sidebar
+    // goes right after the one before it (Find a time and RSVPs after
+    // Calendar, under its heading), and starts hidden if the section it came
+    // out of is.
+    const before =
+      config && !s && SECTIONS[i - 1]?.group === def.group ? items[items.length - 1] : undefined;
+    const from = config && !s ? ADDED_FROM[def.id] : undefined;
+    const fromSaved = from ? saved.get(from) : undefined;
+    items.push({
       id: def.id,
       label: s?.label ?? def.label,
       defaultLabel: def.label,
@@ -138,14 +163,13 @@ export function resolveSidebar(raw: unknown): ResolvedGroup[] {
       path: def.path,
       also: def.also ?? [],
       exact: def.exact ?? false,
-      hidden: def.locked ? false : (s?.hidden ?? false),
+      hidden: def.locked ? false : (s?.hidden ?? fromSaved?.hidden ?? false),
       locked: def.locked ?? false,
-      group: def.locked ? "main" : (s?.group ?? def.group),
+      group: def.locked ? "main" : (s?.group ?? before?.group ?? def.group),
       description: def.description,
-      // Saved order first; sections added since keep their default place after.
-      order: s ? s.index : 100 + i,
-    };
-  });
+      order: s ? s.index : before ? before.order + 0.01 : 100 + i,
+    });
+  }
   // Overview always leads.
   items.sort((a, b) => (a.id === "overview" ? -1 : b.id === "overview" ? 1 : a.order - b.order));
   return GROUP_IDS.map((id) => ({

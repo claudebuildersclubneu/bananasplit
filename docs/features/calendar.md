@@ -73,9 +73,14 @@ events that are still syncing to Google or whose sync failed.
 
 ### 1b. Availability polls
 
-Calendar > **Availability polls** finds a meeting time (when2meet-style). It
-is one of the two kinds of poll on the **Polls** page (sidebar > Polls), with
-question polls (1c); **New poll > Find a time** starts one.
+**Find a time** (its own sidebar section, under Calendar) finds a meeting
+time (when2meet-style): `/app/{slug}/calendar/find-a-time` lists the space's
+availability polls, **New poll** there (or **Find a time** in the
+Calendar's header) starts one, and each lives at
+`/calendar/find-a-time/{pollId}`. It used to be one kind of poll on the
+Polls page; `/calendar/polls/{pollId}` and `/calendar/polls/new` still
+forward there, so older links and pins keep working. In Personal it is the
+only kind of poll: a question needs members to vote.
 
 - **Creating one** (any member): a title, the days to offer, the daily hours
   and the time zone those hours are in (the organization's by default; the
@@ -84,7 +89,7 @@ question polls (1c); **New poll > Find a time** starts one.
   taking answers. The form shows how many slots that makes before you create
   it.
 - **Inviting guests:** *Invite guests* on an open poll's page (or *Copy guest
-  link* in the Polls list) copies the link for people outside the club. They
+  link* in the Find a time list) copies the link for people outside the club. They
   type a name and mark their times: no account, no sign-up and no
   onboarding. Members answer as themselves, in the app or on the link (a
   member who isn't signed in can sign in from it). The poll's in-app address
@@ -114,8 +119,8 @@ question polls (1c); **New poll > Find a time** starts one.
 
 ### 1c. Question polls
 
-**Polls > New poll > Ask a question** asks the club anything: a question and
-the options people vote on. Members only: there is no guest link.
+**Polls > Ask a question** asks the club anything: a question and the
+options people vote on. Members only: there is no guest link.
 
 - **Creating one** (any member): the question (up to 200 characters), an
   optional description, and 2 to 20 options (up to 120 characters each, no
@@ -146,8 +151,8 @@ the options people vote on. Members only: there is no guest link.
   poll is open (its votes go with it; a poll keeps at least two).
 - **Deleting:** the creator or an owner/admin deletes a poll from its "…"
   menu or from the Polls list, after a confirmation. Its votes go with it.
-- **Where else it shows:** the Polls page lists both kinds, newest first,
-  split into open and closed; the Overview's *Open polls* widget; *Pin
+- **Where else it shows:** the Polls page lists question polls, newest
+  first, split into open and closed (Find a time lists the other kind); the Overview's *Open polls* widget; *Pin
   something*; pins and *Recently visited* (under the poll's question). The
   org export (Settings > Danger zone) includes `Poll`, `PollOption` and
   `PollVote`, the votes without who cast them.

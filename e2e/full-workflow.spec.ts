@@ -99,7 +99,7 @@ test("full workspace workflow", async ({ page }) => {
   await expect(page.getByText(/Saved|Saving/)).toBeVisible();
 
   // --- create an availability poll, respond, and finalize into an event ---
-  await page.goto(`/app/${orgSlug}/calendar/polls/new`);
+  await page.goto(`/app/${orgSlug}/calendar/find-a-time/new`);
   const pollTitle = `E2E poll ${uniqueSuffix()}`;
   await page.getByLabel("Title").fill(pollTitle);
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -107,7 +107,7 @@ test("full workspace workflow", async ({ page }) => {
   await page.getByRole("button", { name: dayButtonName(tomorrow) }).click();
   await page.getByRole("button", { name: dayButtonName(dayAfter) }).click();
   await page.getByRole("button", { name: "Create poll" }).click();
-  await expect(page).toHaveURL(/\/calendar\/polls\/[a-z0-9]+$/);
+  await expect(page).toHaveURL(/\/calendar\/find-a-time\/(?!new$)[a-z0-9]+$/);
 
   // The date picker on the form is a grid too: go by the response grid's name.
   const mine = page.getByRole("grid", { name: "Your availability" });
@@ -123,7 +123,7 @@ test("full workspace workflow", async ({ page }) => {
   await page.getByRole("tab", { name: /Everyone/ }).click();
   await page.getByRole("button", { name: "Schedule", exact: true }).first().click();
   await page.getByRole("dialog").getByRole("button", { name: "Schedule" }).click();
-  await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}/calendar/(?!polls)[a-z0-9]+$`));
+  await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}/calendar/(?!find-a-time)[a-z0-9]+$`));
 
   // --- download the .ics for the finalized event ---
   const downloadPromise = page.waitForEvent("download");
