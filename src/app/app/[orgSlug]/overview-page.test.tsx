@@ -67,6 +67,12 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/server/setup/progress", () => ({ loadSetupState: mocks.loadSetupState }));
 vi.mock("@/server/onboarding/join-code", () => ({ getOrCreateJoinCode: vi.fn() }));
 vi.mock("@/components/onboarding/join-code-card", () => ({ JoinCodeCard: () => null }));
+vi.mock("@/server/personal/home", () => ({
+  loadPersonalHome: vi.fn(async () => ({ firstName: "Viewer", clubs: [], pendingInvites: [] })),
+}));
+vi.mock("@/components/personal/personal-home", () => ({
+  PersonalHome: ({ orgSlug }: { orgSlug: string }) => <p>Personal home of {orgSlug}</p>,
+}));
 
 const { default: OverviewPage } = await import("./page");
 
@@ -75,7 +81,9 @@ const org = {
   id: "org_cbc",
   name: "Claude Builders Club",
   slug: "cbc",
+  kind: "CLUB",
   plan: "SOCIETY",
+  trialEndsAt: null,
   timezone: "America/New_York",
 };
 const props = {
@@ -113,25 +121,17 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("a Free club's home", () => {
-  const free = (role: string, welcome = false) => {
+describe("a Personal space's home", () => {
+  it("is the Personal dashboard, not a club's board", async () => {
     mocks.getOrgContextBySlug.mockResolvedValue({
       user: viewer,
-      organization: { ...org, plan: "FREE" },
-      role,
+      organization: { ...org, slug: "me-abc", kind: "PERSONAL", plan: "FREE" },
+      role: "OWNER",
     });
-    return OverviewPage({
-      ...props,
-      searchParams: Promise.resolve(welcome ? { welcome: "1" } : {}),
-    } as unknown as PageProps<"/app/[orgSlug]">);
-  };
-
-  it("has no Overview board: members land on the calendar, organizers on the RSVP pages", async () => {
-    await expect(free("MEMBER")).rejects.toThrow("redirect:/app/cbc/calendar");
-    await expect(free("OWNER")).rejects.toThrow("redirect:/app/cbc/calendar/rsvp");
-    // A new club's owner lands on the invite code (Members).
-    await expect(free("OWNER", true)).rejects.toThrow("redirect:/app/cbc/settings/members");
+    const html = await render();
+    expect(html).toContain("Personal home of me-abc");
     expect(mocks.getMyOpenTasks).not.toHaveBeenCalled();
+    expect(mocks.loadSavedBoard).not.toHaveBeenCalled();
   });
 });
 

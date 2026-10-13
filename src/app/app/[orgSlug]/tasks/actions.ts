@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import type { TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
-import { withOrgAction } from "@/server/db/context";
+import { withOrgAction, type OrgActionOptions } from "@/server/db/context";
 import { AppError } from "@/server/db/errors";
 import {
   COMMENTS_PAGE_SIZE,
@@ -52,8 +52,10 @@ async function run<T extends { error?: string; confirm?: unknown }>(
   }
 }
 
-const withEnv = <Args extends unknown[], R>(fn: (env: svc.TaskEnv, ...args: Args) => Promise<R>) =>
-  withOrgAction(async (ctx, ...args: Args) => fn(await svc.loadTaskEnv(ctx), ...args));
+const withEnv = <Args extends unknown[], R>(
+  fn: (env: svc.TaskEnv, ...args: Args) => Promise<R>,
+  options?: OrgActionOptions,
+) => withOrgAction(async (ctx, ...args: Args) => fn(await svc.loadTaskEnv(ctx), ...args), options);
 
 const createTaskTx = withEnv(svc.createTask);
 const updateTaskTx = withEnv(svc.updateTask);
@@ -70,7 +72,8 @@ const bulkDeleteTx = withEnv(svc.bulkDelete);
 const addCommentTx = withEnv(svc.addComment);
 const editCommentTx = withEnv(svc.editComment);
 const deleteCommentTx = withEnv(svc.deleteComment);
-const postWeeklyTx = withEnv(postWeekly);
+// Sunday updates are work between people: clubs only (Personal has no team).
+const postWeeklyTx = withEnv(postWeekly, { feature: "teamwork" });
 
 export async function createTask(orgId: string, input: unknown) {
   return run(() => createTaskTx(orgId, input));
@@ -102,7 +105,10 @@ export async function createTasksFromImport(
     const key = typeof row?.key === "string" ? row.key.slice(0, 20) : "";
     const input =
       row?.input && typeof row.input === "object"
-        ? { ...(row.input as Record<string, unknown>), confirmFlagged: options.confirmFlagged === true }
+        ? {
+            ...(row.input as Record<string, unknown>),
+            confirmFlagged: options.confirmFlagged === true,
+          }
         : row?.input;
     try {
       const result = await createTaskTx(orgId, input);
@@ -197,13 +203,16 @@ export async function postWeeklyUpdate(
   return run(() => postWeeklyTx(orgId, input));
 }
 
-const loadCommentsTx = withOrgAction(async (ctx, taskId: string, before: string | null) => {
-  const page = await getComments(ctx.db, ctx.organizationId, taskId, {
-    before,
-    take: COMMENTS_PAGE_SIZE,
-  });
-  return page;
-});
+const loadCommentsTx = withOrgAction(
+  async (ctx, taskId: string, before: string | null) => {
+    const page = await getComments(ctx.db, ctx.organizationId, taskId, {
+      before,
+      take: COMMENTS_PAGE_SIZE,
+    });
+    return page;
+  },
+  { whenPaused: "allow" },
+);
 
 /** A page of comments for the dialog (lazy-loaded; oldest first). */
 export async function loadTaskComments(
@@ -220,8 +229,9 @@ export async function loadTaskComments(
   }
 }
 
-const loadActivityTx = withOrgAction(async (ctx, taskId: string) =>
-  getActivity(ctx.db, ctx.organizationId, taskId),
+const loadActivityTx = withOrgAction(
+  async (ctx, taskId: string) => getActivity(ctx.db, ctx.organizationId, taskId),
+  { whenPaused: "allow" },
 );
 
 export async function loadTaskActivity(orgId: string, taskId: string): Promise<TaskActivityItem[]> {
@@ -233,8 +243,9 @@ export async function loadTaskActivity(orgId: string, taskId: string): Promise<T
   }
 }
 
-const loadTaskTx = withOrgAction(async (ctx, taskId: string) =>
-  getTaskDetail(ctx.db, ctx.organizationId, taskId),
+const loadTaskTx = withOrgAction(
+  async (ctx, taskId: string) => getTaskDetail(ctx.db, ctx.organizationId, taskId),
+  { whenPaused: "allow" },
 );
 
 /** One task in the list shape (the dialog opens subtasks with it). */

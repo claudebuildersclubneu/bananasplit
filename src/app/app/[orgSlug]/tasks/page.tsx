@@ -5,7 +5,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { TasksProvider } from "@/components/tasks/tasks-context";
 import { WorkspaceProvider } from "@/components/tasks/workspace-context";
 import { can } from "@/lib/auth/permissions";
-import { planIncludes } from "@/lib/billing/features";
+import { spaceIncludes } from "@/lib/billing/space";
 import {
   effectiveTimezone,
   fromDateKey,
@@ -44,6 +44,8 @@ import { WeekView } from "./week/week-view";
 import { WorkspaceHeader } from "./workspace-header";
 import { ListView } from "./list/list-view";
 import {
+  DEFAULT_TASK_LAYOUT,
+  isDestination,
   parseScope,
   parseWorkspaceQuery,
   TASK_LIST_VIEW,
@@ -77,7 +79,7 @@ export default async function TasksPage({
   const query = await searchParams;
   // Tasks' due dates live on the main calendar now (its Tasks layer).
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
-  if (query.view === "calendar" && planIncludes(org.plan, "taskViews")) {
+  if (query.view === "calendar" && spaceIncludes(org, "taskViews")) {
     redirect(`/app/${orgSlug}/calendar`);
   }
 
@@ -85,10 +87,15 @@ export default async function TasksPage({
   const parsed = parseWorkspaceQuery(query, cookieStore.get(TASKS_VIEW_COOKIE)?.value);
   // The Free plan has the List only: any other ?view= (or a remembered
   // layout) opens the List too, so a typed URL doesn't reach the others.
-  const simple = !planIncludes(org.plan, "taskViews");
+  const simple = !spaceIncludes(org, "taskViews");
+  // Requests and the Sunday update are work between people: a Personal
+  // space has every layout but neither destination.
+  const teamwork = spaceIncludes(org, "teamwork");
   const ws: WorkspaceQuery = simple
     ? { ...parsed, view: TASK_LIST_VIEW, scope: parseScope(query.scope) ?? "all" }
-    : parsed;
+    : !teamwork && isDestination(parsed.view)
+      ? { ...parsed, view: DEFAULT_TASK_LAYOUT }
+      : parsed;
   const isAdmin = can({ role }, "tasks.manageAll");
   const now = new Date();
 
@@ -188,6 +195,7 @@ export default async function TasksPage({
           intakeCount={header.intakeCount}
           showIntake={intakeProjects.length > 0 || isAdmin}
           posted={header.posted}
+          teamwork={teamwork}
         />
         {content}
       </WorkspaceProvider>

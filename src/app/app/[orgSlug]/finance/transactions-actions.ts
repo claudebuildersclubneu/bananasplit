@@ -14,6 +14,10 @@ import { withOrgAction, type OrgContext } from "@/server/db/context";
 import { ensureActivePeriod } from "@/server/finance/periods";
 import { enqueueJob } from "@/server/jobs/enqueue";
 
+/** Every action here belongs to finance (withOrgAction's space check). */
+const financeAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "finance" });
+
 /**
  * Transactions and the expense workflow (0C). Every action runs in one
  * withOrgAction transaction as app_user. The app checks give the messages;
@@ -108,7 +112,7 @@ async function assertLinksBelongToOrg(
   return null;
 }
 
-export const createTransaction = withOrgAction(
+export const createTransaction = financeAction(
   async (ctx, input: unknown): Promise<ActionResult> => {
     const parsed = transactionInputSchema.safeParse(input);
     if (!parsed.success) {
@@ -140,7 +144,8 @@ export const createTransaction = withOrgAction(
         });
         if (!active) {
           return {
-            error: "Your club's treasurer hasn't set up the budget yet, so requests can't be filed. Ask them to open Finance once.",
+            error:
+              "Your club's treasurer hasn't set up the budget yet, so requests can't be filed. Ask them to open Finance once.",
           };
         }
         periodId = active.id;
@@ -193,7 +198,7 @@ export const createTransaction = withOrgAction(
 // period vouch for a foreign category (0A Fix 2). Unknown keys are stripped.
 const updateInputSchema = transactionInputSchema.omit({ budgetPeriodId: true }).partial();
 
-export const updateTransaction = withOrgAction(
+export const updateTransaction = financeAction(
   async (ctx, transactionId: string, input: unknown): Promise<ActionResult> => {
     const existing = await ctx.db.transaction.findFirst({
       where: { id: transactionId, organizationId: ctx.organizationId },
@@ -251,7 +256,7 @@ export const updateTransaction = withOrgAction(
   },
 );
 
-export const voidTransaction = withOrgAction(
+export const voidTransaction = financeAction(
   async (ctx, transactionId: string, reason: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
 
@@ -291,7 +296,7 @@ export const voidTransaction = withOrgAction(
  * Treasurers and owners delete any unlocked transaction; a member deletes
  * their own expense while it's still a draft or waiting for approval.
  */
-export const deleteTransaction = withOrgAction(
+export const deleteTransaction = financeAction(
   async (ctx, transactionId: string): Promise<ActionResult> => {
     const existing = await ctx.db.transaction.findFirst({
       where: { id: transactionId, organizationId: ctx.organizationId },
@@ -303,10 +308,16 @@ export const deleteTransaction = withOrgAction(
       existing.kind === TransactionKind.EXPENSE &&
       (existing.status === "DRAFT" || existing.status === "SUBMITTED");
     if (!can(ctx, "finance.manage") && !ownOpen) {
-      return { error: "Only a treasurer or owner can delete this. You can delete your own requests until they're approved." };
+      return {
+        error:
+          "Only a treasurer or owner can delete this. You can delete your own requests until they're approved.",
+      };
     }
     if (existing.reconciledAt) {
-      return { error: "This transaction is reconciled against a bank statement and locked. Unlock it first." };
+      return {
+        error:
+          "This transaction is reconciled against a bank statement and locked. Unlock it first.",
+      };
     }
 
     const updated = await ctx.db.transaction.update({
@@ -325,7 +336,7 @@ export const deleteTransaction = withOrgAction(
 );
 
 /** Undoes deleteTransaction (or a void): back in the lists and totals. */
-export const restoreTransaction = withOrgAction(
+export const restoreTransaction = financeAction(
   async (ctx, transactionId: string): Promise<ActionResult> => {
     const existing = await ctx.db.transaction.findFirst({
       where: { id: transactionId, organizationId: ctx.organizationId },
@@ -425,31 +436,31 @@ async function applyExpenseTransition(
   return { transactionId: row.id };
 }
 
-export const submitExpense = withOrgAction(async (ctx, transactionId: string) =>
+export const submitExpense = financeAction(async (ctx, transactionId: string) =>
   applyExpenseTransition(ctx, transactionId, "SUBMIT"),
 );
 
-export const withdrawExpense = withOrgAction(async (ctx, transactionId: string) =>
+export const withdrawExpense = financeAction(async (ctx, transactionId: string) =>
   applyExpenseTransition(ctx, transactionId, "WITHDRAW"),
 );
 
-export const markExpenseNotApplicable = withOrgAction(async (ctx, transactionId: string) =>
+export const markExpenseNotApplicable = financeAction(async (ctx, transactionId: string) =>
   applyExpenseTransition(ctx, transactionId, "MARK_NOT_APPLICABLE"),
 );
 
-export const approveExpense = withOrgAction(async (ctx, transactionId: string) =>
+export const approveExpense = financeAction(async (ctx, transactionId: string) =>
   applyExpenseTransition(ctx, transactionId, "APPROVE"),
 );
 
-export const rejectExpense = withOrgAction(async (ctx, transactionId: string, reason: string) =>
+export const rejectExpense = financeAction(async (ctx, transactionId: string, reason: string) =>
   applyExpenseTransition(ctx, transactionId, "REJECT", { rejectionReason: reason }),
 );
 
-export const reimburseExpense = withOrgAction(async (ctx, transactionId: string, method: string) =>
+export const reimburseExpense = financeAction(async (ctx, transactionId: string, method: string) =>
   applyExpenseTransition(ctx, transactionId, "REIMBURSE", { reimbursedMethod: method }),
 );
 
-export const reconcileTransaction = withOrgAction(
+export const reconcileTransaction = financeAction(
   async (ctx, transactionId: string, statementRef: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
 
@@ -479,7 +490,7 @@ export const reconcileTransaction = withOrgAction(
   },
 );
 
-export const unlockTransaction = withOrgAction(
+export const unlockTransaction = financeAction(
   async (ctx, transactionId: string, reason: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
 

@@ -55,6 +55,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   memberships            Membership[]
+  /// Their Personal space (docs/features/personal-and-clubs.md): one each.
+  personalSpace          Organization?        @relation("PersonalSpace")
   sentInvitations        Invitation[]         @relation("InvitationInvitedBy")
   createdTasks           Task[]               @relation("TaskCreatedBy")
   taskAssignments        TaskAssignee[]
@@ -328,13 +330,23 @@ model Organization {
   /// The published org chart (Phase 3). Written only by publish/rollback;
   /// app.assert_org_active_chart keeps it inside the org.
   activeOrgChartVersionId String?   @unique
-  /// Always CLUB (CHECK Organization_kind_club). PERSONAL was the free RSVP
-  /// space, retired in 20261013160000_retire_personal_spaces.
+  /// CLUB: a shared club. PERSONAL: one person's Personal space
+  /// (personalOwnerId), its only member. Fixed at creation
+  /// (app.organization_space_guard).
   kind                    OrgKind   @default(CLUB)
-  /// What the club pays for (src/lib/billing/features.ts says what each
-  /// plan includes). OWNER-only (app.organization_guard); Settings > Plan.
-  plan                    OrgPlan   @default(FREE)
+  /// PERSONAL only: whose space it is (one each).
+  personalOwnerId         String?   @unique
+  /// FREE for Personal; TRIAL, CLUB or SOCIETY for a club
+  /// (src/lib/billing/space.ts says what each includes). OWNER-only
+  /// (app.organization_guard); Admin panel > Plan.
+  plan                    OrgPlan   @default(TRIAL)
+  /// TRIAL: when the trial ends (30 days after the club was started); the
+  /// club is paused after it until the owner picks a plan. Never changed by
+  /// the app roles.
+  trialEndsAt             DateTime?
   createdAt               DateTime  @default(now())
+
+  personalOwner User? @relation("PersonalSpace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
 
   activeOrgChartVersion OrgChartVersion?  @relation("ActiveOrgChartVersion", fields: [activeOrgChartVersionId], references: [id], onDelete: SetNull)
   orgChartVersions      OrgChartVersion[] @relation("OrgChartVersions")
@@ -378,16 +390,18 @@ model Organization {
   noteFolders       NoteFolder[]
 }
 
-/// PERSONAL is retired: no organization may have it (Organization_kind_club).
+/// CLUB or PERSONAL (docs/features/personal-and-clubs.md).
 enum OrgKind {
   CLUB
   PERSONAL
 }
 
-/// FREE: RSVP pages and a simple task list. CLUB and SOCIETY: the paid
-/// plans (src/components/marketing/pricing.tsx).
+/// FREE: Personal (and only Personal). TRIAL: a new club's 30 days of
+/// everything. CLUB and SOCIETY: the paid club plans
+/// (src/components/marketing/pricing.tsx).
 enum OrgPlan {
   FREE
+  TRIAL
   CLUB
   SOCIETY
 }
@@ -1015,6 +1029,8 @@ model EventRegistration {
   @@index([organizationId, eventId, status, queuedAt])
   @@index([invitedById])
   @@index([userId])
+  /// "Your RSVPs" on the Personal dashboard (app.my_rsvp_registrations).
+  @@index([email])
 }
 
 enum RsvpCostMode {

@@ -15,15 +15,18 @@ import { isValidTimeZone } from "@/lib/profile/timezone";
 import { saveBasicsStep } from "./actions";
 import { StepNav, useStepSave } from "./step-nav";
 
-/** A1 · Basics: picture, full name, pronouns, time zone. */
+/** Step 1 · Basics: picture, full name, pronouns, time zone. The one required step. */
 export function BasicsStep({
   user,
   initial,
+  after,
 }: {
   user: UserAvatarUser;
   initial: { name: string; pronouns: string; timezone: string | null };
+  /** Where to go once saved: where sign-up started (a safe callbackUrl), else step 2. */
+  after?: string | null;
 }) {
-  const { pending, errors, saveAndContinue } = useStepSave("basics");
+  const { pending, errors, saveAndContinue } = useStepSave("basics", after);
   const [name, setName] = useState(initial.name);
   const preset = (PRONOUN_CHOICES as readonly string[]).includes(initial.pronouns);
   const [pronouns, setPronouns] = useState(initial.pronouns);

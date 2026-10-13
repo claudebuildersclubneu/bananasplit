@@ -9,7 +9,7 @@ import type { Availability } from "@/lib/availability";
 import { saveAvailabilityStep } from "./actions";
 import { StepNav, useStepSave } from "./step-nav";
 
-/** A5 · When you can't meet. */
+/** Step 4 · When you can't meet. */
 export function AvailabilityStep({ initial }: { initial: Availability }) {
   const { pending, errors, saveAndContinue } = useStepSave("availability");
   const [value, setValue] = useState(initial);

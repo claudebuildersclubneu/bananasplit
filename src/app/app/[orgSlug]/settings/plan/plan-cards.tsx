@@ -8,26 +8,29 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import type { OrgPlan } from "@/generated/prisma/enums";
-import { PLAN_ORDER } from "@/lib/billing/features";
+import type { ClubPlanChoice } from "@/lib/billing/features";
 import { cn } from "@/lib/utils";
 
 import { switchPlan } from "./actions";
 
 export interface PlanCard {
-  plan: OrgPlan;
+  plan: ClubPlanChoice;
   name: string;
   price: string;
   per: string;
   who: string;
-  /** "Includes", "Everything in Free, plus". */
+  /** "Includes", "Everything in Club, plus". */
   intro: string;
   features: string[];
 }
 
+/** A trial is Society: choosing Club from it locks Society's extras too. */
+const rank = (p: OrgPlan) => (p === "CLUB" ? 1 : p === "SOCIETY" || p === "TRIAL" ? 2 : 0);
+
 /**
- * The three plans side by side, the current one marked. The owner gets a
- * switch button on the others (with a confirm that says what changes);
- * everyone else sees who can switch.
+ * Club and Society side by side, the current one marked (neither during
+ * the trial). The owner gets a button on the others (with a confirm that
+ * says what changes); everyone else sees who can choose.
  */
 export function PlanCards({
   orgId,
@@ -42,7 +45,7 @@ export function PlanCards({
 }) {
   const router = useRouter();
   const [confirmEl, confirm] = useConfirm();
-  const rank = (p: OrgPlan) => PLAN_ORDER.indexOf(p);
+  const verb = current === "TRIAL" ? "Choose" : "Switch to";
 
   async function choose(card: PlanCard) {
     const down = rank(card.plan) < rank(current);
@@ -50,11 +53,11 @@ export function PlanCards({
       .filter((c) => rank(c.plan) > rank(card.plan) && rank(c.plan) <= rank(current))
       .flatMap((c) => c.features);
     const ok = await confirm({
-      title: `Switch to ${card.name}?`,
+      title: `${verb} ${card.name}?`,
       description: down
-        ? `These will be locked until you switch back: ${lost.join(", ")}. Nothing is deleted.`
+        ? `These will be locked until you switch: ${lost.join(", ")}. Nothing is deleted.`
         : "It takes effect right away. Billing isn't connected yet, so nothing is charged.",
-      confirmLabel: `Switch to ${card.name}`,
+      confirmLabel: `${verb} ${card.name}`,
       tone: down ? "destructive" : "default",
       run: async () => {
         const result = await switchPlan(orgId, card.plan);
@@ -68,7 +71,7 @@ export function PlanCards({
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {cards.map((card) => {
           const isCurrent = card.plan === current;
           return (
@@ -109,10 +112,10 @@ export function PlanCards({
                     className="w-full"
                     onClick={() => void choose(card)}
                   >
-                    Switch to {card.name}
+                    {verb} {card.name}
                   </Button>
                 ) : (
-                  <p className="text-muted-foreground text-xs">Only the owner can switch plans.</p>
+                  <p className="text-muted-foreground text-xs">Only the owner can choose a plan.</p>
                 )}
               </div>
             </div>

@@ -89,7 +89,7 @@ describe("joinPendingInvitationAction", () => {
     expect(acceptMock).not.toHaveBeenCalled();
   });
 
-  it("accepts and redirects", async () => {
+  it("accepts, then asks for the role in that club", async () => {
     pendingMock.mockResolvedValue([
       {
         id: "inv_1",
@@ -101,7 +101,7 @@ describe("joinPendingInvitationAction", () => {
     ]);
     acceptMock.mockResolvedValue({ ok: true, orgId: "org_1", orgSlug: "org-one" });
     await expect(joinPendingInvitationAction("inv_1")).rejects.toThrow(
-      /NEXT_REDIRECT \/app\/org-one/,
+      /NEXT_REDIRECT \/onboarding\/join\/org-one/,
     );
     expect(acceptMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "inv_1", organizationId: "org_1" }),

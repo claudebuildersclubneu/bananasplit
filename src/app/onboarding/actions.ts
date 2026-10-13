@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { setActiveOrgCookie } from "@/lib/active-org-cookie";
 import { requireUser } from "@/lib/auth/session";
 import { ACCEPT_ERROR_MESSAGES } from "@/lib/invitations";
-import { orgStepHref } from "@/lib/onboarding/steps";
+import { clubRoleHref, orgStepHref } from "@/lib/onboarding/steps";
 import { acceptInvitation, findPendingInvitationsForMe } from "@/server/settings/invitations";
 import { createOrganization, isSlugAvailable } from "@/server/settings/org-creation";
 
@@ -71,5 +71,6 @@ export async function joinPendingInvitationAction(
   if (!result.ok) return { error: ACCEPT_ERROR_MESSAGES[result.reason] };
 
   await setActiveOrgCookie(result.orgId);
-  redirect(`/app/${result.orgSlug}`);
+  // Then the one small club step: "Your role in <club>".
+  redirect(clubRoleHref(result.orgSlug));
 }

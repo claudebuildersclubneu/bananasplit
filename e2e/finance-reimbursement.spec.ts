@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  chooseClubRole,
   createOrgViaOnboarding,
   makeUser,
   signIn,
@@ -41,6 +42,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   await signOut(page);
   await signUpVerified(page, member);
   await page.getByRole("button", { name: "Join", exact: true }).click();
+  await chooseClubRole(page, orgSlug, "Treasurer");
   await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}$`));
 
   // Baseline: nothing owed yet (My reimbursements carries the total).

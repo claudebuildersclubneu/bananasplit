@@ -24,6 +24,7 @@ export default async function DangerZonePage({
     return <SettingsNoAccess title="Danger zone" who="owners" />;
   }
   const orgId = organization.id;
+  const personal = organization.kind === "PERSONAL";
 
   const { exports, members } = await withOrgTx(orgId, async ({ db }) => {
     const exports = await db.orgExport.findMany({
@@ -69,17 +70,25 @@ export default async function DangerZonePage({
         orgSlug={organization.slug}
         exports={exportRows}
         expiryDays={EXPORT_EXPIRY_DAYS}
+        personal={personal}
       />
-      {can({ role }, "workspace.bootstrap") && isPlatformAdmin(await getUserIdentity(user.id)) && (
-        <BootstrapCard
-          orgId={orgId}
-          people={CBC_PEOPLE.map((p) => ({ key: p.key, name: p.name, title: p.title }))}
-          members={memberOptions}
-          suggested={suggested}
-          bootstrappedAt={settings?.bootstrappedAt?.toISOString() ?? null}
-        />
-      )}
-      <DeleteCard orgId={orgId} orgName={organization.name} slug={organization.slug} />
+      {!personal &&
+        can({ role }, "workspace.bootstrap") &&
+        isPlatformAdmin(await getUserIdentity(user.id)) && (
+          <BootstrapCard
+            orgId={orgId}
+            people={CBC_PEOPLE.map((p) => ({ key: p.key, name: p.name, title: p.title }))}
+            members={memberOptions}
+            suggested={suggested}
+            bootstrappedAt={settings?.bootstrappedAt?.toISOString() ?? null}
+          />
+        )}
+      <DeleteCard
+        orgId={orgId}
+        orgName={organization.name}
+        slug={organization.slug}
+        personal={personal}
+      />
     </div>
   );
 }

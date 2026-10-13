@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { signUpAction } from "./actions";
 
 /**
- * One sign-up for everyone; joining or starting a club comes next
- * (/onboarding). `google`: the "Sign up with Google" button and divider,
+ * One sign-up for everyone: name, email, password. "Your profile" comes
+ * next (/onboarding). `google`: the "Sign up with Google" button and divider,
  * above the fields (not once it's sent). `callbackUrl`: where to go once
  * signed up, e.g. back to the invite link someone started from.
  */
@@ -58,7 +58,7 @@ export function SignUpForm({
     <>
       <AuthTitle
         title="Create your account."
-        description="It's free. Next, a quick profile, then join or start your club."
+        description="Free forever for your own tasks, calendar, polls and event pages. Join clubs free."
       />
       {google}
       <form action={formAction} className="flex flex-col gap-[18px]">

@@ -1,41 +1,47 @@
 import type { OrgPlan } from "@/generated/prisma/enums";
 
 /**
- * What each club plan includes: the one place the app asks. The sidebar,
- * the Admin panel and every gated page read planIncludes(), and the pricing
- * table (src/components/marketing/pricing.tsx) promises the same thing, so
- * change both together.
+ * What each priced plan includes (docs/features/personal-and-clubs.md). The
+ * pricing table (src/components/marketing/pricing.tsx) and Admin panel >
+ * Plan read planIncludes(); the app itself asks spaceIncludes()
+ * (src/lib/billing/space.ts), which also knows Personal spaces and trials.
+ * Change the pricing table with this.
  *
- *   FREE     RSVP pages (events, sign-ups, reminders, check-in), a simple
- *            task list, and the Admin panel's basics (general, members and
- *            invitations, the plan, the danger zone).
- *   CLUB     the officer workspace: the overview, every task view, polls,
- *            files, people and the org chart, finance, databases and
- *            reports, and data connections.
+ *   FREE     Personal, every account's own space: RSVP pages, tasks (every
+ *            view, for one person), the calendar and availability polls,
+ *            and its own settings. Never a club's plan.
+ *   CLUB     the club workspace: the overview, Requests and Sunday updates,
+ *            labels, files, people and the org chart, finance, databases
+ *            and reports, and data connections.
  *   SOCIETY  everything, plus themes, AI, sponsorships, website sync and
- *            the audit log.
+ *            the audit log. A club's 30-day trial (TRIAL) is Society.
  *
  * Plans are ordered, so a feature names the cheapest plan that has it.
  */
 
-export const PLAN_ORDER = ["FREE", "CLUB", "SOCIETY"] as const satisfies readonly OrgPlan[];
+/** The plans a price is shown for (TRIAL is a club's first 30 days of Society). */
+export type PricedPlan = Exclude<OrgPlan, "TRIAL">;
+
+export const PLAN_ORDER = ["FREE", "CLUB", "SOCIETY"] as const satisfies readonly PricedPlan[];
 
 export const PLAN_FEATURES = {
   /** Calendar events and their public RSVP pages, check-in and reminders. */
   rsvp: "FREE",
-  /** Tasks, in the List view. */
+  /** Tasks. */
   tasks: "FREE",
-  /** The Admin panel's general settings, members, invitations and plan. */
+  /** Board, Week and Table, and the calendar's Tasks layer. */
+  taskViews: "FREE",
+  /** Availability polls and question polls. */
+  polls: "FREE",
+  /** Settings: general and the danger zone (a club adds members, invitations and its plan). */
   admin: "FREE",
 
-  /** The Overview board of widgets (FREE clubs land on their events). */
+  /** The Overview board of widgets (Personal has its own home). */
   overview: "CLUB",
-  /** Board, Week and Table, the calendar's Tasks layer, Requests, Sunday updates. */
-  taskViews: "CLUB",
+  /** Requests (the intake queue) and Sunday updates: work between people. */
+  teamwork: "CLUB",
   /** Shared task labels (Admin panel > Labels). */
   labels: "CLUB",
-  /** Availability polls and question polls. */
-  polls: "CLUB",
   /** Live notes, documents and uploads. */
   files: "CLUB",
   /** The member directory, profiles and the org chart. */
@@ -63,43 +69,53 @@ export const PLAN_FEATURES = {
   websiteSync: "SOCIETY",
   /** Every settings change: who made it and when. */
   auditLog: "SOCIETY",
-} as const satisfies Record<string, OrgPlan>;
+} as const satisfies Record<string, PricedPlan>;
 
 export type PlanFeature = keyof typeof PLAN_FEATURES;
 
 /** Quantities the pricing table promises (not enforced yet: see the report). */
-export const PLAN_LIMITS: Record<OrgPlan, { storageGb: number; dataConnections: number }> = {
+export const PLAN_LIMITS: Record<PricedPlan, { storageGb: number; dataConnections: number }> = {
   FREE: { storageGb: 0, dataConnections: 0 },
   CLUB: { storageGb: 25, dataConnections: 2 },
   SOCIETY: { storageGb: 100, dataConnections: 6 },
 };
 
 export const PLAN_NAMES: Record<OrgPlan, string> = {
-  FREE: "Free",
+  FREE: "Personal",
+  TRIAL: "Trial",
   CLUB: "Club",
   SOCIETY: "Society",
 };
 
-export function isOrgPlan(value: unknown): value is OrgPlan {
+/** What an owner picks for a club when (or before) its trial ends. */
+export const CLUB_PLAN_CHOICES = ["CLUB", "SOCIETY"] as const satisfies readonly PricedPlan[];
+export type ClubPlanChoice = (typeof CLUB_PLAN_CHOICES)[number];
+
+export function isClubPlanChoice(value: unknown): value is ClubPlanChoice {
+  return typeof value === "string" && (CLUB_PLAN_CHOICES as readonly string[]).includes(value);
+}
+
+/** A priced plan's name (FREE, CLUB or SOCIETY). */
+export function isOrgPlan(value: unknown): value is PricedPlan {
   return typeof value === "string" && (PLAN_ORDER as readonly string[]).includes(value);
 }
 
-function rank(plan: OrgPlan): number {
+function rank(plan: PricedPlan): number {
   return PLAN_ORDER.indexOf(plan);
 }
 
-/** Whether `plan` includes `feature`. */
-export function planIncludes(plan: OrgPlan, feature: PlanFeature): boolean {
+/** Whether `plan` includes `feature` (pricing; the app asks spaceIncludes). */
+export function planIncludes(plan: PricedPlan, feature: PlanFeature): boolean {
   return rank(plan) >= rank(PLAN_FEATURES[feature]);
 }
 
 /** The cheapest plan that includes `feature`. */
-export function planFor(feature: PlanFeature): OrgPlan {
+export function planFor(feature: PlanFeature): PricedPlan {
   return PLAN_FEATURES[feature];
 }
 
 /** Every feature `plan` includes. */
-export function featuresOf(plan: OrgPlan): PlanFeature[] {
+export function featuresOf(plan: PricedPlan): PlanFeature[] {
   return (Object.keys(PLAN_FEATURES) as PlanFeature[]).filter((f) => planIncludes(plan, f));
 }
 
@@ -107,11 +123,12 @@ export function featuresOf(plan: OrgPlan): PlanFeature[] {
 export const FEATURE_LABELS: Record<PlanFeature, string> = {
   rsvp: "RSVP pages",
   tasks: "Tasks",
-  admin: "The Admin panel",
-  overview: "The Overview",
   taskViews: "Board, Week and Table views",
-  labels: "Task labels",
   polls: "Polls",
+  admin: "Settings",
+  overview: "The Overview",
+  teamwork: "Requests and Sunday updates",
+  labels: "Task labels",
   files: "Files",
   people: "People and the org chart",
   finance: "Finance",
@@ -130,13 +147,13 @@ export const FEATURE_LABELS: Record<PlanFeature, string> = {
 /** One line on what the feature does, under the upgrade screen's title. */
 export const FEATURE_PITCH: Record<PlanFeature, string> = {
   rsvp: "Event pages with sign-ups, waitlists, reminders and check-in.",
-  tasks: "A simple list of who is doing what.",
-  admin: "Members, invitations and your club's settings.",
+  tasks: "A list of what needs doing, and by when.",
+  taskViews: "Move work along on a board, plan the week and bulk-edit in a table.",
+  polls: "Find a time that works for everyone, or ask anything.",
+  admin: "Your name, time zone and the rest of your settings.",
   overview: "Each member's home page: their tasks, meetings, pins and recent pages.",
-  taskViews:
-    "Move work along on a board, plan the week, bulk-edit in a table, and run requests and Sunday updates.",
+  teamwork: "Take requests in one queue, and post a weekly update to your team.",
   labels: "A shared label palette for sorting tasks.",
-  polls: "Find a time that works for everyone, or ask the club anything.",
   files: "Live notes, documents and uploads in one place.",
   people: "A member directory with profiles, and an org chart for your officers.",
   finance: "A budget, transactions and reimbursements your treasurer can run.",

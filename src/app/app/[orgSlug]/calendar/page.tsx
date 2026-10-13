@@ -5,7 +5,7 @@ import { EventCalendar, type CalendarItem } from "@/components/calendar/event-ca
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
-import { planIncludes } from "@/lib/billing/features";
+import { spaceIncludes } from "@/lib/billing/space";
 import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
@@ -35,7 +35,7 @@ export default async function CalendarPage({
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
   // The Tasks layer is one of the task views; Google sync a data connection.
-  const tasksLayer = planIncludes(org.plan, "taskViews");
+  const tasksLayer = spaceIncludes(org, "taskViews");
 
   const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
@@ -119,7 +119,7 @@ export default async function CalendarPage({
                 </Link>
               </Button>
             )}
-            {can({ role }, "integrations.view") && planIncludes(org.plan, "integrations") && (
+            {can({ role }, "integrations.view") && spaceIncludes(org, "integrations") && (
               <Button variant="ghost" size="icon-sm" asChild>
                 <Link
                   href={`/app/${orgSlug}/calendar/sync`}

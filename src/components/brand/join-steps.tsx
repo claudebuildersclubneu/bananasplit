@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Your account", "Quick profile", "Join or start a club"] as const;
+const STEPS = ["Your account", "Your profile", "Personal, then your clubs"] as const;
 
 /**
  * The three steps in, under the headline on the sign-up panel: one account
- * for everyone, a quick profile, then joining or starting a club. Numbered 22px dots, the current one ink
+ * for everyone, your profile, then your Personal space, where you join or
+ * start clubs. Numbered 22px dots, the current one ink
  * with a yellow numeral, the rest translucent cream.
  */
 export function JoinSteps({ current }: { current: 1 | 2 | 3 }) {

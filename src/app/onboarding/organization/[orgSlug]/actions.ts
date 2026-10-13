@@ -17,7 +17,7 @@ import {
 import { loadSetupState, skipStep } from "@/server/setup/progress";
 
 /**
- * Org setup (onboarding Flow B, B2-B6) for an OWNER/ADMIN of the new org.
+ * Org setup (onboarding Flow B, B2-B7) for an OWNER/ADMIN of the new org.
  * Each step runs in one withOrgAction transaction as app_user (RLS
  * applies); the services in src/server/onboarding/org-setup.ts check the
  * permissions and validate the input again. A refusal thrown mid-step rolls
@@ -69,7 +69,7 @@ export const saveTeamsStepAction = step(async (ctx, input: unknown) =>
   saveTeamsSetup(ctx, input, await orgTimezone(ctx)),
 );
 
-/** After a step saved: the next step, or the org's home as its admin (B6 -> END). */
+/** After a step saved: the next step, or the org's home as its admin (B7 -> END). */
 export async function goToNextOrgStep(orgSlug: string, current: OrgStep): Promise<void> {
   const next = nextOrgStep(current);
   const slug = /^[a-z0-9-]{1,60}$/.test(orgSlug) ? orgSlug : "";

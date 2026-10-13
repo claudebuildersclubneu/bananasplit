@@ -13,13 +13,25 @@ vi.mock("@/server/db/context", () => ({
     fn({
       db: {
         orgIntegration: { findMany: async () => rows.value },
-        organization: { findUnique: async () => ({ plan: plan.value }) },
+        organization: {
+          findUnique: async () =>
+            plan.value === "FREE"
+              ? { kind: "PERSONAL", plan: "FREE", trialEndsAt: null }
+              : plan.value === "PAUSED"
+                ? { kind: "CLUB", plan: "TRIAL", trialEndsAt: new Date(Date.now() - 1000) }
+                : { kind: "CLUB", plan: plan.value, trialEndsAt: null },
+        },
       },
     }),
 }));
 vi.mock("@/server/secrets", () => ({ getSecret }));
 
-import { listAiConnections, platformModel, resolveAiCredentials, standinEnabled } from "./connections";
+import {
+  listAiConnections,
+  platformModel,
+  resolveAiCredentials,
+  standinEnabled,
+} from "./connections";
 
 const claudeRow = {
   provider: "CLAUDE",
@@ -41,11 +53,13 @@ beforeEach(() => {
 });
 
 describe("which models a club can use", () => {
-  it("offers nothing to a club whose plan doesn't include AI", async () => {
+  it("offers nothing to Personal, a Club plan or a paused club", async () => {
     rows.value = [claudeRow];
-    for (const p of ["FREE", "CLUB"]) {
+    for (const p of ["FREE", "CLUB", "PAUSED"]) {
       plan.value = p;
-      expect(await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" })).toEqual([]);
+      expect(await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" })).toEqual(
+        [],
+      );
       expect(await resolveAiCredentials("org_1", "claude", {})).toBeNull();
     }
     expect(getSecret).not.toHaveBeenCalled();
@@ -62,7 +76,10 @@ describe("which models a club can use", () => {
   });
 
   it("skips a disconnected or keyless integration, and offers nothing when none is set up", async () => {
-    rows.value = [{ ...claudeRow, status: "DISCONNECTED" }, { ...otherRow, secretFingerprint: null }];
+    rows.value = [
+      { ...claudeRow, status: "DISCONNECTED" },
+      { ...otherRow, secretFingerprint: null },
+    ];
     expect(await listAiConnections("org_1", {})).toEqual([]);
     expect(await resolveAiCredentials("org_1", null, {})).toBeNull();
   });
@@ -81,7 +98,12 @@ describe("which models a club can use", () => {
     });
     expect(getSecret).toHaveBeenCalledTimes(1);
     const fallback = await resolveAiCredentials("org_1", "made-up", {});
-    expect(fallback).toMatchObject({ id: "claude", protocol: "anthropic", apiKey: "sk-ant-club", model: "claude-sonnet-5" });
+    expect(fallback).toMatchObject({
+      id: "claude",
+      protocol: "anthropic",
+      apiKey: "sk-ant-club",
+      model: "claude-sonnet-5",
+    });
   });
 });
 
@@ -94,7 +116,9 @@ describe("environment switches", () => {
 
   it("the platform model is a Claude id from the environment, or Sonnet 5", () => {
     expect(platformModel({})).toBe("claude-sonnet-5");
-    expect(platformModel({ AI_IMPORT_MODEL: "claude-haiku-4-5-20251001" })).toBe("claude-haiku-4-5-20251001");
+    expect(platformModel({ AI_IMPORT_MODEL: "claude-haiku-4-5-20251001" })).toBe(
+      "claude-haiku-4-5-20251001",
+    );
     expect(platformModel({ AI_IMPORT_MODEL: "gpt-4o; rm -rf" })).toBe("claude-sonnet-5");
   });
 });

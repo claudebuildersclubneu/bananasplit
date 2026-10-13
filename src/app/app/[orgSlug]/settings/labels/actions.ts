@@ -8,6 +8,10 @@ import { LABEL_COLOR_PALETTE } from "@/lib/label-colors";
 import { writeOrgAuditLog } from "@/server/audit";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+/** Every action here belongs to labels (withOrgAction's space check). */
+const labelsAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "labels" });
+
 /**
  * Settings > Labels, on app_user through withOrgAction. Label RLS is
  * member-level (tasks attach labels), so the palette's admin-only rule is
@@ -28,7 +32,7 @@ function assertCanManageLabels(ctx: OrgContext) {
   }
 }
 
-export const createLabel = withOrgAction(async (ctx, input: unknown) => {
+export const createLabel = labelsAction(async (ctx, input: unknown) => {
   assertCanManageLabels(ctx);
   const parsed = labelSchema.safeParse(input);
   if (!parsed.success) {
@@ -48,7 +52,7 @@ export const createLabel = withOrgAction(async (ctx, input: unknown) => {
   return {};
 });
 
-export const updateLabel = withOrgAction(async (ctx, labelId: string, input: unknown) => {
+export const updateLabel = labelsAction(async (ctx, labelId: string, input: unknown) => {
   assertCanManageLabels(ctx);
   const id = idSchema.parse(labelId);
   const parsed = labelSchema.safeParse(input);
@@ -62,7 +66,7 @@ export const updateLabel = withOrgAction(async (ctx, labelId: string, input: unk
   return {};
 });
 
-export const deleteLabel = withOrgAction(async (ctx, labelId: string) => {
+export const deleteLabel = labelsAction(async (ctx, labelId: string) => {
   assertCanManageLabels(ctx);
   const id = idSchema.parse(labelId);
   await ctx.db.taskLabel.deleteMany({ where: { labelId: id, organizationId: ctx.organizationId } });

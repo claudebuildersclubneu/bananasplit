@@ -1,10 +1,19 @@
 "use client";
 
-import { Check, ChevronsUpDown, KeyRound, LogOut, Plus, ShieldCheck, UserPlus } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  KeyRound,
+  LogOut,
+  Plus,
+  Settings,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 import Link from "next/link";
 import { useTransition, type ReactNode } from "react";
 
-import type { OrgSummary } from "@/components/shell/types";
+import type { OrgSummary, ShellUser } from "@/components/shell/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "@/components/user-avatar";
 import { switchActiveOrg } from "@/app/app/actions";
 
 function initialsOf(name: string): string {
@@ -47,30 +57,54 @@ export function OrgMark({ org, className = "size-6" }: { org: OrgSummary; classN
 }
 
 /**
- * The club menu at the top of the sidebar: the club's logo and name (as its
- * theme says to show them) is the button. It holds what belongs to the club
- * rather than to a page: the Admin panel and invites for owners and admins,
- * leaving for everyone else, and switching, joining or creating a club.
+ * Personal and clubs in one list (docs/features/personal-and-clubs.md):
+ * the user's Personal space first, then their clubs by name.
+ */
+export function orderSpaces(orgs: OrgSummary[]): OrgSummary[] {
+  const personal = orgs.filter((o) => o.kind === "PERSONAL");
+  const clubs = orgs.filter((o) => o.kind !== "PERSONAL");
+  return [...personal, ...clubs];
+}
+
+/**
+ * The menu at the top of the sidebar. Its button is the space you're in:
+ * a club's logo and name (as its theme says to show them), or your picture
+ * and "Personal". It holds what belongs to the space rather than to a page
+ * (the Admin panel and invites for a club's owners and admins, leaving for
+ * everyone else; settings for Personal), and switching: Personal first,
+ * then your clubs, then Join a club and Start a club.
  */
 export function OrgSwitcher({
   orgs,
   activeSlug,
+  user,
   brand,
   isAdmin = false,
   canInvite = false,
 }: {
   orgs: OrgSummary[];
   activeSlug: string;
+  /** The signed-in user: Personal's picture. */
+  user?: ShellUser;
   /** The club's logo and name (OrgBrand); falls back to the mark and name. */
   brand?: ReactNode;
   isAdmin?: boolean;
   canInvite?: boolean;
 }) {
   const [, startTransition] = useTransition();
-  const live = orgs.filter((o) => !o.pendingDeletion);
+  const live = orderSpaces(orgs.filter((o) => !o.pendingDeletion));
   const pending = orgs.filter((o) => o.pendingDeletion);
   const active = live.find((o) => o.slug === activeSlug) ?? live[0] ?? orgs[0];
   const base = `/app/${active.slug}`;
+  const personal = active.kind === "PERSONAL";
+  const mark = (org: OrgSummary, className: string) =>
+    org.kind === "PERSONAL" && user ? (
+      <UserAvatar user={user} size={className === "size-8" ? "md" : "xs"} className="shrink-0" />
+    ) : (
+      <OrgMark org={org} className={className} />
+    );
+  const nameOf = (org: OrgSummary) => (org.kind === "PERSONAL" ? "Personal" : org.name);
+  const clubs = live.filter((o) => o.kind !== "PERSONAL");
 
   return (
     <DropdownMenu>
@@ -78,13 +112,13 @@ export function OrgSwitcher({
         <button
           type="button"
           className="hover:bg-sidebar-accent focus-visible:ring-ring/50 aria-expanded:bg-sidebar-accent -mx-1 flex min-w-0 items-center justify-between gap-2 rounded-lg p-1.5 text-left transition-colors outline-none focus-visible:ring-3"
-          aria-label={`${active.name} menu`}
+          aria-label={`${nameOf(active)} menu`}
         >
           <span className="flex min-w-0 flex-1 items-center gap-2.5">
-            {brand ?? (
+            {(!personal && brand) || (
               <>
-                <OrgMark org={active} className="size-8" />
-                <span className="heading truncate text-[0.95rem]">{active.name}</span>
+                {mark(active, "size-8")}
+                <span className="heading truncate text-[0.95rem]">{nameOf(active)}</span>
               </>
             )}
           </span>
@@ -92,35 +126,60 @@ export function OrgSwitcher({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        {isAdmin ? (
+        {personal ? (
           <DropdownMenuItem asChild>
             <Link href={`${base}/settings`}>
-              <ShieldCheck className="size-4" aria-hidden="true" />
-              Admin panel
+              <Settings className="size-4" aria-hidden="true" />
+              Settings
             </Link>
           </DropdownMenuItem>
-        ) : null}
-        {canInvite ? (
-          <DropdownMenuItem asChild>
-            <Link href={`${base}/settings/members`}>
-              <UserPlus className="size-4" aria-hidden="true" />
-              Invite people
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
-        {!isAdmin ? (
-          <DropdownMenuItem asChild>
-            <Link href={`${base}/settings/members#leave`}>
-              <LogOut className="size-4" aria-hidden="true" />
-              Leave {active.name}
-            </Link>
-          </DropdownMenuItem>
-        ) : null}
+        ) : (
+          <>
+            {isAdmin ? (
+              <DropdownMenuItem asChild>
+                <Link href={`${base}/settings`}>
+                  <ShieldCheck className="size-4" aria-hidden="true" />
+                  Admin panel
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+            {canInvite ? (
+              <DropdownMenuItem asChild>
+                <Link href={`${base}/settings/members`}>
+                  <UserPlus className="size-4" aria-hidden="true" />
+                  Invite people
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+            {!isAdmin ? (
+              <DropdownMenuItem asChild>
+                <Link href={`${base}/settings/members#leave`}>
+                  <LogOut className="size-4" aria-hidden="true" />
+                  Leave {active.name}
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
+          </>
+        )}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-          Your clubs
-        </DropdownMenuLabel>
-        {live.map((org) => (
+        {live
+          .filter((o) => o.kind === "PERSONAL")
+          .map((org) => (
+            <DropdownMenuItem
+              key={org.slug}
+              onSelect={() => startTransition(() => switchActiveOrg(org.slug))}
+            >
+              {mark(org, "size-5")}
+              <span className="flex-1 truncate">Personal</span>
+              {org.slug === active.slug && <Check className="size-4" aria-hidden="true" />}
+            </DropdownMenuItem>
+          ))}
+        {clubs.length > 0 && (
+          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+            Your clubs
+          </DropdownMenuLabel>
+        )}
+        {clubs.map((org) => (
           <DropdownMenuItem
             key={org.slug}
             onSelect={() => startTransition(() => switchActiveOrg(org.slug))}
@@ -140,7 +199,7 @@ export function OrgSwitcher({
               <DropdownMenuItem key={org.slug} asChild>
                 <Link href={`/app/${org.slug}`}>
                   <OrgMark org={org} className="size-5 opacity-50" />
-                  <span className="text-muted-foreground flex-1 truncate">{org.name}</span>
+                  <span className="text-muted-foreground flex-1 truncate">{nameOf(org)}</span>
                 </Link>
               </DropdownMenuItem>
             ))}
@@ -150,13 +209,13 @@ export function OrgSwitcher({
         <DropdownMenuItem asChild>
           <Link href="/onboarding/join">
             <KeyRound className="size-4" aria-hidden="true" />
-            Join with invite code
+            Join a club
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/onboarding/organization">
             <Plus className="size-4" aria-hidden="true" />
-            Create a club
+            Start a club
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

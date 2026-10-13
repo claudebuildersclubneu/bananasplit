@@ -14,9 +14,9 @@ import {
 const ALL = Object.keys(PLAN_FEATURES) as PlanFeature[];
 
 describe("what each plan includes", () => {
-  it("gives a Free club RSVP pages, the task list and the Admin panel, and nothing else", () => {
-    expect(featuresOf("FREE")).toEqual(["rsvp", "tasks", "admin"]);
-    for (const f of ["taskViews", "polls", "files", "finance", "databases", "overview"] as const) {
+  it("gives Free (Personal) RSVP pages, tasks, polls and settings, and nothing for a team", () => {
+    expect(featuresOf("FREE")).toEqual(["rsvp", "tasks", "taskViews", "polls", "admin"]);
+    for (const f of ["teamwork", "files", "people", "finance", "databases", "overview"] as const) {
       expect(planIncludes("FREE", f)).toBe(false);
     }
   });
@@ -24,8 +24,7 @@ describe("what each plan includes", () => {
   it("gives Club the officer workspace but not the Society extras", () => {
     for (const f of [
       "overview",
-      "taskViews",
-      "polls",
+      "teamwork",
       "files",
       "people",
       "finance",
@@ -57,8 +56,9 @@ describe("what each plan includes", () => {
     }
   });
 
-  it("recognises the three plans and nothing else", () => {
+  it("recognises the three priced plans and nothing else", () => {
     expect(["FREE", "CLUB", "SOCIETY"].every(isOrgPlan)).toBe(true);
+    expect(isOrgPlan("TRIAL")).toBe(false);
     expect(isOrgPlan("PRO")).toBe(false);
     expect(isOrgPlan("free")).toBe(false);
     expect(isOrgPlan(undefined)).toBe(false);

@@ -6,16 +6,18 @@ import { JoinSteps } from "@/components/brand/join-steps";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
+import { onboardingHref } from "@/lib/onboarding/steps";
 
 import { SignUpForm } from "./sign-up-form";
 
 export const metadata = { title: "Create your account · Bananasplit" };
 
 /**
- * Sign up: one account for everyone (design: App screens, 02). Next comes
- * a quick profile, then joining or starting a club (/onboarding), unless
- * they came from somewhere specific (?callbackUrl=, e.g. an invite link),
- * where they go back.
+ * Sign up: one account for everyone (design: App screens, 02), free
+ * forever for your own things. Next comes "Your profile" (/onboarding),
+ * then the Personal dashboard, unless they came from somewhere specific
+ * (?callbackUrl=, e.g. an invite link), where step 1 of the profile
+ * returns them. Already signed in: say so, with Continue and Sign out.
  */
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
   const callbackUrl = safeCallbackUrl((await searchParams).callbackUrl);
@@ -49,7 +51,10 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
         google={
           googleEnabled ? (
             <>
-              <BrandGoogleButton label="Sign up with Google" redirectTo={callbackUrl} />
+              <BrandGoogleButton
+                label="Sign up with Google"
+                redirectTo={onboardingHref(callbackUrl)}
+              />
               <OrDivider />
             </>
           ) : null

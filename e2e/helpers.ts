@@ -115,21 +115,36 @@ export async function verifyEmail(page: Page, email: string): Promise<void> {
 }
 
 /**
- * Profile setup (onboarding Flow A): Continue through the six steps with
- * what sign-up already filled in, then A7's choice. "join" lands on
- * /onboarding/join (invite code, and any emailed invites with a Join
- * button); "create" on B1, /onboarding/organization.
+ * "Your profile" (onboarding Flow A, five steps): step 1 with what sign-up
+ * already filled in (it makes the Personal space), then "Finish later" from
+ * step 2, which opens the Personal dashboard; the skipped steps wait there.
+ * Then "join" goes on to /onboarding/join (club code, and any emailed
+ * invites with a Join button), "create" to B1, /onboarding/organization.
  */
 export async function completeProfileSetup(page: Page, next: "join" | "create"): Promise<void> {
-  // A new account fills in the quick profile, then chooses on /onboarding.
-  // The club profile (school, bio, …) is optional and skipped here.
   await page.waitForURL(/\/onboarding\/profile\/basics/);
   await page.getByRole("button", { name: /^Continue$/ }).click();
-  await page.waitForURL(/\/onboarding$/);
+  await page.waitForURL(/\/onboarding\/profile\/school$/);
+  await page.getByRole("button", { name: "Finish later" }).click();
+  // Personal's home (docs/features/personal-and-clubs.md).
+  await page.waitForURL(/\/app\/me-[a-z0-9]+$/);
   await page
-    .getByRole("link", { name: next === "join" ? /Join with a club code/ : /Start a new club/ })
+    .getByRole("main")
+    .getByRole("link", { name: next === "join" ? "Join a club" : "Start a club" })
     .click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
+}
+
+/**
+ * After joining a club (a code, an invite link or an emailed invite): the
+ * one small club step, "Your role in <club>". Picks `role` when given, then
+ * goes into the club.
+ */
+export async function chooseClubRole(page: Page, orgSlug: string, role?: string): Promise<void> {
+  await page.waitForURL(new RegExp(`/onboarding/join/${orgSlug}$`));
+  if (role) await page.getByRole("button", { name: role, exact: true }).click();
+  await page.getByRole("button", { name: /^Go to / }).click();
+  await page.waitForURL(new RegExp(`/app/${orgSlug}$`));
 }
 
 /**
@@ -154,15 +169,9 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Finish setup" }).click();
-  // A new club is on the Free plan, whose home is the invite code (Members).
-  await page.waitForURL(new RegExp(`/app/${slug}(\\?welcome=1|/settings/members)$`));
-  // The flows under test use the whole workspace: switch to Society
-  // (billing isn't connected, so it applies at once).
-  await page.goto(`/app/${slug}/settings/plan`);
-  await page.getByRole("button", { name: "Switch to Society" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Switch to Society" }).click();
-  await page.getByText("Your club is on the Society plan").waitFor();
-  await page.goto(`/app/${slug}?welcome=1`);
+  // A new club starts its 30-day trial with everything (Society), so the
+  // flows under test have the whole club; its home is the Overview.
+  await page.waitForURL(new RegExp(`/app/${slug}(\\?welcome=1)?$`));
   return slug;
 }
 

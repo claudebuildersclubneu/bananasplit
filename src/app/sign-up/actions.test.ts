@@ -139,6 +139,18 @@ describe("signUpAction (0A Fix 4(a,b))", () => {
     errorSpy.mockRestore();
   });
 
+  it("goes through the profile's first step back to where sign-up started", async () => {
+    const data = form("invited@example.edu");
+    data.set("callbackUrl", "/invite/tok_abc");
+    expect(await submit(data)).toEqual({
+      redirectedTo: "/onboarding?callbackUrl=%2Finvite%2Ftok_abc",
+    });
+
+    const offsite = form("offsite@example.edu");
+    offsite.set("callbackUrl", "https://evil.example/");
+    expect(await submit(offsite)).toEqual({ redirectedTo: "/onboarding" });
+  });
+
   it("refuses an address that already has an account, whatever its case", async () => {
     authDbMock.user.findUnique.mockResolvedValue({ id: "existing" });
 

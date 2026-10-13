@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { z } from "zod";
 
-import { Role } from "@/generated/prisma/client";
+import { OrgPlan, Role } from "@/generated/prisma/client";
 import { getUserIdentity } from "@/lib/auth/email-verification";
 import {
   ORG_CREATION_CODE_DAYS,
@@ -12,6 +12,7 @@ import {
   orgCreationPolicy,
 } from "@/lib/auth/org-creation";
 import type { SessionUser } from "@/lib/auth/session";
+import { trialEndsAtFrom } from "@/lib/billing/space";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { isReservedSlug } from "@/lib/slug";
 import { isValidTimeZone } from "@/lib/timezones";
@@ -21,8 +22,10 @@ import { sqlStateOf } from "@/server/db/errors";
 import { ownPreferredTitle } from "@/server/onboarding/title";
 
 /**
- * Creating an organization (onboarding and /app/new) and the platform
- * admins' org-creation codes.
+ * Creating a club (onboarding and /app/new) and the platform admins'
+ * org-creation codes. A club starts on its 30-day trial (plan TRIAL,
+ * trialEndsAt). Personal spaces are made by ensurePersonalSpace
+ * (src/server/personal/space.ts) and never count toward ORG_CREATION_LIMITS.
  *
  * Creation runs on the service path for the creating user,
  * withSystemOrgTx(newOrgId, { userId }), in one transaction: redeem the code
@@ -155,7 +158,18 @@ export async function createOrganization(
         if (rows[0]?.ok !== true)
           return { ok: false as const, error: "That code is invalid, used or expired." };
       }
-      await db.organization.create({ data: { id: orgId, name, slug, timezone } });
+      // Every new club starts its 30-day trial of everything now
+      // (docs/features/personal-and-clubs.md); the database holds it to that.
+      await db.organization.create({
+        data: {
+          id: orgId,
+          name,
+          slug,
+          timezone,
+          plan: OrgPlan.TRIAL,
+          trialEndsAt: trialEndsAtFrom(),
+        },
+      });
       await db.membership.create({
         data: { organizationId: orgId, userId: user.id, role: Role.OWNER, title },
       });

@@ -1,6 +1,7 @@
-import type { OrgPlan, Role } from "@/generated/prisma/enums";
+import type { Role } from "@/generated/prisma/enums";
 import { can, type Permission } from "@/lib/auth/permissions";
-import { planIncludes, type PlanFeature } from "@/lib/billing/features";
+import type { PlanFeature } from "@/lib/billing/features";
+import { spaceIncludes, type SpaceInfo } from "@/lib/billing/space";
 
 /**
  * The Admin panel's navigation (the club's settings; the URL is still
@@ -34,6 +35,10 @@ export interface SettingsSection {
   alsoActiveOn?: string[];
   /** The plan feature the page needs (src/lib/billing/features.ts); none: every plan. */
   feature?: PlanFeature;
+  /** Also in a Personal space's settings (General and the danger zone only). */
+  personal?: boolean;
+  /** The overview card's line in a Personal space, where it differs. */
+  personalDescription?: string;
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -44,11 +49,12 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "Building2",
     group: "Club",
     permission: "settings.view",
+    personal: true,
   },
   {
     label: "Plan",
     segment: "plan",
-    description: "Free, Club or Society: what your club's plan includes.",
+    description: "Your club's trial, and Club or Society: what each includes.",
     icon: "Gem",
     group: "Club",
     permission: "settings.view",
@@ -118,36 +124,48 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   {
     label: "Danger zone",
     segment: "danger",
-    description: "Export all data, or delete the organization.",
+    description: "Export all data, or delete the club.",
+    personalDescription: "Export your data, or delete your Personal space.",
     icon: "TriangleAlert",
     group: "Records",
     permission: "org.delete",
+    personal: true,
   },
 ];
 
-/** The sections `role` may open. */
-export function visibleSettingsSections(role: Role | null): SettingsSection[] {
-  return SETTINGS_SECTIONS.filter((s) => !s.permission || can({ role }, s.permission));
+/**
+ * The sections `role` may open. In a Personal space (`space.kind`), only
+ * those marked `personal`: no members, invitations, plan or team settings.
+ */
+export function visibleSettingsSections(
+  role: Role | null,
+  space?: Pick<SpaceInfo, "kind">,
+): SettingsSection[] {
+  return SETTINGS_SECTIONS.filter(
+    (s) =>
+      (!s.permission || can({ role }, s.permission)) &&
+      (space?.kind !== "PERSONAL" || s.personal === true),
+  );
 }
 
-/** Whether `plan` lacks what `section` needs (no plan given: nothing is locked). */
-export function isSettingsSectionLocked(section: SettingsSection, plan?: OrgPlan): boolean {
-  return Boolean(plan && section.feature && !planIncludes(plan, section.feature));
+/** Whether the space lacks what `section` needs (no space given: nothing is locked). */
+export function isSettingsSectionLocked(section: SettingsSection, space?: SpaceInfo): boolean {
+  return Boolean(space && section.feature && !spaceIncludes(space, section.feature));
 }
 
 export function settingsNavItems(
   orgSlug: string,
   role: Role | null,
-  plan?: OrgPlan,
+  space?: SpaceInfo,
 ): SettingsNavItem[] {
   const base = `/app/${orgSlug}/settings`;
-  return visibleSettingsSections(role).map((s) => ({
+  return visibleSettingsSections(role, space).map((s) => ({
     label: s.label,
     href: `${base}/${s.segment}`,
     icon: s.icon,
     group: s.group,
     alsoActiveOn: s.alsoActiveOn?.map((segment) => `${base}/${segment}`),
-    ...(isSettingsSectionLocked(s, plan) ? { locked: true } : {}),
+    ...(isSettingsSectionLocked(s, space) ? { locked: true } : {}),
   }));
 }
 

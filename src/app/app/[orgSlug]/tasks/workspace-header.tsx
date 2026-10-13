@@ -36,12 +36,15 @@ export function WorkspaceHeader({
   intakeCount,
   showIntake,
   posted,
+  teamwork = true,
 }: {
   /** Open requests waiting in the intake queue. */
   intakeCount: number;
   showIntake: boolean;
   /** Whether the viewer already posted this week's Sunday update. */
   posted: boolean;
+  /** Requests and the Sunday update (not in a Personal space). */
+  teamwork?: boolean;
 }) {
   const { newTask, org } = useTasks();
   const ws = useWorkspace();
@@ -83,7 +86,7 @@ export function WorkspaceHeader({
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back to tasks
             </Button>
-          ) : ws.simple ? null : (
+          ) : ws.simple || !teamwork ? null : (
             <>
               {showIntake && (
                 <DestinationButton

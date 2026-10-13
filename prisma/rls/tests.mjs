@@ -1995,12 +1995,20 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "member_org_id",
         "member_role",
         "membership_history",
+        // "Bring anything in?": moves the caller's Personal items into a club
+        // they run, after checking both.
+        "move_personal_items",
+        // The Personal dashboard's "Your RSVPs": the caller's own sign-ups.
+        "my_rsvp_registrations",
         "org_by_join_code",
         "org_has_members",
         "org_has_other_owner",
         "organization_defaults",
         "organization_slug_guard",
         "pending_invitations_for_me",
+        // A Personal space's one member and no invitations or join code:
+        // a trigger that reads the org past RLS.
+        "personal_space_guard",
         "poll_org_id",
         // Question polls: the counts of an anonymous poll, whose other votes
         // RLS hides from members. Counts only, for the caller's member org.
@@ -2211,12 +2219,18 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       org_has_other_owner: "us",
       org_id: "usa",
       organization_guard: "",
+      // Personal spaces and trials: trigger functions only.
+      organization_space_guard: "",
+      personal_space_guard: "",
+      // "Bring anything in?": the signed-in creator, from their own Personal space.
+      move_personal_items: "u",
       org_settings_guard: "",
       pending_invitations_for_me: "u",
       poll_org_id: "s",
       purge_unverified_users: "a",
       rsvp_page: "s",
       rsvp_ticket: "s",
+      my_rsvp_registrations: "u",
       rsvp_claim_same_event: "",
       rate_limit_hit: "sa",
       secret_delete: "s",

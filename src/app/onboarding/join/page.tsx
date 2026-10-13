@@ -21,10 +21,12 @@ const WHERE = [
 ] as const;
 
 /**
- * A7 · Join, step 2 of 3 (design: App screens, 03): the club's code in six
- * boxes, or an invite emailed to the member's verified address. Both are
- * checked against the club on the server before anyone joins. ?code=
- * pre-fills the boxes (the link an officer shares).
+ * Join a club (design: App screens, 03): the club's code in eight boxes, or
+ * an invite emailed to the member's verified address. Both are checked
+ * against the club on the server, and the club is previewed (name, logo,
+ * members) before anyone joins; then "Your role in <club>"
+ * (./[orgSlug]). ?code= pre-fills the boxes (the link an officer shares).
+ * Joining is always free: no prices or trials here.
  */
 export default async function JoinPage({ searchParams }: PageProps<"/onboarding/join">) {
   const user = await requireUser();
@@ -32,8 +34,13 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
   if (!profile) redirect("/auth/session-ended");
   const { code } = await searchParams;
   const initialCode = typeof code === "string" ? code.slice(0, 20) : "";
-  // Profile setup comes first (the flowchart's "Profile complete?").
-  if (!profile.onboardedAt) redirect("/onboarding/profile/basics");
+  // "Your profile", step 1, comes first; it brings them back here.
+  if (!profile.onboardedAt) {
+    const back = initialCode
+      ? `/onboarding/join?code=${encodeURIComponent(initialCode)}`
+      : "/onboarding/join";
+    redirect(`/onboarding/profile/basics?callbackUrl=${encodeURIComponent(back)}`);
+  }
 
   const invites = profile.emailVerified ? await findPendingInvitationsForMe(user.id) : [];
 
@@ -64,9 +71,9 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
       }
     >
       <AuthTitle
-        eyebrow="Step 2 of 3"
+        eyebrow="Join a club"
         title="Enter your club code."
-        description="Paste it or type it in. We'll find your club as you go."
+        description="Paste it or type it in. You'll see the club before you join."
       />
       {profile.emailVerified ? (
         <JoinForm initialCode={initialCode} />

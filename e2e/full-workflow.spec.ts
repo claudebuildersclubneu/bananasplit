@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  chooseClubRole,
   completeProfileSetup,
   createOrgViaOnboarding,
   dayButtonName,
@@ -53,6 +54,7 @@ test("full workspace workflow", async ({ page }) => {
   await verifyEmail(page, member.email);
   await completeProfileSetup(page, "join");
   await page.getByRole("button", { name: "Join", exact: true }).click();
+  await chooseClubRole(page, orgSlug, "Treasurer");
   await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}$`));
 
   await signOut(page);

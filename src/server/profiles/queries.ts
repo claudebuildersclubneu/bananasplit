@@ -141,8 +141,9 @@ export async function getOwnProfile(userId: string): Promise<OwnProfile | null> 
       },
     });
     if (!user) return null;
+    // Clubs only: the Personal space has no title or role to show.
     const memberships = await db.membership.findMany({
-      where: { userId },
+      where: { userId, organization: { kind: "CLUB" } },
       select: {
         role: true,
         title: true,

@@ -1,12 +1,9 @@
 import {
-  BadgeCheck,
   BookOpen,
-  Building2,
   CalendarX,
   GraduationCap,
-  KeyRound,
   Link2,
-  Palette,
+  NotebookPen,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -15,6 +12,8 @@ import { notFound, redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import {
+  ContinuePill,
+  exitClass,
   PreviewHeader,
   PreviewTile,
   SetupCard,
@@ -22,19 +21,19 @@ import {
   StepFooter,
   StepIntro,
 } from "@/components/onboarding/setup-shell";
-import { ChoiceTileBody, choiceTileClass } from "@/components/onboarding/step-fields";
 import { UserAvatar } from "@/components/user-avatar";
+import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { requireUser } from "@/lib/auth/session";
 import { blockedHoursPerWeek } from "@/lib/availability";
 import {
-  CLUB_PROFILE_STEPS,
+  FIRST_PROFILE_STEP,
   isProfileStep,
-  QUICK_PROFILE_STEP,
+  PROFILE_STEP_TITLES,
+  PROFILE_STEPS,
+  profileStepHref,
   type ProfileStep,
 } from "@/lib/onboarding/steps";
 import { timeZoneLabel } from "@/lib/profile/timezone";
-import { personalPalettes, previewTokens } from "@/lib/theme/personal";
-import { THEME_PRESETS } from "@/lib/theme/presets";
 import { getOnboardingProfile, type OnboardingProfile } from "@/server/onboarding/profile";
 
 import { finishProfileSetup } from "../actions";
@@ -42,96 +41,87 @@ import { AvailabilityStep } from "../availability-step";
 import { BasicsStep } from "../basics-step";
 import { BioStep } from "../bio-step";
 import { SchoolStep } from "../school-step";
-import { ThemeStep } from "../theme-step";
 
 export const dynamic = "force-dynamic";
-
-/** The stepper's short names, in order. */
-const STEP_NAMES: Record<ProfileStep, string> = {
-  basics: "About you",
-  school: "School",
-  bio: "Bio",
-  theme: "Theme",
-  availability: "Availability",
-  review: "Review",
-};
 
 /** Each step's question and the line under it. */
 const META: Record<ProfileStep, { title: string; description: string }> = {
   basics: {
-    title: "Quick profile.",
-    description: "Your name and photo, so people know who you are. That's all for now.",
+    title: "A real profile about you.",
+    description:
+      "Your clubs see it. Start with your name and photo; everything after this step is optional.",
   },
   school: {
     title: "What do you study?",
-    description: "What you study, and what you do in the club.",
+    description: "Your major and when you graduate. Your role in a club is set when you join it.",
   },
   bio: {
     title: "A line about you.",
     description: "And where to find you. The link type is detected from the URL.",
   },
-  theme: {
-    title: "Pick your colours.",
-    description: "Only changes your view. Each theme has a light and a dark set.",
-  },
   availability: {
     title: "When can't you meet?",
-    description: "Mark the hours you can't meet. Teammates only ever see “busy,” never why.",
+    description:
+      "Mark the hours you can't meet, so meetings land when you're free. Clubs only ever see “busy,” never why.",
   },
   review: {
     title: "Everything look right?",
-    description: "You can change any of it later on your profile.",
+    description: "Change any of it later on your profile.",
   },
 };
 
-/** The theme and availability editors need the card's full width. */
-const WIDE: ReadonlySet<ProfileStep> = new Set(["theme", "availability"]);
+/** The availability editor needs the card's full width. */
+const WIDE: ReadonlySet<ProfileStep> = new Set(["availability"]);
 
 /**
- * Profile setup (onboarding Flow A): one step per page, so the flow
- * survives a refresh and the back button, and every step saves as the
- * member presses Continue.
+ * "Your profile" (onboarding Flow A, docs/features/personal-and-clubs.md):
+ * basics -> school -> bio and links -> when you can't meet -> review, one
+ * step per page, so the flow survives a refresh and the back button. Each
+ * step saves as the member presses Continue; every step after the first
+ * has Skip, and "Finish later" goes to the Personal dashboard, which offers
+ * what was skipped. Coming from somewhere specific (?callbackUrl=: an invite
+ * link, a poll, "Start a club"), step 1 returns there.
  */
-export default async function ProfileStepPage({ params }: PageProps<"/onboarding/profile/[step]">) {
+export default async function ProfileStepPage({
+  params,
+  searchParams,
+}: PageProps<"/onboarding/profile/[step]">) {
   const { step } = await params;
+  const after = safeCallbackUrl((await searchParams).callbackUrl);
   if (!isProfileStep(step)) notFound();
   const user = await requireUser();
   const profile = await getOnboardingProfile(user.id);
   if (!profile) redirect("/auth/session-ended");
+  // Step 1 comes first: the later steps are for an account that has one.
+  if (step !== FIRST_PROFILE_STEP && !profile.onboardedAt) {
+    redirect(profileStepHref(FIRST_PROFILE_STEP));
+  }
 
-  // The quick profile is one page in the three steps in; the club profile
-  // is its own five-step run, which saves as it goes and can be left any time.
-  const quick = step === QUICK_PROFILE_STEP;
-  const steps = quick
-    ? ["Your account", "Quick profile", "Join or start a club"]
-    : CLUB_PROFILE_STEPS.map((s) => STEP_NAMES[s]);
-  const index = quick ? 2 : (CLUB_PROFILE_STEPS as readonly ProfileStep[]).indexOf(step) + 1;
-  const total = quick ? 3 : CLUB_PROFILE_STEPS.length;
+  const index = PROFILE_STEPS.indexOf(step) + 1;
   const meta = META[step];
 
   return (
     <SetupShell
-      subject={quick ? "your profile" : "your club profile"}
-      steps={steps}
+      subject="your profile"
+      steps={PROFILE_STEPS.map((s) => PROFILE_STEP_TITLES[s])}
       current={index}
       exit={
-        quick ? (
-          <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
+        profile.onboardedAt ? (
+          <form action={finishProfileSetup}>
+            <button type="submit" className={exitClass}>
+              Finish later
+            </button>
+          </form>
         ) : (
-          <Link
-            href="/onboarding"
-            className="text-ink-muted hover:text-ink text-[14px] font-semibold"
-          >
-            Save and exit
-          </Link>
+          <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
         )
       }
     >
       <SetupCard preview={WIDE.has(step) ? undefined : <ProfilePreview profile={profile} />}>
-        <StepIntro index={index} total={total} title={meta.title}>
+        <StepIntro index={index} total={PROFILE_STEPS.length} title={meta.title}>
           {meta.description}
         </StepIntro>
-        {!profile.emailVerified && quick && (
+        {!profile.emailVerified && step === FIRST_PROFILE_STEP && (
           <div className="mt-4">
             <VerifyEmailNotice
               email={profile.email}
@@ -140,7 +130,7 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
           </div>
         )}
         <div className="mt-[22px] flex flex-1 flex-col">
-          <StepBody step={step} profile={profile} />
+          <StepBody step={step} profile={profile} after={after} />
         </div>
       </SetupCard>
     </SetupShell>
@@ -176,11 +166,6 @@ function ProfilePreview({ profile }: { profile: OnboardingProfile }) {
             {subtitle && <span className="text-ink-soft text-[13px]">{subtitle}</span>}
           </span>
         </div>
-        {profile.preferredTitle && (
-          <span className="bg-oat w-fit rounded-full px-2.5 py-1 text-[12px] font-semibold">
-            {profile.preferredTitle}
-          </span>
-        )}
         {school && <span className="text-ink-muted text-[14px]">{school}</span>}
         {profile.bio && (
           <p className="text-ink-muted m-0 text-[14px] leading-[1.5] whitespace-pre-line">
@@ -200,7 +185,15 @@ function ProfilePreview({ profile }: { profile: OnboardingProfile }) {
   );
 }
 
-function StepBody({ step, profile }: { step: ProfileStep; profile: OnboardingProfile }) {
+function StepBody({
+  step,
+  profile,
+  after,
+}: {
+  step: ProfileStep;
+  profile: OnboardingProfile;
+  after: string | null;
+}) {
   switch (step) {
     case "basics":
       return (
@@ -216,22 +209,13 @@ function StepBody({ step, profile }: { step: ProfileStep; profile: OnboardingPro
             pronouns: profile.pronouns ?? "",
             timezone: profile.timezone,
           }}
+          after={after}
         />
       );
     case "school":
-      return (
-        <SchoolStep
-          initial={{
-            major: profile.major,
-            gradYear: profile.gradYear,
-            preferredTitle: profile.preferredTitle,
-          }}
-        />
-      );
+      return <SchoolStep initial={{ major: profile.major, gradYear: profile.gradYear }} />;
     case "bio":
       return <BioStep initial={{ bio: profile.bio, links: profile.links }} />;
-    case "theme":
-      return <ThemeStep initial={profile.themePreference} />;
     case "availability":
       return <AvailabilityStep initial={profile.availability} />;
     case "review":
@@ -251,47 +235,31 @@ function zoneShort(zone: string | null): string {
   }
 }
 
-/** A6 · Review, then A7's branch: join with an invite code, or create an org. */
+/** Step 5 · Review: what was saved, an Edit on each row, then Done (the Personal dashboard). */
 function Review({ profile }: { profile: OnboardingProfile }) {
-  const theme = profile.themePreference;
-  const palettes = theme ? personalPalettes(theme) : null;
-  const colors =
-    palettes && theme ? previewTokens(palettes, theme.mode === "light" ? "light" : "dark") : null;
-  const themeName = theme
-    ? theme.preset === "custom"
-      ? "Custom"
-      : (THEME_PRESETS.find((p) => p.id === theme.preset)?.name ?? "Default")
-    : "Match my club";
-  const modeName =
-    theme?.mode === "light" ? "Light" : theme?.mode === "dark" ? "Dark" : theme ? "Auto" : null;
   const subtitle = [profile.pronouns, zoneShort(profile.timezone)].filter(Boolean).join(" · ");
-  const home = profile.memberships[0];
   const blocked = blockedHoursPerWeek(profile.availability);
 
   const rows: { icon: LucideIcon; label: string; value: React.ReactNode; edit: ProfileStep }[] = [
     { icon: BookOpen, label: "Major", value: profile.major ?? "—", edit: "school" },
     { icon: GraduationCap, label: "Grad year", value: profile.gradYear ?? "—", edit: "school" },
-    { icon: BadgeCheck, label: "Role", value: profile.preferredTitle ?? "—", edit: "school" },
+    {
+      icon: NotebookPen,
+      label: "Bio",
+      value: profile.bio ? profile.bio : "—",
+      edit: "bio",
+    },
     {
       icon: Link2,
       label: "Links",
       value: profile.links.length === 0 ? "None yet" : `${profile.links.length} added`,
       edit: "bio",
     },
-    { icon: CalendarX, label: "Can't meet", value: `${blocked} hrs a week`, edit: "availability" },
     {
-      icon: Palette,
-      label: "Theme",
-      value: (
-        <span className="inline-flex items-center gap-1.5">
-          {colors && (
-            <span className="size-2.5 rounded-full" style={{ background: colors.primary }} />
-          )}
-          {themeName}
-          {modeName ? ` · ${modeName}` : ""}
-        </span>
-      ),
-      edit: "theme",
+      icon: CalendarX,
+      label: "Can't meet",
+      value: blocked > 0 ? `${blocked} hrs a week` : "Nothing marked",
+      edit: "availability",
     },
   ];
 
@@ -313,7 +281,7 @@ function Review({ profile }: { profile: OnboardingProfile }) {
           {subtitle && <div className="text-muted-foreground text-sm">{subtitle}</div>}
         </div>
         <Link
-          href="/onboarding/profile/basics"
+          href={profileStepHref("basics")}
           className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
         >
           Edit
@@ -327,7 +295,8 @@ function Review({ profile }: { profile: OnboardingProfile }) {
             <dt className="text-muted-foreground w-24 shrink-0">{row.label}</dt>
             <dd className="min-w-0 flex-1 truncate font-medium">{row.value}</dd>
             <Link
-              href={`/onboarding/profile/${row.edit}`}
+              href={profileStepHref(row.edit)}
+              aria-label={`Edit ${row.label.toLowerCase()}`}
               className="text-muted-foreground hover:text-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
             >
               Edit
@@ -336,44 +305,11 @@ function Review({ profile }: { profile: OnboardingProfile }) {
         ))}
       </dl>
 
-      <div className="space-y-2">
-        <span className="text-sm font-medium">What&apos;s next?</span>
-        {home ? (
-          <form action={finishProfileSetup.bind(null, "home")}>
-            <button type="submit" className={choiceTileClass}>
-              <ChoiceTileBody
-                icon={Building2}
-                primary
-                title={`Go to ${home.name}`}
-                detail="You're already a member."
-              />
-            </button>
-          </form>
-        ) : (
-          <>
-            <form action={finishProfileSetup.bind(null, "join")}>
-              <button type="submit" className={choiceTileClass}>
-                <ChoiceTileBody
-                  icon={KeyRound}
-                  primary
-                  title="Join with a club code"
-                  detail="An officer shared a code or a link, or emailed you an invite."
-                />
-              </button>
-            </form>
-            <form action={finishProfileSetup.bind(null, "create")}>
-              <button type="submit" className={choiceTileClass}>
-                <ChoiceTileBody
-                  icon={Building2}
-                  title="Start a new club"
-                  detail="Set up a workspace for your club. You'll be its admin."
-                />
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-      <StepFooter back={{ href: "/onboarding/profile/availability" }}>{null}</StepFooter>
+      <form action={finishProfileSetup} className="contents">
+        <StepFooter back={{ href: profileStepHref("availability") }}>
+          <ContinuePill type="submit">Done</ContinuePill>
+        </StepFooter>
+      </form>
     </div>
   );
 }

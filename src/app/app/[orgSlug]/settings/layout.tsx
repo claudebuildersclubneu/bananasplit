@@ -18,10 +18,7 @@ export default async function SettingsLayout({
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
       <aside className="lg:sticky lg:top-20 lg:self-start">
-        <SettingsSubnav
-          items={settingsNavItems(orgSlug, role, organization.plan)}
-          orgSlug={orgSlug}
-        />
+        <SettingsSubnav items={settingsNavItems(orgSlug, role, organization)} orgSlug={orgSlug} />
       </aside>
       <div className="min-w-0">{children}</div>
     </div>

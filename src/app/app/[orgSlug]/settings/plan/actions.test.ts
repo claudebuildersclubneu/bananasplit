@@ -8,7 +8,7 @@ const { fake, resetFake } = await import("@/test/fake-context");
 const { ForbiddenError } = await import("@/lib/auth/errors");
 const { switchPlan } = await import("./actions");
 
-let plan = "FREE";
+let plan = "TRIAL";
 
 function makeDb() {
   return {
@@ -29,7 +29,7 @@ const auditCalls = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  plan = "FREE";
+  plan = "TRIAL";
   resetFake({ role: "OWNER", db: makeDb() });
 });
 
@@ -53,7 +53,7 @@ describe("Admin panel > Plan", () => {
     expect(call).toBeDefined();
     const values = call!.slice(1);
     expect(values).toContain("org.plan_changed");
-    expect(values).toContain(JSON.stringify({ from: "FREE", to: "CLUB", source: "owner" }));
+    expect(values).toContain(JSON.stringify({ from: "TRIAL", to: "CLUB", source: "owner" }));
   });
 
   it("does nothing for the plan the club is already on", async () => {
@@ -63,9 +63,10 @@ describe("Admin panel > Plan", () => {
     expect(auditCalls()).toHaveLength(0);
   });
 
-  it("refuses anything that isn't a plan", async () => {
-    expect((await switchPlan("org_1", "PLATINUM")).error).toMatch(/Choose a plan/);
-    expect((await switchPlan("org_1", "club")).error).toMatch(/Choose a plan/);
+  it("refuses anything but Club or Society: no Free club, no new trial", async () => {
+    for (const p of ["PLATINUM", "club", "FREE", "TRIAL"]) {
+      expect((await switchPlan("org_1", p)).error).toMatch(/Choose Club or Society/);
+    }
     expect(fake.db.organization.update).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ import { basicsSchema, bioSchema, schoolSchema } from "@/lib/onboarding/steps";
 import { profileFieldErrors } from "@/lib/profile/schema";
 import { personalThemeSchema } from "@/lib/theme/personal";
 import { markProfileSetupComplete, updateOwnOnboardingFields } from "@/server/onboarding/profile";
+import { ensurePersonalSpace, personalHomeHref } from "@/server/personal/space";
 import { updateOwnProfile } from "@/server/profiles/service";
 
 /**
@@ -34,8 +35,9 @@ async function save(run: () => Promise<void>, where: string): Promise<StepSaveRe
 }
 
 /**
- * A1, the quick profile: name, pronouns, time zone (the photo saves on its
- * own). Saving it completes onboarding; the club profile is separate.
+ * Step 1, the one required step: name, pronouns, time zone (the photo saves
+ * on its own). Saving it completes onboarding and makes the Personal space
+ * (docs/features/personal-and-clubs.md); the rest can be skipped.
  */
 export async function saveBasicsStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
@@ -44,22 +46,19 @@ export async function saveBasicsStep(input: unknown): Promise<StepSaveResult> {
   return save(async () => {
     await updateOwnProfile(user.id, parsed.data);
     await markProfileSetupComplete(user.id);
+    await ensurePersonalSpace(user.id);
   }, "basics");
 }
 
-/** A2: major, graduation year, role (the title the user joins orgs with). */
+/** Step 2: major and graduation year (the club role is per club, set on joining). */
 export async function saveSchoolStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
   const parsed = schoolSchema.safeParse(input);
   if (!parsed.success) return { ok: false, fieldErrors: profileFieldErrors(parsed.error) };
-  const { preferredTitle, ...profile } = parsed.data;
-  return save(async () => {
-    await updateOwnProfile(user.id, profile);
-    await updateOwnOnboardingFields(user.id, { preferredTitle });
-  }, "school");
+  return save(() => updateOwnProfile(user.id, parsed.data), "school");
 }
 
-/** A3: bio and links. */
+/** Step 3: bio and links. */
 export async function saveBioStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
   const parsed = bioSchema.safeParse(input);
@@ -67,7 +66,7 @@ export async function saveBioStep(input: unknown): Promise<StepSaveResult> {
   return save(() => updateOwnProfile(user.id, parsed.data), "bio");
 }
 
-/** A4 (and the profile page): the personal theme, or null to follow the org. */
+/** The profile page and theme settings: the personal theme, or null to follow the club. */
 export async function saveThemeStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
   if (input === null)
@@ -77,7 +76,7 @@ export async function saveThemeStep(input: unknown): Promise<StepSaveResult> {
   return save(() => updateOwnOnboardingFields(user.id, { themePreference: parsed.data }), "theme");
 }
 
-/** A5 (and the profile page): blocked hours and rules. */
+/** Step 4 (and the profile page): blocked hours and rules. */
 export async function saveAvailabilityStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
   const parsed = availabilitySchema.safeParse(input);
@@ -88,15 +87,12 @@ export async function saveAvailabilityStep(input: unknown): Promise<StepSaveResu
   );
 }
 
-const FINISH_TARGETS = {
-  join: "/onboarding/join",
-  create: "/onboarding/organization",
-  home: "/app",
-} as const;
-
-/** A6 -> A7: the profile is complete; go join, create, or home. */
-export async function finishProfileSetup(next: keyof typeof FINISH_TARGETS): Promise<void> {
+/**
+ * The end of the flow (Done on review, or "Finish later" anywhere after
+ * step 1): the Personal dashboard, which offers whatever was skipped.
+ */
+export async function finishProfileSetup(): Promise<void> {
   const user = await requireUser();
   await markProfileSetupComplete(user.id);
-  redirect(FINISH_TARGETS[next] ?? "/onboarding");
+  redirect(await personalHomeHref(user.id));
 }

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -48,6 +50,8 @@ export default async function MembersPage({
 }: PageProps<"/app/[orgSlug]/settings/members">) {
   const { orgSlug } = await params;
   const { organization, role, user, settings } = await getOrgContextBySlug(orgSlug);
+  // A Personal space has one member and no invitations or join code.
+  if (organization.kind === "PERSONAL") redirect(`/app/${organization.slug}/settings`);
   const orgId = organization.id;
   const canManage = can({ role }, "members.changeRole");
   const canInvite = can({ role }, "members.invite");
@@ -132,8 +136,8 @@ export default async function MembersPage({
               Invite code
             </h2>
             <p className="text-muted-foreground text-xs">
-              Share it with your members instead of emailing each one. They enter it after setting up their profile,
-              and see {organization.name}&apos;s name before they join.
+              Share it with your members instead of emailing each one. They enter it after setting
+              up their profile, and see {organization.name}&apos;s name before they join.
             </p>
           </div>
           <JoinCodeCard

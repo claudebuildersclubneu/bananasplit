@@ -12,9 +12,17 @@ import { ConflictError } from "./errors";
  * side (policies, set_context, fail-closed roles) is proven by pnpm test:rls.
  */
 
+interface FakeSpace {
+  kind: string;
+  plan: string;
+  trialEndsAt: Date | null;
+}
+
 interface FakeClient {
   log: string[];
   role: (user: string, org: string) => string | null;
+  /** The org row withOrgAction's space check reads. */
+  space: FakeSpace;
   failStarts: number;
   $transaction: ReturnType<typeof vi.fn>;
 }
@@ -24,42 +32,58 @@ const { makeClient, requireUserMock } = vi.hoisted(() => {
     const c: FakeClient = {
       log: [],
       role: () => "MEMBER",
+      space: { kind: "CLUB", plan: "SOCIETY", trialEndsAt: null },
       failStarts: 0,
       $transaction: vi.fn(),
     };
-    c.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>, opts: unknown) => {
-      if (c.failStarts > 0) {
-        c.failStarts--;
-        throw Object.assign(new Error("Unable to start a transaction in the given time."), { code: "P2028" });
-      }
-      c.log.push(`${name}:BEGIN ${JSON.stringify(opts)}`);
-      const tx = {
-        name,
-        $queryRaw: vi.fn(async (_strings: TemplateStringsArray, user: string, org: string) => {
-          c.log.push(`${name}:set_context(${user},${org})`);
-          return [{ role: c.role(user, org) }];
-        }),
-      };
-      try {
-        const result = await fn(tx);
-        c.log.push(`${name}:COMMIT`);
-        return result;
-      } catch (error) {
-        c.log.push(`${name}:ROLLBACK`);
-        throw error;
-      }
-    });
+    c.$transaction.mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>, opts: unknown) => {
+        if (c.failStarts > 0) {
+          c.failStarts--;
+          throw Object.assign(new Error("Unable to start a transaction in the given time."), {
+            code: "P2028",
+          });
+        }
+        c.log.push(`${name}:BEGIN ${JSON.stringify(opts)}`);
+        const tx = {
+          name,
+          $queryRaw: vi.fn(async (_strings: TemplateStringsArray, user: string, org: string) => {
+            c.log.push(`${name}:set_context(${user},${org})`);
+            return [{ role: c.role(user, org) }];
+          }),
+          organization: { findUnique: vi.fn(async () => c.space) },
+        };
+        try {
+          const result = await fn(tx);
+          c.log.push(`${name}:COMMIT`);
+          return result;
+        } catch (error) {
+          c.log.push(`${name}:ROLLBACK`);
+          throw error;
+        }
+      },
+    );
     return c;
   };
   return { makeClient, requireUserMock: vi.fn() };
 });
 
-const { app, service } = vi.hoisted(() => ({ app: makeClient("app"), service: makeClient("service") }));
+const { app, service } = vi.hoisted(() => ({
+  app: makeClient("app"),
+  service: makeClient("service"),
+}));
 
 vi.mock("./clients", () => ({ appDb: app, serviceDb: service }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock }));
 
-import { currentTx, withOrgAction, withOrgTx, withSystemOrgTx, withUserTx } from "./context";
+import {
+  currentTx,
+  SpaceRefusedError,
+  withOrgAction,
+  withOrgTx,
+  withSystemOrgTx,
+  withUserTx,
+} from "./context";
 
 const user = { id: "u1", email: "u1@example.edu", name: "U One" };
 
@@ -67,11 +91,71 @@ beforeEach(() => {
   for (const c of [app, service]) {
     c.log.length = 0;
     c.role = () => "MEMBER";
+    c.space = { kind: "CLUB", plan: "SOCIETY", trialEndsAt: null };
     c.failStarts = 0;
     c.$transaction.mockClear();
   }
   requireUserMock.mockReset();
   requireUserMock.mockResolvedValue(user);
+});
+
+describe("withOrgAction: the space check", () => {
+  const PAUSED = { kind: "CLUB", plan: "TRIAL", trialEndsAt: new Date(Date.now() - 60_000) };
+  const PERSONAL = { kind: "PERSONAL", plan: "FREE", trialEndsAt: null };
+
+  it("refuses a write in a paused club, before the handler, with a message for people", async () => {
+    app.space = PAUSED;
+    const handler = vi.fn();
+    const refused = withOrgAction(handler)("org1");
+    await expect(refused).rejects.toBeInstanceOf(SpaceRefusedError);
+    await expect(withOrgAction(handler)("org1")).rejects.toThrow(/paused/);
+    expect(handler).not.toHaveBeenCalled();
+    expect(app.log.at(-1)).toBe("app:ROLLBACK");
+  });
+
+  it("runs reads and the plan choice in a paused club (whenPaused: allow)", async () => {
+    app.space = PAUSED;
+    await expect(withOrgAction(async () => "read", { whenPaused: "allow" })("org1")).resolves.toBe(
+      "read",
+    );
+  });
+
+  it("runs writes during a trial and on a paid plan", async () => {
+    app.space = { kind: "CLUB", plan: "TRIAL", trialEndsAt: new Date(Date.now() + 60_000) };
+    await expect(withOrgAction(async () => "ok")("org1")).resolves.toBe("ok");
+    app.space = { kind: "CLUB", plan: "CLUB", trialEndsAt: null };
+    await expect(withOrgAction(async () => "ok")("org1")).resolves.toBe("ok");
+  });
+
+  it("refuses an action of a feature the space lacks, even a read", async () => {
+    app.space = PERSONAL;
+    const handler = vi.fn();
+    await expect(
+      withOrgAction(handler, { feature: "finance", whenPaused: "allow" })("org1"),
+    ).rejects.toThrow("Finance is for clubs. Start a club or join one to use it.");
+    app.space = { kind: "CLUB", plan: "CLUB", trialEndsAt: null };
+    await expect(withOrgAction(handler, { feature: "sponsorships" })("org1")).rejects.toThrow(
+      /isn't on this club's plan/,
+    );
+    expect(handler).not.toHaveBeenCalled();
+    await expect(withOrgAction(async () => "ok", { feature: "finance" })("org1")).resolves.toBe(
+      "ok",
+    );
+  });
+
+  it("hands back the refusal as an { error } result with onRefused: return", async () => {
+    app.space = PAUSED;
+    await expect(withOrgAction(vi.fn(), { onRefused: "return" })("org1")).resolves.toMatchObject({
+      ok: false,
+      refused: "paused",
+      error: expect.stringContaining("paused"),
+    });
+  });
+
+  it("lets Personal write its own things", async () => {
+    app.space = PERSONAL;
+    await expect(withOrgAction(async () => "ok", { feature: "tasks" })("org1")).resolves.toBe("ok");
+  });
 });
 
 describe("withOrgAction", () => {
@@ -138,13 +222,18 @@ describe("withOrgAction", () => {
   });
 
   it("commits a returned { error }", async () => {
-    await expect(withOrgAction(async () => ({ error: "nope" }))("org1")).resolves.toEqual({ error: "nope" });
+    await expect(withOrgAction(async () => ({ error: "nope" }))("org1")).resolves.toEqual({
+      error: "nope",
+    });
     expect(app.log.at(-1)).toBe("app:COMMIT");
   });
 
   it("maps database errors that escape the handler to generic AppErrors", async () => {
     const action = withOrgAction(async () => {
-      throw Object.assign(new Error('duplicate key value violates unique constraint "Label_pkey"'), { code: "23505" });
+      throw Object.assign(
+        new Error('duplicate key value violates unique constraint "Label_pkey"'),
+        { code: "23505" },
+      );
     });
     const error = await action("org1").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConflictError);
@@ -189,11 +278,9 @@ describe("withOrgTx and withUserTx", () => {
 
   it("withUserTx sets the user with no org and does not require membership", async () => {
     app.role = () => null;
-    await expect(withUserTx("u9", async (ctx) => [ctx.userId, ctx.organizationId, ctx.role])).resolves.toEqual([
-      "u9",
-      null,
-      null,
-    ]);
+    await expect(
+      withUserTx("u9", async (ctx) => [ctx.userId, ctx.organizationId, ctx.role]),
+    ).resolves.toEqual(["u9", null, null]);
     expect(app.log).toContain("app:set_context(u9,)");
   });
 });
@@ -201,10 +288,9 @@ describe("withOrgTx and withUserTx", () => {
 describe("withSystemOrgTx", () => {
   it("accepts (orgId, fn) and (orgId, options, fn)", async () => {
     service.role = () => null;
-    await expect(withSystemOrgTx("org1", async (ctx) => [ctx.organizationId, ctx.userId])).resolves.toEqual([
-      "org1",
-      null,
-    ]);
+    await expect(
+      withSystemOrgTx("org1", async (ctx) => [ctx.organizationId, ctx.userId]),
+    ).resolves.toEqual(["org1", null]);
     await expect(
       withSystemOrgTx("org2", { userId: "u5" }, async (ctx) => [ctx.organizationId, ctx.userId]),
     ).resolves.toEqual(["org2", "u5"]);

@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import {
   Prisma,
+  type OrgKind,
   type OrgPlan,
   type OrgSettings,
   type OrgTheme,
@@ -13,9 +14,11 @@ import {
 } from "@/generated/prisma/client";
 import { NotFoundError } from "@/lib/auth/errors";
 import { requireUser, type SessionUser } from "@/lib/auth/session";
+import type { PlanFeature } from "@/lib/billing/features";
+import { spaceRefusal, type SpaceRefusal } from "@/lib/billing/space";
 
 import { appDb, serviceDb } from "./clients";
-import { mapDbError } from "./errors";
+import { AppError, mapDbError } from "./errors";
 
 /**
  * Transaction wrappers: the only way request code, jobs and crons reach
@@ -258,6 +261,66 @@ async function runInTx<T>(opts: RunOptions, fn: (ctx: TxContext) => Promise<T>):
 }
 
 /**
+ * What a space must allow before an action runs (src/lib/billing/space.ts).
+ * - feature: the action belongs to it (finance, databases, files, people,
+ *   ...); a space without it refuses the action, so a typed request can't
+ *   reach a locked feature any more than a page can.
+ * - whenPaused: "refuse" (the default) for anything that creates or changes
+ *   club content; "allow" for reads, choosing a plan, leaving, deleting and
+ *   the member's own things (pins), which a paused club still lets through.
+ * - onRefused: "throw" (the default) throws SpaceRefusedError, an AppError
+ *   whose message is meant for the person (the actions' error mappers turn
+ *   it into `{ error }`); "return" hands back a SpaceRefusal instead of
+ *   running the handler, for actions whose results are `{ error }` shapes.
+ */
+export interface OrgActionOptions {
+  feature?: PlanFeature;
+  whenPaused?: "refuse" | "allow";
+  onRefused?: "return" | "throw";
+}
+
+/** An action the space refused (withOrgAction, onRefused "throw"). */
+export class SpaceRefusedError extends AppError {
+  readonly refusal: SpaceRefusal;
+
+  constructor(refusal: SpaceRefusal) {
+    super(refusal.error, 403, refusal.refused === "paused" ? "SPACE_PAUSED" : "SPACE_FEATURE");
+    this.name = "SpaceRefusedError";
+    this.refusal = refusal;
+  }
+}
+
+/** The space checks of withOrgAction, in its transaction (one indexed read). */
+async function checkSpace(
+  db: TxClient,
+  organizationId: string,
+  options: OrgActionOptions,
+): Promise<SpaceRefusal | null> {
+  const space = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { kind: true, plan: true, trialEndsAt: true },
+  });
+  if (!space) return null;
+  const refusal = spaceRefusal(space, options);
+  if (refusal && options.onRefused !== "return") throw new SpaceRefusedError(refusal);
+  return refusal;
+}
+
+/**
+ * The same space check for actions that can't run in withOrgAction (they
+ * talk to the network between reads, like Settings > Integrations): null
+ * when `options` allow the action in the org, else the refusal to return.
+ */
+export async function orgSpaceRefusal(
+  organizationId: string,
+  options: Omit<OrgActionOptions, "onRefused">,
+): Promise<SpaceRefusal | null> {
+  return withOrgTx(organizationId, ({ db }) =>
+    checkSpace(db, organizationId, { ...options, onRefused: "return" }),
+  );
+}
+
+/**
  * Wraps a Server Action. Signature `(organizationId, ...args)`: the session
  * user must be a member of the org
  * (checked by the database in the set_context round trip; a non-member gets
@@ -267,9 +330,15 @@ async function runInTx<T>(opts: RunOptions, fn: (ctx: TxContext) => Promise<T>):
  *     await ctx.db.thing.create({ data: { organizationId: ctx.organizationId, ... } });
  *     ctx.afterCommit(() => invalidate([tags.things(ctx.organizationId)]));
  *   });
+ *
+ * Before the handler it asks the space (OrgActionOptions): a paused club
+ * refuses writes, and an action of a feature the space lacks is refused
+ * (SpaceRefusedError, or with onRefused "return" a SpaceRefusal in place of
+ * the handler's result: only for handlers whose results are `{ error }`).
  */
 export function withOrgAction<Args extends unknown[], Result>(
   handler: (ctx: OrgContext, ...args: Args) => Promise<Result>,
+  options: OrgActionOptions = {},
 ): (organizationId: string, ...args: Args) => Promise<Result> {
   return async (organizationId, ...args) => {
     const user = await requireUser();
@@ -282,8 +351,14 @@ export function withOrgAction<Args extends unknown[], Result>(
         requireMember: true,
         retryOnStartFailure: false,
       },
-      (ctx) =>
-        handler({ ...ctx, user, userId: user.id, organizationId, role: ctx.role as Role }, ...args),
+      async (ctx) => {
+        const refusal = await checkSpace(ctx.db, organizationId, options);
+        if (refusal) return refusal as Result;
+        return handler(
+          { ...ctx, user, userId: user.id, organizationId, role: ctx.role as Role },
+          ...args,
+        );
+      },
     );
   };
 }
@@ -406,6 +481,8 @@ export interface MembershipSummary {
   organizationId: string;
   name: string;
   slug: string;
+  /** PERSONAL: the user's Personal space (listed first, as "Personal"). */
+  kind: OrgKind;
   role: Role;
   /** Organization.logo ({ key, s64, s256, s512 }), for the org switcher. */
   logo: Prisma.JsonValue | null;
@@ -420,8 +497,12 @@ export interface OrgContextBySlug {
     timezone: string;
     logo: Prisma.JsonValue | null;
     activeOrgChartVersionId: string | null;
-    /** What the club pays for (src/lib/billing/features.ts). */
+    /** CLUB or PERSONAL (the user's own space). */
+    kind: OrgKind;
+    /** What the space includes (src/lib/billing/space.ts: spaceIncludes). */
     plan: OrgPlan;
+    /** TRIAL: when the trial ends (after it, the club is paused). */
+    trialEndsAt: Date | null;
   };
   role: Role;
   /** Every live org the user belongs to, by name. */
@@ -464,7 +545,9 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
           timezone: true,
           logo: true,
           activeOrgChartVersionId: true,
+          kind: true,
           plan: true,
+          trialEndsAt: true,
         },
       });
       const memberships = await db.membership.findMany({
@@ -472,7 +555,14 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
         select: {
           role: true,
           organization: {
-            select: { id: true, name: true, slug: true, deletedAt: true, logo: true },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              deletedAt: true,
+              logo: true,
+              kind: true,
+            },
           },
         },
         orderBy: { organization: { name: "asc" } },
@@ -487,6 +577,7 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
         organizationId: m.organization.id,
         name: m.organization.name,
         slug: m.organization.slug,
+        kind: m.organization.kind,
         role: m.role,
         logo: m.organization.logo,
       });

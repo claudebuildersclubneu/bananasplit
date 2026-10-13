@@ -3,11 +3,15 @@ import { SectionTitle } from "./section-title";
 const FAQS = [
   {
     q: "Do I need a club to make RSVP pages?",
-    a: "Yes, and it's free. RSVP pages are part of every club, the Free plan included: sign-ups, waitlists, QR check-in and invite links. Sign up, start your club (even if it's just you for now), and make your first page.",
+    a: "No. Every account comes with Personal, free: RSVP pages with sign-ups, waitlists, QR check-in and invite links, plus your own tasks, calendar and availability polls. Start a club when you want to run things with others.",
+  },
+  {
+    q: "Does it cost anything to join a club?",
+    a: "No. Joining members never pay. A club pays for its plan, and every new club gets a 30-day free trial of everything, no card needed.",
   },
   {
     q: "Who counts as a member?",
-    a: "Anyone who joins your club workspace during the semester. Guests who only RSVP to events, and alumni you keep in the org chart, are free.",
+    a: "Anyone who joins your club during the semester. Guests who only RSVP to events, and alumni you keep in the org chart, are free.",
   },
   {
     q: "Can one person be in several clubs?",
