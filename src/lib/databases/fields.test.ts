@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  choicesFromValues,
+  choicesVersion,
   convertValue,
   displayText,
   inferFieldType,
@@ -84,6 +86,88 @@ describe("type changes and display", () => {
     expect(convertValue(field("TEXT"), field("CHECKBOX"), "yes")).toBe(true);
   });
 
+  const status = [
+    { id: "k3j9x0aa1b", label: "Paid", color: "green" as const },
+    { id: "p0q8r7s6t5", label: "Unpaid", color: "red" as const },
+    { id: "z1y2x3w4v5", label: "12", color: "gray" as const },
+  ];
+  const people = new Map([
+    ["u_maya", "Maya Patel"],
+    ["u_jay", "Jay Thompson"],
+  ]);
+
+  it("turns choices into their labels, never their ids", () => {
+    const select = field("SELECT", { choices: status });
+    const multi = field("MULTI_SELECT", { choices: status });
+    expect(convertValue(select, field("TEXT"), "k3j9x0aa1b", people)).toBe("Paid");
+    expect(convertValue(select, field("LONG_TEXT"), "p0q8r7s6t5", people)).toBe("Unpaid");
+    expect(convertValue(multi, field("TEXT"), ["k3j9x0aa1b", "p0q8r7s6t5"], people)).toBe(
+      "Paid, Unpaid",
+    );
+    expect(convertValue(select, field("NUMBER"), "z1y2x3w4v5", people)).toBe(12);
+    expect(convertValue(select, field("NUMBER"), "k3j9x0aa1b", people)).toBeNull();
+    expect(convertValue(select, field("EMAIL"), "k3j9x0aa1b", people)).toBeNull();
+  });
+
+  it("keeps the choice between single and multi-select", () => {
+    const select = field("SELECT", { choices: status });
+    const multi = field("MULTI_SELECT", { choices: status });
+    expect(convertValue(select, multi, "k3j9x0aa1b", people)).toEqual(["k3j9x0aa1b"]);
+    expect(convertValue(multi, select, ["p0q8r7s6t5"], people)).toBe("p0q8r7s6t5");
+    // Two choices don't fit one: cleared.
+    expect(convertValue(multi, select, ["k3j9x0aa1b", "p0q8r7s6t5"], people)).toBeNull();
+  });
+
+  it("turns members into their names, never their user ids", () => {
+    expect(convertValue(field("MEMBER"), field("TEXT"), "u_maya", people)).toBe("Maya Patel");
+    expect(convertValue(field("MEMBER"), field("LONG_TEXT"), "u_jay", people)).toBe("Jay Thompson");
+    // Someone who has left the club has no name to keep.
+    expect(convertValue(field("MEMBER"), field("TEXT"), "u_gone", people)).toBeNull();
+    // A member field only takes people in the club.
+    expect(convertValue(field("TEXT"), field("MEMBER"), "u_maya", people)).toBe("u_maya");
+    expect(convertValue(field("TEXT"), field("MEMBER"), "u_gone", people)).toBeNull();
+  });
+
+  it("makes choices from a column's values: most used first in, long ones left out", () => {
+    const values = [
+      ...Array.from({ length: 101 }, (_, i) => `Value ${i}`),
+      "Value 100",
+      "value 100",
+      "x".repeat(81),
+    ];
+    const choices = choicesFromValues(field("TEXT"), "SELECT", values, new Map());
+    expect(choices).toHaveLength(100);
+    // "Value 100" is used three times (case aside), so it keeps a choice;
+    // one of the values used once doesn't, and the 81-character one never does.
+    expect(choices.map((c) => c.label)).toContain("Value 100");
+    expect(choices.map((c) => c.label)).not.toContain("Value 99");
+    expect(choices.some((c) => c.label.length > 80)).toBe(false);
+    expect(new Set(choices.map((c) => c.id)).size).toBe(100);
+  });
+
+  it("makes choices from what other types show", () => {
+    const labels = (from: Parameters<typeof choicesFromValues>[0], values: unknown[]) =>
+      choicesFromValues(from, "MULTI_SELECT", values, people).map((c) => c.label);
+    expect(labels(field("MEMBER"), ["u_maya", "u_jay", "u_maya"])).toEqual([
+      "Maya Patel",
+      "Jay Thompson",
+    ]);
+    expect(labels(field("CHECKBOX"), [true, true])).toEqual(["Yes"]);
+    expect(labels(field("CURRENCY"), [15.5])).toEqual(["$15.50"]);
+    expect(labels(field("TEXT"), ["Red; Blue", "blue,Green"])).toEqual(["Red", "Blue", "Green"]);
+  });
+
+  it("fingerprints a choice list, so a save from a stale copy can be refused", () => {
+    const v = choicesVersion(status);
+    expect(choicesVersion(status.map((c) => ({ ...c })))).toBe(v);
+    expect(choicesVersion(status.slice(0, 2))).not.toBe(v);
+    expect(choicesVersion([{ ...status[0]!, label: "Paid in full" }, ...status.slice(1)])).not.toBe(
+      v,
+    );
+    expect(choicesVersion([{ ...status[0]!, color: "blue" }, ...status.slice(1)])).not.toBe(v);
+    expect(choicesVersion(undefined)).toBe(choicesVersion([]));
+  });
+
   it("shows values as plain text for search and CSV", () => {
     const choices = [{ id: "m", label: "Medium", color: "blue" as const }];
     expect(displayText(field("SELECT", { choices }), "m", new Map())).toBe("Medium");
@@ -106,6 +190,33 @@ describe("guessing a spreadsheet column's type", () => {
     expect(inferFieldType(["M", "L", "S", "M", "M", "L"])).toBe("SELECT");
     expect(inferFieldType(["Maya", "Jay", "Alex", "Priya"])).toBe("TEXT");
     expect(inferFieldType(["", " "])).toBe("TEXT");
+  });
+
+  it("keeps phone numbers and ids out of numbers", () => {
+    // Written like phone numbers.
+    expect(inferFieldType(["617 555 0101", "617 555 0102"])).toBe("PHONE");
+    expect(inferFieldType(["+16175550101", "+447700900123"])).toBe("PHONE");
+    expect(inferFieldType(["(617) 555-0101", "617.555.0102"])).toBe("PHONE");
+    // Bare digits under a phone heading.
+    expect(inferFieldType(["5551234567", "5559876543"], "Phone")).toBe("PHONE");
+    expect(inferFieldType(["5551234567"], "Mobile number")).toBe("PHONE");
+    // Ids: leading zeros, the same length every time, or an id heading.
+    expect(inferFieldType(["001234567", "002345678"])).toBe("TEXT");
+    expect(inferFieldType(["123456789", "234567890", "345678901"])).toBe("TEXT");
+    expect(inferFieldType(["12", "345"], "Student ID")).toBe("TEXT");
+    expect(inferFieldType(["4410", "4411"], "Order #")).toBe("TEXT");
+    // Still numbers: counts, amounts, decimals, different lengths.
+    expect(inferFieldType(["2", "14", "3"], "Number of guests")).toBe("NUMBER");
+    expect(inferFieldType(["1234.5678", "99.5"])).toBe("NUMBER");
+    expect(inferFieldType(["1500000", "250000"])).toBe("NUMBER");
+    expect(inferFieldType(["1234567"])).toBe("NUMBER");
+    // Dates stay dates.
+    expect(inferFieldType(["2026-10-12", "2026-10-13"])).toBe("DATE");
+  });
+
+  it("keeps an imported number's decimals (up to 4)", () => {
+    expect(parseCell(field("NUMBER"), "3.14159")).toEqual(ok(3.1416));
+    expect(parseCell(field("NUMBER"), "0.125")).toEqual(ok(0.125));
   });
 });
 

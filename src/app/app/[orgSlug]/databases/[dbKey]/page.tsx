@@ -147,6 +147,7 @@ export default async function DatabaseViewPage({
         database={custom}
         members={members}
         trash={trash}
+        timezone={organization.timezone}
       />
     );
   }

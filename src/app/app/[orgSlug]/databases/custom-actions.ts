@@ -5,13 +5,14 @@ import { z } from "zod";
 
 import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
 import {
+  addChoice,
   addField,
   archiveDatabase,
   createDatabase,
   createRecord,
   DatabaseInputError,
   deleteField,
-  importDatabase,
+  loadRecords,
   moveField,
   purgeRecords,
   restoreRecords,
@@ -21,17 +22,20 @@ import {
   updateField,
   type Actor,
   type CustomRecord,
-  type ImportSummary,
+  type FieldUpdate,
+  type RecordPage,
 } from "@/server/databases/custom";
 import { AppError } from "@/server/db/errors";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
-import type { FieldDef, StoredValue } from "@/lib/databases/fields";
+import type { Choice, FieldDef, StoredValue } from "@/lib/databases/fields";
 
 /**
  * Server Actions of club-made databases (src/server/databases/custom.ts).
  * Each runs as the member (withOrgAction: app_user, RLS) and returns
  * { error } for anything expected; the grid calls updateCell on every edit,
- * which is how a database saves itself.
+ * which is how a database saves itself. A spreadsheet import posts its file
+ * to a route handler instead (databases/import/route.ts): a Server Action's
+ * body is capped at 1 MB, and a spreadsheet can be 4 MB.
  */
 
 export interface Result<T = undefined> {
@@ -85,14 +89,6 @@ export const createDatabaseAction = action(async (a, input: unknown) => {
   return createDatabase(a, parsed.data);
 });
 
-export const importDatabaseAction = action(async (a, input: unknown): Promise<ImportSummary> => {
-  const parsed = z
-    .object({ name: z.string().max(200), csv: z.string().max(4_500_000) })
-    .safeParse(input);
-  if (!parsed.success) throw new DatabaseInputError("That file is too big (4 MB at most).");
-  return importDatabase(a, parsed.data);
-});
-
 const settings = z.object({
   name: z.string().max(200),
   description: z.string().max(2000).nullable(),
@@ -117,6 +113,7 @@ const fieldInput = z.object({
   name: z.string().max(200).optional(),
   type: z.string().max(40).optional(),
   options: z.unknown().optional(),
+  choicesVersion: z.string().max(40).optional(),
 });
 
 export const addFieldAction = action(
@@ -132,10 +129,18 @@ export const addFieldAction = action(
 );
 
 export const updateFieldAction = action(
-  async (a, fieldId: string, input: unknown): Promise<FieldDef> => {
+  async (a, fieldId: string, input: unknown): Promise<FieldUpdate> => {
     const parsed = fieldInput.safeParse(input);
     if (!parsed.success) throw new DatabaseInputError("Check the field.");
     return updateField(a, id.parse(fieldId), parsed.data);
+  },
+);
+
+export const addChoiceAction = action(
+  async (a, fieldId: string, label: string): Promise<{ field: FieldDef; choice: Choice }> => {
+    const parsed = z.string().max(200).safeParse(label);
+    if (!parsed.success) throw new DatabaseInputError("Keep a choice under 80 characters.");
+    return addChoice(a, id.parse(fieldId), parsed.data);
   },
 );
 
@@ -146,6 +151,22 @@ export const deleteFieldAction = action(async (a, fieldId: string) => {
 export const moveFieldAction = action(async (a, fieldId: string, direction: -1 | 1) => {
   await moveField(a, id.parse(fieldId), direction === -1 ? -1 : 1);
 });
+
+const recordQuery = z.object({
+  trash: z.boolean().optional(),
+  q: z.string().max(200).optional(),
+  after: z.string().max(200).nullish(),
+  limit: z.number().int().min(1).max(10_000).optional(),
+});
+
+/** A page of rows: "Load more", a search, the export, a reload after a type change. */
+export const loadRecordsAction = action(
+  async (a, databaseId: string, query: unknown): Promise<RecordPage> => {
+    const parsed = recordQuery.safeParse(query);
+    if (!parsed.success) throw new DatabaseInputError("Check the search.");
+    return loadRecords(a, id.parse(databaseId), parsed.data);
+  },
+);
 
 export const createRecordAction = action(
   async (a, databaseId: string, values?: Record<string, unknown>): Promise<CustomRecord> =>

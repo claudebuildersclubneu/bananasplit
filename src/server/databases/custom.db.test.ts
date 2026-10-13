@@ -22,7 +22,10 @@ import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx, type OrgContext } from "@/server/db/context";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
 
+import { choicesVersion } from "@/lib/databases/fields";
+
 import {
+  addChoice,
   addField,
   createDatabase,
   createRecord,
@@ -30,6 +33,7 @@ import {
   deleteField,
   importDatabase,
   loadCustomDatabase,
+  loadRecords,
   purgeRecords,
   restoreRecords,
   trashRecords,
@@ -110,6 +114,14 @@ async function newRoster(name: string) {
   const db = await as(ownerA, orgA, (a) => loadCustomDatabase(a, key));
   const field = (n: string) => db.fields.find((f) => f.name === n)!;
   return { key, id: db.id, field, fields: db.fields };
+}
+
+/** A row's stored values, read as the table owner. */
+async function valuesOf(id: string): Promise<Record<string, unknown>> {
+  return (await ownerDb.databaseRecord.findUniqueOrThrow({ where: { id } })).values as Record<
+    string,
+    unknown
+  >;
 }
 
 describe("club-made databases against the local database", () => {
@@ -377,5 +389,274 @@ describe("club-made databases against the local database", () => {
     ]);
     const price = db.fields[2]!;
     expect(db.records[1]!.values[price.id]).toBe(35.5);
+  });
+
+  it("imports phone numbers and ids as written, and keeps a number's decimals", async () => {
+    if (!reachable) return;
+    const csv = [
+      "Name,Phone,Student ID,Score",
+      "Maya,5551234567,001234567,3.14159",
+      "Jay,5559876543,002345678,2.5",
+    ].join("\n");
+    const summary = await as(ownerA, orgA, (a) => importDatabase(a, { name: `Ids ${tag}`, csv }));
+    const db = await as(ownerA, orgA, (a) => loadCustomDatabase(a, summary.key));
+    expect(db.fields.map((f) => f.type)).toEqual(["TEXT", "PHONE", "TEXT", "NUMBER"]);
+    expect(db.fields[3]!.options.decimals).toBeUndefined();
+    const [phone, id, score] = db.fields.slice(1);
+    expect(db.records[0]!.values).toMatchObject({
+      [phone!.id]: "+15551234567",
+      [id!.id]: "001234567",
+      [score!.id]: 3.1416,
+    });
+  });
+
+  it("changes a type by what the cells show: choices and members become names, never ids", async () => {
+    if (!reachable) return;
+    const roster = await newRoster(`Convert ${tag}`);
+    const year = roster.field("Year");
+    const major = roster.field("Major");
+    const buddy = await as(ownerA, orgA, (a) =>
+      addField(a, roster.id, { name: "Buddy", type: "MEMBER" }),
+    );
+    const r1 = await as(ownerA, orgA, (a) =>
+      createRecord(a, roster.id, {
+        [year.id]: "Third year",
+        [buddy.id]: memberA.id,
+        [major.id]: "Physics",
+      }),
+    );
+    const r2 = await as(ownerA, orgA, (a) => createRecord(a, roster.id, { [major.id]: "12" }));
+
+    const toText = await as(ownerA, orgA, (a) => updateField(a, year.id, { type: "TEXT" }));
+    expect(toText.cleared).toBe(0);
+    expect((await valuesOf(r1.id))[year.id]).toBe("Third year");
+
+    await as(ownerA, orgA, (a) => updateField(a, buddy.id, { type: "LONG_TEXT" }));
+    expect((await valuesOf(r1.id))[buddy.id]).toBe(memberA.name);
+
+    // "Physics" can't be a number: cleared, and counted. The row's other cells stay.
+    const toNumber = await as(ownerA, orgA, (a) => updateField(a, major.id, { type: "NUMBER" }));
+    expect(toNumber.cleared).toBe(1);
+    expect(await valuesOf(r1.id)).toEqual({
+      [year.id]: "Third year",
+      [buddy.id]: memberA.name,
+    });
+    expect((await valuesOf(r2.id))[major.id]).toBe(12);
+  });
+
+  it("turns text into a select of at most 100 choices across thousands of rows at once, counting what it couldn't keep", async () => {
+    if (!reachable) return;
+    const roster = await newRoster(`Bulk ${tag}`);
+    const name = roster.field("Name");
+    const major = roster.field("Major");
+    // 100 common majors, 109 one-offs, and one too long to be a choice.
+    const majorOf = (i: number) =>
+      i < 4890 ? `Major ${i % 100}` : i < 4999 ? `Rare ${i}` : "x".repeat(90);
+    await ownerDb.databaseRecord.createMany({
+      data: Array.from({ length: 5000 }, (_, i) => ({
+        organizationId: orgA,
+        databaseId: roster.id,
+        values: { [name.id]: `Row ${i}`, [major.id]: majorOf(i) },
+      })),
+    });
+    // One transaction (10 seconds at most), one statement per thousand rows.
+    const result = await as(ownerA, orgA, (a) => updateField(a, major.id, { type: "SELECT" }));
+    const choices = result.field.options.choices!;
+    expect(choices).toHaveLength(100);
+    expect(choices.every((c) => c.label.startsWith("Major "))).toBe(true);
+    expect(result.cleared).toBe(110);
+
+    const rows = await ownerDb.databaseRecord.findMany({
+      where: { databaseId: roster.id },
+      select: { values: true },
+    });
+    const ids = new Set(choices.map((c) => c.id));
+    const values = rows.map((r) => r.values as Record<string, unknown>);
+    expect(values.filter((v) => ids.has(v[major.id] as string))).toHaveLength(4890);
+    expect(values.filter((v) => major.id in v)).toHaveLength(4890);
+    expect(values.every((v) => typeof v[name.id] === "string")).toBe(true);
+  });
+
+  it("adds choices without losing anyone else's, and refuses a choice list saved from a stale copy", async () => {
+    if (!reachable) return;
+    const roster = await newRoster(`Choices ${tag}`);
+    const year = roster.field("Year");
+    const loaded = choicesVersion(year.options.choices);
+
+    // Two admins add a choice each at the same moment, from the same copy.
+    const [fifth, alumni] = await Promise.all([
+      as(ownerA, orgA, (a) => addChoice(a, year.id, "Fifth year")),
+      as(ownerA, orgA, (a) => addChoice(a, year.id, "Alumni")),
+    ]);
+    const again = await as(ownerA, orgA, (a) => addChoice(a, year.id, "  fifth YEAR "));
+    expect(again.choice.id).toBe(fifth.choice.id);
+    const labels = again.field.options.choices!.map((c) => c.label);
+    expect(labels).toEqual(expect.arrayContaining(["Grad", "Fifth year", "Alumni"]));
+    expect(labels).toHaveLength(7);
+
+    // Saving the whole list from the copy loaded before those adds is refused...
+    await expect(
+      as(ownerA, orgA, (a) =>
+        updateField(a, year.id, {
+          options: { choices: year.options.choices },
+          choicesVersion: loaded,
+        }),
+      ),
+    ).rejects.toThrow(/Someone else changed these choices/);
+    expect(
+      (await as(ownerA, orgA, (a) => loadCustomDatabase(a, roster.key))).fields
+        .find((f) => f.id === year.id)!
+        .options.choices!.map((c) => c.label),
+    ).toEqual(labels);
+
+    // ...and from the current one it saves, clearing a removed choice from its rows.
+    const row = await as(ownerA, orgA, (a) =>
+      createRecord(a, roster.id, { [year.id]: alumni.choice.id }),
+    );
+    const current = choicesVersion(again.field.options.choices);
+    const kept = again.field.options.choices!.filter((c) => c.id !== alumni.choice.id);
+    const renamed = again.field.options.choices!.map((c) =>
+      c.id === fifth.choice.id ? { ...c, label: "Fifth-year" } : c,
+    );
+    // Two saves from the same copy: one wins, the other is told to reload.
+    const saves = await Promise.allSettled([
+      as(ownerA, orgA, (a) =>
+        updateField(a, year.id, { options: { choices: kept }, choicesVersion: current }),
+      ),
+      as(ownerA, orgA, (a) =>
+        updateField(a, year.id, { options: { choices: renamed }, choicesVersion: current }),
+      ),
+    ]);
+    expect(saves.filter((s) => s.status === "fulfilled")).toHaveLength(1);
+    expect(saves.filter((s) => s.status === "rejected")).toHaveLength(1);
+    if (saves[0]!.status === "fulfilled") {
+      expect(saves[0].value.cleared).toBe(1);
+      expect((await valuesOf(row.id))[year.id]).toBeUndefined();
+    }
+
+    // Members don't shape fields.
+    await expect(as(memberA, orgA, (a) => addChoice(a, year.id, "Sneaky"))).rejects.toBeInstanceOf(
+      DatabaseInputError,
+    );
+  });
+
+  it("pages through every row in order, and pages the trash", async () => {
+    if (!reachable) return;
+    const roster = await newRoster(`Pages ${tag}`);
+    const name = roster.field("Name");
+    const start = Date.UTC(2026, 0, 1, 12);
+    // Three rows to each millisecond: the id settles their order.
+    await ownerDb.databaseRecord.createMany({
+      data: Array.from({ length: 1203 }, (_, i) => ({
+        organizationId: orgA,
+        databaseId: roster.id,
+        values: { [name.id]: `Row ${i}` },
+        createdAt: new Date(start + Math.floor(i / 3)),
+      })),
+    });
+    const first = await as(ownerA, orgA, (a) => loadCustomDatabase(a, roster.key));
+    expect(first.records).toHaveLength(500);
+    expect(first.total).toBe(1203);
+    const seen = [...first.records];
+    let next = first.next;
+    while (next) {
+      const after = next;
+      const page = await as(ownerA, orgA, (a) => loadRecords(a, roster.id, { after }));
+      expect(page.total).toBe(1203);
+      seen.push(...page.records);
+      next = page.next;
+    }
+    expect(seen).toHaveLength(1203);
+    expect(new Set(seen.map((r) => r.id)).size).toBe(1203);
+    const order = seen.map((r) => [r.createdAt, r.id].join(" "));
+    expect([...order].sort()).toEqual(order);
+
+    // The trash: most recently deleted first, three at the same moment.
+    await as(ownerA, orgA, (a) =>
+      trashRecords(
+        a,
+        roster.id,
+        seen.slice(0, 3).map((r) => r.id),
+      ),
+    );
+    const t1 = await as(ownerA, orgA, (a) => loadRecords(a, roster.id, { trash: true, limit: 2 }));
+    expect(t1.records).toHaveLength(2);
+    expect(t1.total).toBe(3);
+    const t2 = await as(ownerA, orgA, (a) =>
+      loadRecords(a, roster.id, { trash: true, limit: 2, after: t1.next }),
+    );
+    expect(t2.records).toHaveLength(1);
+    expect(t2.next).toBeNull();
+    expect(new Set([...t1.records, ...t2.records].map((r) => r.id)).size).toBe(3);
+    expect((await as(ownerA, orgA, (a) => loadRecords(a, roster.id, {}))).total).toBe(1200);
+
+    await expect(
+      as(ownerA, orgA, (a) => loadRecords(a, roster.id, { after: "page-2" })),
+    ).rejects.toBeInstanceOf(DatabaseInputError);
+    // Another club can't page it.
+    await expect(as(ownerB, orgB, (a) => loadRecords(a, roster.id, {}))).rejects.toThrow();
+  });
+
+  it("searches every field on the server, by what the grid shows", async () => {
+    if (!reachable) return;
+    const roster = await newRoster(`Search ${tag}`);
+    const f = roster.field;
+    const buddy = await as(ownerA, orgA, (a) =>
+      addField(a, roster.id, { name: "Buddy", type: "MEMBER" }),
+    );
+    const dues = await as(ownerA, orgA, (a) =>
+      addField(a, roster.id, { name: "Dues", type: "CURRENCY" }),
+    );
+    const tags = await as(ownerA, orgA, (a) =>
+      addField(a, roster.id, {
+        name: "Tags",
+        type: "MULTI_SELECT",
+        options: {
+          choices: [
+            { id: "t_board", label: "Board", color: "blue" },
+            { id: "t_alum", label: "Alum 100%", color: "gray" },
+          ],
+        },
+      }),
+    );
+    const add = (values: Record<string, unknown>) =>
+      as(ownerA, orgA, (a) => createRecord(a, roster.id, values));
+    await add({
+      [f("Name").id]: "Maya Patel",
+      [f("Year").id]: "Third year",
+      [f("Major").id]: "Physics",
+      [buddy.id]: memberA.id,
+      [dues.id]: "15.5",
+      [tags.id]: ["t_board"],
+    });
+    await add({
+      [f("Name").id]: "Jay Thompson",
+      [f("Dues paid").id]: true,
+      [f("Major").id]: "Economics_101",
+      [tags.id]: ["t_alum"],
+    });
+    await add({ [f("Name").id]: "Sam Okafor", [f("Major").id]: "1000 Club" });
+
+    const find = async (q: string) =>
+      (await as(ownerA, orgA, (a) => loadRecords(a, roster.id, { q }))).records
+        .map((r) => r.values[f("Name").id])
+        .sort();
+    expect(await find("PHYSICS")).toEqual(["Maya Patel"]);
+    expect(await find("third")).toEqual(["Maya Patel"]); // a choice's label
+    expect(await find("member-a")).toEqual(["Maya Patel"]); // a member's name
+    expect(await find("$15.5")).toEqual(["Maya Patel"]); // money as shown
+    expect(await find("board")).toEqual(["Maya Patel"]); // a multi-select's label
+    expect(await find("yes")).toEqual(["Jay Thompson"]); // a ticked box
+    // % and _ are plain characters, not wildcards.
+    expect(await find("100%")).toEqual(["Jay Thompson"]);
+    expect(await find("_")).toEqual(["Jay Thompson"]);
+    // Ids are never matched: not a choice's, not a member's.
+    const third = f("Year").options.choices!.find((c) => c.label === "Third year")!;
+    expect(await find(third.id)).toEqual([]);
+    expect(await find(memberA.id)).toEqual([]);
+    // The count is of the matches.
+    const page = await as(ownerA, orgA, (a) => loadRecords(a, roster.id, { q: "o" }));
+    expect(page.total).toBe(page.records.length);
+    expect(page.total).toBe(3);
   });
 });

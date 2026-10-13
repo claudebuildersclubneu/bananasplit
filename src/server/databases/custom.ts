@@ -4,6 +4,8 @@ import { NotFoundError } from "@/lib/auth/errors";
 import {
   choiceId,
   CHOICE_COLORS,
+  choicesFromValues,
+  choicesVersion,
   convertValue,
   fieldOptionsSchema,
   FIELD_TYPES,
@@ -12,6 +14,7 @@ import {
   LIMITS,
   parseCell,
   readOptions,
+  type Choice,
   type FieldDef,
   type FieldOptions,
   type FieldType,
@@ -74,18 +77,40 @@ export interface CustomDatabase {
   memberVisibility: MemberVisibility;
   memberCanEdit: boolean;
   fields: FieldDef[];
+  /** The first page of rows (of the trash, when reading the trash). */
   records: CustomRecord[];
+  /** Where the next page starts (loadRecords' `after`); null once every row is loaded. */
+  next: string | null;
+  /** Rows in the database (or in the trash), loaded or not. */
+  total: number;
   trashCount: number;
   /** Add and edit rows (app.can_edit_database). */
   canEdit: boolean;
   /** Fields, settings, deleting for good (owners and admins). */
   canManage: boolean;
-  /** More rows than the page loads. */
-  truncated: boolean;
 }
 
-/** Rows a page loads at once; the export reads them all. */
-export const PAGE_ROWS = 5_000;
+/** Rows a page loads at once; "Load more" fetches the next page. */
+export const PAGE_ROWS = 500;
+
+/** What to read: the rows or the trash, matching a search, from a page on. */
+export interface RecordQuery {
+  trash?: boolean;
+  /** Search text, matched against every field as the grid shows it. */
+  q?: string;
+  /** A page's `next`: read the rows after it. */
+  after?: string | null;
+  /** Rows to read (PAGE_ROWS by default, at most a whole database). */
+  limit?: number;
+}
+
+export interface RecordPage {
+  records: CustomRecord[];
+  /** Where the next page starts; null when there are no more rows. */
+  next: string | null;
+  /** Rows matching the query, on every page. */
+  total: number;
+}
 
 async function allowed(db: TxClient, fn: "can_view_database" | "can_edit_database", id: string) {
   const rows =
@@ -138,25 +163,7 @@ export async function loadCustomDatabase(
   });
   if (!def || !(await allowed(db, "can_view_database", def.id))) throw new NotFoundError();
   const fields = await loadFields(db, organizationId, def.id);
-  const where = {
-    organizationId,
-    databaseId: def.id,
-    deletedAt: options.trash ? { not: null } : null,
-  };
-  const rows = await db.databaseRecord.findMany({
-    where,
-    orderBy: options.trash ? [{ deletedAt: "desc" }] : [{ createdAt: "asc" }, { id: "asc" }],
-    take: PAGE_ROWS + 1,
-    select: {
-      id: true,
-      values: true,
-      createdAt: true,
-      updatedAt: true,
-      deletedAt: true,
-      createdBy: { select: { name: true } },
-      updatedBy: { select: { name: true } },
-    },
-  });
+  const page = await readRecords(actor, def.id, fields, { trash: options.trash });
   const trashCount = await db.databaseRecord.count({
     where: { organizationId, databaseId: def.id, deletedAt: { not: null } },
   });
@@ -169,19 +176,163 @@ export async function loadCustomDatabase(
     memberVisibility: def.memberVisibility,
     memberCanEdit: def.memberCanEdit,
     fields,
-    records: rows.slice(0, PAGE_ROWS).map((r) => ({
-      id: r.id,
-      values: (r.values ?? {}) as Record<string, unknown>,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-      createdByName: r.createdBy?.name ?? null,
-      updatedByName: r.updatedBy?.name ?? null,
-      deletedAt: r.deletedAt?.toISOString() ?? null,
-    })),
+    records: page.records,
+    next: page.next,
+    total: page.total,
     trashCount,
     canEdit: await allowed(db, "can_edit_database", def.id),
     canManage: can({ role: actor.role }, "databases.write"),
-    truncated: rows.length > PAGE_ROWS,
+  };
+}
+
+/** A page of a database's rows (or its trash), for "Load more", search and the export. */
+export async function loadRecords(
+  actor: Actor,
+  databaseId: string,
+  query: RecordQuery,
+): Promise<RecordPage> {
+  await liveDefinition(actor, databaseId);
+  const fields = await loadFields(actor.db, actor.organizationId, databaseId);
+  return readRecords(actor, databaseId, fields, query);
+}
+
+const RECORD_SELECT = {
+  id: true,
+  values: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+  createdBy: { select: { name: true } },
+  updatedBy: { select: { name: true } },
+} as const;
+
+/**
+ * A page cursor: the last row's position (createdAt, or deletedAt in the
+ * trash, as Postgres prints it) and its id, which breaks ties. Rows come
+ * oldest first (the trash: most recently deleted first), so a row added or
+ * trashed while someone pages never shifts the pages they haven't read.
+ */
+const CURSOR = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)~([A-Za-z0-9_-]{1,100})$/;
+
+/**
+ * The search as SQL: true when any field shows the text, the way the grid
+ * shows it. Plain fields match their stored text; choices and members are
+ * stored as ids, so the labels and names that match are looked up first
+ * and the row matches when it holds one of them.
+ */
+function searchSql(
+  fields: readonly FieldDef[],
+  names: ReadonlyMap<string, string>,
+  q: string,
+): Prisma.Sql {
+  const needle = q.toLowerCase();
+  const pattern = `%${needle.replace(/[\\%_]/g, "\\$&")}%`;
+  const value = (f: FieldDef) => Prisma.sql`r."values" -> (${f.id}::text)`;
+  const text = (f: FieldDef) => Prisma.sql`r."values" ->> (${f.id}::text)`;
+  const parts: Prisma.Sql[] = [];
+  const plain = fields
+    .filter((f) => !hasChoices(f.type) && !["CURRENCY", "CHECKBOX", "MEMBER"].includes(f.type))
+    .map((f) => f.id);
+  if (plain.length > 0) {
+    parts.push(Prisma.sql`EXISTS (SELECT 1 FROM jsonb_each_text(r."values") AS e
+      WHERE e.key IN (${Prisma.join(plain)}) AND e.value ILIKE ${pattern})`);
+  }
+  for (const f of fields) {
+    if (f.type === "CURRENCY") {
+      // Money shows as "$15.50".
+      parts.push(Prisma.sql`(CASE WHEN jsonb_typeof(${value(f)}) = 'number'
+        THEN '$' || to_char((${text(f)})::numeric, 'FM999999999999990.00') END) ILIKE ${pattern}`);
+    } else if (f.type === "CHECKBOX") {
+      // A ticked box shows as "Yes"; an unticked one has no value.
+      if ("yes".includes(needle)) parts.push(Prisma.sql`r."values" ? (${f.id}::text)`);
+    } else if (f.type === "MEMBER") {
+      const ids = [...names].filter(([, name]) => name.toLowerCase().includes(needle));
+      if (ids.length > 0) {
+        parts.push(Prisma.sql`${text(f)} IN (${Prisma.join(ids.map(([id]) => id))})`);
+      }
+    } else if (hasChoices(f.type)) {
+      const ids = (f.options.choices ?? [])
+        .filter((c) => c.label.toLowerCase().includes(needle))
+        .map((c) => c.id);
+      if (ids.length === 0) continue;
+      parts.push(
+        f.type === "SELECT"
+          ? Prisma.sql`${text(f)} IN (${Prisma.join(ids)})`
+          : Prisma.sql`(${value(f)}) ?| ARRAY[${Prisma.join(ids)}]::text[]`,
+      );
+    }
+  }
+  return parts.length > 0 ? Prisma.join(parts, " OR ") : Prisma.sql`FALSE`;
+}
+
+async function readRecords(
+  actor: Actor,
+  databaseId: string,
+  fields: readonly FieldDef[],
+  query: RecordQuery,
+): Promise<RecordPage> {
+  const { db, organizationId } = actor;
+  const trash = query.trash === true;
+  const limit = Math.min(
+    Math.max(Math.floor(query.limit ?? PAGE_ROWS), 1),
+    LIMITS.recordsPerDatabase,
+  );
+  const q = (query.q ?? "").trim().slice(0, 200);
+  const names =
+    q && fields.some((f) => f.type === "MEMBER")
+      ? await memberNames(db, organizationId)
+      : new Map<string, string>();
+  const where = Prisma.sql`r."organizationId" = ${organizationId} AND r."databaseId" = ${databaseId}
+    AND r."deletedAt" ${trash ? Prisma.sql`IS NOT NULL` : Prisma.sql`IS NULL`}
+    ${q ? Prisma.sql`AND (${searchSql(fields, names, q)})` : Prisma.empty}`;
+
+  let after = Prisma.empty;
+  if (query.after) {
+    const cursor = CURSOR.exec(query.after);
+    if (!cursor) throw new DatabaseInputError("That list is out of date. Reload the page.");
+    // timestamp(3) has no time zone: the trailing Z is ignored, as written.
+    after = trash
+      ? Prisma.sql`AND (r."deletedAt", r."id") < (${cursor[1]}::timestamp, ${cursor[2]})`
+      : Prisma.sql`AND (r."createdAt", r."id") > (${cursor[1]}::timestamp, ${cursor[2]})`;
+  }
+  const at = trash ? Prisma.sql`r."deletedAt"` : Prisma.sql`r."createdAt"`;
+  const hits = await db.$queryRaw<{ id: string; at: string }[]>`
+    SELECT r."id", to_char(${at}, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at
+      FROM "DatabaseRecord" r
+     WHERE ${where} ${after}
+     ORDER BY ${at} ${trash ? Prisma.sql`DESC` : Prisma.sql`ASC`}, r."id" ${trash ? Prisma.sql`DESC` : Prisma.sql`ASC`}
+     LIMIT ${limit + 1}`;
+  const ids = hits.slice(0, limit).map((h) => h.id);
+  const rows = ids.length
+    ? await db.databaseRecord.findMany({
+        // The trash test again: a row trashed or restored since the query above stays out.
+        where: { organizationId, id: { in: ids }, deletedAt: trash ? { not: null } : null },
+        select: RECORD_SELECT,
+      })
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const counted = await db.$queryRaw<{ total: number }[]>`
+    SELECT count(*)::int AS total FROM "DatabaseRecord" r WHERE ${where}`;
+  const last = hits.length > limit ? hits[limit - 1] : undefined;
+  return {
+    records: ids.flatMap((id) => {
+      const r = byId.get(id);
+      return r
+        ? [
+            {
+              id: r.id,
+              values: (r.values ?? {}) as Record<string, unknown>,
+              createdAt: r.createdAt.toISOString(),
+              updatedAt: r.updatedAt.toISOString(),
+              createdByName: r.createdBy?.name ?? null,
+              updatedByName: r.updatedBy?.name ?? null,
+              deletedAt: r.deletedAt?.toISOString() ?? null,
+            },
+          ]
+        : [];
+    }),
+    next: last ? `${last.at}~${last.id}` : null,
+    total: counted[0]?.total ?? 0,
   };
 }
 
@@ -191,6 +342,15 @@ async function memberIds(db: TxClient, organizationId: string): Promise<Set<stri
     select: { userId: true },
   });
   return new Set(rows.map((r) => r.userId));
+}
+
+/** The club's members by user id, named as the member picker names them. */
+async function memberNames(db: TxClient, organizationId: string): Promise<Map<string, string>> {
+  const rows = await db.membership.findMany({
+    where: { organizationId },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  return new Map(rows.map((r) => [r.userId, r.user.name ?? "Member"]));
 }
 
 async function liveDefinition(actor: Actor, databaseId: string) {
@@ -370,7 +530,7 @@ export async function importDatabase(
   for (const [i, c] of columns.entries()) {
     const samples = lines.map((l) => l[c.index] ?? "");
     // The first column names the rows, so it stays text.
-    const type: FieldType = i === 0 ? "TEXT" : inferFieldType(samples);
+    const type: FieldType = i === 0 ? "TEXT" : inferFieldType(samples, c.name);
     let options: FieldOptions = {};
     if (hasChoices(type)) {
       const labels = [...new Set(samples.map((s) => s.trim()).filter(Boolean))].slice(
@@ -385,7 +545,8 @@ export async function importDatabase(
         })),
       };
     }
-    if (type === "NUMBER") options = { decimals: 2 };
+    // Numbers keep the default 4 decimals: rounding to 2 here would lose
+    // what the spreadsheet had for good.
     const created = await actor.db.databaseField.create({
       data: {
         organizationId: actor.organizationId,
@@ -544,18 +705,85 @@ export async function addField(
 }
 
 /**
+ * Holds the field's row until the transaction ends, so two changes to its
+ * choices take turns instead of one quietly undoing the other.
+ */
+async function lockField(actor: Actor, fieldId: string): Promise<void> {
+  await actor.db.$queryRaw`
+    SELECT 1 FROM "DatabaseField"
+     WHERE "id" = ${fieldId} AND "organizationId" = ${actor.organizationId}
+       FOR UPDATE`;
+}
+
+/** Every row's value of one field (trash included), skipping empty cells. */
+async function fieldCells(
+  actor: Actor,
+  databaseId: string,
+  fieldId: string,
+): Promise<{ id: string; value: unknown }[]> {
+  return actor.db.$queryRaw<{ id: string; value: unknown }[]>`
+    SELECT "id", "values" -> (${fieldId}::text) AS "value" FROM "DatabaseRecord"
+     WHERE "organizationId" = ${actor.organizationId} AND "databaseId" = ${databaseId}
+       AND "values" ? (${fieldId}::text)`;
+}
+
+/**
+ * Sets one field's value in many rows with one statement per thousand rows
+ * (null clears the cell). Like a cell save it merges that one key into each
+ * row, so edits to the row's other cells stand; RLS decides who may.
+ */
+async function setCells(
+  actor: Actor,
+  databaseId: string,
+  fieldId: string,
+  changes: readonly { id: string; value: StoredValue | null }[],
+): Promise<void> {
+  for (let i = 0; i < changes.length; i += 1000) {
+    // An omitted "v" reads as NULL: the cell is cleared.
+    const batch = changes
+      .slice(i, i + 1000)
+      .map((c) => (c.value === null ? { id: c.id } : { id: c.id, v: c.value }));
+    await actor.db.$executeRaw`
+      UPDATE "DatabaseRecord" AS r
+         SET "values" = CASE WHEN c.v IS NULL THEN r."values" - ${fieldId}::text
+                             ELSE r."values" || jsonb_build_object(${fieldId}::text, c.v) END,
+             "updatedById" = ${actor.userId}, "updatedAt" = now()
+        FROM jsonb_to_recordset(${JSON.stringify(batch)}::jsonb) AS c("id" text, "v" jsonb)
+       WHERE r."id" = c."id" AND r."organizationId" = ${actor.organizationId}
+         AND r."databaseId" = ${databaseId}`;
+  }
+}
+
+export interface FieldUpdate {
+  field: FieldDef;
+  /** Cells that had a value the change couldn't keep, now empty. */
+  cleared: number;
+}
+
+/**
  * Renames a field, changes its options or its type. A type change converts
- * every row's value (what still fits is kept); removing a choice clears it
- * from the rows that had it.
+ * every row's value (what still fits is kept, the rest is cleared and
+ * counted); removing a choice clears it from the rows that had it. A save
+ * of the whole choice list passes the `choicesVersion` it started from and
+ * is refused when someone else has changed the choices since.
  */
 export async function updateField(
   actor: Actor,
   fieldId: string,
-  input: { name?: string; type?: string; options?: unknown },
-): Promise<FieldDef> {
+  input: { name?: string; type?: string; options?: unknown; choicesVersion?: string },
+): Promise<FieldUpdate> {
   requireManage(actor);
+  await lockField(actor, fieldId);
   const before = await fieldOf(actor, fieldId);
   const beforeDef = toFieldDef(before);
+  if (
+    input.choicesVersion !== undefined &&
+    input.choicesVersion !== choicesVersion(beforeDef.options.choices)
+  ) {
+    throw new DatabaseInputError(
+      "Someone else changed these choices while you were editing. Reload the page to see their changes, then make yours again.",
+    );
+  }
   const type = input.type ? FIELD_TYPES.find((t) => t === input.type) : beforeDef.type;
   if (!type) throw new DatabaseInputError("Pick a field type.");
   if (before.isPrimary && type !== beforeDef.type && !PRIMARY_TYPES.has(type)) {
@@ -563,28 +791,31 @@ export async function updateField(
       "The first field names your rows; keep it text, a number, an email, a phone or a link.",
     );
   }
+  const typeChanged = type !== beforeDef.type;
   let options = input.options !== undefined ? checkOptions(type, input.options) : beforeDef.options;
-  // Turning text into a select: its distinct values become the choices.
-  if (hasChoices(type) && !hasChoices(beforeDef.type) && !options.choices?.length) {
-    const rows = await actor.db.databaseRecord.findMany({
-      where: { organizationId: actor.organizationId, databaseId: before.databaseId },
-      select: { values: true },
-    });
-    const labels = new Set<string>();
-    for (const r of rows) {
-      const v = (r.values as Record<string, unknown>)[fieldId];
-      const text = typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
-      for (const part of type === "MULTI_SELECT" ? text.split(/[,;]/) : [text]) {
-        if (part.trim()) labels.add(part.trim().slice(0, 80));
-      }
-      if (labels.size >= LIMITS.choicesPerField) break;
-    }
+  const removedChoices =
+    hasChoices(type) && hasChoices(beforeDef.type)
+      ? (beforeDef.options.choices ?? []).filter(
+          (c) => !(options.choices ?? []).some((n) => n.id === c.id),
+        )
+      : [];
+  const cells =
+    typeChanged || removedChoices.length > 0
+      ? await fieldCells(actor, before.databaseId, fieldId)
+      : [];
+  const members = typeChanged
+    ? await memberNames(actor.db, actor.organizationId)
+    : new Map<string, string>();
+  // Turning text (or anything else) into a select: its values, as the
+  // cells show them, become the choices.
+  if (typeChanged && hasChoices(type) && !hasChoices(beforeDef.type) && !options.choices?.length) {
     options = {
-      choices: [...labels].map((label, j) => ({
-        id: choiceId(),
-        label,
-        color: CHOICE_COLORS[(j + 1) % CHOICE_COLORS.length]!,
-      })),
+      choices: choicesFromValues(
+        beforeDef,
+        type as "SELECT" | "MULTI_SELECT",
+        cells.map((c) => c.value),
+        members,
+      ),
     };
   }
   const after: FieldDef = {
@@ -594,40 +825,64 @@ export async function updateField(
     options,
   };
 
-  const typeChanged = type !== beforeDef.type;
-  const removedChoices =
-    hasChoices(type) && hasChoices(beforeDef.type)
-      ? (beforeDef.options.choices ?? [])
-          .filter((c) => !(options.choices ?? []).some((n) => n.id === c.id))
-          .map((c) => c.id)
-      : [];
-  if (typeChanged || removedChoices.length > 0) {
-    const members = await memberIds(actor.db, actor.organizationId);
-    const rows = await actor.db.databaseRecord.findMany({
-      where: { organizationId: actor.organizationId, databaseId: before.databaseId },
-      select: { id: true, values: true },
-    });
-    for (const r of rows) {
-      const values = r.values as Record<string, unknown>;
-      if (!(fieldId in values)) continue;
-      const old = values[fieldId];
-      let next: StoredValue | null;
-      if (typeChanged) {
-        next = convertValue(beforeDef, after, old, members);
-      } else {
-        const kept = parseCell(after, old, members);
-        next = kept.ok ? kept.value : null;
-      }
-      if (JSON.stringify(next) === JSON.stringify(old)) continue;
-      await setCell(actor.db, actor.organizationId, r.id, fieldId, next, actor.userId);
+  let cleared = 0;
+  const changes: { id: string; value: StoredValue | null }[] = [];
+  for (const cell of cells) {
+    let next: StoredValue | null;
+    if (typeChanged) {
+      next = convertValue(beforeDef, after, cell.value, members);
+    } else {
+      const kept = parseCell(after, cell.value);
+      next = kept.ok ? kept.value : null;
     }
+    if (next === null) cleared++;
+    if (JSON.stringify(next) !== JSON.stringify(cell.value))
+      changes.push({ id: cell.id, value: next });
   }
+  await setCells(actor, before.databaseId, fieldId, changes);
+
   const saved = await actor.db.databaseField.update({
     where: { id: fieldId },
     data: { name: after.name, type, options: options as Prisma.InputJsonObject },
     select: FIELD_SELECT,
   });
-  return toFieldDef(saved);
+  return { field: toFieldDef(saved), cleared };
+}
+
+/**
+ * Adds one choice to a select field (the "Add a choice" box in a cell), or
+ * returns the one already named that. It adds to the field's current list,
+ * so a choice someone else added meanwhile stays.
+ */
+export async function addChoice(
+  actor: Actor,
+  fieldId: string,
+  label: string,
+): Promise<{ field: FieldDef; choice: Choice }> {
+  requireManage(actor);
+  await lockField(actor, fieldId);
+  const def = toFieldDef(await fieldOf(actor, fieldId));
+  if (!hasChoices(def.type)) throw new DatabaseInputError("Only select fields have choices.");
+  const text = label.trim().replace(/\s+/g, " ");
+  if (!text) throw new DatabaseInputError("Give the choice a name.");
+  if (text.length > 80) throw new DatabaseInputError("Keep a choice under 80 characters.");
+  const choices = def.options.choices ?? [];
+  const existing = choices.find((c) => c.label.toLowerCase() === text.toLowerCase());
+  if (existing) return { field: def, choice: existing };
+  if (choices.length >= LIMITS.choicesPerField) {
+    throw new DatabaseInputError(`A field can have up to ${LIMITS.choicesPerField} choices.`);
+  }
+  const choice: Choice = {
+    id: choiceId(),
+    label: text,
+    color: CHOICE_COLORS[(choices.length + 1) % CHOICE_COLORS.length]!,
+  };
+  const saved = await actor.db.databaseField.update({
+    where: { id: fieldId },
+    data: { options: { ...def.options, choices: [...choices, choice] } as Prisma.InputJsonObject },
+    select: FIELD_SELECT,
+  });
+  return { field: toFieldDef(saved), choice };
 }
 
 /** Deletes a field and its values from every row. The field that names rows stays. */

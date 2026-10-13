@@ -15,10 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
-import {
-  createDatabaseAction,
-  importDatabaseAction,
-} from "@/app/app/[orgSlug]/databases/custom-actions";
+import { createDatabaseAction } from "@/app/app/[orgSlug]/databases/custom-actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,6 +32,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toaster";
 import { DATABASE_TEMPLATES } from "@/lib/databases/templates";
 import { cn } from "@/lib/utils";
+import type { ImportSummary } from "@/server/databases/custom";
 
 const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   Table2,
@@ -96,16 +94,22 @@ export function NewDatabaseDialog({
         setError("That file is over 4 MB. Split it, or export fewer columns.");
         return;
       }
-      const csv = await file.text();
-      const result = await importDatabaseAction(orgId, {
-        name: name || file.name.replace(/\.[^.]+$/, ""),
-        csv,
-      });
-      if (result.error || !result.data) {
+      // The file goes to a route handler: a Server Action takes at most 1 MB.
+      const body = new FormData();
+      body.set("file", file);
+      body.set("name", name || file.name.replace(/\.[^.]+$/, ""));
+      let result: Partial<ImportSummary> & { error?: string };
+      try {
+        const res = await fetch(`/app/${orgSlug}/databases/import`, { method: "POST", body });
+        result = await res.json().catch(() => ({ error: "The server didn't answer. Try again." }));
+      } catch {
+        result = { error: "Couldn't reach Bananasplit. Check your connection and try again." };
+      }
+      if (result.error || !result.key) {
         setError(result.error ?? "That didn't work.");
         return;
       }
-      const { rows, fields, skippedCells, key } = result.data;
+      const { rows = 0, fields = 0, skippedCells = 0, key } = result;
       toast({
         title: `Imported ${rows.toLocaleString()} rows`,
         description: `${fields} fields${skippedCells ? `; ${skippedCells} values didn't fit their column and were left empty` : ""}.`,

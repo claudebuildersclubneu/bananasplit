@@ -290,19 +290,82 @@ export function parseCell(
 /**
  * The value in another field type, for changing a field's type: whatever
  * still parses is kept (a number in a text field stays, "Yes" becomes a
- * checkbox), the rest is cleared.
+ * checkbox), the rest is cleared. `members` maps the club's user ids to
+ * their names: a member cell becomes their name, and a member field only
+ * takes people in the club.
  */
 export function convertValue(
   from: Pick<FieldDef, "type" | "options">,
   to: Pick<FieldDef, "type" | "options">,
   value: unknown,
-  members?: ReadonlySet<string>,
+  members?: ReadonlyMap<string, string>,
 ): StoredValue | null {
-  const text = displayText(from, value, new Map());
-  const asIs = parseCell(to, value, members);
-  if (asIs.ok && asIs.value !== null) return asIs.value;
-  const fromText = parseCell(to, text, members);
+  const memberIds = members ? new Set(members.keys()) : undefined;
+  // Between single and multi-select the choices carry over, ids and all.
+  if (hasChoices(from.type) && hasChoices(to.type)) {
+    const same = parseCell(to, value, memberIds);
+    return same.ok ? same.value : null;
+  }
+  // Choices and members are stored as ids, and an id is valid text too:
+  // convert those from what the cell shows ("Paid", "Maya Patel"), never
+  // from the id itself.
+  if (!hasChoices(from.type) && from.type !== "MEMBER") {
+    const asIs = parseCell(to, value, memberIds);
+    if (asIs.ok && asIs.value !== null) return asIs.value;
+  }
+  const fromText = parseCell(to, displayText(from, value, members ?? new Map()), memberIds);
   return fromText.ok ? fromText.value : null;
+}
+
+/**
+ * Choices for a field turning into a select: its values as the cells show
+ * them, one choice per distinct value (case aside). A field holds at most
+ * 100 choices, so the most used values win; a value longer than a choice
+ * label (80 characters) gets none. Cells left without a choice are cleared
+ * when the values convert, and counted.
+ */
+export function choicesFromValues(
+  from: Pick<FieldDef, "type" | "options">,
+  to: "SELECT" | "MULTI_SELECT",
+  values: readonly unknown[],
+  members: ReadonlyMap<string, string>,
+): Choice[] {
+  const seen = new Map<string, { label: string; uses: number; order: number }>();
+  for (const value of values) {
+    const text = displayText(from, value, members);
+    for (const part of to === "MULTI_SELECT" ? text.split(/[,;]/) : [text]) {
+      const label = part.trim().replace(/\s+/g, " ");
+      if (!label || label.length > 80) continue;
+      const key = label.toLowerCase();
+      const hit = seen.get(key);
+      if (hit) hit.uses++;
+      else seen.set(key, { label, uses: 1, order: seen.size });
+    }
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.uses - a.uses || a.order - b.order)
+    .slice(0, LIMITS.choicesPerField)
+    .sort((a, b) => a.order - b.order)
+    .map((c, j) => ({
+      id: choiceId(),
+      label: c.label,
+      color: CHOICE_COLORS[(j + 1) % CHOICE_COLORS.length]!,
+    }));
+}
+
+/**
+ * A short fingerprint of a field's choices. Saving the whole list sends the
+ * fingerprint it started from, and the server refuses the save when the
+ * choices have changed since (someone else edited them meanwhile).
+ */
+export function choicesVersion(choices: readonly Choice[] | undefined): string {
+  const text = JSON.stringify((choices ?? []).map((c) => [c.id, c.label, c.color]));
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${(choices ?? []).length}-${hash.toString(36)}`;
 }
 
 /** A value as plain text: for search, CSV export and type changes. */
@@ -333,13 +396,46 @@ export function displayText(
   }
 }
 
-/** For a CSV import's column: the most specific type every non-empty value fits. */
-export function inferFieldType(samples: readonly string[]): FieldType {
+/** Column names that hold phone numbers. */
+const PHONE_HEADER = /\b(phone|mobile|cell|tel|telephone|whatsapp)\b/i;
+/** Column names that hold ids and codes: digits that aren't amounts. */
+const ID_HEADER =
+  /(\b(id|nuid|sid|zip|zipcode|postcode|postal|code|pin)\b|\b(student|member|employee|account|order|ticket|card)\s*(no|num|number|#)|#\s*$)/i;
+
+/** "(617) 555-0101", "+1 617 555 0101", "617.555.0101": written the way phone numbers are. */
+function phoneShaped(v: string): boolean {
+  const digits = v.replace(/\D/g, "").length;
+  if (digits < 7 || digits > 15 || !/^\+?[\d\s().-]+$/.test(v) || DATE.test(v)) return false;
+  return v.startsWith("+") || /[()]/.test(v) || (v.match(/\d[\s.-]+\d/g)?.length ?? 0) >= 2;
+}
+
+/**
+ * Digits that are ids, not amounts: a leading zero, or every value the same
+ * length of 7 to 15 digits (student ids, phone numbers without punctuation).
+ */
+function idShaped(values: readonly string[]): boolean {
+  if (!values.every((v) => /^\d+$/.test(v))) return false;
+  if (values.some((v) => /^0\d/.test(v))) return true;
+  const lengths = new Set(values.map((v) => v.length));
+  const length = values[0]!.length;
+  return values.length >= 2 && lengths.size === 1 && length >= 7 && length <= 15;
+}
+
+/**
+ * For a CSV import's column: the most specific type every non-empty value
+ * fits. `header` is the column's name, a hint for phone numbers and ids.
+ */
+export function inferFieldType(samples: readonly string[], header = ""): FieldType {
   const values = samples.map((s) => s.trim()).filter(Boolean);
   if (values.length === 0) return "TEXT";
   const all = (test: (v: string) => boolean) => values.every(test);
   if (all((v) => /^(yes|no|y|n|true|false|x|✓)$/i.test(v))) return "CHECKBOX";
   if (all((v) => /^\$\s?[-\d,]+(\.\d{1,2})?$/.test(v))) return "CURRENCY";
+  // Phone numbers and ids are digits but not amounts: catch them before
+  // numbers, or 5551234567 shows as "5,551,234,567" and a leading zero is lost.
+  const phones = all((v) => normalizePhone(v) !== null);
+  if (phones && (PHONE_HEADER.test(header) || all(phoneShaped))) return "PHONE";
+  if (all((v) => /^\d+$/.test(v)) && (ID_HEADER.test(header) || idShaped(values))) return "TEXT";
   if (all((v) => toNumber(v) !== null && !/^0\d/.test(v))) return "NUMBER";
   if (all((v) => EMAIL.test(v))) return "EMAIL";
   if (all((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) || /^\d{1,2}\/\d{1,2}\/(\d{2}|\d{4})$/.test(v)))

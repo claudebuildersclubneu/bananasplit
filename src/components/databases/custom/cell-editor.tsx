@@ -410,7 +410,17 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
     setAdding(false);
     if (!choice) return;
     setNewLabel("");
-    toggle(choice);
+    // Pick it, never toggle: it may be a choice the cell already has. A new
+    // choice isn't in `choices` yet (the field updates on the next render),
+    // so it goes after the ones already picked, the way it sits in the list.
+    if (multi) {
+      const known = choices.some((c) => c.id === choice.id);
+      const ids = choices.filter((c) => selected.has(c.id) || c.id === choice.id).map((c) => c.id);
+      onSave(known ? ids : [...ids, choice.id]);
+    } else {
+      onSave(choice.id);
+      setOpen(false);
+    }
   }
 
   const pills = (

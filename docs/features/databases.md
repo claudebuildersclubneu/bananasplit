@@ -12,14 +12,24 @@ Owners and admins make databases from **Databases › New database**:
 
 - from a template (Blank, Member roster, Equipment, Merch orders,
   Sponsors and contacts, Event ideas; `src/lib/databases/templates.ts`);
-- or by importing a spreadsheet (CSV from Google Sheets or Excel). Each
-  column becomes a field and its type is guessed from the values; a value
-  that doesn't fit is left empty and counted.
+- or by importing a spreadsheet (CSV from Google Sheets or Excel, up to
+  4 MB and 10,000 rows). Each column becomes a field and its type is
+  guessed from the values; a value that doesn't fit is left empty and
+  counted.
+  - Phone numbers (written like phone numbers, or under a heading such as
+    "Phone") become phone fields, and ids (leading zeros, digits all the
+    same length, or a heading such as "Student ID") stay text, so they
+    never turn into numbers like "5,551,234,567".
+  - Numbers keep their decimals (up to 4).
+  - The file is posted to a route handler
+    (`src/app/app/[orgSlug]/databases/import/route.ts`), not a Server
+    Action, whose body is capped at 1 MB.
 
 A database is a grid. Click a cell and type: each cell saves on its own as
 you pause typing and when you leave the cell. Checkboxes, dates, choices
 and members save the moment you pick them. The header shows "Saving…",
-then "All changes saved", or "Last change not saved" with the reason.
+then "All changes saved", or "Last change not saved" with the reason. A
+save that fails puts back only its own cell; the row's other edits stay.
 
 Field types (`src/lib/databases/fields.ts`):
 
@@ -33,13 +43,31 @@ email, a choice must exist, a member must be in the club.
 Other things the grid does:
 
 - **Field menu:** sort, rename, edit choices, change type, move, delete.
-  Changing a type keeps the values that fit and clears the rest. Deleting
-  a field deletes its values.
+  Deleting a field deletes its values.
+- **Changing a type** keeps the values that fit and clears the rest, then
+  says how many it cleared.
+  - Choices and members convert from what the cell shows ("Paid", "Maya
+    Patel"), never from their stored ids.
+  - Between single and multi-select the choices carry over.
+  - Turning a field into a select makes a choice of each different value.
+    A field holds up to 100 choices of up to 80 characters, so the most
+    used values get one; the rest are cleared and counted.
+- **Choices:** "Add a choice" in a cell adds to the field's current list
+  on the server, so a choice someone else just added stays. Saving the
+  whole list in **Edit choices** is refused when someone else changed the
+  choices since the list was opened ("reload the page"), so two admins
+  can't wipe each other's choices.
 - **Rows:** expand a row to edit it as a form (handy on a phone), select
   rows to move them to the trash, and restore them from **… › Trash**.
   Only owners and admins delete rows for good.
-- **Search, sort and export:** search runs across every field, and
-  **Export CSV** downloads the current view.
+- **Pages:** rows load 500 at a time, oldest first (the trash: most
+  recently deleted first), with **Load more** for the next page. The
+  pages are cut by position (keyset), so rows added or trashed meanwhile
+  never shift them.
+- **Search, sort and export:** search runs on the server across every
+  row, not just the loaded ones, and matches what the grid shows (a
+  choice's label, a member's name, money as "$15.50"). Sorting sorts the
+  loaded rows. **Export CSV** downloads every row matching the search.
 
 ### How it's stored
 
@@ -54,6 +82,12 @@ How writes and limits work:
 - **Cell saves:** a cell save merges one key into the row (`values ||
 {field: value}`), so two people editing different cells of the same row
   never undo each other.
+- **Type changes and removed choices:** the field's new values are
+  written with one `UPDATE … FROM jsonb_to_recordset(…)` per 1,000 rows,
+  merging that one key the same way, so even a full database fits in the
+  transaction.
+- **Choices:** adding a choice and saving the choice list lock the
+  field's row first, so two at once take turns.
 - **Lookups:** a GIN index on `values` keeps lookups fast.
 - **Size limits:** a row is at most 64 KB (a database check); there are at
   most 60 fields per database, 10,000 rows per database and 100 databases
