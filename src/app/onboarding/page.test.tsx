@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+// The "Signed in as … Sign out" line reads the session; not under test here.
+vi.mock("@/components/auth/signed-in-as", () => ({ SignedInAs: () => null }));
 vi.mock("@/lib/auth/session", () => ({
   requireUser: async () => ({ id: "u1", email: "verify-test@example.edu", name: "Verify Test" }),
 }));
@@ -63,14 +65,17 @@ beforeEach(() => {
 });
 
 describe("OnboardingPage", () => {
-  it("asks a new account what it's for: free event pages, or a club (profile setup first)", async () => {
+  it("sends a new account to the quick profile first", async () => {
     mocks.profile.mockResolvedValue(profile({ onboardedAt: null }));
+    await expect(render()).rejects.toMatchObject({ url: "/onboarding/profile/basics" });
+  });
+
+  it("then asks what it's for: event pages, a club, and the optional club profile", async () => {
+    mocks.profile.mockResolvedValue(profile());
     const html = await render();
     expect(html).toContain("What are you here for?");
     expect(html).toContain('href="/rsvp/new"');
-    expect(html).toContain('href="/onboarding/profile/basics"');
-    // Nothing about joining or creating until the club path is chosen.
-    expect(html).not.toContain("Join with a club code");
+    expect(html).toContain('href="/onboarding/profile/school"');
   });
 
   it("sends a member straight to their organization", async () => {
@@ -88,6 +93,8 @@ describe("OnboardingPage", () => {
     expect(html).toContain("Resend verification email");
     expect(html).not.toContain('href="/onboarding/join"');
     expect(html).not.toContain('href="/onboarding/organization"');
+    // Event pages need no verified address.
+    expect(html).toContain('href="/rsvp/new"');
     // Invites are not even looked up for an unverified address.
     expect(mocks.pendingInvites).not.toHaveBeenCalled();
   });

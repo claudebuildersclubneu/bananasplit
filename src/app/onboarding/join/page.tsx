@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { SignedInAs } from "@/components/auth/signed-in-as";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import { ArrowRight } from "@/components/brand/arrows";
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
@@ -38,6 +39,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
 
   return (
     <AuthCard
+      footer={<SignedInAs />}
       formClassName="gap-6"
       panel={
         <div className="flex flex-col gap-5">

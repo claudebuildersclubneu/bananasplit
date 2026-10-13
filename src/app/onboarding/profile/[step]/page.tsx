@@ -26,7 +26,12 @@ import { ChoiceTileBody, choiceTileClass } from "@/components/onboarding/step-fi
 import { UserAvatar } from "@/components/user-avatar";
 import { requireUser } from "@/lib/auth/session";
 import { blockedHoursPerWeek } from "@/lib/availability";
-import { isProfileStep, PROFILE_STEPS, type ProfileStep } from "@/lib/onboarding/steps";
+import {
+  CLUB_PROFILE_STEPS,
+  isProfileStep,
+  QUICK_PROFILE_STEP,
+  type ProfileStep,
+} from "@/lib/onboarding/steps";
 import { timeZoneLabel } from "@/lib/profile/timezone";
 import { personalPalettes, previewTokens } from "@/lib/theme/personal";
 import { THEME_PRESETS } from "@/lib/theme/presets";
@@ -53,7 +58,10 @@ const STEP_NAMES: Record<ProfileStep, string> = {
 
 /** Each step's question and the line under it. */
 const META: Record<ProfileStep, { title: string; description: string }> = {
-  basics: { title: "Tell us about you.", description: "How you'll show up to your teammates." },
+  basics: {
+    title: "Quick profile.",
+    description: "Your name and photo, so people know who you are. That's all for now.",
+  },
   school: {
     title: "What do you study?",
     description: "What you study, and what you do in the club.",
@@ -91,23 +99,39 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
   const profile = await getOnboardingProfile(user.id);
   if (!profile) redirect("/auth/session-ended");
 
-  const index = PROFILE_STEPS.indexOf(step) + 1;
+  // The quick profile is one page in the three steps in; the club profile
+  // is its own five-step run, which saves as it goes and can be left any time.
+  const quick = step === QUICK_PROFILE_STEP;
+  const steps = quick
+    ? ["Your account", "Quick profile", "Event pages or a club"]
+    : CLUB_PROFILE_STEPS.map((s) => STEP_NAMES[s]);
+  const index = quick ? 2 : (CLUB_PROFILE_STEPS as readonly ProfileStep[]).indexOf(step) + 1;
+  const total = quick ? 3 : CLUB_PROFILE_STEPS.length;
   const meta = META[step];
 
   return (
     <SetupShell
-      subject="your profile"
-      steps={PROFILE_STEPS.map((s) => STEP_NAMES[s])}
+      subject={quick ? "your profile" : "your club profile"}
+      steps={steps}
       current={index}
       exit={
-        <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
+        quick ? (
+          <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
+        ) : (
+          <Link
+            href="/onboarding"
+            className="text-ink-muted hover:text-ink text-[14px] font-semibold"
+          >
+            Save and exit
+          </Link>
+        )
       }
     >
       <SetupCard preview={WIDE.has(step) ? undefined : <ProfilePreview profile={profile} />}>
-        <StepIntro index={index} total={PROFILE_STEPS.length} title={meta.title}>
+        <StepIntro index={index} total={total} title={meta.title}>
           {meta.description}
         </StepIntro>
-        {!profile.emailVerified && step === "basics" && (
+        {!profile.emailVerified && quick && (
           <div className="mt-4">
             <VerifyEmailNotice
               email={profile.email}
@@ -118,16 +142,6 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
         <div className="mt-[22px] flex flex-1 flex-col">
           <StepBody step={step} profile={profile} />
         </div>
-        {step === "basics" && (
-          // Profile setup is for club members; someone who only wants event
-          // pages doesn't need it (/rsvp never asks for it).
-          <p className="text-ink-muted mt-4 mb-0 text-[14px]">
-            Only here to make an event page?{" "}
-            <Link href="/rsvp" className="text-ink font-semibold">
-              Skip to free event pages
-            </Link>
-          </p>
-        )}
       </SetupCard>
     </SetupShell>
   );

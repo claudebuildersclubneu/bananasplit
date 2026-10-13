@@ -29,6 +29,7 @@ import {
   gradYearChoices,
   joinMajor,
   nextProfileStep,
+  previousProfileStep,
   schoolSchema,
   splitMajor,
 } from "@/lib/onboarding/steps";
@@ -134,8 +135,10 @@ describe("join codes", () => {
 });
 
 describe("profile setup steps", () => {
-  it("walks the six steps in order", () => {
-    expect(nextProfileStep("basics")).toBe("school");
+  it("keeps the quick profile and the club profile as separate runs", () => {
+    expect(nextProfileStep("basics")).toBeNull();
+    expect(previousProfileStep("school")).toBeNull();
+    expect(nextProfileStep("school")).toBe("bio");
     expect(nextProfileStep("availability")).toBe("review");
     expect(nextProfileStep("review")).toBeNull();
   });

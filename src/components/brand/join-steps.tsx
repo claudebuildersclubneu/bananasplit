@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Create your account", "Choose event pages or a club", "You're in"] as const;
+const STEPS = ["Your account", "Quick profile", "Event pages or a club"] as const;
 
 /**
  * The three steps in, under the headline on the sign-up panel: one account

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BrandRoot } from "@/components/brand/brand-root";
+import { SignOutLink } from "@/components/auth/sign-out-link";
 import { Logo } from "@/components/brand/logo";
 import { Toaster } from "@/components/ui/toaster";
 import { getSession } from "@/lib/auth/session";
@@ -31,6 +32,7 @@ export default async function RsvpLayout({ children }: LayoutProps<"/rsvp">) {
                 <Link href="/rsvp" className="text-ink-muted hidden sm:inline">
                   Your events
                 </Link>
+                <SignOutLink className="text-ink-muted cursor-pointer whitespace-nowrap" />
                 <Link
                   href="/rsvp/new"
                   className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] whitespace-nowrap"

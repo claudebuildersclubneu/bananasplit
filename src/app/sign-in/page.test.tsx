@@ -11,6 +11,8 @@ const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
 
 vi.mock("@/lib/auth/config", () => ({ auth: authMock, signIn: vi.fn() }));
 vi.mock("./actions", () => ({ passwordSignInAction: vi.fn() }));
+// The "Signed in as … Sign out" line reads the session; not under test here.
+vi.mock("@/components/auth/signed-in-as", () => ({ SignedInAs: () => null }));
 
 const { default: SignInPage } = await import("./page");
 
@@ -29,6 +31,18 @@ afterEach(() => {
 });
 
 describe("/sign-in", () => {
+  it("tells someone already signed in which account, with a way to sign out", async () => {
+    authMock.mockResolvedValue({
+      user: { id: "u1", email: "wrong@example.com", name: "Wren Ong" },
+    });
+    const html = await render();
+    expect(html).toContain("You&#x27;re already signed in.");
+    expect(html).toContain("wrong@example.com");
+    expect(html).toContain("Continue as Wren");
+    expect(html).toContain("Sign out and use another account");
+    expect(html).not.toContain('name="password"');
+  });
+
   it("offers Google and email/password when the Google client is configured", async () => {
     vi.stubEnv("AUTH_GOOGLE_ID", "client-id");
     vi.stubEnv("AUTH_GOOGLE_SECRET", "client-secret");

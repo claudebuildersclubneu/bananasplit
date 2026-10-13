@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { SignedInAs } from "@/components/auth/signed-in-as";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import { ArrowRight } from "@/components/brand/arrows";
 import { AuthCard, AuthHeadline, AuthTitle } from "@/components/brand/auth-card";
@@ -12,7 +13,7 @@ import { findPendingInvitationsForMe } from "@/server/settings/invitations";
 
 import { PendingInviteCard } from "./pending-invite-card";
 
-export const metadata = { title: "Find your club · Bananasplit" };
+export const metadata = { title: "Welcome · Bananasplit" };
 
 /** The two ways on: a 50px row with a title, a line of detail and an arrow. */
 const choiceClass =
@@ -21,19 +22,18 @@ const choiceClass =
 /**
  * /onboarding: where sign-up and sign-in land for someone with no club.
  *
- * One account for everyone, then a choice: free event pages (no club, no
- * profile setup) or a club. Choosing a club runs profile setup (A1), and
- * once the profile is complete this page is A7: join with a club code or an
- * emailed invite, or start a club (Flow B). With a club, its home.
+ * One account for everyone, then the quick profile (A1: name, photo), then
+ * this page (A7): free event pages, join with a club code or an emailed
+ * invite, or start a club (Flow B). The club profile (school, bio, theme,
+ * availability) is its own optional setup, offered here. With a club, its
+ * home.
  */
 export default async function OnboardingPage() {
   const user = await requireUser();
   const profile = await getOnboardingProfile(user.id);
   if (!profile) redirect("/auth/session-ended");
   if (profile.memberships[0]) redirect(`/app/${profile.memberships[0].slug}`);
-  if (!profile.onboardedAt) {
-    return <ChoosePath />;
-  }
+  if (!profile.onboardedAt) redirect("/onboarding/profile/basics");
 
   // Clubs scheduled for deletion stay reachable at their URL, where an owner
   // can cancel during the 30-day grace period.
@@ -49,16 +49,17 @@ export default async function OnboardingPage() {
 
   return (
     <AuthCard
+      footer={<SignedInAs />}
       panel={
         <div className="flex flex-col gap-6">
           <AuthHeadline />
-          <JoinSteps current={2} />
+          <JoinSteps current={3} />
         </div>
       }
     >
       <AuthTitle
         title={firstName ? `Welcome, ${firstName}.` : "Welcome."}
-        description="Your profile is set. Join your club, start one, or just make event pages."
+        description="What are you here for? You can always do the others later."
       />
 
       {!profile.emailVerified && (
@@ -81,37 +82,48 @@ export default async function OnboardingPage() {
         </section>
       )}
 
-      {profile.emailVerified && (
-        <div className="flex flex-col gap-2.5">
-          <Link href="/onboarding/join" className={choiceClass}>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[16px] font-bold">Join with a club code</span>
-              <span className="text-ink-soft text-[14px]">
-                An officer shared a code or a link with you.
-              </span>
+      <div className="flex flex-col gap-2.5">
+        <Link href="/rsvp/new" className={choiceClass}>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[16px] font-bold">Make event pages</span>
+            <span className="text-ink-soft text-[14px]">
+              Free RSVP pages with just your account. No club, no team.
             </span>
-            <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link href="/onboarding/organization" className={choiceClass}>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[16px] font-bold">Start a new club</span>
-              <span className="text-ink-soft text-[14px]">
-                Set up a workspace for your club. You&apos;ll be its admin.
+          </span>
+          <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
+        </Link>
+        {profile.emailVerified && (
+          <>
+            <Link href="/onboarding/join" className={choiceClass}>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[16px] font-bold">Join with a club code</span>
+                <span className="text-ink-soft text-[14px]">
+                  An officer shared a code or a link with you.
+                </span>
               </span>
-            </span>
-            <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link href="/rsvp" className={choiceClass}>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[16px] font-bold">Just make event pages</span>
-              <span className="text-ink-soft text-[14px]">
-                Free RSVP pages with your account. No club, no team.
+              <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link href="/onboarding/organization" className={choiceClass}>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-[16px] font-bold">Start a new club</span>
+                <span className="text-ink-soft text-[14px]">
+                  Set up a workspace for your club. You&apos;ll be its admin.
+                </span>
               </span>
+              <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </>
+        )}
+        <Link href="/onboarding/profile/school" className={choiceClass}>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[16px] font-bold">Set up your club profile</span>
+            <span className="text-ink-soft text-[14px]">
+              Optional. School, bio, theme and when you can&apos;t meet, for your teammates.
             </span>
-            <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-      )}
+          </span>
+          <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
 
       {pendingDeletion.length > 0 && (
         <section className="border-ink/10 flex flex-col gap-2 border-t pt-4">
@@ -140,55 +152,6 @@ export default async function OnboardingPage() {
           </ul>
         </section>
       )}
-
-      <Link
-        href="/onboarding/profile/review"
-        className="text-ink-muted w-fit self-center text-[14px] font-semibold"
-      >
-        Review your profile
-      </Link>
-    </AuthCard>
-  );
-}
-
-/**
- * Right after sign-up: what the account is for. Event pages need nothing
- * more; a club starts with profile setup. Either way the other stays open.
- */
-function ChoosePath() {
-  return (
-    <AuthCard
-      panel={
-        <div className="flex flex-col gap-6">
-          <AuthHeadline />
-          <JoinSteps current={2} />
-        </div>
-      }
-    >
-      <AuthTitle
-        title="Welcome to Bananasplit."
-        description="What are you here for? You can always do the other one later."
-      />
-      <div className="flex flex-col gap-2.5">
-        <Link href="/rsvp/new" className={choiceClass}>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[16px] font-bold">Make event pages</span>
-            <span className="text-ink-soft text-[14px]">
-              Free RSVP pages with just your account. No club, no team.
-            </span>
-          </span>
-          <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-        </Link>
-        <Link href="/onboarding/profile/basics" className={choiceClass}>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[16px] font-bold">Join or start a club</span>
-            <span className="text-ink-soft text-[14px]">
-              A workspace for your club. Set up your profile, then join with a code or start one.
-            </span>
-          </span>
-          <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
     </AuthCard>
   );
 }

@@ -6,9 +6,12 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
 /**
  * The two onboarding flows from the design (docs/features/onboarding-flows.md):
  *
- *   A  Profile setup, once per new member:
- *      A1 basics -> A2 school -> A3 bio -> A4 theme -> A5 availability -> A6 review
- *      then A7: join with an invite code, or create an organization (Flow B).
+ *   A  Profile setup, in two parts:
+ *      A1 basics, the quick profile everyone fills in right after sign-up
+ *      (name, photo, pronouns, time zone); it alone completes onboarding,
+ *      then A7: event pages, join with a code, or create a club (Flow B).
+ *      The club profile, optional and separate: A2 school -> A3 bio ->
+ *      A4 theme -> A5 availability -> A6 review.
  *   B  Create an organization, only for the person creating one:
  *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> B6 invite
  *      -> the org, as admin.
@@ -25,6 +28,11 @@ export const PROFILE_STEPS = [
   "review",
 ] as const;
 export type ProfileStep = (typeof PROFILE_STEPS)[number];
+
+/** The quick profile: one page, for everyone. */
+export const QUICK_PROFILE_STEP = "basics" satisfies ProfileStep;
+/** The club profile: what teammates in a club see, set up separately. */
+export const CLUB_PROFILE_STEPS = ["school", "bio", "theme", "availability", "review"] as const;
 
 export const PROFILE_STEP_TITLES: Record<ProfileStep, string> = {
   basics: "About you",
@@ -43,14 +51,17 @@ export function profileStepHref(step: ProfileStep): string {
   return `/onboarding/profile/${step}`;
 }
 
+/** The quick profile and the club profile are separate runs: neither leads into the other. */
 export function nextProfileStep(step: ProfileStep): ProfileStep | null {
-  const i = PROFILE_STEPS.indexOf(step);
-  return PROFILE_STEPS[i + 1] ?? null;
+  if (step === QUICK_PROFILE_STEP) return null;
+  const i = (CLUB_PROFILE_STEPS as readonly ProfileStep[]).indexOf(step);
+  return CLUB_PROFILE_STEPS[i + 1] ?? null;
 }
 
 export function previousProfileStep(step: ProfileStep): ProfileStep | null {
-  const i = PROFILE_STEPS.indexOf(step);
-  return i > 0 ? PROFILE_STEPS[i - 1] : null;
+  if (step === QUICK_PROFILE_STEP) return null;
+  const i = (CLUB_PROFILE_STEPS as readonly ProfileStep[]).indexOf(step);
+  return i > 0 ? CLUB_PROFILE_STEPS[i - 1] : null;
 }
 
 // B1 is /onboarding/organization; the rest live under the new org's slug.

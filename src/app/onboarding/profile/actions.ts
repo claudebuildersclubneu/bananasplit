@@ -33,12 +33,18 @@ async function save(run: () => Promise<void>, where: string): Promise<StepSaveRe
   }
 }
 
-/** A1: name, pronouns, time zone. */
+/**
+ * A1, the quick profile: name, pronouns, time zone (the photo saves on its
+ * own). Saving it completes onboarding; the club profile is separate.
+ */
 export async function saveBasicsStep(input: unknown): Promise<StepSaveResult> {
   const user = await requireUser();
   const parsed = basicsSchema.safeParse(input);
   if (!parsed.success) return { ok: false, fieldErrors: profileFieldErrors(parsed.error) };
-  return save(() => updateOwnProfile(user.id, parsed.data), "basics");
+  return save(async () => {
+    await updateOwnProfile(user.id, parsed.data);
+    await markProfileSetupComplete(user.id);
+  }, "basics");
 }
 
 /** A2: major, graduation year, role (the title the user joins orgs with). */

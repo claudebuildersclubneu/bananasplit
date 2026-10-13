@@ -121,20 +121,13 @@ export async function verifyEmail(page: Page, email: string): Promise<void> {
  * button); "create" on B1, /onboarding/organization.
  */
 export async function completeProfileSetup(page: Page, next: "join" | "create"): Promise<void> {
-  // A new account first chooses event pages or a club (/onboarding).
-  await page.waitForURL(/\/onboarding(\/profile\/basics)?$/);
-  if (!/\/profile\/basics$/.test(new URL(page.url()).pathname)) {
-    await page.getByRole("link", { name: /Join or start a club/ }).click();
-  }
+  // A new account fills in the quick profile, then chooses on /onboarding.
+  // The club profile (school, bio, …) is optional and skipped here.
   await page.waitForURL(/\/onboarding\/profile\/basics/);
-  for (const step of ["school", "bio", "theme", "availability", "review"]) {
-    await page.getByRole("button", { name: /^(Continue|Use .+)$/ }).click();
-    await page.waitForURL(new RegExp(`/onboarding/profile/${step}$`));
-  }
+  await page.getByRole("button", { name: /^Continue$/ }).click();
+  await page.waitForURL(/\/onboarding$/);
   await page
-    .getByRole("button", {
-      name: next === "join" ? "Join with a club code" : "Start a new club",
-    })
+    .getByRole("link", { name: next === "join" ? /Join with a club code/ : /Start a new club/ })
     .click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
 }

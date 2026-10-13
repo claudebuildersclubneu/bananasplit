@@ -58,7 +58,7 @@ export function SignUpForm({
     <>
       <AuthTitle
         title="Create your account."
-        description="It's free. Next you'll choose what it's for: event pages, or your club."
+        description="It's free. Next, a quick profile, then event pages or your club."
       />
       {google}
       <form action={formAction} className="flex flex-col gap-[18px]">

@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-
+import { AlreadySignedIn } from "@/components/auth/already-signed-in";
 import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
 import { AuthCard, AuthHeadline } from "@/components/brand/auth-card";
 import { OrDivider } from "@/components/brand/fields";
@@ -20,8 +19,14 @@ export const metadata = { title: "Create your account · Bananasplit" };
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
   const callbackUrl = safeCallbackUrl((await searchParams).callbackUrl);
   const session = await auth();
-  if (session) {
-    redirect(callbackUrl ?? "/");
+  if (session?.user?.email) {
+    return (
+      <AlreadySignedIn
+        email={session.user.email}
+        name={session.user.name ?? null}
+        continueTo={callbackUrl ?? "/app"}
+      />
+    );
   }
 
   // Only offered when the Google client is configured (as on /sign-in).
