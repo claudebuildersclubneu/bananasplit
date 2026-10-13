@@ -177,7 +177,13 @@ export function WidgetBody({
       return (
         <Big
           value={formatCents(data.balanceCents)}
-          sub={period?.label ?? "No budget period yet"}
+          sub={
+            !period
+              ? "No budget period yet"
+              : data.carriedInCents !== 0
+                ? `${period.label} · ${formatCents(data.carriedInCents)} carried over`
+                : period.label
+          }
           tone={data.balanceCents < 0 ? "bad" : undefined}
         />
       );

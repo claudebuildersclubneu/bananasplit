@@ -42,6 +42,7 @@ function dashboard(runway: Partial<RunwayInput>): DashboardData {
     pendingApproval: { count: 2, cents: 4_500 },
     spendByKind: [],
     balanceTrend: [],
+    carriedInCents: 0,
     recent: [],
     topExpenses: [],
     incomeByKind: [],

@@ -237,7 +237,10 @@ export function getSponsorships(db: TxClient, organizationId: string) {
 
 export interface DashboardData {
   period: { id: string; label: string; startsOn: Date; endsOn: Date } | null;
+  /** What the club has: carried over from earlier periods plus this period's in less out. */
   balanceCents: number;
+  /** The balance the earlier periods ended with, which this period opens on. */
+  carriedInCents: number;
   totalAllocatedCents: number;
   categories: { id: string; name: string; allocatedCents: number; spentCents: number }[];
   /** Owed to members for submitted or approved expenses, in every period. */
@@ -347,6 +350,7 @@ export async function getDashboardData(
     return {
       period: null,
       balanceCents: 0,
+      carriedInCents: 0,
       totalAllocatedCents: 0,
       categories: [],
       sponsorshipCommittedCents: 0,
@@ -390,6 +394,25 @@ export async function getDashboardData(
       categoryId: true,
     },
   });
+  // The money doesn't reset when a new budget period starts: the balance
+  // opens on whatever the earlier periods' ledgers left. Category budgets do
+  // start fresh each period. Summed live, so an edit to an old period flows
+  // through without a stored opening balance to keep in step.
+  const carried = await db.transaction.groupBy({
+    by: ["direction"],
+    where: {
+      organizationId,
+      voidedAt: null,
+      status: { notIn: [TransactionStatus.DRAFT, TransactionStatus.REJECTED] },
+      budgetPeriod: { startsOn: { lt: period.startsOn } },
+    },
+    _sum: { amountCents: true },
+  });
+  const carriedInCents = carried.reduce(
+    (sum, g) =>
+      sum + (g.direction === TransactionDirection.IN ? 1 : -1) * (g._sum.amountCents ?? 0),
+    0,
+  );
   const meetings = await db.event.findMany({
     where: {
       organizationId,
@@ -448,7 +471,7 @@ export async function getDashboardData(
       t.status !== TransactionStatus.APPROVED,
   ).length;
 
-  const balanceCents = inTotal - outTotal;
+  const balanceCents = carriedInCents + inTotal - outTotal;
 
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
   const toRow = (t: (typeof ledger)[number]): DashboardTransaction => ({
@@ -462,7 +485,7 @@ export async function getDashboardData(
   });
   const byDate = [...ledger].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
   const trend = new Map<string, number>();
-  let running = 0;
+  let running = carriedInCents;
   for (const t of byDate) {
     running += t.direction === TransactionDirection.IN ? t.amountCents : -t.amountCents;
     trend.set(t.occurredAt.toISOString().slice(0, 10), running);
@@ -487,6 +510,7 @@ export async function getDashboardData(
       endsOn: period.endsOn,
     },
     balanceCents,
+    carriedInCents,
     totalAllocatedCents: categories.reduce((sum, c) => sum + c.allocatedCents, 0),
     categories: categorySpent,
     sponsorshipCommittedCents,

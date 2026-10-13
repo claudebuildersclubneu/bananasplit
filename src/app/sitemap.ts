@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 import { siteOrigin } from "@/lib/brand/site-origin";
 
 /** The public pages worth indexing. Add /rsvp here once that page exists. */
-const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"] as const;
+const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up", "/privacy"] as const;
 
 /**
  * sitemap.xml, on the same origin as the app's emails. Empty when there is

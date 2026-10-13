@@ -229,6 +229,17 @@ runSuite("rls-attacks", async ({ clients, record: rec }) => {
     { check: (s) => Object.values(s).every((v) => v === "42501") },
   );
 
+  await acase(
+    "A-B2b",
+    "B2",
+    "a MEMBER cannot mark their own draft expense not applicable (it would count without approval)",
+    "app_user",
+    A("u_memberA"),
+    async (q) =>
+      tryq(q, `UPDATE "Transaction" SET "status"='NOT_APPLICABLE' WHERE "id"='tx_A_draft'`),
+    { check: (s) => s === "42501" },
+  );
+
   // ======================= B3: forced membership =======================
   await acase(
     "A-B3",

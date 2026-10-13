@@ -164,7 +164,8 @@ describe("signUpAction (0A Fix 4(a,b))", () => {
       where: { email: "existing@example.edu" },
       select: { id: true },
     });
-    expect(state.error).toMatch(/already exists/i);
+    expect(state.error).toMatch(/already an account/i);
+    expect(state.accountExists).toBe(true);
     expect(authDbMock.user.create).not.toHaveBeenCalled();
   });
 

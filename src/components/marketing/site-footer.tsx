@@ -1,5 +1,5 @@
 import { Logo } from "@/components/brand/logo";
-import { CONTACT_HREF, PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
+import { CONTACT_HREF, PRIVACY_HREF } from "@/lib/brand/links";
 
 import { FooterAccountLink } from "./signed-in";
 import { SiteLink } from "./site-link";
@@ -8,27 +8,26 @@ const COLUMNS = [
   {
     title: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "Finance", href: "#finance" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "FAQs", href: "#faq" },
+      { label: "Features", href: "/#features" },
+      { label: "Finance", href: "/#finance" },
+      { label: "Pricing", href: "/#pricing" },
+      { label: "FAQs", href: "/#faq" },
     ],
   },
   {
     title: "Account",
     links: [
       { label: "Log in", href: "/sign-in" },
-      { label: "Create your club", href: "#pricing" },
+      { label: "Create your club", href: "/#pricing" },
       { label: "Join with a code", href: "/onboarding/join" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "For schools", href: "#pricing" },
+      { label: "For schools", href: "/#pricing" },
       { label: "Contact", href: CONTACT_HREF },
       { label: "Privacy", href: PRIVACY_HREF },
-      { label: "Terms", href: TERMS_HREF },
     ],
   },
 ] as const;
@@ -44,9 +43,9 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-[1240px] flex-col gap-12 px-6 pt-[72px] pb-10">
         <div className="flex flex-wrap justify-between gap-x-16 gap-y-10">
           <div className="flex max-w-[360px] flex-[1_1_280px] flex-col gap-4">
-            <a href="#top" className="flex">
+            <SiteLink href="/" className="flex">
               <Logo size={30} textSize={22} />
-            </a>
+            </SiteLink>
             <p className="text-ink-muted text-[15px] leading-[1.55]">
               The all-in-one workspace for student clubs and the teams that grow out of them.
             </p>

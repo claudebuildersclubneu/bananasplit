@@ -206,25 +206,33 @@ describe.skipIf(!dbAvailable)("getDashboardData — matches independent raw SQL 
     await disconnectAll();
   });
 
-  it("balance equals SUM(IN) - SUM(OUT) over non-voided transactions, drafts and rejections left out", async () => {
+  it("balance equals SUM(IN) - SUM(OUT) over non-voided transactions, drafts and rejections left out, carried over from earlier periods", async () => {
     const data = await dashboard();
 
-    const [{ balance, drafts }] = await sql(
+    const [{ balance, carried, drafts }] = await sql(
       ({ db }) =>
-        db.$queryRaw<{ balance: bigint; drafts: bigint }[]>`
+        db.$queryRaw<{ balance: bigint; carried: bigint; drafts: bigint }[]>`
         SELECT
-          COALESCE(SUM(
-            CASE WHEN status IN ('DRAFT', 'REJECTED') THEN 0
-                 WHEN direction = 'IN' THEN "amountCents" ELSE -"amountCents" END
-          ), 0) AS balance,
-          COUNT(*) FILTER (WHERE status = 'DRAFT') AS drafts
-        FROM "Transaction"
-        WHERE "organizationId" = ${orgId} AND "budgetPeriodId" = ${periodId} AND "voidedAt" IS NULL
+          COALESCE(SUM(v.signed), 0) AS balance,
+          COALESCE(SUM(v.signed) FILTER (WHERE v."budgetPeriodId" <> ${periodId}), 0) AS carried,
+          COUNT(*) FILTER (WHERE v.status = 'DRAFT') AS drafts
+        FROM (
+          SELECT t."budgetPeriodId", t.status,
+                 CASE WHEN t.status IN ('DRAFT', 'REJECTED') THEN 0
+                      WHEN t.direction = 'IN' THEN t."amountCents" ELSE -t."amountCents" END AS signed
+            FROM "Transaction" t
+            JOIN "BudgetPeriod" p ON p.id = t."budgetPeriodId"
+           WHERE t."organizationId" = ${orgId} AND t."voidedAt" IS NULL
+             AND p."startsOn" <= (SELECT "startsOn" FROM "BudgetPeriod" WHERE id = ${periodId})
+        ) v
       `,
     );
 
-    // The seed has live drafts, so leaving them out really changes the figure.
+    // The seed has live drafts, so leaving them out really changes the figure,
+    // and last year's open requests, so the carry-over does too.
     expect(Number(drafts)).toBeGreaterThan(0);
+    expect(Number(carried)).not.toBe(0);
+    expect(data.carriedInCents).toBe(Number(carried));
     expect(data.balanceCents).toBe(Number(balance));
   });
 

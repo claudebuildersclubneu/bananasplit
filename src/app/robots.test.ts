@@ -57,6 +57,7 @@ describe("sitemap.xml", () => {
       "https://bananasplit.app",
       "https://bananasplit.app/sign-in",
       "https://bananasplit.app/sign-up",
+      "https://bananasplit.app/privacy",
     ]);
   });
 

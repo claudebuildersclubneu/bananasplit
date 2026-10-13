@@ -7,7 +7,7 @@ import { ArrowLeft } from "@/components/brand/arrows";
 import { CoreMark } from "@/components/brand/logo";
 import { CLUB_PLANS, type ClubPlanId } from "@/lib/billing/plans";
 import type { SemesterSeason } from "@/lib/billing/semester";
-import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
+import { PRIVACY_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
 /** "$280.00", "$1,400.00". */
@@ -234,9 +234,6 @@ export function CheckoutForm({
               Powered by <b className="text-ink-muted">stripe</b>
             </span>
             <span aria-hidden="true">|</span>
-            <a href={TERMS_HREF} className="text-ink-faint">
-              Terms
-            </a>
             <a href={PRIVACY_HREF} className="text-ink-faint">
               Privacy
             </a>

@@ -38,6 +38,8 @@ export interface SignUpState {
    * says so when the server could not sign anyone in).
    */
   checkEmail?: string;
+  /** The email already has an account: the form offers log in and reset. */
+  accountExists?: boolean;
 }
 
 /**
@@ -86,8 +88,11 @@ export async function signUpAction(
     where: { email: parsed.data.email },
     select: { id: true },
   });
+  // Said plainly, by choice: someone who forgot they signed up is far more
+  // common here than someone probing for addresses, and the per-IP and
+  // per-email limits above still cap how fast anyone can ask.
   if (existing) {
-    return { error: "An account with this email already exists." };
+    return { error: "There's already an account with this email.", accountExists: true };
   }
 
   const passwordHash = await hashPassword(parsed.data.password);

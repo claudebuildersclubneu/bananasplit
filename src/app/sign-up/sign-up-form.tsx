@@ -8,7 +8,7 @@ import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components
 import { NewPasswordField } from "@/components/brand/new-password-field";
 import { pill } from "@/components/brand/pill";
 import { signInPath } from "@/lib/auth/callback-url";
-import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
+import { PRIVACY_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
 import { signUpAction } from "./actions";
@@ -91,16 +91,29 @@ export function SignUpForm({
           />
         </BrandField>
         <NewPasswordField inputClassName="h-12" />
-        {state.error && <FormMessage>{state.error}</FormMessage>}
+        {state.error && (
+          <FormMessage>
+            {state.error}
+            {state.accountExists && (
+              <>
+                {" "}
+                <Link href={signInPath(callbackUrl)} className="font-bold underline">
+                  Log in
+                </Link>{" "}
+                or{" "}
+                <Link href="/forgot-password" className="font-bold underline">
+                  reset your password
+                </Link>
+                .
+              </>
+            )}
+          </FormMessage>
+        )}
         <PrimaryButton type="submit" disabled={isPending}>
           {isPending ? "Creating account…" : "Create account"}
         </PrimaryButton>
         <p className="text-ink-soft m-0 text-center text-[13px] leading-normal">
-          By continuing you agree to the{" "}
-          <a href={TERMS_HREF} className="text-ink-muted underline">
-            Terms
-          </a>{" "}
-          and{" "}
+          By continuing you agree to our{" "}
           <a href={PRIVACY_HREF} className="text-ink-muted underline">
             Privacy Policy
           </a>
