@@ -83,3 +83,57 @@
 .rsvp-bg-cover {
   background-color: var(--color-night);
 }
+
+/*
+ * The printable flyer (/e/[slug]/flyer): a US Letter sheet. On screen it
+ * sits on the page with a shadow, zoomed down to fit a phone; printed, the
+ * toolbar goes and the sheet fills the page edge to edge.
+ */
+.flyer-sheet {
+  width: 8.5in;
+  height: 11in;
+  flex: none;
+  box-shadow:
+    0 1px 2px rgb(28 24 16 / 0.08),
+    0 24px 60px -24px rgb(28 24 16 / 0.35);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@media screen and (max-width: 880px) {
+  .flyer-sheet {
+    zoom: 0.8;
+  }
+}
+@media screen and (max-width: 720px) {
+  .flyer-sheet {
+    zoom: 0.62;
+  }
+}
+@media screen and (max-width: 560px) {
+  .flyer-sheet {
+    zoom: 0.46;
+  }
+}
+@media screen and (max-width: 420px) {
+  .flyer-sheet {
+    zoom: 0.4;
+  }
+}
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0;
+  }
+  .flyer-toolbar {
+    display: none !important;
+  }
+  .flyer-screen {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  .flyer-sheet {
+    box-shadow: none;
+  }
+}

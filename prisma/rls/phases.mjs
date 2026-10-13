@@ -82,6 +82,10 @@ const GRANTS = {
   Project: ["SIUD", "SIUD", ""],
   RateLimitBucket: ["", "", ""],
   Receipt: ["SID", "SID", ""],
+  // An RSVP page's bring list: owners/admins in the suite (row policy), the
+  // public page's claims on the service path. Claims are insert/delete.
+  RsvpItem: ["SIUD", "SIUD", ""],
+  RsvpItemClaim: ["SID", "SID", ""],
   RecentVisit: ["SIUD", "", ""],
   Session: ["", "", "SIUD"],
   Signup: ["SIUD", "SIUD", ""],
@@ -160,6 +164,8 @@ const NEW_TENANT_TABLES = [
   "EventRegistration",
   "DatabaseField",
   "DatabaseRecord",
+  "RsvpItem",
+  "RsvpItemClaim",
 ];
 
 /**
@@ -3479,5 +3485,48 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       return claimed;
     },
     { value: ["gcal"] },
+  );
+  await tcase(
+    "P-RSVP-FREE-01",
+    "Free RSVP pages: bring lists are owners' and admins' in the suite; a club can't become a personal space; only a space's owner moves its events out",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      s.admin_adds_line = await rc(
+        q,
+        `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_1','org_A','e_A','Chips')`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_sees_lines = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
+      s.member_adds_line = await tryq(
+        q,
+        `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_2','org_A','e_A','Ice')`,
+      );
+      // A club's event is no one's free event: nothing moves.
+      s.member_moves = await tryv(q, `SELECT app.move_personal_event('e_A','org_A')`);
+      s.member_purges = await tryv(q, `SELECT app.purge_personal_rsvp_guests(30)`);
+      await q(`SELECT app.set_context('u_ownerA','org_A')`);
+      s.owner_moves_club_event = await tryv(q, `SELECT app.move_personal_event('e_A','org_B')`);
+      s.owner_flips_kind = await tryq(
+        q,
+        `UPDATE "Organization" SET "kind" = 'PERSONAL', "personalOwnerId" = 'u_ownerA' WHERE "id" = 'org_A'`,
+      );
+      await q(`SELECT app.set_context('u_memberB','org_B')`);
+      s.other_org_sees = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
+      return s;
+    },
+    {
+      value: {
+        admin_adds_line: 1,
+        member_sees_lines: 0,
+        member_adds_line: "42501",
+        member_moves: false,
+        member_purges: "error:42501",
+        owner_moves_club_event: false,
+        owner_flips_kind: "42501",
+        other_org_sees: 0,
+      },
+    },
   );
 });

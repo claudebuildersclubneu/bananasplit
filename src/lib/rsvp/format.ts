@@ -1,3 +1,5 @@
+import { allDaySpan } from "@/lib/calendar/dates";
+
 /**
  * Pure rules and formatting for public RSVP pages (docs/features/rsvp.md):
  * who gets a spot, what the page shows, phone numbers and names. No I/O, so
@@ -51,16 +53,6 @@ export function promotableCount(
 ): number {
   if (capacity === null) return waitingCount;
   return Math.min(waitingCount, Math.max(0, capacity - goingCount));
-}
-
-/** "Maya Patel" -> "Maya P.": how the public page lists who's going. */
-export function publicName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "Guest";
-  const first = parts[0];
-  if (parts.length === 1) return first;
-  const last = parts[parts.length - 1];
-  return `${first} ${last[0]!.toUpperCase()}.`;
 }
 
 /** One or two initials for an avatar. */
@@ -123,20 +115,28 @@ export function splitLocation(location: string): { venue: string; rest: string |
   return { venue: lines[0]!, rest: lines.slice(1).join(", ") };
 }
 
-/** Google Calendar's "add event" link. */
+/**
+ * Google Calendar's "add event" link. An all-day event goes in as dates
+ * (YYYYMMDD/YYYYMMDD, the end the day after its last), so Google shows it
+ * as all day on the club's dates rather than midnight to midnight.
+ */
 export function googleCalendarUrl(event: {
   title: string;
   startsAt: Date;
   endsAt: Date;
+  allDay: boolean;
+  /** The club's timezone, which an all-day event's dates are in. */
+  timeZone: string;
   details?: string | null;
   location?: string | null;
 }): string {
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: event.title,
-    dates: `${fmt(event.startsAt)}/${fmt(event.endsAt)}`,
-  });
+  let dates = `${fmt(event.startsAt)}/${fmt(event.endsAt)}`;
+  if (event.allDay) {
+    const span = allDaySpan(event.startsAt, event.endsAt, event.timeZone);
+    dates = `${span.start.replace(/-/g, "")}/${span.endExclusive.replace(/-/g, "")}`;
+  }
+  const params = new URLSearchParams({ action: "TEMPLATE", text: event.title, dates });
   if (event.details) params.set("details", event.details);
   if (event.location) params.set("location", event.location);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
@@ -158,4 +158,54 @@ export function avatarTone(name: string): string {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return AVATAR_TONES[h % AVATAR_TONES.length]!;
+}
+
+/** The ticket code in a scanned QR (/e/{slug}/t/{code}), or null. */
+export function ticketCodeFrom(raw: string): string | null {
+  const m = /\/t\/([a-z0-9]{12})(?:[/?#]|$)/.exec(raw.trim());
+  return m ? m[1]! : null;
+}
+
+/**
+ * What a ticket scanned in door mode does: checks a going guest in, or
+ * stops to say why not. A waitlisted guest's ticket isn't a spot, so the
+ * host decides (tapping their name checks them in anyway).
+ */
+export function doorScan<G extends { ticketCode: string; status: string; checkedIn: boolean }>(
+  guests: readonly G[],
+  raw: string,
+): { kind: "unknown" } | { kind: "already" | "waitlist" | "check-in"; guest: G } {
+  const code = ticketCodeFrom(raw);
+  const guest = code ? guests.find((g) => g.ticketCode === code) : undefined;
+  if (!guest) return { kind: "unknown" };
+  if (guest.checkedIn) return { kind: "already", guest };
+  if (guest.status === "WAITLIST") return { kind: "waitlist", guest };
+  return { kind: "check-in", guest };
+}
+
+/** A name as the guest list shows it: in full, with the spacing tidied. */
+export function displayName(name: string): string {
+  return name.trim().replace(/\s+/g, " ") || "Guest";
+}
+
+const INSTAGRAM_HANDLE = /^[A-Za-z0-9._]{1,30}$/;
+
+/**
+ * An Instagram handle from whatever a guest typed: "maya.chen",
+ * "@maya.chen" or a profile link ("instagram.com/maya.chen/"). Empty is
+ * null (they'd rather not); anything else that isn't a handle is undefined.
+ */
+export function normalizeInstagram(input: string): string | null | undefined {
+  const raw = input.trim();
+  if (!raw) return null;
+  const fromUrl = /^(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^/?#\s]+)\/?(?:[?#].*)?$/i.exec(
+    raw,
+  );
+  const handle = (fromUrl ? fromUrl[1]! : raw).replace(/^@/, "");
+  return INSTAGRAM_HANDLE.test(handle) ? handle : undefined;
+}
+
+/** The profile behind a handle. */
+export function instagramUrl(handle: string): string {
+  return `https://www.instagram.com/${encodeURIComponent(handle)}/`;
 }

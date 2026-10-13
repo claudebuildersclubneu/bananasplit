@@ -2,16 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import { resolveRsvpBackground } from "./backgrounds";
 import {
+  doorScan,
   formatPhone,
+  displayName,
   initials,
+  instagramUrl,
+  normalizeInstagram,
   maskEmail,
   mapsSearchUrl,
   normalizePhone,
   placeRegistration,
   promotableCount,
-  publicName,
   splitLocation,
   spotsLeft,
+  ticketCodeFrom,
 } from "./format";
 import { registrationSchema } from "./schema";
 import { dateTile, timeLine, whenLine } from "./when";
@@ -38,12 +42,25 @@ describe("who gets a spot", () => {
 });
 
 describe("names, phones and emails", () => {
-  it("shortens names for the public page", () => {
-    expect(publicName("Maya Patel")).toBe("Maya P.");
-    expect(publicName("  ivy   nine stone ")).toBe("ivy S.");
-    expect(publicName("Cher")).toBe("Cher");
-    expect(publicName("   ")).toBe("Guest");
+  it("shows names in full on the public page, spacing tidied", () => {
+    expect(displayName("Jackson Lamoureux")).toBe("Jackson Lamoureux");
+    expect(displayName("  ivy   nine stone ")).toBe("ivy nine stone");
+    expect(displayName("   ")).toBe("Guest");
     expect(initials("Maya Patel")).toBe("MP");
+  });
+
+  it("reads an Instagram handle from whatever the guest typed", () => {
+    expect(normalizeInstagram("maya.chen")).toBe("maya.chen");
+    expect(normalizeInstagram(" @maya_chen ")).toBe("maya_chen");
+    expect(normalizeInstagram("instagram.com/maya.chen/")).toBe("maya.chen");
+    expect(normalizeInstagram("https://www.instagram.com/maya.chen?igsh=abc")).toBe("maya.chen");
+    expect(normalizeInstagram("")).toBeNull();
+    // Not a handle: spaces, other sites, too long, script.
+    expect(normalizeInstagram("maya chen")).toBeUndefined();
+    expect(normalizeInstagram("https://evil.example/maya")).toBeUndefined();
+    expect(normalizeInstagram("a".repeat(31))).toBeUndefined();
+    expect(normalizeInstagram("javascript:alert(1)")).toBeUndefined();
+    expect(instagramUrl("maya.chen")).toBe("https://www.instagram.com/maya.chen/");
   });
   it("normalizes phone numbers to E.164 where it can", () => {
     expect(normalizePhone("(617) 555-0142")).toBe("+16175550142");
@@ -71,7 +88,29 @@ describe("names, phones and emails", () => {
         email: " Maya@Example.EDU ",
         phone: "617-555-0142",
       }),
-    ).toEqual({ name: "Maya Patel", email: "maya@example.edu", phone: "+16175550142" });
+    ).toEqual({
+      name: "Maya Patel",
+      email: "maya@example.edu",
+      phone: "+16175550142",
+      instagram: null,
+    });
+    // Instagram is optional, and stored without the @.
+    expect(
+      registrationSchema.parse({
+        name: "Maya Patel",
+        email: "maya@example.edu",
+        phone: "6175550142",
+        instagram: "@maya.p",
+      }).instagram,
+    ).toBe("maya.p");
+    expect(
+      registrationSchema.safeParse({
+        name: "Maya Patel",
+        email: "maya@example.edu",
+        phone: "6175550142",
+        instagram: "not a handle",
+      }).success,
+    ).toBe(false);
     expect(
       registrationSchema.safeParse({ name: "", email: "a@b.co", phone: "6175550142" }).success,
     ).toBe(false);
@@ -107,5 +146,44 @@ describe("backgrounds", () => {
     expect(resolveRsvpBackground("cover", false).id).toBe("banana");
     expect(resolveRsvpBackground("cover", true).id).toBe("cover");
     expect(resolveRsvpBackground("lava", true).id).toBe("banana");
+  });
+});
+
+describe("scanning a ticket at the door", () => {
+  const guests = [
+    { name: "Ava", ticketCode: "aaaaaaaaaaaa", status: "GOING", checkedIn: false },
+    { name: "Ben", ticketCode: "bbbbbbbbbbbb", status: "GOING", checkedIn: true },
+    { name: "Maya", ticketCode: "mmmmmmmmmmmm", status: "WAITLIST", checkedIn: false },
+  ];
+  const scan = (code: string) => doorScan(guests, `https://bananasplit.fyi/e/k3x9p2qa/t/${code}`);
+
+  it("checks in someone going", () => {
+    expect(scan("aaaaaaaaaaaa")).toEqual({ kind: "check-in", guest: guests[0] });
+  });
+
+  it("stops for someone already in, someone waitlisted, or another event's ticket", () => {
+    expect(scan("bbbbbbbbbbbb")).toEqual({ kind: "already", guest: guests[1] });
+    expect(scan("mmmmmmmmmmmm")).toEqual({ kind: "waitlist", guest: guests[2] });
+    expect(scan("zzzzzzzzzzzz")).toEqual({ kind: "unknown" });
+    expect(doorScan(guests, "not a ticket")).toEqual({ kind: "unknown" });
+  });
+});
+
+describe("ticketCodeFrom", () => {
+  it("reads the code from a ticket's link, wherever it's hosted", () => {
+    expect(ticketCodeFrom("https://bananasplit.fyi/e/k3x9p2qa/t/abcdefghjkmn")).toBe(
+      "abcdefghjkmn",
+    );
+    expect(ticketCodeFrom("http://localhost:3540/e/k3x9p2qa/t/abcdefghjkmn?x=1")).toBe(
+      "abcdefghjkmn",
+    );
+    expect(ticketCodeFrom(" /e/k3x9p2qa/t/abcdefghjkmn/ ")).toBe("abcdefghjkmn");
+  });
+
+  it("ignores anything that isn't a ticket", () => {
+    expect(ticketCodeFrom("https://bananasplit.fyi/e/k3x9p2qa")).toBeNull();
+    expect(ticketCodeFrom("/e/k3x9p2qa/t/short")).toBeNull();
+    expect(ticketCodeFrom("/e/k3x9p2qa/t/ABCDEFGHJKMN")).toBeNull();
+    expect(ticketCodeFrom("hello")).toBeNull();
   });
 });

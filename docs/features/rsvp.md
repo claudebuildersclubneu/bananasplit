@@ -1,10 +1,17 @@
 # RSVP pages
 
-A public sign-up page for an event, in the style of Luma. An owner or admin
-turns it on for any event; anyone with the link signs up with a name, an
-email and a phone number, member or not. Guests get a confirmation email,
-then a reminder (email, and a text once Twilio is set up) a day and an hour
-before the event.
+A public sign-up page for an event. An owner or admin turns it on for any
+event, or anyone makes one for free at /rsvp without a club; anyone with
+the link signs up with a name, an email and a phone number. Guests get a
+confirmation email (with their ticket and invite link), then a reminder
+(email, and a text once Twilio is set up) a day and an hour before.
+
+What sets it apart from Luma and Partiful: guests **split the cost** with
+the host's Venmo, Cash App, PayPal or Zelle (no fees, nothing through us),
+claim lines on a **bring list**, bring friends with their **own invite
+link**, and get a **QR ticket** a host scans in **door mode**; any page
+prints as a **flyer** with tear-off tabs; and in a club every check-in lands
+in the club's People and Attendance databases.
 
 ## Where it lives
 
@@ -29,19 +36,28 @@ before the event.
 ## What the page shows
 
 - The title, date and time in the club's timezone, and the location with a
-  Google Maps link and embedded map (the keyless embed; CSP `frame-src`
-  allows `https://www.google.com`).
+  Google Maps link, and a map that loads when the guest taps "Show the map"
+  (the keyless embed; CSP `frame-src` allows `https://www.google.com`). It
+  isn't loaded up front: the embed is well over a megabyte of scripts, and
+  would tell Google about every visitor. An all-day event is dated in the
+  club's timezone too (it is stored as midnight there), and its Google
+  Calendar link adds it as all day on those dates.
 - Directions ("How to find it", `Event.locationDetails`).
 - The cover (square WebP crops in the public store, kind `event-covers`).
 - **Hosted by:** the club and the event's host.
-- **Who's going:** names shortened to "Maya P." and initials avatars.
-- The online meeting link, only to someone who has signed up.
+- **Who's going:** one name a line, in full ("Jackson Lamoureux"), with
+  initials avatars and, when the guest shared it, a link to their
+  Instagram (`EventRegistration.instagram`, optional on the sign-up form,
+  stored without the @). A free page's "Hosted by" links the host's
+  Instagram from their Bananasplit profile. Instagram profile pictures
+  aren't pulled in: Instagram offers no way for other sites to load them.
+- The online meeting link, only to someone who is going (not the waitlist).
 
 The host's privacy switches:
 
 | Switch                                | Effect                                                                                    |
 | ------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Hide the address until people sign up | The address, directions and map show only to signed-up guests.                            |
+| Hide the address until people sign up | The address, directions and map show only to guests who are going.                        |
 | Hide who's going                      | No names on the page.                                                                     |
 | Hide how many are going               | No head count or spots left. This also hides the names, since a list of names is a count. |
 
@@ -59,10 +75,16 @@ The registration card is always paper and ink, whatever the background.
 - When the event is full:
   - with the waitlist on (`rsvpWaitlist`), new sign-ups join the waitlist;
   - without it, registration says the event is full.
-- When a guest leaves the going list, the earliest person on the waitlist
-  moves up and is emailed. Leaving means cancelling, being moved by a host,
-  or being deleted.
-- Raising the capacity or removing the limit moves people up the same way.
+- When someone going cancels (or a host cancels or deletes their sign-up),
+  the person who has waited longest moves up and is emailed. Raising the
+  capacity or removing the limit moves people up the same way.
+- A host moving a going guest to the waitlist moves nobody up: who goes is
+  the host's call there (and the guest would otherwise get the spot straight
+  back, with a "spot opened" email).
+- The line is ordered by `EventRegistration.queuedAt`, when the guest last
+  joined the going list or the waitlist (then `id`), and so is the place in
+  line a waitlisted guest sees. Someone who cancels and signs up again goes
+  to the back.
 - Hosts can add a guest past capacity, and can move anyone to going.
 - Sign-ups are counted under a per-event advisory lock
   (`pg_advisory_xact_lock`), so a rush for the last spots can't overbook
@@ -92,12 +114,29 @@ Job kinds in `src/server/jobs/registry.ts`:
 - `rsvp-email`: one email per guest. The templates are confirmation,
   waitlist, a spot opened, the day-before and hour-before reminders, and
   the event was cancelled.
-- `rsvp-fanout`: queues one `rsvp-email` per guest.
-  - Reminders are queued with `runAt` 24 hours and 1 hour before the start.
-    Their key includes the start, so moving the event queues new reminders,
-    and the old ones find the time changed and do nothing.
+- `rsvp-fanout`: queues one `rsvp-email` per guest, in bulk
+  (`enqueueRsvpEmails`: the same keys, with `app.enqueue_job` run per guest
+  inside the database in one statement), so a big guest list fits in its
+  short transaction.
+  It may run in the request's `after()`, so a cancellation goes out right
+  after the delete.
+  - Reminders are queued with `runAt` 24 hours and 1 hour before the start
+    (an all-day event gets only the day-before one). Their key includes the
+    start, so moving the event queues new reminders, and the old ones find
+    the time changed and do nothing.
+  - Moving the event also clears `reminderDaySentAt` and
+    `reminderHourSentAt` in the same transaction, so the new time's
+    reminders reach everyone.
+  - A reminder still waiting when the event starts (a retry, a late drain)
+    is dropped.
   - The event service queues a `cancelled` fan-out when an event with a
-    page is deleted (not when it is merged).
+    page is deleted. A merge sends none, so `mergeEvents` refuses to merge
+    away an event whose page is on with people signed up (sign-ups don't
+    move): merge the other way round, or turn the page off first.
+
+Emails follow the page's rules: the online meeting link goes only to
+someone going, and an address the host hides (with its directions) only to
+someone going too (`guestPlace` in `src/server/rsvp/email.ts`).
 
 Emails come from the club's own sender if it has one, otherwise from
 "<Club> via Bananasplit". The text goes out with each reminder when
@@ -119,3 +158,85 @@ backstop cron, they arrive late.
 - The org export includes sign-ups. It is owner-only.
 - Turning a page off keeps its sign-ups. Deleting the event soft-deletes
   it, and its guests are emailed that it's cancelled.
+
+## Free pages (no club)
+
+- **/rsvp** is the home for someone who only wants event pages: their
+  events, what a free page does, and free page vs. club. **/rsvp/new**
+  makes one (sign-in first; sign-up from there skips club onboarding and
+  comes back). A verified email is required, like for a club.
+- The first free event makes the person's **personal space**: an
+  `Organization` with `kind = PERSONAL` and `personalOwnerId` = them, and an
+  OWNER membership (`src/server/rsvp/personal.ts`). Events, sign-ups, jobs
+  and row security work exactly as in a club. `kind` and `personalOwnerId`
+  can't change after creation (`app.organization_kind_guard`).
+- A personal space is never a club: the org switcher, `/app`, onboarding
+  and the profile page list `kind = CLUB` only, and `/app/{its slug}`
+  redirects to /rsvp. Its host screens live at `/rsvp/{eventId}` (the same
+  `RsvpManager` as the suite), `/rsvp/{eventId}/edit` and `/door`.
+- The public page says **Hosted by** the person (name and avatar).
+- **Guest lists are kept 30 days after the event** (`PERSONAL_GUEST_DAYS`).
+  The daily maintenance job runs `app.purge_personal_rsvp_guests(30)`,
+  which deletes the sign-ups (claims go with them), turns the page off and
+  stamps `Event.rsvpGuestsPurgedAt`. Clubs keep theirs.
+- **Save to a club** (`/rsvp/{eventId}/save`): `app.move_personal_event`
+  moves the event into a club the caller owns or runs as an admin. The
+  composite foreign keys carry the sign-ups, bring list and claims; pending
+  `rsvp-email`/`rsvp-fanout` jobs move with it; the link (`rsvpSlug`) stays.
+  With no club yet, "Start a club" remembers the event in a cookie
+  (`bs-rsvp-save`) and creating the club moves it in.
+- Every public page ends with **Make a page like this one. Free.**: create a
+  free RSVP page, or start a club on Bananasplit.
+
+## Split the cost
+
+- `Event.rsvpCostMode`: `NONE`, `EACH` (a price per guest) or `SPLIT` (a
+  total shared by everyone going, rounded up to the cent, so a guest's share
+  drops as people sign up). `rsvpCostCents`, `rsvpCostNote`.
+- `Event.rsvpPayTo`: `{venmo, cashapp, paypal, zelle}` handles
+  (`src/lib/rsvp/pay.ts` validates them). Guests going get buttons that open
+  each app with their share and a note filled in; Zelle shows who to send to.
+- A guest taps **I've paid** (`paidCents`, `paidClaimedAt`); a host confirms
+  it, or marks cash at the door (`paidConfirmedAt`). The host screen shows
+  what's collected, and door mode and tickets show who still owes.
+
+## The bring list
+
+`RsvpItem` (label, how many people it needs) and `RsvpItemClaim`. Hosts edit
+the list in Page settings; guests who signed up claim lines on the page. A
+claim counts under the event's advisory lock, so the last slot goes to one
+guest; `app.rsvp_claim_same_event` keeps a claim on its own event. A guest
+who cancels (or is cancelled by a host) lets go of their lines. Names show
+in full, and not at all when the host hides who's going.
+
+## Invite links
+
+Every sign-up has an `inviteCode`: `/e/{slug}?via={code}`. A visitor through
+it sees "Maya Patel invited you"; signing up records `invitedById` (the first
+inviter keeps the credit). The guest's card counts who joined with their
+link; the host's list shows "Invited by" and who brought the most friends.
+
+## Tickets, door mode and check-in
+
+- Every sign-up has a `ticketCode` (12 characters): `/e/{slug}/t/{code}`,
+  a QR on the guest's card and in their emails. A guest sees their ticket;
+  a host of the event (signed in, owner or admin) who opens the same URL,
+  for instance by scanning it with the phone's camera, gets a one-tap
+  check-in (and "Mark paid"). `app.rsvp_ticket` finds it on the service path.
+- **Door mode** (`/app/{slug}/calendar/{id}/rsvp/door`, `/rsvp/{id}/door`):
+  search and tap, or scan tickets in the browser where it has
+  `BarcodeDetector`. Scanning a waitlisted guest's ticket doesn't check
+  them in: it warns they're on the waitlist, and the host can tap their name
+  to let them in anyway. Those two routes allow the camera
+  (`DOOR_PERMISSIONS_HEADER`); every other page keeps `camera=()`.
+- In a club, a check-in also finds or makes the guest's `Contact` (by
+  email) and an `Attendance` row (method QR or MANUAL), linked through
+  `EventRegistration.attendanceId`; undoing it removes only that row. A
+  check-in the club already had is left alone. This is best effort: if the
+  club's databases refuse it, the check-in still stands.
+
+## The flyer
+
+`/e/{slug}/flyer`: a US Letter poster with the event in big type, a QR to
+the page and seven tear-off tabs. It shows only what the page shows anyone,
+so any guest can print one.

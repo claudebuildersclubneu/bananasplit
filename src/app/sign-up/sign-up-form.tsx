@@ -12,8 +12,22 @@ import { cn } from "@/lib/utils";
 
 import { signUpAction } from "./actions";
 
-/** `google`: the "Sign up with Google" button and divider, above the fields (not once it's sent). */
-export function SignUpForm({ google }: { google?: React.ReactNode }) {
+/**
+ * One sign-up for everyone; what the account is for is chosen next
+ * (/onboarding). `google`: the "Sign up with Google" button and divider,
+ * above the fields (not once it's sent). `callbackUrl`: where to go once
+ * signed up, e.g. back to /rsvp/new for someone who started there.
+ */
+export function SignUpForm({
+  google,
+  callbackUrl,
+}: {
+  google?: React.ReactNode;
+  callbackUrl?: string | null;
+}) {
+  const signInHref = callbackUrl
+    ? `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    : "/sign-in";
   const [state, formAction, isPending] = useActionState(signUpAction, {});
   // Controlled, so React's reset after the action doesn't wipe what was typed.
   const [name, setName] = useState("");
@@ -28,12 +42,12 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             <>
               We sent a verification link to{" "}
               <span className="font-semibold">{state.checkEmail}</span>. Open it to verify your
-              address, then log in. You need a verified email to join or create a club.
+              address, then log in. You need a verified email to make event pages or join a club.
             </>
           }
         />
         {state.error && <FormMessage>{state.error}</FormMessage>}
-        <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
+        <Link href={signInHref} className={cn(pill({ raised: true }), "w-full")}>
           Go to log in
         </Link>
       </>
@@ -44,10 +58,11 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
     <>
       <AuthTitle
         title="Create your account."
-        description="You'll join your club with a code next."
+        description="It's free. Next you'll choose what it's for: event pages, or your club."
       />
       {google}
       <form action={formAction} className="flex flex-col gap-[18px]">
+        {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
         <BrandField id="name" label="Full name">
           <BrandInput
             id="name"
@@ -60,14 +75,14 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             onChange={(e) => setName(e.target.value)}
           />
         </BrandField>
-        <BrandField id="email" label="School email">
+        <BrandField id="email" label="Email">
           <BrandInput
             id="email"
             name="email"
             type="email"
             required
             autoComplete="email"
-            placeholder="you@school.edu"
+            placeholder="you@example.com"
             className="h-12"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -88,7 +103,7 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             Privacy Policy
           </a>
           . Have an account?{" "}
-          <Link href="/sign-in" className="font-bold">
+          <Link href={signInHref} className="font-bold">
             Log in
           </Link>
         </p>

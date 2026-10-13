@@ -55,6 +55,8 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   memberships            Membership[]
+  /// The free RSVP space (/rsvp), made the first time they create an event.
+  personalSpace          Organization?        @relation("PersonalSpace")
   sentInvitations        Invitation[]         @relation("InvitationInvitedBy")
   createdTasks           Task[]               @relation("TaskCreatedBy")
   taskAssignments        TaskAssignee[]
@@ -328,8 +330,14 @@ model Organization {
   /// The published org chart (Phase 3). Written only by publish/rollback;
   /// app.assert_org_active_chart keeps it inside the org.
   activeOrgChartVersionId String?   @unique
+  /// CLUB: a club with a team. PERSONAL: one person's free RSVP space
+  /// (/rsvp), never listed as a club. Fixed at creation (organization_kind_guard).
+  kind                    OrgKind   @default(CLUB)
+  /// PERSONAL only: whose space it is (one each).
+  personalOwnerId         String?   @unique
   createdAt               DateTime  @default(now())
 
+  personalOwner         User?             @relation("PersonalSpace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
   activeOrgChartVersion OrgChartVersion?  @relation("ActiveOrgChartVersion", fields: [activeOrgChartVersionId], references: [id], onDelete: SetNull)
   orgChartVersions      OrgChartVersion[] @relation("OrgChartVersions")
 
@@ -370,6 +378,11 @@ model Organization {
   memberPrefs       MemberPrefs[]
   files             OrgFile[]
   noteFolders       NoteFolder[]
+}
+
+enum OrgKind {
+  CLUB
+  PERSONAL
 }
 
 enum NotificationType {
@@ -863,6 +876,18 @@ model Event {
   rsvpBackground     String             @default("banana")
   /// {key, s480, s960, updatedAt}: WebP variants of the cover image (public store).
   rsvpCover          Json?
+  /// Split the cost: nothing, a price for each guest, or a total shared by
+  /// everyone going (the share moves as people sign up).
+  rsvpCostMode       RsvpCostMode       @default(NONE)
+  /// EACH: the price per guest; SPLIT: the total. In cents.
+  rsvpCostCents      Int?
+  /// What it pays for ("Pizza and drinks"). Max 120.
+  rsvpCostNote       String?
+  /// {venmo?, cashapp?, paypal?, zelle?}: where guests pay the host (src/lib/rsvp/pay.ts).
+  rsvpPayTo          Json?
+  /// A free (personal space) event's guest list was cleared this long after
+  /// it ended (app.purge_personal_rsvp_guests); clubs keep theirs.
+  rsvpGuestsPurgedAt DateTime?
 
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy         User                @relation("EventCreatedBy", fields: [createdById], references: [id])
@@ -877,6 +902,7 @@ model Event {
   attendance        Attendance[]
   ballotDefinitions BallotDefinition[]
   registrations     EventRegistration[]
+  rsvpItems         RsvpItem[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, sourceSessionId])
@@ -948,16 +974,87 @@ model EventRegistration {
   /// sends twice).
   reminderDaySentAt  DateTime?
   reminderHourSentAt DateTime?
+  /// The guest's own invite link, /e/{slug}?via={inviteCode}. Unique per event.
+  inviteCode         String
+  /// Whose invite link they signed up with: a sign-up for the same event.
+  invitedById        String?
+  /// The QR on their ticket, /e/{slug}/t/{ticketCode}: a host who scans it
+  /// checks them in. 12 letters and digits.
+  ticketCode         String             @unique
+  /// Split the cost: what they said they paid (cents) and when, then when a
+  /// host confirmed it. Money moves outside Bananasplit (Venmo and the like).
+  paidCents          Int?
+  paidClaimedAt      DateTime?
+  paidConfirmedAt    DateTime?
+  /// The club's Attendance row made when a host checked them in (clubs only).
+  attendanceId       String?            @unique
+  /// Their Instagram handle, without the @ (optional; shown on the guest list).
+  instagram          String?
+  /// When they last joined the going list or the waitlist. The waitlist
+  /// moves up in this order, so a guest who cancels and signs up again
+  /// goes to the back of the line.
+  queuedAt           DateTime           @default(now())
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  event Event @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
-  user  User? @relation("EventRegistrationUser", fields: [userId], references: [id], onDelete: SetNull)
+  event      Event               @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
+  user       User?               @relation("EventRegistrationUser", fields: [userId], references: [id], onDelete: SetNull)
+  invitedBy  EventRegistration?  @relation("RegistrationInvites", fields: [invitedById], references: [id], onDelete: SetNull)
+  invited    EventRegistration[] @relation("RegistrationInvites")
+  attendance Attendance?         @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
+  itemClaims RsvpItemClaim[]
 
   @@unique([eventId, email])
+  @@unique([eventId, inviteCode])
   @@unique([organizationId, id])
   @@index([organizationId, eventId, status, createdAt])
+  @@index([organizationId, eventId, status, queuedAt])
+  @@index([invitedById])
   @@index([userId])
+}
+
+enum RsvpCostMode {
+  NONE
+  /// A set price for each guest.
+  EACH
+  /// A total shared by everyone going.
+  SPLIT
+}
+
+/// A bring list line on an RSVP page ("Chips", "Help set up at 5"): guests
+/// who signed up claim it, up to `slots` of them. Hosts edit the list; the
+/// page shows who's bringing what (names shortened).
+model RsvpItem {
+  id             String   @id @default(cuid())
+  organizationId String
+  eventId        String
+  /// Max 80.
+  label          String
+  /// How many guests can take it (1-50).
+  slots          Int      @default(1)
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  event  Event           @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
+  claims RsvpItemClaim[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, eventId, position])
+}
+
+/// A guest bringing a bring list item. organizationId follows the item (its
+/// composite FK cascades when a free event moves into a club).
+model RsvpItemClaim {
+  organizationId String
+  itemId         String
+  registrationId String
+  createdAt      DateTime @default(now())
+
+  item         RsvpItem          @relation(fields: [organizationId, itemId], references: [organizationId, id], onDelete: Cascade)
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, registrationId])
+  @@index([organizationId, registrationId])
 }
 
 /// organizationId is denormalized from Event (Phase 7) and kept equal by the
@@ -2045,8 +2142,10 @@ model Attendance {
   isFirstVisit   Boolean          @default(false)
   createdAt      DateTime         @default(now())
 
-  event   Event   @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
-  contact Contact @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: NoAction)
+  event            Event              @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Cascade)
+  contact          Contact            @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: NoAction)
+  /// The RSVP sign-up whose check-in made this row, if any.
+  rsvpRegistration EventRegistration?
 
   @@unique([organizationId, eventId, contactId])
   @@unique([organizationId, source, externalId])

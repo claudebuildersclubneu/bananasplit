@@ -8,6 +8,7 @@ import { cancelMyRegistration, registerForEvent } from "@/app/e/[slug]/actions";
 import { BrandField, BrandInput, FormMessage } from "@/components/brand/fields";
 import { pill } from "@/components/brand/pill";
 import type { ClosedReason } from "@/lib/rsvp/format";
+import { formatCents } from "@/lib/rsvp/pay";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,6 +32,12 @@ export interface RegistrationCardProps {
   joinUrl: string | null;
   googleCalendarUrl: string;
   icsUrl: string;
+  /** The invite code of the link this visitor came from (?via=). */
+  via?: string | null;
+  /** Split the cost: what a new guest would chip in, for the form's note. */
+  cost?: { mode: "EACH" | "SPLIT"; shareIfJoining: number; payWith: string[] } | null;
+  /** Under "You're going": chip in, the ticket, bring friends. */
+  signedExtras?: React.ReactNode;
 }
 
 const CLOSED_COPY: Record<ClosedReason, { title: string; body: string }> = {
@@ -113,21 +120,28 @@ function SpotsBadge({
   );
 }
 
-function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
+function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCardProps) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
   const [exists, setExists] = useState(false);
+  // Controlled, so what the guest typed survives an error: React resets a
+  // form's uncontrolled fields after every action.
+  const [values, setValues] = useState({ name: "", email: "", phone: "", instagram: "" });
+  const bind = (field: keyof typeof values) => ({
+    value: values[field],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setValues((v) => ({ ...v, [field]: e.target.value })),
+  });
 
   function submit(form: FormData) {
     setError(null);
     start(async () => {
       const result = await registerForEvent({
         slug,
-        name: String(form.get("name") ?? ""),
-        email: String(form.get("email") ?? ""),
-        phone: String(form.get("phone") ?? ""),
+        ...values,
         website: String(form.get("website") ?? ""),
+        via: via ?? "",
       });
       if (!result.ok) {
         setError({ message: result.error, field: result.field });
@@ -152,7 +166,10 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
     );
   }
 
-  const invalid = (field: string) => (error?.field === field ? true : undefined);
+  const invalid = (field: string) =>
+    error?.field === field
+      ? ({ "aria-invalid": true, "aria-describedby": "rsvp-error" } as const)
+      : {};
 
   return (
     <>
@@ -162,6 +179,21 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
           ? "This event is full. Join the waitlist and we'll email you the moment a spot opens up."
           : "Save your spot below. You'll get a confirmation by email."}
       </p>
+      {cost && !waitlistOnly && (
+        <p className="bg-oat text-ink -mt-2 mb-5 rounded-2xl px-4 py-3 text-[14px] leading-[1.5]">
+          <span className="font-bold">
+            {cost.mode === "SPLIT" ? "About " : ""}
+            {formatCents(cost.shareIfJoining)} to chip in
+          </span>
+          <span className="text-ink-muted">
+            {" "}
+            {cost.mode === "SPLIT" ? "(your share, and it shrinks as more people join)" : "each"}
+            {cost.payWith.length > 0
+              ? `. You'll pay the host with ${cost.payWith.join(" or ")} after you sign up.`
+              : ". You'll settle up with the host."}
+          </span>
+        </p>
+      )}
       <form action={submit} className="flex flex-col gap-4" noValidate>
         <BrandField id="rsvp-name" label="Name">
           <BrandInput
@@ -171,7 +203,8 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
             placeholder="Your full name"
             required
             maxLength={100}
-            aria-invalid={invalid("name")}
+            {...bind("name")}
+            {...invalid("name")}
           />
         </BrandField>
         <BrandField id="rsvp-email" label="Email">
@@ -181,10 +214,11 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
             type="email"
             autoComplete="email"
             inputMode="email"
-            placeholder="you@school.edu"
+            placeholder="you@example.com"
             required
             maxLength={254}
-            aria-invalid={invalid("email")}
+            {...bind("email")}
+            {...invalid("email")}
           />
         </BrandField>
         <BrandField id="rsvp-phone" label="Phone">
@@ -197,15 +231,44 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft }: RegistrationCardProps) {
             placeholder="(555) 123-4567"
             required
             maxLength={32}
-            aria-invalid={invalid("phone")}
+            {...bind("phone")}
+            {...invalid("phone")}
           />
+        </BrandField>
+        <BrandField
+          id="rsvp-instagram"
+          label={
+            <>
+              Instagram <span className="text-ink-soft font-normal">(optional)</span>
+            </>
+          }
+        >
+          <BrandInput
+            id="rsvp-instagram"
+            name="instagram"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="@yourhandle"
+            maxLength={200}
+            aria-describedby="rsvp-instagram-hint"
+            {...bind("instagram")}
+            {...invalid("instagram")}
+          />
+          <span id="rsvp-instagram-hint" className="text-ink-soft text-[13px]">
+            Shown next to your name on the guest list, so people can find you.
+          </span>
         </BrandField>
         {/* People never see this; bots fill it in. */}
         <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
           <label htmlFor="rsvp-website">Website</label>
           <input id="rsvp-website" name="website" tabIndex={-1} autoComplete="off" />
         </div>
-        {error && <FormMessage>{error.message}</FormMessage>}
+        {error && (
+          <div id="rsvp-error">
+            <FormMessage>{error.message}</FormMessage>
+          </div>
+        )}
         <button type="submit" disabled={pending} className={cn(pill({ raised: true }), "w-full")}>
           {pending ? "Saving your spot…" : waitlistOnly ? "Join the waitlist" : "Register"}
         </button>
@@ -225,6 +288,7 @@ function Signed({
   joinUrl,
   googleCalendarUrl,
   icsUrl,
+  signedExtras,
 }: RegistrationCardProps & { viewer: NonNullable<RegistrationCardProps["viewer"]> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -300,6 +364,8 @@ function Signed({
           </a>
         </div>
       )}
+
+      {signedExtras && <div className="mt-5 flex flex-col gap-4">{signedExtras}</div>}
 
       <div className="border-ink/10 mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         {confirming ? (

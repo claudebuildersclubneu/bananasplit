@@ -1,6 +1,16 @@
 "use client";
 
-import { Check, Copy, ExternalLink, PowerOff, Ticket } from "lucide-react";
+import {
+  Building2,
+  Check,
+  Copy,
+  ExternalLink,
+  Printer,
+  PowerOff,
+  ScanLine,
+  Ticket,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -16,20 +26,30 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toaster";
 import type { RsvpCover } from "@/lib/rsvp/cover";
+import { formatCents } from "@/lib/rsvp/pay";
 
+import type { BringLine } from "./bring-list-editor";
 import { PagePreview } from "./page-preview";
 import { RsvpGuests, type RsvpGuest } from "./rsvp-guests";
 import { RsvpSettings, type RsvpSettingsValue } from "./rsvp-settings";
 
 /**
- * An event's RSVP page, from the suite: its link, the numbers, and two tabs,
- * Guests (the list, check-in, moving people) and Page (how it looks and
- * what it shows). Before the page is on, one card explains it and turns it on.
+ * An event's RSVP page, from the suite or a free page at /rsvp: its link,
+ * the numbers, and two tabs, Guests (the list, check-in, payments, moving
+ * people) and Page (how it looks, what it costs, the bring list, what it
+ * shows). Before the page is on, one card explains it and turns it on.
  */
+
+export interface RsvpManagerLinks {
+  back: { href: string; label: string };
+  /** Where the event's title, time and place are edited. */
+  edit: string;
+  door: string;
+  flyer: string;
+}
 
 export interface RsvpManagerProps {
   orgId: string;
-  orgSlug: string;
   event: { id: string; title: string; when: string; location: string | null; ended: boolean };
   page: {
     enabled: boolean;
@@ -38,13 +58,20 @@ export interface RsvpManagerProps {
     settings: RsvpSettingsValue;
   };
   guests: RsvpGuest[];
+  items: BringLine[];
+  /** Split the cost: one guest's share now, or null when it's free. */
+  owes: number | null;
   messaging: { email: "org" | "platform"; texts: boolean };
+  links: RsvpManagerLinks;
+  /** A free page: when its guest list goes, and where to save it to a club. */
+  personal?: { purgeOn: string | null; purged: boolean; saveHref: string } | null;
+  initialTab?: "guests" | "page";
 }
 
 export function RsvpManager(props: RsvpManagerProps) {
-  const { orgId, orgSlug, event, page, guests } = props;
+  const { orgId, event, page, guests, links, personal } = props;
   const router = useRouter();
-  const [tab, setTab] = useState<"guests" | "page">("guests");
+  const [tab, setTab] = useState<"guests" | "page">(props.initialTab ?? "guests");
   const [pending, start] = useTransition();
   const [confirmEl, confirm] = useConfirm();
   const [copied, setCopied] = useState(false);
@@ -53,6 +80,10 @@ export function RsvpManager(props: RsvpManagerProps) {
   const waiting = guests.filter((g) => g.status === "WAITLIST").length;
   const checkedIn = going.filter((g) => g.checkedIn).length;
   const capacity = page.settings.capacity;
+  const collected = going
+    .filter((g) => g.paid.confirmed)
+    .reduce((sum, g) => sum + (g.paid.cents ?? props.owes ?? 0), 0);
+  const paidCount = going.filter((g) => g.paid.confirmed).length;
 
   function turnOn() {
     start(async () => {
@@ -93,11 +124,17 @@ export function RsvpManager(props: RsvpManagerProps) {
 
   const header = (
     <PageHeader
-      title="RSVP page"
-      description={`${event.title} · ${event.when}`}
+      title={personal ? event.title : "RSVP page"}
+      description={personal ? event.when : `${event.title} · ${event.when}`}
       actions={
         page.enabled && page.url ? (
           <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={links.door}>
+                <ScanLine aria-hidden="true" />
+                Door mode
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <a href={page.url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink aria-hidden="true" />
@@ -108,10 +145,16 @@ export function RsvpManager(props: RsvpManagerProps) {
               label="More RSVP page actions"
               items={[
                 {
+                  label: "Print a flyer",
+                  icon: Printer,
+                  onSelect: () => window.open(links.flyer, "_blank", "noopener"),
+                },
+                {
                   label: "Turn off the page",
                   icon: PowerOff,
                   onSelect: () => void turnOff(),
                   destructive: true,
+                  separated: true,
                 },
               ]}
             />
@@ -124,8 +167,34 @@ export function RsvpManager(props: RsvpManagerProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {confirmEl}
-      <BackLink href={`/app/${orgSlug}/calendar/${event.id}`} label={event.title} />
+      <BackLink href={links.back.href} label={links.back.label} />
       {header}
+
+      {personal && (
+        <section className="bg-card flex flex-wrap items-center gap-4 rounded-xl border p-4">
+          <span className="bg-primary/10 text-primary grid size-10 flex-none place-items-center rounded-lg">
+            <Building2 className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="text-sm font-semibold">
+              {personal.purged
+                ? "This free page's guest list was cleared after the event"
+                : personal.purgeOn
+                  ? `Free pages keep their guest list until ${personal.purgeOn}`
+                  : "Free pages keep their guest list for 30 days after the event"}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Save it to a club to keep every guest for good, see who keeps coming back, and run it
+              with your team. The link stays the same.
+            </p>
+          </div>
+          {!personal.purged && (
+            <Button asChild size="sm">
+              <Link href={personal.saveHref}>Save to a club</Link>
+            </Button>
+          )}
+        </section>
+      )}
 
       {!page.enabled && (
         <section className="bg-card overflow-hidden rounded-xl border">
@@ -140,16 +209,18 @@ export function RsvpManager(props: RsvpManagerProps) {
               <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
                 {page.url
                   ? "Turn it back on and the same link works again. Everyone who signed up is still on the list below."
-                  : "A public page for this event, like Luma: the time and place with a map, who's hosting and who's going, and a sign-up form that takes a name, email and phone number. You can cap the spots, keep a waitlist and hide the address until people sign up. Guests get a confirmation email and a reminder before it starts."}
+                  : "A public page for this event: the time and place with a map, who's hosting and who's going, and a sign-up form. Split the cost, hand out a bring list, give every guest an invite link and a QR ticket, and check them in at the door."}
               </p>
-              <Button onClick={turnOn} disabled={pending}>
-                <Ticket aria-hidden="true" />
-                {pending
-                  ? "Turning on…"
-                  : page.url
-                    ? "Turn the page back on"
-                    : "Turn on the RSVP page"}
-              </Button>
+              {!personal?.purged && (
+                <Button onClick={turnOn} disabled={pending}>
+                  <Ticket aria-hidden="true" />
+                  {pending
+                    ? "Turning on…"
+                    : page.url
+                      ? "Turn the page back on"
+                      : "Turn on the RSVP page"}
+                </Button>
+              )}
             </div>
             <PagePreview
               cover={page.cover}
@@ -193,17 +264,25 @@ export function RsvpManager(props: RsvpManagerProps) {
               value={waiting}
               detail={page.settings.waitlist ? "First in line moves up" : "Waitlist off"}
             />
-            <Stat
-              label="Spots left"
-              value={capacity ? Math.max(0, capacity - going.length) : "∞"}
-              detail={
-                page.settings.closed
-                  ? "Sign-ups closed"
-                  : event.ended
-                    ? "Event ended"
-                    : "Taking sign-ups"
-              }
-            />
+            {props.owes !== null ? (
+              <Stat
+                label="Collected"
+                value={formatCents(collected)}
+                detail={`${paidCount} of ${going.length} paid · ${formatCents(props.owes)} each`}
+              />
+            ) : (
+              <Stat
+                label="Spots left"
+                value={capacity ? Math.max(0, capacity - going.length) : "∞"}
+                detail={
+                  page.settings.closed
+                    ? "Sign-ups closed"
+                    : event.ended
+                      ? "Event ended"
+                      : "Taking sign-ups"
+                }
+              />
+            )}
             <Stat
               label="Checked in"
               value={checkedIn}
@@ -232,17 +311,21 @@ export function RsvpManager(props: RsvpManagerProps) {
               guests={guests}
               canAdd={page.enabled}
               shareUrl={page.url}
+              owes={props.owes}
             />
           ) : (
             <RsvpSettings
               orgId={orgId}
-              orgSlug={orgSlug}
               eventId={event.id}
               title={event.title}
               location={event.location}
               cover={page.cover}
               initial={page.settings}
               messaging={props.messaging}
+              editHref={links.edit}
+              going={going.length}
+              items={props.items}
+              personal={Boolean(personal)}
             />
           )}
         </>

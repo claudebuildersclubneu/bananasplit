@@ -37,7 +37,7 @@ export default async function Home() {
         <FeatureBoard />
         <Ripeness />
         <Finance />
-        <Pricing />
+        <Pricing signedIn={signedIn} />
         <Faq />
         <FinalCta />
       </main>

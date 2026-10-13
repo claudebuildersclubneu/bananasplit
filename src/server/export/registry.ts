@@ -71,6 +71,9 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "EventAttendee", key: ["eventId", "userId"] },
   // RSVP page sign-ups; the export is OWNER-only, who see them in the suite too.
   { model: "EventRegistration", key: ID },
+  // An RSVP page's bring list, and who is bringing each line.
+  { model: "RsvpItem", key: ID },
+  { model: "RsvpItemClaim", key: ["itemId", "registrationId"] },
   { model: "EventLinkLog", key: ID },
   { model: "AvailabilityPoll", key: ID },
   { model: "PollSlot", key: ID },

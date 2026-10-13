@@ -22,7 +22,7 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
           type="email"
           required
           autoComplete="email"
-          placeholder="you@school.edu"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -51,7 +51,12 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
       </PrimaryButton>
       <p className="text-ink-muted m-0 text-center text-[14px]">
         New to Bananasplit?{" "}
-        <Link href="/sign-up" className="font-bold">
+        <Link
+          href={
+            callbackUrl ? `/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/sign-up"
+          }
+          className="font-bold"
+        >
           Create an account
         </Link>
       </p>

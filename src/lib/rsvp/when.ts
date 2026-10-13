@@ -19,9 +19,12 @@ export function dateTile(start: Date, timeZone: string): { month: string; day: s
   };
 }
 
-/** "Thursday, October 15" (all-day events count their dates in UTC). */
-export function dateLine(start: Date, timeZone: string, allDay = false): string {
-  return parts(start, allDay ? "UTC" : timeZone, {
+/**
+ * "Thursday, October 15". An all-day event is dated the same way: it is
+ * stored as midnight in the club's timezone (src/lib/calendar/dates.ts).
+ */
+export function dateLine(start: Date, timeZone: string): string {
+  return parts(start, timeZone, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -45,7 +48,7 @@ export function timeLine(start: Date, end: Date, timeZone: string, allDay = fals
 
 /** One line for emails and texts: "Thursday, October 15, 6:00 – 7:00 PM EDT". */
 export function whenLine(start: Date, end: Date, timeZone: string, allDay = false): string {
-  return `${dateLine(start, timeZone, allDay)}, ${timeLine(start, end, timeZone, allDay)}`;
+  return `${dateLine(start, timeZone)}, ${timeLine(start, end, timeZone, allDay)}`;
 }
 
 /** "6:00 PM", for the text sent an hour before. */

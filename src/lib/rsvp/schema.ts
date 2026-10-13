@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { normalizePhone } from "./format";
+import { normalizeInstagram, normalizePhone } from "./format";
 
 /**
  * A sign-up on a public RSVP page: a name, an email and a phone number,
@@ -26,6 +26,22 @@ export const registrationSchema = z.object({
         return z.NEVER;
       }
       return phone;
+    }),
+  /** Optional, shown as a link next to their name on the guest list. */
+  instagram: z
+    .string()
+    .max(200)
+    .optional()
+    .transform((v, ctx) => {
+      const handle = normalizeInstagram(v ?? "");
+      if (handle === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          message: "That doesn't look like an Instagram handle. Try @yourname.",
+        });
+        return z.NEVER;
+      }
+      return handle;
     }),
 });
 

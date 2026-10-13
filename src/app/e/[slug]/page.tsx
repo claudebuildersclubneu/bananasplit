@@ -1,19 +1,38 @@
 import "../rsvp.css";
 
-import { DoorOpen, ExternalLink, Lock, MapPin, Mic, Video } from "lucide-react";
+import { Banknote, DoorOpen, ExternalLink, Lock, MapPin, Mic, Video } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { BrandRoot } from "@/components/brand/brand-root";
 import { Logo } from "@/components/brand/logo";
 import { pill } from "@/components/brand/pill";
+import { BringList, ChipIn, InviteFriends, TicketStub } from "@/components/rsvp/guest-extras";
+import { HostYourOwn } from "@/components/rsvp/host-your-own";
+import { InstagramLink } from "@/components/rsvp/instagram-link";
+import { MapEmbed } from "@/components/rsvp/map-embed";
+import { QrCode } from "@/components/rsvp/qr-code";
 import { RegistrationCard } from "@/components/rsvp/registration-card";
 import { appUrl } from "@/lib/app-url";
-import { googleCalendarUrl, mapsEmbedUrl, mapsSearchUrl, splitLocation } from "@/lib/rsvp/format";
+import {
+  avatarTone,
+  googleCalendarUrl,
+  initials,
+  mapsEmbedUrl,
+  mapsSearchUrl,
+  splitLocation,
+} from "@/lib/rsvp/format";
 import { dateLine, dateTile, timeLine } from "@/lib/rsvp/when";
 import { cn } from "@/lib/utils";
-import { loadRsvpPage, rsvpPageTarget, type RsvpPageData } from "@/server/rsvp/page";
+import {
+  loadRsvpPage,
+  rsvpPageTarget,
+  type RsvpGuest,
+  type RsvpPageData,
+} from "@/server/rsvp/page";
 import { readRsvpManageKey, rsvpCookieName } from "@/server/rsvp/token";
 
 /**
@@ -24,21 +43,39 @@ import { readRsvpManageKey, rsvpCookieName } from "@/server/rsvp/token";
  */
 export const dynamic = "force-dynamic";
 
-async function load(slug: string): Promise<RsvpPageData | null> {
+/**
+ * The page's data, once per request: generateMetadata and the page both
+ * ask for it with the same slug and ?via=, and cache() hands the second
+ * caller the first one's result instead of reading it all again.
+ */
+const load = cache(async (slug: string, via: string | null): Promise<RsvpPageData | null> => {
   const target = await rsvpPageTarget(slug);
   if (!target) return null;
   const viewerId = readRsvpManageKey((await cookies()).get(rsvpCookieName(target.eventId))?.value);
-  return loadRsvpPage(slug, target, viewerId);
+  return loadRsvpPage(slug, target, viewerId, { via });
+});
+
+/** ?via= from a guest's invite link (one value, the code's own shape). */
+function viaParam(value: string | string[] | undefined): string | null {
+  return typeof value === "string" && /^[a-z0-9]{6,12}$/.test(value) ? value : null;
 }
 
-export async function generateMetadata({ params }: PageProps<"/e/[slug]">): Promise<Metadata> {
+/** Who the page says is hosting: the club, or the person on a free page. */
+function hostLabel(page: RsvpPageData): string {
+  return page.hostPerson?.name ?? page.org.name;
+}
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps<"/e/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const page = await load(slug);
+  const page = await load(slug, viaParam((await searchParams).via));
   if (!page) return { title: "Event not found", robots: { index: false } };
-  const when = `${dateLine(page.startsAt, page.timeZone, page.allDay)}, ${timeLine(page.startsAt, page.endsAt, page.timeZone, page.allDay)}`;
-  const description = `${when} · Hosted by ${page.org.name}`;
+  const when = `${dateLine(page.startsAt, page.timeZone)}, ${timeLine(page.startsAt, page.endsAt, page.timeZone, page.allDay)}`;
+  const description = `${when} · Hosted by ${hostLabel(page)}`;
   return {
-    title: `${page.title} · ${page.org.name}`,
+    title: `${page.title} · ${hostLabel(page)}`,
     description,
     robots: { index: false, follow: false },
     openGraph: {
@@ -47,13 +84,19 @@ export async function generateMetadata({ params }: PageProps<"/e/[slug]">): Prom
       url: appUrl(`/e/${slug}`),
       ...(page.cover ? { images: [{ url: page.cover.s960, width: 960, height: 960 }] } : {}),
     },
+    // Without this, X shows the site-wide card instead of the event's cover.
+    ...(page.cover ? { twitter: { card: "summary_large_image", images: [page.cover.s960] } } : {}),
   };
 }
 
-export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
+export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[slug]">) {
   const { slug } = await params;
-  const page = await load(slug);
-  if (!page) return <Missing />;
+  const via = viaParam((await searchParams).via);
+  const page = await load(slug, via);
+  // A real 404 (not-found.tsx), so link checkers and crawlers see it's gone.
+  if (!page) notFound();
+  const viewer = page.viewer;
+  const going = viewer?.status === "GOING";
 
   const tone = page.background.tone;
   const tile = dateTile(page.startsAt, page.timeZone);
@@ -110,6 +153,19 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
 
           <div className="flex min-w-0 flex-col gap-7">
             <div className="flex flex-col gap-5">
+              {page.invitedBy && !viewer && (
+                <p className="m-0 inline-flex w-fit items-center gap-2 rounded-full border border-(--rsvp-tile-line) bg-(--rsvp-tile) py-1 pr-3.5 pl-1 text-[14px] font-semibold">
+                  <span
+                    className={cn(
+                      "grid size-7 place-items-center rounded-full text-[11px] font-bold",
+                      avatarTone(page.invitedBy),
+                    )}
+                  >
+                    {initials(page.invitedBy)}
+                  </span>
+                  {page.invitedBy} invited you
+                </p>
+              )}
               <h1 className="font-heading text-[clamp(34px,5.4vw,54px)] leading-[1.02] tracking-[-0.03em] text-balance break-words">
                 {page.title}
               </h1>
@@ -124,7 +180,7 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
                       <span className="font-heading py-0.5 text-[20px] leading-7">{tile.day}</span>
                     </span>
                   }
-                  title={dateLine(page.startsAt, page.timeZone, page.allDay)}
+                  title={dateLine(page.startsAt, page.timeZone)}
                   detail={timeLine(page.startsAt, page.endsAt, page.timeZone, page.allDay)}
                 />
                 {place ? (
@@ -149,6 +205,20 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
                     detail="Register to see the address and how to find it."
                   />
                 ) : null}
+                {page.cost && (
+                  <InfoRow
+                    tile={<IconTile icon={<Banknote className="size-5" aria-hidden="true" />} />}
+                    title={page.cost.line}
+                    detail={[
+                      page.cost.note,
+                      page.cost.payWith.length > 0
+                        ? `Pay the host with ${page.cost.payWith.join(" or ")}`
+                        : "Settle up with the host",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  />
+                )}
                 {page.online && (
                   <InfoRow
                     tile={<IconTile icon={<Video className="size-5" aria-hidden="true" />} />}
@@ -174,11 +244,69 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
                 title: page.title,
                 startsAt: page.startsAt,
                 endsAt: page.endsAt,
+                allDay: page.allDay,
+                timeZone: page.timeZone,
                 details: appUrl(`/e/${page.slug}`),
                 location: page.location,
               })}
               icsUrl={`/e/${page.slug}/calendar.ics`}
+              via={via}
+              cost={
+                page.cost
+                  ? {
+                      mode: page.cost.mode,
+                      shareIfJoining: page.cost.shareIfJoining,
+                      payWith: page.cost.payWith,
+                    }
+                  : null
+              }
+              signedExtras={
+                viewer ? (
+                  <>
+                    {viewer.owes !== null && page.cost && (
+                      <ChipIn
+                        slug={page.slug}
+                        owes={viewer.owes}
+                        note={page.cost.note}
+                        split={page.cost.mode === "SPLIT"}
+                        payLinks={viewer.payLinks}
+                        paid={viewer.paid}
+                      />
+                    )}
+                    {going && !page.ended && (
+                      <TicketStub
+                        ticketUrl={viewer.ticketUrl}
+                        checkedIn={viewer.checkedIn}
+                        qr={
+                          <QrCode
+                            value={viewer.ticketUrl}
+                            label="Your ticket"
+                            className="size-full"
+                          />
+                        }
+                      />
+                    )}
+                    {!page.ended && (
+                      <InviteFriends
+                        inviteUrl={viewer.inviteUrl}
+                        invitedCount={viewer.invitedCount}
+                        title={page.title}
+                      />
+                    )}
+                  </>
+                ) : null
+              }
             />
+
+            {page.items.length > 0 && (
+              <Section title="Bring list">
+                <BringList
+                  slug={page.slug}
+                  items={page.items}
+                  canClaim={Boolean(viewer) && !page.ended}
+                />
+              </Section>
+            )}
 
             {page.description && (
               <Section title="About">
@@ -215,15 +343,10 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
                   )}
                   {page.location && (
                     <>
-                      <div className="border-ink/10 overflow-hidden rounded-2xl border bg-(--rsvp-tile)">
-                        <iframe
-                          title={`Map of ${place?.venue ?? "the location"}`}
-                          src={mapsEmbedUrl(page.location)}
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          className="block h-[240px] w-full border-0 sm:h-[280px]"
-                        />
-                      </div>
+                      <MapEmbed
+                        title={`Map of ${place?.venue ?? "the location"}`}
+                        src={mapsEmbedUrl(page.location)}
+                      />
                       <a
                         href={mapsSearchUrl(page.location)}
                         target="_blank"
@@ -243,6 +366,8 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
           </div>
         </main>
 
+        <HostYourOwn personal={page.personal} />
+
         <footer className="mx-auto w-full max-w-[1000px] px-5 pb-8 text-center text-[13px] text-(--rsvp-soft) sm:px-8">
           <Link
             href="/"
@@ -251,26 +376,6 @@ export default async function RsvpPage({ params }: PageProps<"/e/[slug]">) {
             Event page by <Logo size={16} textSize={13} />
           </Link>
         </footer>
-      </div>
-    </BrandRoot>
-  );
-}
-
-function Missing() {
-  return (
-    <BrandRoot>
-      <div className="rsvp-page rsvp-bg-banana flex min-h-svh flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
-        <Logo size={32} textSize={22} />
-        <h1 className="font-heading text-[40px] leading-[1.05] tracking-[-0.03em]">
-          This event isn&apos;t here
-        </h1>
-        <p className="text-ink-muted max-w-[420px] text-[16px]">
-          The link may be mistyped, or the host turned off sign-ups or removed the event. Ask
-          whoever sent it for a new one.
-        </p>
-        <Link href="/" className={pill({ size: "md" })}>
-          Go to Bananasplit
-        </Link>
       </div>
     </BrandRoot>
   );
@@ -343,6 +448,30 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function HostedBy({ page }: { page: RsvpPageData }) {
+  if (page.hostPerson) {
+    const person = page.hostPerson;
+    return (
+      <Section title="Hosted by">
+        <div className="flex items-center gap-3">
+          {person.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a stored WebP variant or OAuth image
+            <img src={person.avatarUrl} alt="" className="size-9 rounded-full object-cover" />
+          ) : (
+            <span
+              className={cn(
+                "grid size-9 place-items-center rounded-full text-[13px] font-bold ring-1 ring-(--rsvp-tile-line)",
+                avatarTone(person.name),
+              )}
+            >
+              {initials(person.name)}
+            </span>
+          )}
+          <span className="min-w-0 flex-1 text-[15px] font-semibold">{person.name}</span>
+          {person.instagramUrl && <InstagramLink url={person.instagramUrl} name={person.name} />}
+        </div>
+      </Section>
+    );
+  }
   return (
     <Section title="Hosted by">
       <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -372,12 +501,32 @@ function HostedBy({ page }: { page: RsvpPageData }) {
 
 /** Faces in the row before "+N". */
 const AVATARS = 8;
+/** Names in the list before "See everyone". */
+const LISTED = 6;
+
+function GuestRow({ guest }: { guest: RsvpGuest }) {
+  return (
+    <li className="flex min-h-9 items-center gap-3">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "grid size-8 flex-none place-items-center rounded-full text-[11px] font-bold",
+          guest.tone,
+        )}
+      >
+        {guest.initials}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{guest.name}</span>
+      {guest.instagramUrl && <InstagramLink url={guest.instagramUrl} name={guest.name} />}
+    </li>
+  );
+}
 
 function Guests({ page }: { page: RsvpPageData }) {
   if (page.going === null) return null;
   const guests = page.guests ?? [];
-  const named = guests.slice(0, 3).map((g) => g.name);
-  const others = page.going - named.length;
+  const shown = guests.slice(0, LISTED);
+  const rest = guests.slice(LISTED);
   const heading =
     page.going === 0
       ? "Be the first to sign up"
@@ -386,11 +535,10 @@ function Guests({ page }: { page: RsvpPageData }) {
     <Section title={heading}>
       {page.going > 0 && page.guests && (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center">
+          <div className="flex items-center" aria-hidden="true">
             {guests.slice(0, AVATARS).map((g, i) => (
               <span
                 key={i}
-                title={g.name}
                 className={cn(
                   "grid size-9 flex-none place-items-center rounded-full text-[12px] font-bold ring-2 ring-(--rsvp-ring)",
                   i > 0 && "-ml-2",
@@ -406,32 +554,24 @@ function Guests({ page }: { page: RsvpPageData }) {
               </span>
             )}
           </div>
-          <p className="m-0 text-[14px] leading-[1.5] text-(--rsvp-muted)">
-            {named.join(", ")}
-            {others > 0 ? ` and ${others} ${others === 1 ? "other" : "others"}` : ""}
-          </p>
-          {guests.length > 3 && (
+          {/* One name a line, in full, with their Instagram when they shared it. */}
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {shown.map((g, i) => (
+              <GuestRow key={i} guest={g} />
+            ))}
+          </ul>
+          {(rest.length > 0 || page.going > guests.length) && (
             <details className="group">
               <summary className="cursor-pointer list-none text-[14px] font-semibold text-(--rsvp-fg) [&::-webkit-details-marker]:hidden">
-                <span className="group-open:hidden">See everyone</span>
-                <span className="hidden group-open:inline">Hide the list</span>
+                <span className="group-open:hidden">See everyone ({page.going})</span>
+                <span className="hidden group-open:inline">Show fewer</span>
               </summary>
-              <ul className="m-0 mt-3 grid list-none grid-cols-2 gap-x-4 gap-y-2 p-0 text-[14px]">
-                {guests.map((g, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "grid size-6 flex-none place-items-center rounded-full text-[10px] font-bold",
-                        g.tone,
-                      )}
-                    >
-                      {g.initials}
-                    </span>
-                    <span className="truncate">{g.name}</span>
-                  </li>
+              <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0">
+                {rest.map((g, i) => (
+                  <GuestRow key={i} guest={g} />
                 ))}
                 {page.going > guests.length && (
-                  <li className="col-span-2 text-(--rsvp-muted)">
+                  <li className="text-[14px] text-(--rsvp-muted)">
                     and {page.going - guests.length} more
                   </li>
                 )}

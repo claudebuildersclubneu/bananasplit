@@ -1,7 +1,15 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { ArrowDownToLine, ArrowUpToLine, Download, Trash2, UserPlus, UserX } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Banknote,
+  Download,
+  Trash2,
+  UserPlus,
+  UserX,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -9,6 +17,7 @@ import {
   addGuest,
   deleteGuest,
   setGuestCheckedIn,
+  setGuestPaid,
   setGuestStatus,
 } from "@/app/app/[orgSlug]/calendar/[eventId]/rsvp/actions";
 import { EmptyState } from "@/components/empty-state";
@@ -38,7 +47,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
-import { avatarTone, formatPhone, initials } from "@/lib/rsvp/format";
+import { avatarTone, formatPhone, initials, instagramUrl } from "@/lib/rsvp/format";
+import { formatCents } from "@/lib/rsvp/pay";
 import { cn } from "@/lib/utils";
 
 export interface RsvpGuest {
@@ -46,9 +56,19 @@ export interface RsvpGuest {
   name: string;
   email: string;
   phone: string;
+  /** Instagram handle, without the @. */
+  instagram: string | null;
   status: "GOING" | "WAITLIST" | "CANCELLED";
   checkedIn: boolean;
   createdAt: string;
+  /** Whose invite link they signed up with. */
+  invitedBy: string | null;
+  /** Still-signed-up guests who came through their link. */
+  invitedCount: number;
+  /** Bring list lines they took. */
+  bringing: string[];
+  /** Split the cost: what they said and whether a host confirmed it. */
+  paid: { cents: number | null; claimed: boolean; confirmed: boolean };
 }
 
 type Filter = "all" | "GOING" | "WAITLIST" | "CANCELLED";
@@ -72,6 +92,7 @@ export function RsvpGuests({
   guests,
   canAdd,
   shareUrl,
+  owes,
 }: {
   orgId: string;
   eventId: string;
@@ -79,6 +100,8 @@ export function RsvpGuests({
   guests: RsvpGuest[];
   canAdd: boolean;
   shareUrl: string | null;
+  /** Split the cost: one guest's share now; null when the event is free. */
+  owes: number | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -133,16 +156,50 @@ export function RsvpGuests({
     if (ok) router.refresh();
   }
 
+  const inviters = useMemo(
+    () =>
+      guests
+        .filter((g) => g.invitedCount > 0 && g.status !== "CANCELLED")
+        .sort((a, b) => b.invitedCount - a.invitedCount)
+        .slice(0, 5),
+    [guests],
+  );
+
   function exportCsv() {
     const rows = [
-      ["Name", "Email", "Phone", "Status", "Checked in", "Signed up"],
+      [
+        "Name",
+        "Email",
+        "Phone",
+        "Instagram",
+        "Status",
+        "Checked in",
+        "Signed up",
+        "Invited by",
+        "Brought",
+        "Bringing",
+        ...(owes !== null ? ["Paid"] : []),
+      ],
       ...guests.map((g) => [
         g.name,
         g.email,
         g.phone,
+        g.instagram ? `@${g.instagram}` : "",
         STATUS_BADGE[g.status].label,
         g.checkedIn ? "Yes" : "No",
         new Date(g.createdAt).toISOString(),
+        g.invitedBy ?? "",
+        String(g.invitedCount),
+        g.bringing.join("; "),
+        ...(owes !== null
+          ? [
+              g.paid.confirmed
+                ? `Paid ${formatCents(g.paid.cents ?? owes)}`
+                : g.paid.claimed
+                  ? `Says paid ${formatCents(g.paid.cents ?? owes)}`
+                  : "",
+            ]
+          : []),
       ]),
     ];
     const csv = rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
@@ -206,6 +263,29 @@ export function RsvpGuests({
         </div>
       </div>
 
+      {inviters.length > 0 && (
+        <div className="bg-card flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border px-4 py-3 text-sm">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Brought the most friends
+          </span>
+          {inviters.map((g) => (
+            <span key={g.id} className="flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "grid size-6 place-items-center rounded-full text-[10px] font-bold",
+                  avatarTone(g.name),
+                )}
+              >
+                {initials(g.name)}
+              </span>
+              <span className="font-medium">{g.name}</span>
+              <span className="text-muted-foreground tabular-nums">{g.invitedCount}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {guests.length === 0 ? (
         <EmptyState
           title="Nobody has signed up yet"
@@ -230,6 +310,7 @@ export function RsvpGuests({
                 <TableHead>Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Signed up</TableHead>
+                {owes !== null && <TableHead>Paid</TableHead>}
                 <TableHead className="text-center">Checked in</TableHead>
                 <TableHead className="w-10">
                   <span className="sr-only">Actions</span>
@@ -258,6 +339,26 @@ export function RsvpGuests({
                         >
                           {g.email}
                         </a>
+                        {g.instagram && (
+                          <a
+                            href={instagramUrl(g.instagram)}
+                            target="_blank"
+                            rel="noopener noreferrer nofollow"
+                            className="text-muted-foreground block truncate text-xs hover:underline"
+                          >
+                            @{g.instagram} on Instagram
+                          </a>
+                        )}
+                        {(g.invitedBy || g.bringing.length > 0) && (
+                          <span className="text-muted-foreground block truncate text-xs">
+                            {[
+                              g.invitedBy && `Invited by ${g.invitedBy}`,
+                              g.bringing.length > 0 && `Bringing ${g.bringing.join(", ")}`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </TableCell>
@@ -274,6 +375,39 @@ export function RsvpGuests({
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                     {formatDistanceToNow(new Date(g.createdAt), { addSuffix: true })}
                   </TableCell>
+                  {owes !== null && (
+                    <TableCell className="whitespace-nowrap">
+                      {g.status !== "GOING" ? (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      ) : g.paid.confirmed ? (
+                        <Badge className="bg-success/12 text-success">
+                          Paid {formatCents(g.paid.cents ?? owes)}
+                        </Badge>
+                      ) : (
+                        <Button
+                          variant={g.paid.claimed ? "default" : "outline"}
+                          size="sm"
+                          disabled={busy === g.id}
+                          onClick={() =>
+                            act(
+                              g.id,
+                              () => setGuestPaid(orgId, eventId, g.id, true),
+                              `${g.name} is marked paid`,
+                            )
+                          }
+                          title={
+                            g.paid.claimed
+                              ? "They said they paid. Confirm once you see it."
+                              : "Mark paid (cash at the door, or a payment you got)"
+                          }
+                        >
+                          {g.paid.claimed
+                            ? `Confirm ${formatCents(g.paid.cents ?? owes)}`
+                            : `Owes ${formatCents(owes)}`}
+                        </Button>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell className="text-center">
                     <Checkbox
                       checked={g.checkedIn}
@@ -308,6 +442,14 @@ export function RsvpGuests({
                               `${g.name} is on the waitlist`,
                             ),
                         },
+                        owes !== null &&
+                          g.status === "GOING" &&
+                          (g.paid.confirmed || g.paid.claimed) && {
+                            label: "Mark not paid",
+                            icon: Banknote,
+                            onSelect: () =>
+                              act(g.id, () => setGuestPaid(orgId, eventId, g.id, false)),
+                          },
                         g.status !== "CANCELLED" && {
                           label: "Cancel spot",
                           icon: UserX,

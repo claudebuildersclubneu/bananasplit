@@ -40,6 +40,7 @@ export const NONCE_ROUTE_PREFIXES = [
   "/app",
   "/poll",
   "/e",
+  "/rsvp",
   "/invite",
   "/sign-in",
   "/sign-up",
@@ -161,6 +162,21 @@ export const STATIC_SECURITY_HEADERS: { key: string; value: string }[] = [
 ];
 
 /**
+ * Door mode (an RSVP page's check-in screen) scans tickets with the
+ * phone's camera, so its two routes let this origin use the camera; every
+ * other page keeps camera=() from STATIC_SECURITY_HEADERS. next.config.ts
+ * lists these after the static headers, and the later value wins.
+ */
+export const DOOR_MODE_SOURCES = [
+  "/app/:orgSlug/calendar/:eventId/rsvp/door",
+  "/rsvp/:eventId/door",
+] as const;
+export const DOOR_PERMISSIONS_HEADER = {
+  key: "Permissions-Policy",
+  value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+};
+
+/**
  * X-Frame-Options: DENY, on every path except the Notes files route, whose
  * PDFs the in-app preview shows in a same-origin frame (that route sends
  * SAMEORIGIN and its own frame-ancestors 'self').
@@ -173,4 +189,4 @@ export const NOT_FRAMABLE_SOURCE = `/((?!${FRAMABLE}).*)`;
  * next.config.ts `source` for the static CSP: every path EXCEPT the nonce
  * routes (so a matched route never carries two policies).
  */
-export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|e/|e$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;
+export const STATIC_CSP_SOURCE = `/((?!app/|app$|poll/|poll$|e/|e$|rsvp/|rsvp$|invite/|invite$|sign-in|sign-up|verify-email|onboarding|checkout|forgot-password|reset-password|${FRAMABLE}).*)`;

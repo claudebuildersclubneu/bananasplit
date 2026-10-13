@@ -19,12 +19,42 @@ export interface RsvpMessageInput {
   when: string;
   /** "6:00 PM", for the hour-before text. */
   startTime: string;
+  /** Null when the host hides it from this guest (guestPlace). */
   location: string | null;
   locationDetails: string | null;
-  /** The online meeting link, if the event has one. */
+  /** The online meeting link, for a guest who is going (guestPlace). */
   joinUrl: string | null;
   /** The page, signed in as this guest (their manage link). */
   pageUrl: string;
+  /** Their ticket (the QR a host scans), while they're going. */
+  ticketUrl?: string | null;
+  /** Their own invite link. */
+  inviteUrl?: string | null;
+  /** Split the cost: "$4 to the host: Venmo @maya, Cash App $maya". */
+  chipIn?: string | null;
+}
+
+/**
+ * Where the event is, as one guest's email may tell it: the same rule as
+ * the page. The online meeting link goes only to someone going, and when
+ * the host hides the address, it and the directions go only to someone
+ * going too (not the waitlist, not a guest who isn't going anymore).
+ */
+export function guestPlace(
+  event: {
+    location: string | null;
+    locationDetails: string | null;
+    hideLocation: boolean;
+    joinUrl: string | null;
+  },
+  going: boolean,
+): Pick<RsvpMessageInput, "location" | "locationDetails" | "joinUrl"> {
+  const showWhere = going || !event.hideLocation;
+  return {
+    location: showWhere ? event.location : null,
+    locationDetails: showWhere ? event.locationDetails : null,
+    joinUrl: going ? event.joinUrl : null,
+  };
 }
 
 const COPY: Record<
@@ -95,6 +125,28 @@ export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
       ),
     );
     text.push(`Online: ${input.joinUrl}`);
+  }
+  if (input.chipIn && !cancelled) {
+    rows.push(detailRow("Chip in", escapeHtml(input.chipIn)));
+    text.push(`Chip in: ${input.chipIn}`);
+  }
+  if (input.ticketUrl && !cancelled) {
+    rows.push(
+      detailRow(
+        "Ticket",
+        `<a href="${safeHref(input.ticketUrl)}" style="color:#7a5a00">Show this at the door</a>`,
+      ),
+    );
+    text.push(`Ticket (show it at the door): ${input.ticketUrl}`);
+  }
+  if (input.inviteUrl && !cancelled) {
+    rows.push(
+      detailRow(
+        "Bring friends",
+        `<a href="${safeHref(input.inviteUrl)}" style="color:#7a5a00">${escapeHtml(input.inviteUrl.replace(/^https?:\/\//, ""))}</a>`,
+      ),
+    );
+    text.push(`Bring friends with your link: ${input.inviteUrl}`);
   }
 
   const details = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;width:100%;background:#f7f2e6;border-radius:12px"><tr><td style="padding:12px 16px"><table role="presentation" cellpadding="0" cellspacing="0">${rows.join("")}</table></td></tr></table>`;

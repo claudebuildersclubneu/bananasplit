@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { credentialsSignIn, SIGN_IN_UNAVAILABLE_MESSAGE } from "@/lib/auth/credentials-sign-in";
 import { emailVerificationRequired } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
@@ -120,8 +121,11 @@ export async function signUpAction(
     }
   }
 
-  const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, "/onboarding");
-  if (signedIn.ok) redirect("/onboarding");
+  // Someone who came to make a free event page (/rsvp/new) goes back there;
+  // everyone else goes on to find or start their club.
+  const next = safeCallbackUrl(formData.get("callbackUrl")) ?? "/onboarding";
+  const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, next);
+  if (signedIn.ok) redirect(next);
 
   // The account exists either way. A server-side failure is said as such
   // (it is not the password); anything else falls back to signing in by hand.

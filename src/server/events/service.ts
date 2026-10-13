@@ -17,7 +17,11 @@ import { invalidate } from "@/server/cache/invalidate";
 import { publicEvents, reports } from "@/server/cache/tags";
 import type { TxClient, TxKind } from "@/server/db/context";
 import { enqueueJob } from "@/server/jobs/enqueue";
-import { notifyEventCancelled, scheduleRsvpReminders } from "@/server/rsvp/service";
+import {
+  notifyEventCancelled,
+  resetRsvpReminders,
+  scheduleRsvpReminders,
+} from "@/server/rsvp/service";
 import { markReportsDataChanged } from "@/server/reports/data-version";
 
 /**
@@ -329,12 +333,19 @@ async function afterSave(
       runAt: new Date(Date.now() + 60_000),
     });
   }
+  // A move also forgets which reminders went out (they were for the old
+  // time), even while the page is off, so turning it back on reminds again.
+  const moved = before !== null && before.startsAt.getTime() !== after.startsAt.getTime();
+  if (moved && action !== "event.deleted") {
+    await resetRsvpReminders(ctx.db, ctx.organizationId, after.id);
+  }
   // An RSVP page's guests: reminders follow the start time, and a deleted
-  // event tells them it's off (not a merge, whose sign-ups' event lives on).
+  // event tells them it's off (not a merge: mergeEvents won't merge away a
+  // live page that people signed up on).
   if (after.rsvpEnabled) {
     if (action === "event.deleted") {
       if (!after.mergedIntoId) await notifyEventCancelled(ctx.db, ctx.organizationId, after.id);
-    } else if (!before || before.startsAt.getTime() !== after.startsAt.getTime()) {
+    } else if (!before || moved) {
       await scheduleRsvpReminders(ctx.db, after);
     }
   }
@@ -488,6 +499,8 @@ export interface MergeEventsResult {
  *   3. Copies the loser's website session link, term and stamp slot onto the
  *      survivor where the survivor has none. Two Events linked to different
  *      website sessions cannot be merged: the sync would recreate the loser.
+ *      Nor can a loser whose RSVP page is on with people signed up: its
+ *      sign-ups (EventRegistration) don't move, so its page would go dark.
  *   4. Soft-deletes the loser with mergedIntoId (its Google mirror is removed
  *      by the gcal job), recomputes the rollups, records the merge in
  *      EventLinkLog and OrgAuditLog, and invalidates reports (and the public
@@ -527,6 +540,22 @@ export async function mergeEvents(
     );
   }
   const org = ctx.organizationId;
+  // Sign-ups don't move with a merge, and a merged-away event's page,
+  // tickets and guest links stop working with no email to anyone. So a live
+  // page that people signed up on has to be the one that stays.
+  const loserPage = await ctx.db.event.count({
+    where: {
+      id: loser.id,
+      organizationId: org,
+      rsvpEnabled: true,
+      registrations: { some: { status: { in: ["GOING", "WAITLIST"] } } },
+    },
+  });
+  if (loserPage > 0) {
+    throw new EventMergeError(
+      "People have signed up on the RSVP page of the session you're merging away, and merging would take their page down. Merge the other way round to keep it, or turn its RSVP page off first.",
+    );
+  }
 
   // 1. Check-ins.
   const survivorContacts = new Set(

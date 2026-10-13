@@ -22,9 +22,14 @@ type Tier = {
   note: string;
   cta: string;
   href: string;
-  lead: string;
-  items: readonly string[];
 };
+
+/** A cell in the comparison: included, not included, or a value ("25 GB"). */
+type Mark = boolean | string;
+
+type Row = { feature: string; marks: readonly Mark[] };
+
+type Section = { title: string; rows: readonly Row[] };
 
 const AUDIENCES = [
   { id: "clubs", label: "Student clubs" },
@@ -33,9 +38,9 @@ const AUDIENCES = [
 
 const COPY: Record<Audience, { title: string; intro: string }> = {
   clubs: {
-    title: "Pay for the club you have.",
+    title: "Free for event pages. Pay for the club you have.",
     intro:
-      "Clubs pay per active member, per semester, so you only pay for the people you actually have. Guests who just RSVP are free.",
+      "Anyone can make RSVP pages for free with just an account: no club, no team. A club workspace is paid per active member, per semester, and guests who just RSVP are always free.",
   },
   teams: {
     title: "Simple pricing for your team.",
@@ -43,8 +48,49 @@ const COPY: Record<Audience, { title: string; intro: string }> = {
   },
 };
 
-const TIERS: Record<Audience, readonly Tier[]> = {
-  clubs: [
+/** Where "start a club" goes: straight to setup when signed in, else sign-up first. */
+function createClubHref(signedIn: boolean): string {
+  return signedIn
+    ? "/onboarding/organization"
+    : "/sign-up?callbackUrl=%2Fonboarding%2Forganization";
+}
+
+function tiers(audience: Audience, signedIn: boolean): readonly Tier[] {
+  const club = createClubHref(signedIn);
+  if (audience === "teams") {
+    return [
+      {
+        name: TEAM_PLANS.team.name,
+        featured: true,
+        badge: "For teams",
+        who: "For startups, studios and groups outside school.",
+        price: dollars(TEAM_PLANS.team.perSeatPerMonth),
+        per: "per seat / month",
+        note: `Or ${dollars(TEAM_PLANS.team.perSeatPerYear)} per seat billed yearly.`,
+        cta: "Start your team",
+        href: club,
+      },
+      {
+        name: TEAM_PLANS.business.name,
+        who: "For organizations with several teams.",
+        price: dollars(TEAM_PLANS.business.perSeatPerMonth),
+        per: "per seat / month",
+        note: `Or ${dollars(TEAM_PLANS.business.perSeatPerYear)} per seat billed yearly.`,
+        cta: "Talk to us",
+        href: CONTACT_HREF,
+      },
+    ];
+  }
+  return [
+    {
+      name: "Free",
+      who: "Just you and your event pages. An account, not a club.",
+      price: "$0",
+      per: "always",
+      note: "Start a club any time and bring your events.",
+      cta: "Make a free event page",
+      href: "/rsvp",
+    },
     {
       name: CLUB_PLANS.club.name,
       who: "For active clubs with an officer team.",
@@ -52,74 +98,77 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       per: "per member / semester",
       note: `A 40-member club pays ${dollars(40 * CLUB_PLANS.club.perMemberPerSemester)} a semester.`,
       cta: "Create your club",
-      href: "/sign-up",
-      lead: "Everything to run the club:",
-      items: [
-        "Tasks in five views",
-        "Calendar with availability polls and RSVPs",
-        "Live notes and 25 GB of club storage",
-        "Finance board and receipt reimbursements",
-        "Databases with CSV import",
-        "2 data connections",
-      ],
+      href: club,
     },
     {
       name: CLUB_PLANS.society.name,
       featured: true,
       badge: "Most popular",
-      who: "For growing clubs that want every feature. Built for big clubs, loved by small ones.",
+      who: "For growing clubs that want every feature.",
       price: dollars(CLUB_PLANS.society.perMemberPerSemester),
       per: "per member / semester",
       note: `A 120-member society pays ${dollars(120 * CLUB_PLANS.society.perMemberPerSemester)} a semester.`,
       cta: "Go Society",
-      href: "/sign-up",
-      lead: "Everything in Club, plus:",
-      items: [
-        "Public event pages, waitlists and check-in",
-        "Custom themes and branding",
-        "AI that creates tasks and events and sorts your data",
-        "Sponsorship tracking and runway",
-        "6 data connections and 100 GB storage",
-        "Website sync for events and sign-ups",
-        "Audit log and full export",
+      href: club,
+    },
+  ];
+}
+
+/** What each plan includes, one column per tier in the same order as the cards. */
+const SECTIONS: Record<Audience, readonly Section[]> = {
+  clubs: [
+    {
+      title: "Event pages",
+      rows: [
+        { feature: "RSVP pages, sign-ups and waitlists", marks: [true, true, true] },
+        { feature: "Reminders by email", marks: [true, true, true] },
+        { feature: "QR tickets and check-in at the door", marks: [true, true, true] },
+        { feature: "Invite links and a bring list", marks: [true, true, true] },
+        { feature: "Guest lists kept", marks: ["30 days", "Forever", "Forever"] },
+      ],
+    },
+    {
+      title: "Your club",
+      rows: [
+        { feature: "A shared workspace for your officers", marks: [false, true, true] },
+        { feature: "Tasks in five views", marks: [false, true, true] },
+        { feature: "Calendar and availability polls", marks: [false, true, true] },
+        { feature: "Live notes and club storage", marks: [false, "25 GB", "100 GB"] },
+        { feature: "Finance board and reimbursements", marks: [false, true, true] },
+        { feature: "Databases with CSV import", marks: [false, true, true] },
+        { feature: "Data connections", marks: [false, "2", "6"] },
+      ],
+    },
+    {
+      title: "For growing clubs",
+      rows: [
+        { feature: "Custom themes and branding", marks: [false, false, true] },
+        {
+          feature: "AI that creates tasks and events and sorts your data",
+          marks: [false, false, true],
+        },
+        { feature: "Sponsorship tracking and runway", marks: [false, false, true] },
+        { feature: "Website sync for events and sign-ups", marks: [false, false, true] },
+        { feature: "Audit log and full export", marks: [false, false, true] },
       ],
     },
   ],
   teams: [
     {
-      name: TEAM_PLANS.team.name,
-      featured: true,
-      badge: "For teams",
-      who: "For startups, studios and groups outside school.",
-      price: dollars(TEAM_PLANS.team.perSeatPerMonth),
-      per: "per seat / month",
-      note: `Or ${dollars(TEAM_PLANS.team.perSeatPerYear)} per seat billed yearly.`,
-      cta: "Start your team",
-      href: "/sign-up",
-      lead: "Every Society feature, plus:",
-      items: [
-        "Google Workspace sign-in",
-        "Unlimited data connections",
-        "250 GB storage",
-        "Admin roles and permissions",
-        "Priority support",
-      ],
+      title: "Everything clubs get",
+      rows: [{ feature: "Every Society feature", marks: [true, true] }],
     },
     {
-      name: TEAM_PLANS.business.name,
-      who: "For organizations with several teams.",
-      price: dollars(TEAM_PLANS.business.perSeatPerMonth),
-      per: "per seat / month",
-      note: `Or ${dollars(TEAM_PLANS.business.perSeatPerYear)} per seat billed yearly.`,
-      cta: "Talk to us",
-      href: CONTACT_HREF,
-      lead: "Everything in Team, plus:",
-      items: [
-        "Multiple workspaces under one account",
-        "Advanced permissions",
-        "1 TB storage",
-        "Extended audit log retention",
-        "Dedicated onboarding",
+      title: "For teams",
+      rows: [
+        { feature: "Google Workspace sign-in", marks: [true, true] },
+        { feature: "Data connections", marks: ["Unlimited", "Unlimited"] },
+        { feature: "Storage", marks: ["250 GB", "1 TB"] },
+        { feature: "Admin roles and permissions", marks: [true, "Advanced"] },
+        { feature: "Priority support", marks: [true, true] },
+        { feature: "Several workspaces under one account", marks: [false, true] },
+        { feature: "Longer audit log history", marks: [false, true] },
+        { feature: "Dedicated onboarding", marks: [false, true] },
       ],
     },
   ],
@@ -138,18 +187,21 @@ const PROMISES = [
 ] as const;
 
 /**
- * Plans for two audiences behind a segmented toggle: per-member, per-semester
- * club plans (plus the school-wide plan), or per-seat team plans.
+ * Plans for two audiences behind a segmented toggle: free event pages and
+ * the per-member, per-semester club plans (plus the school-wide plan), or
+ * per-seat team plans. The cards carry the price and one button each, in
+ * line across the row; what each plan includes is one table underneath.
  */
-export function Pricing() {
+export function Pricing({ signedIn = false }: { signedIn?: boolean }) {
   const [audience, setAudience] = useState<Audience>("clubs");
   const copy = COPY[audience];
+  const plans = tiers(audience, signedIn);
 
   return (
     <section id="pricing" className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 py-32">
       <div className="flex flex-col items-center gap-[18px] text-center">
         <SectionTitle>{copy.title}</SectionTitle>
-        <p className="text-ink-muted max-w-[540px] text-[17px] leading-[1.55] text-pretty">
+        <p className="text-ink-muted max-w-[580px] text-[17px] leading-[1.55] text-pretty">
           {copy.intro}
         </p>
         <div
@@ -177,11 +229,18 @@ export function Pricing() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[940px] grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-stretch gap-4">
-        {TIERS[audience].map((tier) => (
+      <div
+        className={cn(
+          "mx-auto grid w-full items-stretch gap-4",
+          plans.length > 2 ? "max-w-[1100px] md:grid-cols-3" : "max-w-[760px] md:grid-cols-2",
+        )}
+      >
+        {plans.map((tier) => (
           <TierCard key={tier.name} tier={tier} />
         ))}
       </div>
+
+      <ComparisonTable plans={plans} sections={SECTIONS[audience]} />
 
       {audience === "clubs" && <SchoolsPanel />}
 
@@ -201,11 +260,16 @@ export function Pricing() {
   );
 }
 
+/**
+ * A plan's name, who it's for, its price and its button. The button sits at
+ * the bottom (mt-auto) and the cards in a row stretch to the same height, so
+ * every button lines up across the row whatever the copy above it.
+ */
 function TierCard({ tier }: { tier: Tier }) {
   return (
     <div
       className={cn(
-        "relative flex flex-col gap-5 rounded-[28px] border p-8 tabular-nums",
+        "relative flex flex-col gap-5 rounded-[28px] border p-7 tabular-nums",
         tier.featured
           ? "border-banana/90 bg-paper shadow-featured"
           : "border-ink/10 bg-transparent",
@@ -213,7 +277,7 @@ function TierCard({ tier }: { tier: Tier }) {
     >
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[19px] font-bold">{tier.name}</span>
+          <h3 className="m-0 text-[19px] font-bold">{tier.name}</h3>
           {tier.featured && tier.badge && (
             <span className="bg-ink text-banana rounded-full px-2.5 py-[5px] font-mono text-[11px] tracking-[0.05em] uppercase">
               {tier.badge}
@@ -224,7 +288,7 @@ function TierCard({ tier }: { tier: Tier }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-2.5">
-          <span className="font-heading text-[64px] leading-none tracking-[-0.04em]">
+          <span className="font-heading text-[56px] leading-none tracking-[-0.04em]">
             {tier.price}
           </span>
           <span className="text-ink-muted text-[15px] leading-[1.3]">{tier.per}</span>
@@ -234,7 +298,7 @@ function TierCard({ tier }: { tier: Tier }) {
       <SiteLink
         href={tier.href}
         className={cn(
-          "border-ink rounded-full border p-3.5 text-center text-[15px] font-semibold whitespace-nowrap",
+          "border-ink mt-auto rounded-full border p-3.5 text-center text-[15px] font-semibold whitespace-nowrap",
           tier.featured
             ? "bg-ink text-cream hover:border-ink-hover hover:bg-ink-hover"
             : "text-ink hover:bg-paper bg-transparent",
@@ -242,17 +306,92 @@ function TierCard({ tier }: { tier: Tier }) {
       >
         {tier.cta}
       </SiteLink>
-      <div className="border-ink/10 flex flex-col gap-3 border-t pt-5">
-        <span className="text-ink-soft text-[13px] font-bold">{tier.lead}</span>
-        {tier.items.map((item) => (
-          <div key={item} className="flex gap-2.5 text-[15px] leading-[1.45]">
-            <span className="bg-butter text-honey mt-px grid size-5 flex-none place-items-center rounded-full text-[11px] font-extrabold">
-              ✓
-            </span>
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
+    </div>
+  );
+}
+
+/** One cell: a check, a muted cross, or a value. */
+function MarkCell({ mark, featured }: { mark: Mark; featured?: boolean }) {
+  return (
+    <td className={cn("px-3 py-3 text-center align-middle", featured && "bg-paper")}>
+      {mark === true ? (
+        <span className="bg-butter text-honey inline-grid size-6 place-items-center rounded-full text-[12px] font-extrabold">
+          <span aria-hidden="true">✓</span>
+          <span className="sr-only">Included</span>
+        </span>
+      ) : mark === false ? (
+        <span className="text-ink-ghost text-[16px]">
+          <span aria-hidden="true">✕</span>
+          <span className="sr-only">Not included</span>
+        </span>
+      ) : (
+        <span className="text-[14px] font-semibold">{mark}</span>
+      )}
+    </td>
+  );
+}
+
+/**
+ * Every plan's features in one table: a row per feature, a column per plan,
+ * grouped under headings. Scrolls sideways on a narrow phone rather than
+ * squeezing the plan names.
+ */
+function ComparisonTable({
+  plans,
+  sections,
+}: {
+  plans: readonly Tier[];
+  sections: readonly Section[];
+}) {
+  return (
+    <div className="border-ink/10 relative mx-auto w-full max-w-[1100px] overflow-x-auto rounded-[24px] border">
+      <table className="w-full min-w-[560px] border-collapse text-left">
+        <caption className="sr-only">What each plan includes</caption>
+        <thead>
+          <tr className="border-ink/10 border-b">
+            <th scope="col" className="text-ink-soft px-5 py-4 text-[14px] font-semibold">
+              Compare plans
+            </th>
+            {plans.map((tier) => (
+              <th
+                key={tier.name}
+                scope="col"
+                className={cn(
+                  "w-[22%] px-3 py-4 text-center text-[15px] font-bold",
+                  tier.featured && "bg-paper",
+                )}
+              >
+                {tier.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sections.map((section) => (
+            <Fragment key={section.title}>
+              <tr>
+                <th
+                  scope="colgroup"
+                  colSpan={plans.length + 1}
+                  className="text-ink-soft bg-oat/60 px-5 pt-5 pb-2 text-[12px] font-bold tracking-[0.06em] uppercase"
+                >
+                  {section.title}
+                </th>
+              </tr>
+              {section.rows.map((row) => (
+                <tr key={row.feature} className="border-ink/8 border-t">
+                  <th scope="row" className="px-5 py-3 text-[15px] leading-[1.4] font-normal">
+                    {row.feature}
+                  </th>
+                  {row.marks.map((mark, i) => (
+                    <MarkCell key={i} mark={mark} featured={plans[i]?.featured} />
+                  ))}
+                </tr>
+              ))}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

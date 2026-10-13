@@ -264,10 +264,13 @@ export const JOB_KINDS = {
     maxRuntimeMs: 20_000,
     leaseSeconds: 60,
     tier: "fast",
-    afterEligible: false,
+    // Queues the emails in bulk, so it is quick: a deleted event's
+    // cancellation fan-out runs right after the request instead of waiting
+    // for the cron. Reminders have a future runAt, so they still wait.
+    afterEligible: true,
     handler: () => import("@/server/rsvp/jobs").then((m) => m.rsvpFanoutJob),
     description:
-      "One rsvp-email per guest: the 24h and 1h reminders to everyone going (key rsvp-fanout:{eventId}:{stage}:{startMinute}, runAt before the start), or the cancellation when the event is deleted (key rsvp-fanout:{eventId}:cancelled).",
+      "One rsvp-email per guest, queued in bulk: the 24h and 1h reminders to everyone going (key rsvp-fanout:{eventId}:{stage}:{startMinute}, runAt before the start; no 1h one for an all-day event), or the cancellation when the event is deleted (key rsvp-fanout:{eventId}:cancelled).",
   }),
   "google-import": kind({
     payload: z.object({ integrationId: id, mode: z.enum(["dry-run", "apply"]) }).strict(),

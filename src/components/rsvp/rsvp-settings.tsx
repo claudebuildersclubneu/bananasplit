@@ -1,6 +1,15 @@
 "use client";
 
-import { EyeOff, ImagePlus, Lock, Mail, MessageSquareText, Trash2, Users } from "lucide-react";
+import {
+  Banknote,
+  EyeOff,
+  ImagePlus,
+  Lock,
+  Mail,
+  MessageSquareText,
+  Trash2,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -14,8 +23,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toaster";
 import { RSVP_BACKGROUNDS } from "@/lib/rsvp/backgrounds";
 import type { RsvpCover } from "@/lib/rsvp/cover";
+import {
+  formatCents,
+  PAY_APP_LABEL,
+  PAY_APPS,
+  parseDollars,
+  shareCents,
+  type CostMode,
+  type PayApp,
+} from "@/lib/rsvp/pay";
 import { cn } from "@/lib/utils";
 
+import { BringListEditor, type BringLine } from "./bring-list-editor";
 import { PagePreview } from "./page-preview";
 
 export interface RsvpSettingsValue {
@@ -27,7 +46,29 @@ export interface RsvpSettingsValue {
   hideGuests: boolean;
   hideCount: boolean;
   background: string;
+  costMode: CostMode;
+  /** The amount as typed ("12.50"); EACH: per guest, SPLIT: the total. */
+  costText: string;
+  costNote: string;
+  payTo: Record<PayApp, string>;
 }
+
+const PAY_PLACEHOLDER: Record<PayApp, string> = {
+  venmo: "@your-venmo",
+  cashapp: "$yourcashtag",
+  paypal: "paypal.me name",
+  zelle: "Email or phone on Zelle",
+};
+
+const COST_MODES: { id: CostMode; label: string; hint: string }[] = [
+  { id: "NONE", label: "Free", hint: "Nothing to pay." },
+  { id: "EACH", label: "Price each", hint: "Every guest pays the same amount." },
+  {
+    id: "SPLIT",
+    label: "Split a total",
+    hint: "Enter what it all costs; each guest's share drops as more sign up.",
+  },
+];
 
 function Card({
   title,
@@ -124,22 +165,31 @@ function PrivacyTile({
 
 export function RsvpSettings({
   orgId,
-  orgSlug,
   eventId,
   title,
   location,
   cover,
   initial,
   messaging,
+  editHref,
+  going,
+  items,
+  personal = false,
 }: {
   orgId: string;
-  orgSlug: string;
   eventId: string;
   title: string;
   location: string | null;
   cover: RsvpCover | null;
   initial: RsvpSettingsValue;
   messaging: { email: "org" | "platform"; texts: boolean };
+  /** Where the event's own details (title, time, place) are edited. */
+  editHref: string;
+  /** How many are going, for the split preview. */
+  going: number;
+  items: BringLine[];
+  /** A free page (no club): messages go out as the person. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
@@ -159,6 +209,15 @@ export function RsvpSettings({
     setValue((prev) => ({ ...prev, [key]: v }));
   }
 
+  const costCents = value.costMode === "NONE" ? null : parseDollars(value.costText);
+  const sample = Math.max(going, 1);
+  const costPreview =
+    value.costMode === "NONE" || costCents === null
+      ? null
+      : value.costMode === "EACH"
+        ? `${formatCents(costCents)} from each guest`
+        : `${formatCents(costCents)} total: ${formatCents(shareCents("SPLIT", costCents, sample) ?? costCents)} each with ${sample} going, ${formatCents(shareCents("SPLIT", costCents, Math.max(sample, 10) * 2) ?? costCents)} each with ${Math.max(sample, 10) * 2}`;
+
   function save() {
     const capacity = limited ? Number.parseInt(capacityText, 10) : null;
     if (limited && (!Number.isFinite(capacity) || (capacity ?? 0) < 1)) {
@@ -168,11 +227,22 @@ export function RsvpSettings({
       });
       return;
     }
+    if (value.costMode !== "NONE" && (costCents === null || costCents < 1)) {
+      toast({
+        title: "Set the amount",
+        description: "Enter dollars like 12 or 12.50, or pick Free.",
+      });
+      return;
+    }
     start(async () => {
+      // costText goes as cents; the action's schema drops the text itself.
       const result = await saveRsvpSettings(orgId, eventId, {
         ...value,
         capacity,
         locationDetails: value.locationDetails.trim() || null,
+        costCents,
+        costNote: value.costNote.trim() || null,
+        payTo: value.payTo,
       });
       if (result.error) {
         toast({ title: "Couldn't save", description: result.error });
@@ -386,7 +456,7 @@ export function RsvpSettings({
               {location ?? "No location set"}
             </span>
             <Link
-              href={`/app/${orgSlug}/calendar/${eventId}?edit=1`}
+              href={editHref}
               className="text-primary shrink-0 text-xs font-medium hover:underline"
             >
               Edit event
@@ -403,6 +473,103 @@ export function RsvpSettings({
               placeholder="Room 204 on the second floor. Take the east elevator; we'll have a sign on the door."
             />
           </div>
+        </Card>
+
+        <Card
+          title="Split the cost"
+          description="Pizza, a cabin, tickets: guests chip in straight to you. No fees, no money through Bananasplit."
+        >
+          <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Cost">
+            {COST_MODES.map((m) => {
+              const active = value.costMode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => set("costMode", m.id)}
+                  className={cn(
+                    "flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-colors",
+                    active ? "border-primary bg-primary/6" : "border-border hover:bg-muted/50",
+                  )}
+                >
+                  <span className="text-sm font-bold">{m.label}</span>
+                  <span className="text-muted-foreground text-xs leading-relaxed">{m.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+          {value.costMode !== "NONE" && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="rsvp-cost">
+                    {value.costMode === "EACH" ? "Price per guest" : "Total to split"}
+                  </Label>
+                  <div className="relative">
+                    <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
+                      $
+                    </span>
+                    <Input
+                      id="rsvp-cost"
+                      inputMode="decimal"
+                      value={value.costText}
+                      onChange={(e) => set("costText", e.target.value)}
+                      placeholder={value.costMode === "EACH" ? "5" : "120"}
+                      className="ps-6"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rsvp-cost-note">What it&apos;s for</Label>
+                  <Input
+                    id="rsvp-cost-note"
+                    maxLength={120}
+                    value={value.costNote}
+                    onChange={(e) => set("costNote", e.target.value)}
+                    placeholder="Pizza and drinks"
+                  />
+                </div>
+              </div>
+              {costPreview && (
+                <p className="bg-muted/50 flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
+                  <Banknote className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                  {costPreview}
+                </p>
+              )}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Where guests pay you</p>
+                <p className="text-muted-foreground text-xs">
+                  Fill in any you use. Guests get a button that opens the app with their share
+                  filled in, then tap &ldquo;I&apos;ve paid&rdquo; and you tick them off.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {PAY_APPS.map((app) => (
+                    <div key={app} className="space-y-1">
+                      <Label htmlFor={`rsvp-pay-${app}`} className="text-xs">
+                        {PAY_APP_LABEL[app]}
+                      </Label>
+                      <Input
+                        id={`rsvp-pay-${app}`}
+                        value={value.payTo[app]}
+                        onChange={(e) => set("payTo", { ...value.payTo, [app]: e.target.value })}
+                        placeholder={PAY_PLACEHOLDER[app]}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card
+          title="Bring list"
+          description="What you need people to bring or help with. Guests claim lines on the page, and everyone sees what's covered."
+        >
+          <BringListEditor orgId={orgId} eventId={eventId} initial={items} />
         </Card>
 
         <Card title="Privacy" description="What the public page keeps to itself.">
@@ -468,9 +635,11 @@ export function RsvpSettings({
             <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>
               A confirmation email, then reminders a day and an hour before.{" "}
-              {messaging.email === "org"
-                ? "Sent from your club's email sender."
-                : "Sent as your club via Bananasplit until you connect your own sender in Admin panel › Integrations."}
+              {personal
+                ? "Sent as you via Bananasplit, with their ticket and invite link."
+                : messaging.email === "org"
+                  ? "Sent from your club's email sender."
+                  : "Sent as your club via Bananasplit until you connect your own sender in Admin panel › Integrations."}
             </span>
           </p>
           <p className="text-muted-foreground flex gap-2 text-xs leading-relaxed">

@@ -10,7 +10,15 @@ import { getClientIp } from "@/lib/request-ip";
 import { registrationSchema } from "@/lib/rsvp/schema";
 import { withSystemOrgTx } from "@/server/db/context";
 import { rsvpPageTarget } from "@/server/rsvp/page";
-import { registerGuest, RSVP_RULES_SELECT, setRegistrationStatus } from "@/server/rsvp/service";
+import { shareCents } from "@/lib/rsvp/pay";
+import {
+  claimPayment,
+  registerGuest,
+  registrationCounts,
+  RSVP_RULES_SELECT,
+  setItemClaim,
+  setRegistrationStatus,
+} from "@/server/rsvp/service";
 import {
   readRsvpManageKey,
   RSVP_COOKIE_MAX_AGE_SECONDS,
@@ -30,7 +38,7 @@ export type RegisterResult =
   | { ok: true; status: "GOING" | "WAITLIST" }
   /** That email is already signed up: we emailed its owner a link. */
   | { ok: true; status: "EXISTS" }
-  | { ok: false; error: string; field?: "name" | "email" | "phone" };
+  | { ok: false; error: string; field?: "name" | "email" | "phone" | "instagram" };
 
 // Generous: a whole room on one campus network signs up at once.
 const REGISTER_LIMIT = { limit: 60, windowSec: 10 * 60 };
@@ -48,8 +56,15 @@ const inputSchema = z.object({
   name: z.string().max(200),
   email: z.string().max(400),
   phone: z.string().max(64),
+  instagram: z.string().max(200).optional(),
   /** A field people never see; bots fill it in. */
   website: z.string().max(200).optional(),
+  /** The invite code of the link they came from. */
+  via: z
+    .string()
+    .regex(/^[a-z0-9]{6,12}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 const SOMETHING_WRONG = "Something went wrong on our side. Try again in a moment.";
@@ -93,7 +108,10 @@ async function register(input: unknown): Promise<RegisterResult> {
     return {
       ok: false,
       error: issue?.message ?? "Check the form and try again.",
-      field: field === "name" || field === "email" || field === "phone" ? field : undefined,
+      field:
+        field === "name" || field === "email" || field === "phone" || field === "instagram"
+          ? field
+          : undefined,
     };
   }
 
@@ -107,7 +125,12 @@ async function register(input: unknown): Promise<RegisterResult> {
       select: RSVP_RULES_SELECT,
     });
     if (!event) return { kind: "closed" as const, reason: "off" as const };
-    return registerGuest(db, event, { ...parsed.data, userId: session?.user.id ?? null });
+    return registerGuest(
+      db,
+      event,
+      { ...parsed.data, userId: session?.user.id ?? null },
+      { via: raw.data.via },
+    );
   });
 
   if (outcome.kind === "closed") return { ok: false, error: CLOSED_MESSAGE[outcome.reason] };
@@ -157,4 +180,76 @@ async function cancel(input: unknown): Promise<{ ok: boolean; error?: string }> 
   });
   store.delete({ name: rsvpCookieName(target.eventId), path: rsvpCookiePath(parsed.data.slug) });
   return done ? { ok: true } : { ok: false, error: "We couldn't find your sign-up." };
+}
+
+const slugSchema = z.string().regex(/^[a-z0-9]{8}$/);
+const GUEST_LIMIT = { limit: 120, windowSec: 10 * 60 };
+
+/**
+ * The page's event and this browser's sign-up (its signed cookie), for the
+ * guest's own actions. A string is the message to show.
+ */
+async function myRegistration(
+  slug: string,
+  label: string,
+): Promise<{ organizationId: string; eventId: string; registrationId: string } | string> {
+  const limited = await checkRateLimit(
+    rateLimitKey(`rsvp-${label}`, await getClientIp()),
+    GUEST_LIMIT.limit,
+    GUEST_LIMIT.windowSec,
+  );
+  if (!limited.allowed) return "Too many tries. Wait a few minutes.";
+  const target = await rsvpPageTarget(slug);
+  if (!target) return CLOSED_MESSAGE.off;
+  const registrationId = readRsvpManageKey(
+    (await cookies()).get(rsvpCookieName(target.eventId))?.value,
+  );
+  if (!registrationId) return "We couldn't find your sign-up on this device.";
+  return { ...target, registrationId };
+}
+
+/** "I'll bring it" (or "Never mind") on a bring list line. */
+export async function claimBringItem(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  return guarded("bring-list", { ok: false, error: SOMETHING_WRONG }, async () => {
+    const parsed = z
+      .object({ slug: slugSchema, itemId: z.string().min(1).max(64), claim: z.boolean() })
+      .safeParse(input);
+    if (!parsed.success) return { ok: false, error: "Reload the page and try again." };
+    const mine = await myRegistration(parsed.data.slug, "bring");
+    if (typeof mine === "string") return { ok: false, error: mine };
+    const outcome = await withSystemOrgTx(mine.organizationId, ({ db }) =>
+      setItemClaim(
+        db,
+        { id: mine.eventId, organizationId: mine.organizationId },
+        mine.registrationId,
+        parsed.data.itemId,
+        parsed.data.claim,
+      ),
+    );
+    if (outcome === "full") return { ok: false, error: "Someone just took the last one." };
+    if (outcome === "gone") return { ok: false, error: "That isn't on the list anymore." };
+    return { ok: true };
+  });
+}
+
+/** "I paid": records the guest's share right now as what they sent the host. */
+export async function markMyPayment(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  return guarded("paid", { ok: false, error: SOMETHING_WRONG }, async () => {
+    const parsed = z.object({ slug: slugSchema }).safeParse(input);
+    if (!parsed.success) return { ok: false, error: "Reload the page and try again." };
+    const mine = await myRegistration(parsed.data.slug, "paid");
+    if (typeof mine === "string") return { ok: false, error: mine };
+    const done = await withSystemOrgTx(mine.organizationId, async ({ db }) => {
+      const event = await db.event.findFirst({
+        where: { id: mine.eventId, organizationId: mine.organizationId },
+        select: RSVP_RULES_SELECT,
+      });
+      if (!event || event.rsvpCostMode === "NONE") return false;
+      const { going } = await registrationCounts(db, mine.organizationId, event.id);
+      const share = shareCents(event.rsvpCostMode, event.rsvpCostCents, going);
+      if (share === null) return false;
+      return claimPayment(db, event, mine.registrationId, share);
+    });
+    return done ? { ok: true } : { ok: false, error: "Only guests who are going can pay." };
+  });
 }

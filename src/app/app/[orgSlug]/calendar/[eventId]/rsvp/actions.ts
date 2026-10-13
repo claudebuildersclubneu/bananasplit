@@ -2,19 +2,23 @@
 
 import { z } from "zod";
 
-import { Prisma } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/auth/permissions";
 import { isRsvpBackground } from "@/lib/rsvp/backgrounds";
+import { shareCents } from "@/lib/rsvp/pay";
+import { payToSchema } from "@/lib/rsvp/pay-schema";
 import { registrationSchema } from "@/lib/rsvp/schema";
 import { writeOrgAuditLog } from "@/server/audit";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
+import { setRegistrationCheckIn } from "@/server/rsvp/checkin";
 import {
-  generateRsvpSlug,
+  confirmPayment,
+  enableRsvpPage,
   lockEvent,
   promoteFromWaitlist,
   registerGuest,
+  registrationCounts,
   RSVP_RULES_SELECT,
-  scheduleRsvpReminders,
+  saveRsvpItems,
   setRegistrationStatus,
 } from "@/server/rsvp/service";
 
@@ -29,6 +33,9 @@ import { actionError } from "../../action-result";
 export interface RsvpActionResult {
   error?: string;
   slug?: string;
+  /** Check-in: the guest's name, and whether they were already in. */
+  name?: string;
+  already?: boolean;
 }
 
 async function loadEvent(ctx: OrgContext, eventId: string) {
@@ -66,28 +73,7 @@ function run<Args extends unknown[]>(
 /** Turns the page on, giving the event its link the first time. */
 export const turnOnRsvpPage = run(async (ctx, eventId: string) => {
   const event = await loadEvent(ctx, eventId);
-  let slug = event.rsvpSlug;
-  for (let attempt = 0; !slug; attempt++) {
-    const candidate = generateRsvpSlug();
-    // A savepoint, so a code another club already has (1 in 10^12) doesn't
-    // abort the whole transaction.
-    await ctx.db.$executeRaw`SAVEPOINT rsvp_slug`;
-    try {
-      await ctx.db.event.update({ where: { id: event.id }, data: { rsvpSlug: candidate } });
-      await ctx.db.$executeRaw`RELEASE SAVEPOINT rsvp_slug`;
-      slug = candidate;
-    } catch (error) {
-      await ctx.db.$executeRaw`ROLLBACK TO SAVEPOINT rsvp_slug`;
-      const taken = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
-      if (!taken || attempt >= 4) throw error;
-    }
-  }
-  const updated = await ctx.db.event.update({
-    where: { id: event.id },
-    data: { rsvpEnabled: true },
-    select: { id: true, organizationId: true, startsAt: true, rsvpEnabled: true },
-  });
-  await scheduleRsvpReminders(ctx.db, updated);
+  const slug = await enableRsvpPage(ctx.db, ctx.organizationId, event.id);
   await writeOrgAuditLog(ctx.db, {
     organizationId: ctx.organizationId,
     action: "event.rsvp_page_on",
@@ -123,6 +109,17 @@ const settingsSchema = z.object({
   hideGuests: z.boolean(),
   hideCount: z.boolean(),
   background: z.string().refine(isRsvpBackground, "Pick one of the backgrounds."),
+  // Split the cost. Optional, so a form that doesn't send them keeps them.
+  costMode: z.enum(["NONE", "EACH", "SPLIT"]).optional(),
+  costCents: z
+    .number()
+    .int()
+    .min(1, "Enter an amount, or turn off splitting the cost.")
+    .max(10_000_000, "That's more than $100,000.")
+    .nullable()
+    .optional(),
+  costNote: z.string().trim().max(120, "Keep the note under 120 characters.").nullable().optional(),
+  payTo: payToSchema.optional(),
 });
 
 export type RsvpSettingsInput = z.input<typeof settingsSchema>;
@@ -132,6 +129,9 @@ export const saveRsvpSettings = run(async (ctx, eventId: string, input: unknown)
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings." };
   const s = parsed.data;
+  if (s.costMode && s.costMode !== "NONE" && !s.costCents) {
+    return { error: "Enter an amount, or turn off splitting the cost." };
+  }
   const event = await loadEvent(ctx, eventId);
   await lockEvent(ctx.db, event.id);
   const updated = await ctx.db.event.update({
@@ -145,6 +145,14 @@ export const saveRsvpSettings = run(async (ctx, eventId: string, input: unknown)
       rsvpHideGuests: s.hideGuests,
       rsvpHideCount: s.hideCount,
       rsvpBackground: s.background,
+      ...(s.costMode
+        ? {
+            rsvpCostMode: s.costMode,
+            rsvpCostCents: s.costMode === "NONE" ? null : (s.costCents ?? null),
+            rsvpCostNote: s.costNote || null,
+          }
+        : {}),
+      ...(s.payTo ? { rsvpPayTo: s.payTo } : {}),
     },
     select: RSVP_RULES_SELECT,
   });
@@ -165,17 +173,71 @@ export const setGuestStatus = run(
   },
 );
 
-/** Checks a guest in at the door, or undoes it. */
+/**
+ * Checks a guest in at the door, or undoes it. In a club the check-in also
+ * lands in its People and Attendance databases (src/server/rsvp/checkin.ts).
+ */
 export const setGuestCheckedIn = run(
-  async (ctx, eventId: string, registrationId: string, checkedIn: unknown) => {
+  async (
+    ctx,
+    eventId: string,
+    registrationId: string,
+    checkedIn: unknown,
+    method: unknown = "MANUAL",
+  ) => {
     const event = await loadEvent(ctx, eventId);
-    const done = await ctx.db.eventRegistration.updateMany({
-      where: { id: registrationId, organizationId: ctx.organizationId, eventId: event.id },
-      data: { checkedInAt: checkedIn === true ? new Date() : null },
+    const result = await setRegistrationCheckIn(ctx.db, {
+      organizationId: ctx.organizationId,
+      eventId: event.id,
+      registrationId,
+      checkedIn: checkedIn === true,
+      actorUserId: ctx.userId,
+      method: method === "QR" ? "QR" : "MANUAL",
     });
-    return done.count ? {} : { error: "That guest isn't signed up anymore." };
+    return result.ok
+      ? { name: result.name, already: result.already }
+      : { error: "That guest isn't signed up anymore." };
   },
 );
+
+/** Marks a guest paid (what they said, or cash at the door) or not paid. */
+export const setGuestPaid = run(
+  async (ctx, eventId: string, registrationId: string, paid: unknown) => {
+    const event = await loadEvent(ctx, eventId);
+    const { going } = await registrationCounts(ctx.db, ctx.organizationId, event.id);
+    const ok = await confirmPayment(
+      ctx.db,
+      event,
+      registrationId,
+      paid === true,
+      shareCents(event.rsvpCostMode, event.rsvpCostCents, going),
+    );
+    return ok ? {} : { error: "That guest isn't signed up anymore." };
+  },
+);
+
+const itemsSchema = z
+  .array(
+    z.object({
+      id: z.string().min(1).max(64).optional(),
+      label: z
+        .string()
+        .trim()
+        .min(1, "Every line needs a name.")
+        .max(80, "Keep each line under 80 characters."),
+      slots: z.number().int().min(1).max(50, "Up to 50 people per line."),
+    }),
+  )
+  .max(40, "Up to 40 lines.");
+
+/** Saves the bring list: lines left out are removed, with who was bringing them. */
+export const saveBringList = run(async (ctx, eventId: string, items: unknown) => {
+  const parsed = itemsSchema.safeParse(items);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list." };
+  const event = await loadEvent(ctx, eventId);
+  await saveRsvpItems(ctx.db, event, parsed.data);
+  return {};
+});
 
 /** Adds someone by hand: always going, even past capacity. */
 export const addGuest = run(async (ctx, eventId: string, input: unknown) => {

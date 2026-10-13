@@ -8,9 +8,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 /**
  * Public RSVP pages against the real roles, policies and app.rsvp_page on
  * the local database: spots and the waitlist (including a race for the last
- * spots), moving the waitlist up, what the public page reveals, and who in
- * the suite can read sign-ups. A throwaway org is made as the table owner
- * and removed in afterAll. Skipped when the database is not reachable.
+ * spots), moving the waitlist up, what the public page reveals, who in the
+ * suite can read sign-ups, reminders around a moved or started event, and
+ * merging an event that has a page. A throwaway org is made as the table
+ * owner and removed in afterAll. Skipped when the database is not reachable.
  */
 
 const { requireUserMock } = vi.hoisted(() => ({ requireUserMock: vi.fn() }));
@@ -19,8 +20,11 @@ vi.mock("@/server/cache/invalidate", () => ({ invalidate: vi.fn() }));
 
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx, withSystemOrgTx } from "@/server/db/context";
+import { mergeEvents, updateEvent, type EventServiceContext } from "@/server/events/service";
+import type { JobRun } from "@/server/jobs/types";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
 
+import { rsvpEmailJob, rsvpFanoutJob } from "./jobs";
 import { loadRsvpPage, rsvpPageTarget } from "./page";
 import {
   registerGuest,
@@ -48,13 +52,17 @@ async function makeUser(local: string) {
   return { id: row.id, email: row.email, name: row.name ?? local };
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
 async function makeEvent(rules: {
   capacity: number | null;
   waitlist: boolean;
   hideLocation?: boolean;
+  startsAt?: Date;
+  allDay?: boolean;
 }) {
   const slug = randomSlug();
-  const start = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const start = rules.startsAt ?? new Date(Date.now() + 3 * DAY);
   const event = await ownerDb.event.create({
     data: {
       organizationId: orgId,
@@ -69,6 +77,7 @@ async function makeEvent(rules: {
       rsvpCapacity: rules.capacity,
       rsvpWaitlist: rules.waitlist,
       rsvpHideLocation: rules.hideLocation ?? false,
+      allDay: rules.allDay ?? false,
     },
     select: { id: true },
   });
@@ -92,6 +101,47 @@ function signUp(eventId: string, name: string, email: string) {
     });
     return registerGuest(db, event, { name, email, phone: "+16175550100" });
   });
+}
+
+function setStatus(
+  eventId: string,
+  registrationId: string,
+  status: "GOING" | "WAITLIST" | "CANCELLED",
+) {
+  return withSystemOrgTx(orgId, async ({ db }) =>
+    setRegistrationStatus(
+      db,
+      await db.event.findFirstOrThrow({ where: { id: eventId }, select: RSVP_RULES_SELECT }),
+      registrationId,
+      status,
+    ),
+  );
+}
+
+/** The events service as the owner, on the service path (as the Sessions database runs it). */
+function asOwner<T>(fn: (ctx: EventServiceContext) => Promise<T>): Promise<T> {
+  return withSystemOrgTx(orgId, { userId: admin.id }, (ctx) =>
+    fn({ ...ctx, organizationId: orgId, userId: admin.id, role: "OWNER", kind: "system" }),
+  );
+}
+
+function run<P>(kind: string, payload: P): JobRun<P> {
+  return {
+    id: "job_test",
+    kind,
+    organizationId: orgId,
+    payload,
+    dedupeKey: kind,
+    attempt: 1,
+    maxAttempts: 8,
+    signal: new AbortController().signal,
+    deadline: Date.now() + 20_000,
+  };
+}
+
+function registered(outcome: Awaited<ReturnType<typeof signUp>>) {
+  if (outcome.kind !== "registered") throw new Error(`expected a sign-up, got ${outcome.kind}`);
+  return outcome;
 }
 
 function statuses(eventId: string) {
@@ -232,7 +282,7 @@ describe("RSVP pages against the local database", () => {
       locationHidden: true,
       viewer: null,
     });
-    expect(stranger?.guests).toEqual([expect.objectContaining({ name: "Ivy S." })]);
+    expect(stranger?.guests).toEqual([expect.objectContaining({ name: "Ivy Nine Stone" })]);
     expect(JSON.stringify(stranger)).not.toContain("@x.test");
     expect(JSON.stringify(stranger)).not.toContain("6175550100");
 
@@ -281,5 +331,199 @@ describe("RSVP pages against the local database", () => {
       select: { dedupeKey: true, runAt: true },
     });
     expect(jobs.map((j) => j.dedupeKey.split(":")[2]).sort()).toEqual(["day", "hour"]);
+  });
+
+  it("queues only the day-before reminder for an all-day event", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: null, waitlist: true, allDay: true });
+    const rules = await rulesOf(event.id);
+    await withSystemOrgTx(orgId, ({ db }) => scheduleRsvpReminders(db, rules));
+    const jobs = await ownerDb.job.findMany({
+      where: { organizationId: orgId, kind: "rsvp-fanout", dedupeKey: { contains: event.id } },
+      select: { dedupeKey: true },
+    });
+    expect(jobs.map((j) => j.dedupeKey.split(":")[2])).toEqual(["day"]);
+  });
+
+  it("keeps a guest a host moves to the waitlist there, without a 'spot opened' email", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: 1, waitlist: true });
+    const ava = registered(await signUp(event.id, "Ava Moved", `ava-moved-${tag}@x.test`));
+    await setStatus(event.id, ava.registrationId, "WAITLIST");
+    expect(await statuses(event.id)).toEqual([
+      { email: `ava-moved-${tag}@x.test`, status: "WAITLIST" },
+    ]);
+    expect(
+      await ownerDb.job.count({
+        where: { organizationId: orgId, dedupeKey: `rsvp-email:${ava.registrationId}:promoted` },
+      }),
+    ).toBe(0);
+  });
+
+  it("puts someone who cancels and signs up again at the back of the line", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: 1, waitlist: true });
+    const target = { organizationId: orgId, eventId: event.id };
+    const ann = registered(await signUp(event.id, "Ann Going", `ann-line-${tag}@x.test`));
+    const bo = registered(await signUp(event.id, "Bo First", `bo-line-${tag}@x.test`));
+    const cy = registered(await signUp(event.id, "Cy Second", `cy-line-${tag}@x.test`));
+    expect(bo.status).toBe("WAITLIST");
+
+    await setStatus(event.id, bo.registrationId, "CANCELLED");
+    const again = registered(await signUp(event.id, "Bo First", `bo-line-${tag}@x.test`));
+    expect(again).toMatchObject({ registrationId: bo.registrationId, status: "WAITLIST" });
+    const place = async (id: string) =>
+      (await loadRsvpPage(event.slug, target, id))?.viewer?.waitlistPosition;
+    expect(await place(cy.registrationId)).toBe(1);
+    expect(await place(bo.registrationId)).toBe(2);
+
+    // Ann's spot goes to Cy, who waited longer.
+    await setStatus(event.id, ann.registrationId, "CANCELLED");
+    const after = await ownerDb.eventRegistration.findMany({
+      where: { eventId: event.id, status: { not: "CANCELLED" } },
+      select: { id: true, status: true },
+    });
+    expect(after).toEqual(
+      expect.arrayContaining([
+        { id: cy.registrationId, status: "GOING" },
+        { id: bo.registrationId, status: "WAITLIST" },
+      ]),
+    );
+  });
+
+  it("reminds everyone again after the event moves, and drops reminders once it has started", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: null, waitlist: true });
+    const guest = registered(await signUp(event.id, "Kit Moved", `kit-moved-${tag}@x.test`));
+    await ownerDb.eventRegistration.update({
+      where: { id: guest.registrationId },
+      data: { reminderDaySentAt: new Date(), reminderHourSentAt: new Date() },
+    });
+    const before = await rulesOf(event.id);
+    const startsAt = new Date(before.startsAt.getTime() + 2 * DAY);
+    await asOwner((ctx) =>
+      updateEvent(ctx, event.id, {
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 2 * 60 * 60 * 1000),
+      }),
+    );
+    expect(
+      await ownerDb.eventRegistration.findUniqueOrThrow({
+        where: { id: guest.registrationId },
+        select: { reminderDaySentAt: true, reminderHourSentAt: true },
+      }),
+    ).toEqual({ reminderDaySentAt: null, reminderHourSentAt: null });
+
+    // The new start's day-before fan-out queues the guest's reminder again.
+    await rsvpFanoutJob(
+      run("rsvp-fanout", { eventId: event.id, stage: "day", startsAt: startsAt.toISOString() }),
+    );
+    const minute = Math.floor(startsAt.getTime() / 60_000);
+    expect(
+      await ownerDb.job.findFirst({
+        where: {
+          organizationId: orgId,
+          dedupeKey: `rsvp-email:${guest.registrationId}:reminder-day:${minute}`,
+        },
+        select: { payload: true },
+      }),
+    ).toEqual({
+      payload: {
+        registrationId: guest.registrationId,
+        template: "reminder-day",
+        startsAt: startsAt.toISOString(),
+      },
+    });
+
+    // Started ten minutes ago: a late reminder is dropped, not claimed or sent.
+    const started = await makeEvent({
+      capacity: null,
+      waitlist: true,
+      startsAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+    const late = registered(await signUp(started.id, "Lou Late", `lou-late-${tag}@x.test`));
+    const { startsAt: lateStart } = await rulesOf(started.id);
+    expect(
+      await rsvpEmailJob(
+        run("rsvp-email", {
+          registrationId: late.registrationId,
+          template: "reminder-hour" as const,
+          startsAt: lateStart.toISOString(),
+        }),
+      ),
+    ).toEqual({ status: "DONE" });
+    expect(
+      (
+        await ownerDb.eventRegistration.findUniqueOrThrow({
+          where: { id: late.registrationId },
+          select: { reminderHourSentAt: true },
+        })
+      ).reminderHourSentAt,
+    ).toBeNull();
+    expect(
+      await rsvpFanoutJob(
+        run("rsvp-fanout", {
+          eventId: started.id,
+          stage: "hour",
+          startsAt: lateStart.toISOString(),
+        }),
+      ),
+    ).toEqual({ status: "DONE" });
+    expect(
+      await ownerDb.job.count({
+        where: {
+          organizationId: orgId,
+          dedupeKey: { startsWith: `rsvp-email:${late.registrationId}:reminder` },
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it("fans reminders out to everyone going in one go, with the usual keys", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: 3, waitlist: true });
+    const guests = [];
+    for (const n of ["Mo", "Ned", "Oli", "Pam"]) {
+      guests.push(
+        registered(await signUp(event.id, `${n} Fan`, `${n.toLowerCase()}-fan-${tag}@x.test`)),
+      );
+    }
+    const { startsAt } = await rulesOf(event.id);
+    await rsvpFanoutJob(
+      run("rsvp-fanout", { eventId: event.id, stage: "hour", startsAt: startsAt.toISOString() }),
+    );
+    const minute = Math.floor(startsAt.getTime() / 60_000);
+    const keys = (
+      await ownerDb.job.findMany({
+        where: {
+          organizationId: orgId,
+          kind: "rsvp-email",
+          dedupeKey: { endsWith: `:reminder-hour:${minute}` },
+        },
+        select: { dedupeKey: true },
+      })
+    ).map((j) => j.dedupeKey);
+    // The three going, not Pam on the waitlist.
+    expect(keys.sort()).toEqual(
+      guests
+        .filter((g) => g.status === "GOING")
+        .map((g) => `rsvp-email:${g.registrationId}:reminder-hour:${minute}`)
+        .sort(),
+    );
+    expect(guests.filter((g) => g.status === "GOING")).toHaveLength(3);
+  });
+
+  it("won't merge away a live page people signed up on, but will once it's off", async () => {
+    if (!reachable) return;
+    const keep = await makeEvent({ capacity: null, waitlist: true });
+    const drop = await makeEvent({ capacity: null, waitlist: true });
+    await signUp(drop.id, "Quin Merged", `quin-merge-${tag}@x.test`);
+    const merge = () => asOwner((ctx) => mergeEvents(ctx, keep.id, drop.id));
+
+    await expect(merge()).rejects.toThrow(/Merge the other way round/);
+    expect(await rsvpPageTarget(drop.slug)).toEqual({ organizationId: orgId, eventId: drop.id });
+
+    await ownerDb.event.update({ where: { id: drop.id }, data: { rsvpEnabled: false } });
+    expect((await merge()).survivor.id).toBe(keep.id);
   });
 });
