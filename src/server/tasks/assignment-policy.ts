@@ -42,19 +42,29 @@ export function buildViewerChart(
   };
 }
 
-/** The published chart's positions, read in the caller's transaction. */
+/**
+ * The published chart's positions, read in the caller's transaction. A
+ * caller that has already read the org passes its activeOrgChartVersionId
+ * (null included) so the org is not read a second time.
+ */
 export async function loadChartNodes(
   db: TxClient,
   organizationId: string,
+  activeVersionId?: string | null,
 ): Promise<ChartNode[] | null> {
-  const org = await db.organization.findUnique({
-    where: { id: organizationId },
-    select: { activeOrgChartVersionId: true },
-  });
-  if (!org?.activeOrgChartVersionId) return null;
+  const versionId =
+    activeVersionId !== undefined
+      ? activeVersionId
+      : (
+          await db.organization.findUnique({
+            where: { id: organizationId },
+            select: { activeOrgChartVersionId: true },
+          })
+        )?.activeOrgChartVersionId;
+  if (!versionId) return null;
   const version = await db.orgChartVersion.findFirst({
     where: {
-      id: org.activeOrgChartVersionId,
+      id: versionId,
       organizationId,
       status: OrgChartVersionStatus.PUBLISHED,
     },

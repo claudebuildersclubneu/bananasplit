@@ -20,16 +20,18 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(taskId)) notFound();
 
-  const members = await getOrgMembersForPicker(org.id);
+  // The cached chart reads on its own connection, before the page's one
+  // transaction; the member picker's withOrgTx joins that transaction.
   const chart = buildViewerChart(await getChartForPage(org.id), user.id);
   const data = await withOrgTx(org.id, async ({ db }) => {
     const task = await getTaskDetail(db, org.id, taskId);
     if (!task) return null;
+    const members = await getOrgMembersForPicker(org.id);
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
     const labels = await getOrgLabels(db, org.id);
     const projects = await getOrgProjects(db, org.id, true);
     const comments = await getComments(db, org.id, taskId);
-    return { task, labels, projects, comments, tz: effectiveTimezone(me, org) };
+    return { task, members, labels, projects, comments, tz: effectiveTimezone(me, org) };
   });
   if (!data) notFound();
 
@@ -50,7 +52,7 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
         isAdmin: can({ role }, "tasks.manageAll"),
         chart,
       }}
-      members={members}
+      members={data.members}
       labels={data.labels}
       projects={data.projects}
     >

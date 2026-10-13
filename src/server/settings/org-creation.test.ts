@@ -29,12 +29,16 @@ const { createOrganization, hashOrgCreationCode, generateOrgCreationCode } =
 const user = { id: "user_1", email: "jackson@example.edu", name: "Jackson" };
 let slugAvailable = true;
 let redeemOk = true;
+/** What app.rate_limit_hit answers inside the creation transaction (the 30-day allowance). */
+let monthlyAllowed = true;
 
 function makeDbs() {
   const queryRaw = vi.fn(async (strings: TemplateStringsArray) => {
     const sql = strings.join("?");
     if (sql.includes("slug_available")) return [{ ok: slugAvailable }];
     if (sql.includes("redeem_org_creation_code")) return [{ ok: redeemOk }];
+    if (sql.includes("rate_limit_hit"))
+      return [{ allowed: monthlyAllowed, retry_after_ms: monthlyAllowed ? 0 : 86_400_000 }];
     return [{ id: "audit" }];
   });
   return {
@@ -53,6 +57,7 @@ beforeEach(() => {
   resetFake(makeDbs());
   slugAvailable = true;
   redeemOk = true;
+  monthlyAllowed = true;
   rateLimitMock.mockResolvedValue({ allowed: true });
   getUserIdentityMock.mockResolvedValue({ ...user, emailVerified: new Date() });
 });
@@ -133,13 +138,13 @@ describe("createOrganization", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("PLATFORM_ORG_CREATION_ENABLED", "true");
     vi.stubEnv("ORG_CREATION_MODE", "open");
-    rateLimitMock.mockImplementation(async (key: string) => ({
-      allowed: !key.startsWith("org-create-open"),
-    }));
+    monthlyAllowed = false;
     expect(await createOrganization(user, input)).toMatchObject({
       ok: false,
       error: expect.stringMatching(/every 30 days/),
     });
+    expect(fake.systemDb.organization.create).not.toHaveBeenCalled();
+    monthlyAllowed = true;
     rateLimitMock.mockImplementation(async (key: string) => ({
       allowed: !key.startsWith("org-create-platform"),
     }));
@@ -149,6 +154,39 @@ describe("createOrganization", () => {
     });
     expect(rateLimitMock).toHaveBeenCalledWith("org-create-platform:all", 20, 86_400);
     expect(fake.systemDb.organization.create).not.toHaveBeenCalled();
+  });
+
+  it("spends the 30-day allowance inside the creation transaction, so a failed creation keeps it", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("PLATFORM_ORG_CREATION_ENABLED", "true");
+    vi.stubEnv("ORG_CREATION_MODE", "open");
+    await createOrganization(user, input);
+
+    // Never through the limiter's own autocommit call...
+    expect(rateLimitMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^org-create-open/),
+      expect.anything(),
+      expect.anything(),
+    );
+    // ...but on the creation transaction's own connection, before the insert.
+    const hit = fake.systemDb.$queryRaw.mock.calls.find((c: unknown[]) =>
+      (c[0] as TemplateStringsArray).join("?").includes("rate_limit_hit"),
+    );
+    expect(hit?.slice(1)).toEqual(["org-create-open:user_1", 1, 30 * 86_400]);
+    expect(
+      fake.systemDb.$queryRaw.mock.invocationCallOrder[
+        fake.systemDb.$queryRaw.mock.calls.indexOf(hit)
+      ],
+    ).toBeLessThan(fake.systemDb.organization.create.mock.invocationCallOrder[0]);
+    expect(fake.systemCalls).toHaveLength(1);
+  });
+
+  it("does not count the 30-day allowance outside production's open mode", async () => {
+    await createOrganization(user, input);
+    const sql = fake.systemDb.$queryRaw.mock.calls.map((c: unknown[]) =>
+      (c[0] as TemplateStringsArray).join("?"),
+    );
+    expect(sql.some((s: string) => s.includes("rate_limit_hit"))).toBe(false);
   });
 
   it("keeps the base 3-per-day limit in every mode", async () => {

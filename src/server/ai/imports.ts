@@ -1,5 +1,4 @@
 import {
-  ActionItemsOutput,
   longDate,
   memberRoster,
   normalizeActionItems,
@@ -7,6 +6,7 @@ import {
   type ImportMember,
   type ProposedItem,
 } from "@/lib/ai/action-items";
+import { ActionItemsOutput } from "@/lib/ai/action-items.schema";
 import { CalendarShotOutput, normalizeShotEvents, type CalendarShotOutputData, type ProposedEvent } from "@/lib/ai/calendar-shot";
 import { addDaysToKey } from "@/lib/calendar/dates";
 

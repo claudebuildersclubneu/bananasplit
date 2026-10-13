@@ -104,12 +104,21 @@ export async function storeNoteFile(input: {
   }
 }
 
+/** The Notes page's file list never shows more than this many. */
+const MAX_LISTED_FILES = 200;
+
+/**
+ * The org's files, newest first. `take` asks for fewer (the Overview widget
+ * shows six), so the database stops there instead of returning the whole
+ * page's worth of rows; it is capped at MAX_LISTED_FILES either way.
+ */
 export function listNoteFiles(
   db: TxClient,
   orgId: string,
-  filters: { folderId?: string; q?: string } = {},
+  filters: { folderId?: string; q?: string; take?: number } = {},
 ): Promise<NoteFileRow[]> {
   const q = filters.q?.trim().slice(0, 100);
+  const take = Math.min(filters.take ?? MAX_LISTED_FILES, MAX_LISTED_FILES);
   return db.orgFile.findMany({
     where: {
       organizationId: orgId,
@@ -120,7 +129,7 @@ export function listNoteFiles(
     },
     orderBy: { createdAt: "desc" },
     select: fileSelect,
-    take: 200,
+    take,
   });
 }
 

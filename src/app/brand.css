@@ -16,8 +16,14 @@
   --color-ink: #1c1810;
   --color-ink-hover: #3a3122;
   --color-ink-muted: #5c5444;
-  --color-ink-soft: #7a6e58;
-  --color-ink-faint: #8a8070;
+  /*
+   * Soft and faint are small print (12-15px), so they keep 4.5:1 on every
+   * light surface they sit on: soft 5.7:1 on cream and 5.1:1 on sand,
+   * faint 5.1:1 on cream and 4.6:1 on sand. The handoff's #7a6e58 and
+   * #8a8070 fell to 3.1-4.5:1 there.
+   */
+  --color-ink-soft: #675e4d;
+  --color-ink-faint: #6f6655;
   --color-ink-ghost: #a89e88;
   /* The dark panels (finance, "For schools") and the phone's island. */
   --color-night: #17140e;
@@ -262,9 +268,18 @@
     & ::placeholder {
       color: var(--color-ink-ghost);
     }
+    /*
+     * The keyboard focus ring, in two tones: a cream band against the
+     * element and an ink outline around it. On cream pages the ink shows
+     * (the band melts into the page); on the dark panels (night, ink,
+     * pine) the cream band does, where an ink ring alone was invisible.
+     * An element's own shadow utility replaces the band; those sit on
+     * light backgrounds, where the ink outline carries the ring.
+     */
     & :focus-visible {
       outline: 2px solid var(--color-ink);
-      outline-offset: 3px;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 2px var(--color-cream);
     }
     & [id] {
       scroll-margin-top: 80px;

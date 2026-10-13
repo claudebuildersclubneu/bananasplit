@@ -1,11 +1,12 @@
 "use client";
 
 import { Menu, Search } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import type { PaletteSection } from "@/components/command-palette/catalog";
-import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useModKey } from "@/components/command-palette/use-mod-key";
+import { SessionKeepAlive } from "@/components/auth/session-keep-alive";
 import { NotificationBell } from "@/components/shell/notification-bell";
 import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { PinsProvider } from "@/components/pins/pins-context";
@@ -19,6 +20,22 @@ import { Toaster } from "@/components/ui/toaster";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { OrgSummary, ShellUser } from "@/components/shell/types";
 import type { Role } from "@/generated/prisma/enums";
+
+/**
+ * The ⌘K palette (cmdk and the page catalog) is its own chunk, fetched the
+ * first time someone reaches for search: hovering or focusing the search
+ * box starts the download, and ⌘K or a click mounts it. Until then nothing
+ * of it is in the page's JavaScript.
+ */
+const loadPalette = () =>
+  import("@/components/command-palette/command-palette").then((m) => m.CommandPalette);
+const CommandPalette = dynamic(loadPalette, { ssr: false });
+
+function preloadPalette() {
+  void loadPalette().catch(() => {
+    // A failed prefetch is retried when the palette actually mounts.
+  });
+}
 
 export function AppShell({
   orgSlug,
@@ -134,6 +151,8 @@ export function AppShell({
             <button
               type="button"
               onClick={() => setCommandOpen(true)}
+              onPointerEnter={preloadPalette}
+              onFocus={preloadPalette}
               aria-label="Search everything"
               className="border-input text-muted-foreground hover:text-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 flex h-8 w-full max-w-sm min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:ring-3"
             >
@@ -162,16 +181,20 @@ export function AppShell({
         </div>
 
         <VisitTracker orgId={orgId} />
-        <CommandPalette
-          key={command.session}
-          orgId={orgId}
-          orgSlug={orgSlug}
-          role={role}
-          sections={sectionPaths}
-          orgs={orgs}
-          open={command.open}
-          onOpenChange={setCommandOpen}
-        />
+        <SessionKeepAlive />
+        {/* Mounted from the first opening on (session 0 means never opened). */}
+        {command.session > 0 && (
+          <CommandPalette
+            key={command.session}
+            orgId={orgId}
+            orgSlug={orgSlug}
+            role={role}
+            sections={sectionPaths}
+            orgs={orgs}
+            open={command.open}
+            onOpenChange={setCommandOpen}
+          />
+        )}
         <Toaster />
       </div>
     </PinsProvider>

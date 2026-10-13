@@ -4,10 +4,12 @@ import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import { ArrowRight } from "@/components/brand/arrows";
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { requireUser } from "@/lib/auth/session";
+import { normalizeJoinCode } from "@/lib/join-code";
 import { getOnboardingProfile } from "@/server/onboarding/profile";
 import { findPendingInvitationsForMe } from "@/server/settings/invitations";
 
 import { PendingInviteCard } from "../pending-invite-card";
+import { rememberedJoinCode } from "./join-code-cookie";
 import { JoinForm } from "./join-form";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +25,25 @@ const WHERE = [
  * A7 · Join, step 2 of 3 (design: App screens, 03): the club's code in six
  * boxes, or an invite emailed to the member's verified address. Both are
  * checked against the club on the server before anyone joins. ?code=
- * pre-fills the boxes (the link an officer shares).
+ * pre-fills the boxes (the link an officer shares), and so does the code
+ * kept from that link while a new member set up their profile.
  */
 export default async function JoinPage({ searchParams }: PageProps<"/onboarding/join">) {
   const user = await requireUser();
   const profile = await getOnboardingProfile(user.id);
   if (!profile) redirect("/auth/session-ended");
   const { code } = await searchParams;
-  const initialCode = typeof code === "string" ? code.slice(0, 20) : "";
-  // Profile setup comes first (the flowchart's "Profile complete?").
-  if (!profile.onboardedAt) redirect("/onboarding/profile/basics");
+  const linkCode = typeof code === "string" ? code.slice(0, 20) : "";
+  // Profile setup comes first (the flowchart's "Profile complete?"). A code
+  // from the link is kept for the way back (join-code-cookie.ts).
+  if (!profile.onboardedAt) {
+    redirect(
+      normalizeJoinCode(linkCode)
+        ? `/onboarding/join/remember?code=${encodeURIComponent(linkCode)}`
+        : "/onboarding/profile/basics",
+    );
+  }
+  const initialCode = linkCode || (await rememberedJoinCode());
 
   const invites = profile.emailVerified ? await findPendingInvitationsForMe(user.id) : [];
 

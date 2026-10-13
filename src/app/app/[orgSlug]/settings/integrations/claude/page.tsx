@@ -20,7 +20,7 @@ export default async function ClaudeIntegrationPage({
         title="Claude API"
         description="Optional. Your club's own Claude key powers the AI imports (a pasted list of action items into tasks, a calendar screenshot into events) and backs up the org chart importer for documents it can't read itself. Usage is billed to your Anthropic account."
       />
-      <StatusPanel dto={dto} secretLabel="API key" />
+      <StatusPanel dto={dto} secretLabel="API key" timeZone={organization.timezone} />
       <ClaudeForm orgId={organization.id} dto={dto} canWrite={canWrite} />
       {dto.hasSecret && (
         <TestAndRemove

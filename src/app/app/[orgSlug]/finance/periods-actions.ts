@@ -3,7 +3,6 @@
 import { z } from "zod";
 
 import { requirePermission } from "@/lib/auth/permissions";
-import { writeFinanceAuditLog } from "@/lib/finance/audit";
 import { DEFAULT_CATEGORY_NAMES } from "@/lib/finance/default-categories";
 import { fromDateValue } from "@/lib/finance/periods";
 import { withOrgAction } from "@/server/db/context";
@@ -31,7 +30,10 @@ const periodInputSchema = z.object({
   endsOn: z.string(),
 });
 
-function parseRange(startsOnRaw: string, endsOnRaw: string): { startsOn: Date; endsOn: Date } | { error: string } {
+function parseRange(
+  startsOnRaw: string,
+  endsOnRaw: string,
+): { startsOn: Date; endsOn: Date } | { error: string } {
   const startsOn = fromDateValue(startsOnRaw);
   const endsOn = fromDateValue(endsOnRaw);
   if (!startsOn) return { error: "Pick a start date." };
@@ -142,8 +144,12 @@ export const deleteBudgetPeriod = withOrgAction(
       select: { id: true, isActive: true },
     });
     if (!period) return { error: "Budget period not found." };
-    const transactions = await ctx.db.transaction.count({ where: { organizationId, budgetPeriodId: periodId } });
-    const sponsorships = await ctx.db.sponsorship.count({ where: { organizationId, budgetPeriodId: periodId } });
+    const transactions = await ctx.db.transaction.count({
+      where: { organizationId, budgetPeriodId: periodId },
+    });
+    const sponsorships = await ctx.db.sponsorship.count({
+      where: { organizationId, budgetPeriodId: periodId },
+    });
     if (transactions > 0 || sponsorships > 0) {
       const what = [
         transactions > 0 ? `${transactions} transaction${transactions === 1 ? "" : "s"}` : null,
@@ -151,7 +157,9 @@ export const deleteBudgetPeriod = withOrgAction(
       ]
         .filter(Boolean)
         .join(" and ");
-      return { error: `This period has ${what}, so it stays for the records. Make another period active instead.` };
+      return {
+        error: `This period has ${what}, so it stays for the records. Make another period active instead.`,
+      };
     }
     await ctx.db.budgetPeriod.delete({ where: { id: periodId } });
     if (period.isActive) {
@@ -160,7 +168,8 @@ export const deleteBudgetPeriod = withOrgAction(
         orderBy: { endsOn: "desc" },
         select: { id: true },
       });
-      if (next) await ctx.db.budgetPeriod.update({ where: { id: next.id }, data: { isActive: true } });
+      if (next)
+        await ctx.db.budgetPeriod.update({ where: { id: next.id }, data: { isActive: true } });
     }
     return {};
   },
@@ -265,15 +274,22 @@ export const deleteCategory = withOrgAction(
         error: `${locked} reconciled transaction${locked === 1 ? " is" : "s are"} filed under ${category.name}. Unlock ${locked === 1 ? "it" : "them"} first, or keep the category.`,
       };
     }
-    for (const t of used) {
-      await ctx.db.transaction.update({ where: { id: t.id }, data: { categoryId: null } });
-      await writeFinanceAuditLog(ctx.db, {
-        organizationId,
-        transactionId: t.id,
-        action: "UPDATE",
+    if (used.length > 0) {
+      // Set-based: one update and one audit statement however many rows (a
+      // round trip per row could outrun the transaction's timeout). Each row
+      // still gets its own UPDATE entry, as before.
+      const ids = used.map((t) => t.id);
+      await ctx.db.transaction.updateMany({
+        where: { organizationId, categoryId, id: { in: ids } },
+        data: { categoryId: null },
+      });
+      const diff = JSON.stringify({
         before: { categoryId, categoryName: category.name },
         after: { categoryId: null, reason: "category deleted" },
       });
+      await ctx.db.$queryRaw`
+        SELECT app.write_finance_audit(${organizationId}, 'UPDATE', t.id, NULL, ${diff}::jsonb)
+        FROM unnest(${ids}::text[]) AS t(id)`;
     }
 
     await ctx.db.budgetCategory.delete({ where: { id: categoryId } });

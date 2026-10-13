@@ -31,7 +31,7 @@ import {
   ROLE_CHOICES,
   splitMajor,
 } from "@/lib/onboarding/steps";
-import { PROFILE_LIMITS } from "@/lib/profile/schema";
+import { PROFILE_LIMITS } from "@/lib/profile/limits";
 
 import { saveSchoolStep } from "./actions";
 import { StepNav, useStepSave } from "./step-nav";

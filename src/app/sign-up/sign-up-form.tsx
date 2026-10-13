@@ -7,13 +7,32 @@ import { AuthTitle } from "@/components/brand/auth-card";
 import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
 import { NewPasswordField } from "@/components/brand/new-password-field";
 import { pill } from "@/components/brand/pill";
+import { signInPath } from "@/lib/auth/callback-url";
 import { PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
 import { signUpAction } from "./actions";
 
-/** `google`: the "Sign up with Google" button and divider, above the fields (not once it's sent). */
-export function SignUpForm({ google }: { google?: React.ReactNode }) {
+/** What comes after the account, under the title. */
+const NEXT_STEP = {
+  join: "You'll join your club with a code next.",
+  create: "Next you'll set up your profile, then your club.",
+} as const;
+
+/**
+ * `google`: the "Sign up with Google" button and divider, above the fields
+ * (not once it's sent). `callbackUrl`: where the new account goes next (a
+ * club's join link, or starting a club), carried to log in as well.
+ */
+export function SignUpForm({
+  google,
+  callbackUrl = null,
+  flow = "join",
+}: {
+  google?: React.ReactNode;
+  callbackUrl?: string | null;
+  flow?: keyof typeof NEXT_STEP;
+}) {
   const [state, formAction, isPending] = useActionState(signUpAction, {});
   // Controlled, so React's reset after the action doesn't wipe what was typed.
   const [name, setName] = useState("");
@@ -33,7 +52,7 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
           }
         />
         {state.error && <FormMessage>{state.error}</FormMessage>}
-        <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
+        <Link href={signInPath(callbackUrl)} className={cn(pill({ raised: true }), "w-full")}>
           Go to log in
         </Link>
       </>
@@ -42,12 +61,10 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
 
   return (
     <>
-      <AuthTitle
-        title="Create your account."
-        description="You'll join your club with a code next."
-      />
+      <AuthTitle title="Create your account." description={NEXT_STEP[flow]} />
       {google}
       <form action={formAction} className="flex flex-col gap-[18px]">
+        {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
         <BrandField id="name" label="Full name">
           <BrandInput
             id="name"
@@ -88,7 +105,7 @@ export function SignUpForm({ google }: { google?: React.ReactNode }) {
             Privacy Policy
           </a>
           . Have an account?{" "}
-          <Link href="/sign-in" className="font-bold">
+          <Link href={signInPath(callbackUrl)} className="font-bold">
             Log in
           </Link>
         </p>

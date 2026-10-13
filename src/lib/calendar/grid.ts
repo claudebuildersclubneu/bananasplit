@@ -1,4 +1,4 @@
-import { addDaysToKey, parseDateKey } from "./dates";
+import { addDaysToKey, parseDateKey, zonedDateKey, zonedMidnight } from "./dates";
 
 /**
  * Layout maths for the calendar's own month, week and agenda renderers.
@@ -10,12 +10,19 @@ import { addDaysToKey, parseDateKey } from "./dates";
  * hour column" are decided once and tested once.
  *
  * TWO TIMEZONES, DELIBERATELY. Timed events are bucketed by the VIEWER's
- * local day, because their times are shown in the viewer's own timezone.
+ * day, because their times are shown in the viewer's own timezone.
  * All-day events arrive already resolved to org-timezone day keys
  * ("YYYY-MM-DD", with an exclusive end, see lib/calendar/dates.ts) and are
  * bucketed by those keys untouched, so an all-day event covers the same days
  * for everyone. Mixing the two would drift an all-day event by a day for a
  * viewer west of the org.
+ *
+ * The viewer's zone is always passed in, never read from the runtime. The
+ * grid is rendered on the server (UTC on Vercel) and then hydrated in the
+ * browser, and a day key read from the runtime's own zone put an 8pm EDT
+ * event in the next day's cell in the server HTML. The components pass the
+ * zone the server rendered in until the browser's own is known (see
+ * components/calendar/hooks.ts).
  */
 
 /** The minimum an item needs for layout. Views add their own fields. */
@@ -30,30 +37,14 @@ export interface GridItem {
 
 const pad = (n: number, w = 2) => String(n).padStart(w, "0");
 
-/** "YYYY-MM-DD" for a Date in the runtime's local zone. */
-export function localDayKey(date: Date): string {
-  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/** Local midnight at the start of a day key. */
-export function localMidnight(key: string): Date {
-  const p = parseDateKey(key);
-  if (!p) throw new RangeError(`not a date key: ${key}`);
-  return new Date(p.year, p.month - 1, p.day);
-}
-
-/** Minutes from local midnight, for a Date on a given local day. */
-function minutesInto(day: string, at: Date): number {
-  return (at.getTime() - localMidnight(day).getTime()) / 60_000;
-}
-
 /**
- * Every day key an item covers, first to last.
+ * Every day key an item covers, first to last. Timed events are read in
+ * `timeZone`; all-day events are already day keys.
  *
  * A timed event that ends exactly at midnight belongs to the day it started,
  * not to the next one: a 9pm-to-midnight social is a Friday event.
  */
-export function itemDayKeys(item: GridItem): string[] {
+export function itemDayKeys(item: GridItem, timeZone: string): string[] {
   if (item.allDay) {
     const last = addDaysToKey(item.end, -1);
     const first = item.start;
@@ -64,21 +55,24 @@ export function itemDayKeys(item: GridItem): string[] {
   }
   const start = new Date(item.start);
   const end = new Date(item.end);
-  const first = localDayKey(start);
+  const first = zonedDateKey(start, timeZone);
   if (!(end.getTime() > start.getTime())) return [first];
   // Step back a millisecond so a midnight end lands on the previous day.
-  const last = localDayKey(new Date(end.getTime() - 1));
+  const last = zonedDateKey(new Date(end.getTime() - 1), timeZone);
   if (last <= first) return [first];
   const out: string[] = [];
   for (let key = first; key <= last; key = addDaysToKey(key, 1)) out.push(key);
   return out;
 }
 
-/** Items bucketed by day key, each bucket in start order. */
-export function bucketByDay<T extends GridItem>(items: readonly T[]): Map<string, T[]> {
+/** Items bucketed by day key (timed ones in `timeZone`), each bucket in start order. */
+export function bucketByDay<T extends GridItem>(
+  items: readonly T[],
+  timeZone: string,
+): Map<string, T[]> {
   const byDay = new Map<string, T[]>();
   for (const item of items) {
-    for (const key of itemDayKeys(item)) {
+    for (const key of itemDayKeys(item, timeZone)) {
       const bucket = byDay.get(key);
       if (bucket) bucket.push(item);
       else byDay.set(key, [item]);
@@ -122,7 +116,11 @@ export interface MonthGridShape {
  * actually fetched rather than recomputing a month and asking for days the
  * server never sent.
  */
-export function monthGridShape(fromKey: string, dayCount: number, todayKey: string): MonthGridShape {
+export function monthGridShape(
+  fromKey: string,
+  dayCount: number,
+  todayKey: string,
+): MonthGridShape {
   const cells: MonthCell[] = [];
   const monthCounts = new Map<string, number>();
   for (let i = 0; i < dayCount; i += 1) {
@@ -161,7 +159,7 @@ export function dayKeysBetween(fromKey: string, dayCount: number): string[] {
 
 export interface PlacedItem<T> {
   item: T;
-  /** Minutes from local midnight, clamped into the day. */
+  /** Minutes from midnight in the display zone, clamped into the day. */
   startMinutes: number;
   endMinutes: number;
   /** Column index within its overlap cluster, and how many columns that cluster has. */
@@ -190,18 +188,23 @@ export const MIN_SLOT_MINUTES = 30;
  * duration, so two back-to-back 15-minute events that visually collide are
  * given their own lanes instead of being drawn on top of each other.
  */
-export function placeDayItems<T extends GridItem>(dayKey: string, items: readonly T[]): PlacedItem<T>[] {
-  const midnight = localMidnight(dayKey).getTime();
-  const nextMidnight = localMidnight(addDaysToKey(dayKey, 1)).getTime();
+export function placeDayItems<T extends GridItem>(
+  dayKey: string,
+  items: readonly T[],
+  timeZone: string,
+): PlacedItem<T>[] {
+  const midnight = zonedMidnight(dayKey, timeZone).getTime();
+  const nextMidnight = zonedMidnight(addDaysToKey(dayKey, 1), timeZone).getTime();
+  const minutesInto = (at: number) => (at - midnight) / 60_000;
 
   const placed: PlacedItem<T>[] = items
     .filter((item) => !item.allDay)
     .map((item) => {
       const start = new Date(item.start).getTime();
       const end = Math.max(new Date(item.end).getTime(), start);
-      const startMinutes = Math.max(0, minutesInto(dayKey, new Date(Math.max(start, midnight))));
+      const startMinutes = Math.max(0, minutesInto(Math.max(start, midnight)));
       const rawEnd = Math.min(end, nextMidnight);
-      const endMinutes = Math.min(1440, Math.max(startMinutes + 1, minutesInto(dayKey, new Date(rawEnd))));
+      const endMinutes = Math.min(1440, Math.max(startMinutes + 1, minutesInto(rawEnd)));
       return {
         item,
         startMinutes,
@@ -284,8 +287,13 @@ export interface AgendaDay<T> {
 }
 
 /** Days that have something on them, in order, each with its items. */
-export function agendaDays<T extends GridItem>(items: readonly T[], fromKey: string, dayCount: number): AgendaDay<T>[] {
-  const byDay = bucketByDay(items);
+export function agendaDays<T extends GridItem>(
+  items: readonly T[],
+  fromKey: string,
+  dayCount: number,
+  timeZone: string,
+): AgendaDay<T>[] {
+  const byDay = bucketByDay(items, timeZone);
   const out: AgendaDay<T>[] = [];
   for (const key of dayKeysBetween(fromKey, dayCount)) {
     const dayItems = byDay.get(key);

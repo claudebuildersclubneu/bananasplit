@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { JoinCodeCard } from "@/components/onboarding/join-code-card";
@@ -35,7 +36,7 @@ import { loadSavedBoard } from "@/server/boards";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listNoteFiles } from "@/server/notes/files";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
-import { listPins, listRecent } from "@/server/pins";
+import { listRecent } from "@/server/pins";
 import { listOpenPolls } from "@/server/polls/open-polls";
 import { loadSetupState } from "@/server/setup/progress";
 import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
@@ -43,6 +44,7 @@ import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
 const MY_TASKS_LIMIT = 8;
 const EVENTS_LIMIT = 6;
 const RECENT_LIMIT = 8;
+const FILES_LIMIT = 6;
 
 function greeting(now: Date, timeZone: string): string {
   const hour = Number(
@@ -67,80 +69,110 @@ export default async function OrgOverviewPage({
   // ?welcome=1: the end of org setup. The admin's first look at their org
   // shows the invite code and link to share (the flowchart's END).
   const welcome = (await searchParams).welcome === "1";
-  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
+  // The viewer's own row and pins come with the org context (one transaction
+  // the layout shares), so the page does not read them again.
+  const {
+    organization: org,
+    user,
+    role,
+    settings,
+    viewer,
+    pins,
+  } = await getOrgContextBySlug(orgSlug);
   const canSetUp = can({ role }, "integrations.write");
   const isAdmin = can({ role }, "settings.view");
   const canAddEvents = can({ role }, "events.write");
 
   // One transaction as the member: the reads run one after another on its
-  // connection, and RLS bounds each to the org.
+  // connection, and RLS bounds each to the org. The saved board comes first
+  // and decides the rest: a widget that is not on it reads nothing.
   const now = new Date();
   const data = await withOrgTx(org.id, async ({ db }) => {
-    const me = await db.user.findUnique({
-      where: { id: user.id },
-      select: { timezone: true, name: true },
-    });
-    const tz = effectiveTimezone(me, org);
+    const tz = effectiveTimezone(viewer, org);
     const dayKey = localDateKey(now, tz);
     const today = fromDateKey(dayKey);
+    const saved = await loadSavedBoard(db, org.id, user.id, "overview");
+    const shown = new Set(resolveOverview(saved, isAdmin).map((w) => w.type));
     const mine = taskFilterWhere(org.id, { assigneeId: user.id, status: "open" });
-    const events = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "events");
-    const meetings = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "meetings");
-    const weekEvents = await getUpcomingEvents(db, org.id, now, 60);
+    // getMyOpenTasks counts the open and overdue tasks too: the stats reuse them.
+    const myTasks =
+      shown.has("my-tasks") || shown.has("task-stats")
+        ? await getMyOpenTasks(db, org.id, user.id, { limit: MY_TASKS_LIMIT, today })
+        : null;
+    const events = shown.has("events")
+      ? await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "events")
+      : null;
+    const meetings = shown.has("meetings")
+      ? await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "meetings")
+      : null;
+    const memberCount =
+      shown.has("people") || shown.has("getting-started")
+        ? await db.membership.count({ where: { organizationId: org.id } })
+        : 0;
     return {
       timeZone: tz,
       todayKey: dayKey,
-      firstName: me?.name?.trim().split(/\s+/)[0] ?? null,
-      myTasks: await getMyOpenTasks(db, org.id, user.id, { limit: MY_TASKS_LIMIT, today }),
-      stats: {
-        open: await db.task.count({ where: mine }),
-        today: await db.task.count({ where: { AND: [mine, { dueDate: today }] } }),
-        overdue: await db.task.count({ where: { AND: [mine, { dueDate: { lt: today } }] } }),
-        blocked: await db.task.count({ where: { AND: [mine, { status: "BLOCKED" }] } }),
-      },
+      firstName: viewer.name?.trim().split(/\s+/)[0] ?? null,
+      saved,
+      myTasks,
+      stats:
+        myTasks && shown.has("task-stats")
+          ? {
+              open: myTasks.total,
+              today: await db.task.count({ where: { AND: [mine, { dueDate: today }] } }),
+              overdue: myTasks.overdue,
+              blocked: await db.task.count({ where: { AND: [mine, { status: "BLOCKED" }] } }),
+            }
+          : null,
       events,
       meetings,
-      weekEvents,
+      weekEvents: shown.has("week") ? await getUpcomingEvents(db, org.id, now, 60) : null,
       rsvps: await getViewerRsvps(
         db,
         org.id,
         user.id,
-        [...events, ...meetings].map((e) => e.id),
+        [...(events ?? []), ...(meetings ?? [])].map((e) => e.id),
       ),
-      pins: await listPins(db, org.id, org.slug, user.id),
-      recent: await listRecent(db, org.id, org.slug, user.id, RECENT_LIMIT),
-      notes: await getRecentNotes(db, org.id, user.id, 6),
-      files: (await listNoteFiles(db, org.id)).slice(0, 6),
+      pins: shown.has("pinned") ? pins : null,
+      recent: shown.has("recent")
+        ? await listRecent(db, org.id, org.slug, user.id, RECENT_LIMIT)
+        : null,
+      notes: shown.has("notes") ? await getRecentNotes(db, org.id, user.id, 6) : null,
+      files: shown.has("files") ? await listNoteFiles(db, org.id, { take: FILES_LIMIT }) : null,
       // Questions and find-a-time polls still taking answers, newest first.
-      polls: await listOpenPolls(db, org.id, now, 5),
-      people: await db.membership.findMany({
-        where: { organizationId: org.id },
-        select: {
-          userId: true,
-          title: true,
-          user: { select: { id: true, name: true, email: true, image: true, avatar: true } },
-        },
-        orderBy: { joinedAt: "desc" },
-        take: 6,
-      }),
-      memberCount: await db.membership.count({ where: { organizationId: org.id } }),
-      saved: await loadSavedBoard(db, org.id, user.id, "overview"),
+      polls: shown.has("polls") ? await listOpenPolls(db, org.id, now, 5) : null,
+      people: shown.has("people")
+        ? await db.membership.findMany({
+            where: { organizationId: org.id },
+            select: {
+              userId: true,
+              title: true,
+              user: { select: { id: true, name: true, email: true, image: true, avatar: true } },
+            },
+            orderBy: { joinedAt: "desc" },
+            take: 6,
+          })
+        : null,
+      memberCount,
       setup: canSetUp ? await loadSetupState(db, org.id) : null,
       joinCode:
         welcome && can({ role }, "members.invite")
           ? await getOrCreateJoinCode(db, org.id, user.id)
           : null,
-      started: isAdmin
-        ? {
-            members: (await db.membership.count({ where: { organizationId: org.id } })) > 1,
-            picture: org.logo != null,
-            event:
-              (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
-            task: (await db.task.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
-            budget: (await db.budgetPeriod.count({ where: { organizationId: org.id } })) > 0,
-            note: (await db.note.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
-          }
-        : null,
+      started:
+        isAdmin && shown.has("getting-started")
+          ? {
+              members: memberCount > 1,
+              picture: org.logo != null,
+              event:
+                (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+              task:
+                (await db.task.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+              budget: (await db.budgetPeriod.count({ where: { organizationId: org.id } })) > 0,
+              note:
+                (await db.note.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+            }
+          : null,
     };
   }).catch(handleAuthErrorInPage);
 
@@ -165,21 +197,24 @@ export default async function OrgOverviewPage({
     minute: "2-digit",
     timeZone,
   });
-  const week: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
-    const key = addDaysToKey(todayKey, i);
-    return {
-      key,
-      label: i === 0 ? "Today" : dayFmt.format(new Date(`${key}T00:00:00Z`)),
-      isToday: i === 0,
-      events: data.weekEvents
-        .filter((e) => localDateKey(e.startsAt, timeZone) === key)
-        .map((e) => ({
-          id: e.id,
-          title: e.title,
-          time: e.allDay ? "All day" : timeFmt.format(e.startsAt),
-        })),
-    };
-  });
+  const weekEvents = data.weekEvents;
+  const week: WeekDay[] | null = weekEvents
+    ? Array.from({ length: 7 }, (_, i) => {
+        const key = addDaysToKey(todayKey, i);
+        return {
+          key,
+          label: i === 0 ? "Today" : dayFmt.format(new Date(`${key}T00:00:00Z`)),
+          isToday: i === 0,
+          events: weekEvents
+            .filter((e) => localDateKey(e.startsAt, timeZone) === key)
+            .map((e) => ({
+              id: e.id,
+              title: e.title,
+              time: e.allDay ? "All day" : timeFmt.format(e.startsAt),
+            })),
+        };
+      })
+    : null;
 
   const shortcuts = visibleSidebar(settings?.sidebar)
     .flatMap((g) => g.items)
@@ -201,9 +236,14 @@ export default async function OrgOverviewPage({
     />
   );
 
-  const bodies = {
-    pinned: <PinnedGrid orgId={org.id} pins={data.pins} />,
-    "my-tasks": (
+  // Only the widgets whose data was read get a body (the board shows a
+  // placeholder for one added in Customize until it is saved).
+  const bodies: Record<string, ReactNode> = {
+    shortcuts: <Shortcuts links={shortcuts} />,
+  };
+  if (data.pins) bodies.pinned = <PinnedGrid orgId={org.id} pins={data.pins} />;
+  if (data.myTasks) {
+    bodies["my-tasks"] = (
       <MyTasksCard
         bare
         orgSlug={orgSlug}
@@ -212,10 +252,12 @@ export default async function OrgOverviewPage({
         overdue={data.myTasks.overdue}
         todayKey={todayKey}
       />
-    ),
-    "task-stats": <TaskStats orgSlug={orgSlug} stats={data.stats} />,
-    recent: <RecentList items={data.recent} now={now} />,
-    meetings: (
+    );
+  }
+  if (data.stats) bodies["task-stats"] = <TaskStats orgSlug={orgSlug} stats={data.stats} />;
+  if (data.recent) bodies.recent = <RecentList items={data.recent} now={now} />;
+  if (data.meetings) {
+    bodies.meetings = (
       <UpcomingEventsCard
         bare
         orgSlug={orgSlug}
@@ -230,8 +272,10 @@ export default async function OrgOverviewPage({
           "Schedule a meeting",
         )}
       />
-    ),
-    events: (
+    );
+  }
+  if (data.events) {
+    bodies.events = (
       <UpcomingEventsCard
         bare
         orgSlug={orgSlug}
@@ -245,17 +289,18 @@ export default async function OrgOverviewPage({
           "Add an event",
         )}
       />
-    ),
-    week: <WeekStrip orgSlug={orgSlug} days={week} />,
-    polls: <PollList orgSlug={orgSlug} polls={data.polls} now={now} />,
-    notes: <NoteList orgSlug={orgSlug} notes={data.notes} />,
-    files: <FileList orgSlug={orgSlug} files={data.files} />,
-    people: <PeopleList orgSlug={orgSlug} people={data.people} total={data.memberCount} />,
-    shortcuts: <Shortcuts links={shortcuts} />,
-    ...(data.started
-      ? { "getting-started": <GettingStartedCard orgSlug={orgSlug} state={data.started} /> }
-      : {}),
-  };
+    );
+  }
+  if (week) bodies.week = <WeekStrip orgSlug={orgSlug} days={week} />;
+  if (data.polls) bodies.polls = <PollList orgSlug={orgSlug} polls={data.polls} now={now} />;
+  if (data.notes) bodies.notes = <NoteList orgSlug={orgSlug} notes={data.notes} />;
+  if (data.files) bodies.files = <FileList orgSlug={orgSlug} files={data.files} />;
+  if (data.people) {
+    bodies.people = <PeopleList orgSlug={orgSlug} people={data.people} total={data.memberCount} />;
+  }
+  if (data.started) {
+    bodies["getting-started"] = <GettingStartedCard orgSlug={orgSlug} state={data.started} />;
+  }
 
   const greetingBlock = (
     <div>

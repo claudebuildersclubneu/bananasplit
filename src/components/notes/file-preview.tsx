@@ -1,7 +1,5 @@
 "use client";
 
-import { generateJSON, generateText } from "@tiptap/core";
-import { EditorContent, useEditor } from "@tiptap/react";
 import { Download, Link2, Loader2, NotebookPen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -11,33 +9,12 @@ import {
   removeNoteFileAction,
   restoreNoteFileAction,
 } from "@/app/app/[orgSlug]/notes/files-actions";
+import { NOTE_TOO_BIG, noteBodyTooBig } from "@/app/app/[orgSlug]/notes/limits";
 import { ItemMenu } from "@/components/item-menu";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import { NOTE_TRASH_DAYS } from "@/lib/notes/trash";
-import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
-
-/**
- * A Word document shown in the app: its HTML read into a read-only editor
- * with the note schema, so it looks like a note and nothing outside the
- * schema (scripts, styles, frames) survives.
- */
-export function DocumentPreview({ html }: { html: string }) {
-  const editor = useEditor({
-    editable: false,
-    immediatelyRender: false,
-    extensions: noteSchemaExtensions(),
-    content: html || "<p></p>",
-    editorProps: {
-      attributes: {
-        class: "tiptap prose prose-sm dark:prose-invert max-w-none focus:outline-none",
-      },
-    },
-  });
-  if (!editor) return <div className="bg-muted/40 h-64 animate-pulse rounded-lg" />;
-  return <EditorContent editor={editor} />;
-}
 
 /** Download, and a "…" menu: make a note from it (Word), copy its link, delete it. */
 export function FileActions({
@@ -65,12 +42,15 @@ export function FileActions({
     if (noteHtml == null) return;
     start(async () => {
       setError(null);
-      const extensions = noteSchemaExtensions();
-      const json = generateJSON(noteHtml || "<p></p>", extensions);
+      const { htmlToNoteBody } = await import("@/components/notes/html-to-note");
+      const body = htmlToNoteBody(noteHtml);
+      if (noteBodyTooBig(body.contentJson, body.contentText)) {
+        setError(NOTE_TOO_BIG);
+        return;
+      }
       const result = await importNote(orgId, {
         title: name.replace(/\.[a-z0-9]{1,8}$/i, "").slice(0, 300) || "Imported document",
-        contentJson: JSON.stringify(json),
-        contentText: generateText(json, extensions).slice(0, 200_000),
+        ...body,
       });
       if (result.error || !result.noteId) setError(result.error ?? "Couldn't make a note from it.");
       else router.push(`/app/${orgSlug}/notes/${result.noteId}`);

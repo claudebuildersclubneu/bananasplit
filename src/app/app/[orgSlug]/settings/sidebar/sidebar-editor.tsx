@@ -23,7 +23,7 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toConfig, type GroupId, type ResolvedGroup, type ResolvedItem } from "@/lib/nav/sidebar";
+import { toConfig, type GroupId, type ResolvedGroup, type ResolvedItem } from "@/lib/nav/sections";
 import { cn } from "@/lib/utils";
 
 import { saveSidebarAction } from "./actions";

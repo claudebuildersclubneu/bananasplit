@@ -13,20 +13,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +22,19 @@ import { SETUP_STEPS, stepDone, type FinanceSetupState } from "@/lib/finance/set
 import type { WidgetTypeId } from "@/lib/finance/widgets";
 import { cn } from "@/lib/utils";
 
-import { BurnChart } from "./burn-chart";
+import {
+  LazyBalanceTrendChart,
+  LazyBurnChart,
+  LazyDonutChart,
+  LazyHorizontalBarChart,
+} from "./lazy-charts";
 import { RunwaySection } from "./runway-section";
 
 /**
  * The finance widgets' bodies (the board adds the frame, title and edit
  * controls). Every figure comes from DashboardData: the active period's
- * ledger, the same numbers as the budget and transactions pages.
+ * ledger, the same numbers as the budget and transactions pages; what
+ * members are owed spans every period. Charts load lazily (lazy-charts.tsx).
  */
 
 const CHART_COLORS = [
@@ -206,13 +198,14 @@ export function WidgetBody({
         />
       );
     }
+    // Owed and pending span every period, so their lists do too.
     case "owed":
       return (
         <Big
           value={formatCents(data.outstandingReimbursementsCents)}
           sub={
             <Link
-              href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE`}
+              href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE&period=all`}
               className="hover:underline"
             >
               Expenses not yet paid back
@@ -227,7 +220,7 @@ export function WidgetBody({
           sub={
             data.pendingApproval.count > 0 ? (
               <Link
-                href={`/app/${orgSlug}/finance/transactions?status=SUBMITTED`}
+                href={`/app/${orgSlug}/finance/transactions?status=SUBMITTED&period=all`}
                 className="hover:underline"
               >
                 {formatCents(data.pendingApproval.cents)} to review
@@ -239,42 +232,15 @@ export function WidgetBody({
         />
       );
     case "burn":
-      return <BurnChart data={data.burnByMonth} />;
+      // Checked here, so an empty period never loads the chart code.
+      if (data.burnByMonth.length === 0) {
+        return <p className="text-muted-foreground text-sm">No activity yet this period.</p>;
+      }
+      return <LazyBurnChart data={data.burnByMonth} />;
     case "trend":
       if (data.balanceTrend.length === 0)
         return <ChartEmpty text="No transactions yet this period" />;
-      return (
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={data.balanceTrend} margin={{ left: 0, right: 8, top: 8 }}>
-            <defs>
-              <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(d: string) => shortDate.format(new Date(d))}
-              minTickGap={24}
-            />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => money(v)} width={70} />
-            <Tooltip
-              formatter={(value) => formatCents(Number(value ?? 0))}
-              labelFormatter={(d) => shortDate.format(new Date(String(d)))}
-            />
-            <Area
-              type="monotone"
-              dataKey="balanceCents"
-              name="Balance"
-              stroke="var(--chart-1)"
-              strokeWidth={2}
-              fill="url(#trendFill)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      );
+      return <LazyBalanceTrendChart data={data.balanceTrend} />;
     case "by-category": {
       const slices = data.categories.filter((c) => c.spentCents > 0);
       if (slices.length === 0) return <ChartEmpty text="Nothing spent in a category yet" />;
@@ -282,24 +248,14 @@ export function WidgetBody({
       return (
         <div className="flex flex-col items-center gap-4 sm:flex-row">
           <div className="h-44 w-44 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={slices}
-                  dataKey="spentCents"
-                  nameKey="name"
-                  innerRadius="58%"
-                  outerRadius="100%"
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {slices.map((c, i) => (
-                    <Cell key={c.id} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
+            <LazyDonutChart
+              slices={slices.map((c, i) => ({
+                key: c.id,
+                label: c.name,
+                cents: c.spentCents,
+                color: CHART_COLORS[i % CHART_COLORS.length],
+              }))}
+            />
           </div>
           <ul className="w-full min-w-0 space-y-1.5">
             {slices.map((c, i) => (
@@ -325,18 +281,16 @@ export function WidgetBody({
       }));
       if (rows.length === 0) return <ChartEmpty text="Nothing spent yet this period" />;
       return (
-        <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
-          <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }}>
-            <XAxis type="number" hide />
-            <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-            <Bar dataKey="cents" name="Spent" radius={[0, 4, 4, 0]}>
-              {rows.map((r, i) => (
-                <Cell key={r.label} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <div style={{ height: Math.max(120, rows.length * 44) }}>
+          <LazyHorizontalBarChart
+            rows={rows.map((r, i) => ({
+              key: r.label,
+              label: r.label,
+              cents: r.cents,
+              color: CHART_COLORS[i % CHART_COLORS.length],
+            }))}
+          />
+        </div>
       );
     }
     case "budget":
@@ -465,24 +419,14 @@ export function WidgetBody({
       return (
         <div className="flex flex-col items-center gap-4 sm:flex-row">
           <div className="h-40 w-40 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={rows}
-                  dataKey="cents"
-                  nameKey="label"
-                  innerRadius="58%"
-                  outerRadius="100%"
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {rows.map((r, i) => (
-                    <Cell key={r.label} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
+            <LazyDonutChart
+              slices={rows.map((r, i) => ({
+                key: r.label,
+                label: r.label,
+                cents: r.cents,
+                color: CHART_COLORS[i % CHART_COLORS.length],
+              }))}
+            />
           </div>
           <ul className="w-full min-w-0 space-y-1.5">
             {rows.map((r, i) => (
@@ -511,7 +455,7 @@ export function WidgetBody({
           {data.reimbursementQueue.map((t) => (
             <li key={t.id}>
               <Link
-                href={`${base}/transactions?status=${t.status}`}
+                href={`${base}/transactions?status=${t.status}&period=all`}
                 className="hover:bg-accent/50 -mx-2 flex items-center gap-3 rounded-md px-2 py-2"
               >
                 <span className="min-w-0 flex-1">
@@ -550,7 +494,7 @@ export function WidgetBody({
             detail="What each category may spend"
           />
           <Shortcut
-            href={`${base}/transactions?status=SUBMITTED`}
+            href={`${base}/transactions?status=SUBMITTED&period=all`}
             icon={ReceiptText}
             label="Requests to review"
             detail={

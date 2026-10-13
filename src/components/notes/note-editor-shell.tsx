@@ -24,6 +24,7 @@ import {
   restoreNote,
   type NoteDetailsInput,
 } from "@/app/app/[orgSlug]/notes/actions";
+import { NOTE_TEXT_MAX_CHARS, noteBodyTooBig } from "@/app/app/[orgSlug]/notes/limits";
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { ItemMenu } from "@/components/item-menu";
 import { PresenceBar } from "@/components/notes/collab/presence-bar";
@@ -104,6 +105,8 @@ export function NoteEditorShell({
   const [confirmEl, confirm] = useConfirm();
   // "Make tasks from this note": the note's text at the moment it's opened.
   const [importText, setImportText] = useState<string | null>(null);
+  // The latest autosave was over the size a save can carry, so it wasn't sent.
+  const [tooBig, setTooBig] = useState(false);
 
   const session = useNoteCollab({ orgId, noteId: note.id, initial: collab });
   // The collaborative editor, once joined (it stays, read-only, if the
@@ -137,6 +140,11 @@ export function NoteEditorShell({
         savedAt: Date.now(),
       });
       setWroteBackup(true);
+      // Checked here rather than left to the server: a body over the Server
+      // Action limit fails without a reason the member could act on.
+      const big = noteBodyTooBig(payload.contentJson, payload.contentText);
+      setTooBig(big);
+      if (big) return { error: "too big" };
       const result = await updateNote(orgId, note.id, payload, versionRef.current);
       if (result.version) versionRef.current = result.version;
       if (!result.error && !result.conflict) clearNoteBackup(note.id);
@@ -179,7 +187,8 @@ export function NoteEditorShell({
       schedule({
         title,
         contentJson: JSON.stringify(contentRef.current.json),
-        contentText: contentRef.current.text,
+        // Only kept for search and snippets, so capped like an import's.
+        contentText: contentRef.current.text.slice(0, NOTE_TEXT_MAX_CHARS),
         visibility,
         eventId,
         ...overrides,
@@ -285,6 +294,15 @@ export function NoteEditorShell({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {backLink}
+      {tooBig && status === "error" && (
+        <p
+          role="alert"
+          className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm"
+        >
+          This note is too big to save. Make it shorter or split it into smaller notes, and it saves
+          again.
+        </p>
+      )}
       {status === "conflict" && (
         <div className="border-destructive/30 bg-destructive/10 text-destructive flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
           <span>This note was updated by someone else — reload to see the latest version.</span>

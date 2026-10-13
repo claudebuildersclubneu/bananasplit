@@ -7,8 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * only reach Auth.js's "server configuration" error.
  */
 
-const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
+const { authMock, redirectMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  redirectMock: vi.fn((url: string) => {
+    throw Object.assign(new Error(`NEXT_REDIRECT ${url}`), { url });
+  }),
+}));
 
+vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/auth/config", () => ({ auth: authMock, signIn: vi.fn() }));
 vi.mock("./actions", () => ({ passwordSignInAction: vi.fn() }));
 
@@ -52,5 +58,25 @@ describe("/sign-in", () => {
     expect(html).not.toContain("Google account");
     expect(html).toContain("Log in to your club workspace.");
     expect(html).toContain('name="password"');
+  });
+
+  // After a Google sign-in Auth.js can land back here; that must lead into
+  // the app, as a password sign-in does, not to the marketing page.
+  it("sends a signed-in visitor into the app, or to their callbackUrl", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@example.edu" } });
+    await expect(render()).rejects.toMatchObject({ url: "/app" });
+    const withCallback = {
+      searchParams: Promise.resolve({ callbackUrl: "/app/cbc/tasks/t1" }),
+    } as unknown as PageProps<"/sign-in">;
+    await expect(SignInPage(withCallback)).rejects.toMatchObject({ url: "/app/cbc/tasks/t1" });
+  });
+
+  it("carries the callbackUrl to sign-up, so a join link survives creating an account", async () => {
+    const html = renderToStaticMarkup(
+      await SignInPage({
+        searchParams: Promise.resolve({ callbackUrl: "/onboarding/join?code=RPKA-YWSF" }),
+      } as unknown as PageProps<"/sign-in">),
+    );
+    expect(html).toContain('href="/sign-up?callbackUrl=%2Fonboarding%2Fjoin%3Fcode%3DRPKA-YWSF"');
   });
 });

@@ -1,15 +1,14 @@
 import { longDate } from "@/lib/ai/action-items";
 import {
-  DocumentReadOutput,
   normalizeDocumentRead,
   normalizeSheetRead,
-  SheetReadOutput,
   type DocumentRead,
   type DocumentReadOutputData,
   type SheetRead,
   type SheetReadOutputData,
   type SheetSampleData,
 } from "@/lib/ai/finance-sheet";
+import { DocumentReadOutput, SheetReadOutput } from "@/lib/ai/finance-sheet.schema";
 import { guessMapping } from "@/lib/finance/import/mapping";
 import { parseAmount, parseDate } from "@/lib/finance/import/values";
 

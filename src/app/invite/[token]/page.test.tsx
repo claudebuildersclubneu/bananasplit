@@ -44,6 +44,7 @@ beforeEach(() => {
     invitedById: "u_admin",
     orgName: "Claude Builders Club",
     orgSlug: "cbc",
+    orgDeleted: false,
   });
   mocks.getSession.mockResolvedValue(null);
 });
@@ -72,5 +73,22 @@ describe("/invite/[token], signed out", () => {
     expect(html).toContain(">Sign in</a>");
     expect(html).toContain("New here?");
     expect(html).toContain("with this email, verify it, then open this link again.");
+  });
+});
+
+describe("/invite/[token], a club scheduled for deletion", () => {
+  it("says so up front, signed in or not, with no way to join", async () => {
+    mocks.findInvitationByRawToken.mockResolvedValue({
+      ...(await mocks.findInvitationByRawToken()),
+      orgDeleted: true,
+    });
+    for (const session of [null, { user: { id: "u_new", email: "new@example.edu" } }]) {
+      mocks.getSession.mockResolvedValue(session);
+      const html = await render();
+      expect(html).toContain("Club no longer active");
+      expect(html).toContain("Claude Builders Club is scheduled for deletion");
+      expect(html).not.toContain("Sign in");
+      expect(html).not.toContain("Join");
+    }
   });
 });

@@ -33,8 +33,12 @@ import { createSponsor, createSponsorship, updateSponsorshipStatus } from "./spo
 import {
   approveExpense,
   createTransaction,
+  deleteTransaction,
+  reconcileTransaction,
   reimburseExpense,
+  restoreTransaction,
   submitExpense,
+  unlockTransaction,
 } from "./transactions-actions";
 
 interface Person {
@@ -79,7 +83,11 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
       ["member2", "MEMBER"],
     ] as const) {
       people[key] = await authDb.user.create({
-        data: { email: `fin-${key}-${stamp}@example.edu`, name: `Fin ${key}`, emailVerified: new Date() },
+        data: {
+          email: `fin-${key}-${stamp}@example.edu`,
+          name: `Fin ${key}`,
+          emailVerified: new Date(),
+        },
         select: { id: true, email: true, name: true },
       });
       // Memberships are created on the service path by the joining user (D6).
@@ -131,11 +139,22 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
     expect(created.error).toBeUndefined();
     periodId = created.periodId!;
     const categories = await withOrgTx(orgId, ({ db }) =>
-      db.budgetCategory.findMany({ where: { budgetPeriodId: periodId }, orderBy: { sortOrder: "asc" } }),
+      db.budgetCategory.findMany({
+        where: { budgetPeriodId: periodId },
+        orderBy: { sortOrder: "asc" },
+      }),
     );
-    expect(categories.map((c) => c.name)).toEqual(["Food", "Supplies", "Events", "Travel", "Marketing"]);
+    expect(categories.map((c) => c.name)).toEqual([
+      "Food",
+      "Supplies",
+      "Events",
+      "Travel",
+      "Marketing",
+    ]);
 
-    expect(await createCategory(orgId, periodId, { name: "Swag", allocatedCents: 5000 })).toEqual({});
+    expect(await createCategory(orgId, periodId, { name: "Swag", allocatedCents: 5000 })).toEqual(
+      {},
+    );
     const swag = await withOrgTx(orgId, ({ db }) =>
       db.budgetCategory.findFirstOrThrow({ where: { budgetPeriodId: periodId, name: "Swag" } }),
     );
@@ -258,6 +277,125 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
     ).toMatch(/member of this organization/);
   });
 
+  it("sponsorships: a reconciled payment stays locked, and a deleted one is never brought back", async () => {
+    as(people.treasurer);
+    const { sponsorId } = await createSponsor(orgId, { name: "Locked Co" });
+    const { sponsorshipId } = await createSponsorship(orgId, {
+      sponsorId,
+      budgetPeriodId: periodId,
+      amountCents: 25_000,
+      ownerId: people.owner.id,
+    });
+    expect(await updateSponsorshipStatus(orgId, sponsorshipId!, "RECEIVED")).toEqual({
+      sponsorshipId,
+    });
+    const read = () =>
+      withOrgTx(orgId, async ({ db }) => {
+        const s = await db.sponsorship.findUniqueOrThrow({ where: { id: sponsorshipId! } });
+        return {
+          s,
+          t: await db.transaction.findUniqueOrThrow({ where: { id: s.transactionId! } }),
+        };
+      });
+    const paymentId = (await read()).t.id;
+
+    expect(await reconcileTransaction(orgId, paymentId, "Statement 7")).toEqual({
+      transactionId: paymentId,
+    });
+    expect((await updateSponsorshipStatus(orgId, sponsorshipId!, "COMMITTED")).error).toMatch(
+      /Unlock it/,
+    );
+    let state = await read();
+    expect(state.s.status).toBe("RECEIVED");
+    expect(state.t.voidedAt).toBeNull();
+
+    // Unlocked and deleted by hand: going back to RECEIVED must not revive it.
+    await unlockTransaction(orgId, paymentId, "wrong statement");
+    expect(await deleteTransaction(orgId, paymentId)).toEqual({ transactionId: paymentId });
+    expect(await updateSponsorshipStatus(orgId, sponsorshipId!, "COMMITTED")).toEqual({
+      sponsorshipId,
+    });
+    expect((await updateSponsorshipStatus(orgId, sponsorshipId!, "RECEIVED")).error).toMatch(
+      /deleted under Transactions/,
+    );
+    state = await read();
+    expect(state.s.status).toBe("COMMITTED");
+    expect(state.t.voidReason).toBe("Deleted");
+  });
+
+  it("receipts: removing one is audited, and they freeze once the expense is approved", async () => {
+    as(people.member);
+    const { transactionId } = await createTransaction(orgId, {
+      budgetPeriodId: periodId,
+      direction: "OUT",
+      kind: "EXPENSE",
+      amountCents: 900,
+      description: "Receipt lock test",
+      occurredAt: "2026-09-05T00:00:00.000Z",
+    });
+    const attach = () =>
+      withOrgTx(orgId, ({ db, userId }) =>
+        db.receipt.create({
+          data: {
+            organizationId: orgId,
+            transactionId: transactionId!,
+            blobKey: `receipts/${orgId}/${transactionId}/${randomUUID()}.pdf`,
+            filename: "lock.pdf",
+            mimeType: "application/pdf",
+            sizeBytes: 4,
+            uploadedById: userId,
+          },
+          select: { id: true },
+        }),
+      );
+    const first = await attach();
+    await submitExpense(orgId, transactionId!);
+    expect(await deleteReceiptAction(orgId, first.id)).toEqual({});
+    const audit = await withSystemOrgTx(orgId, ({ db }) =>
+      db.financeAuditLog.findFirstOrThrow({
+        where: { transactionId: transactionId!, action: "RECEIPT_DELETE" },
+        select: { actorId: true, diffJson: true },
+      }),
+    );
+    expect(audit.actorId).toBe(people.member.id);
+    expect(audit.diffJson).toMatchObject({ before: { receiptId: first.id, filename: "lock.pdf" } });
+
+    const second = await attach();
+    as(people.treasurer);
+    await approveExpense(orgId, transactionId!);
+    expect((await deleteReceiptAction(orgId, second.id)).error).toMatch(/locked/);
+    as(people.member);
+    expect((await deleteReceiptAction(orgId, second.id)).error).toMatch(/locked/);
+    expect(await withOrgTx(orgId, ({ db }) => db.receipt.count({ where: { id: second.id } }))).toBe(
+      1,
+    );
+  });
+
+  it("a member undoes their own delete, never one by finance", async () => {
+    as(people.member);
+    const create = async (description: string) => {
+      const { transactionId } = await createTransaction(orgId, {
+        budgetPeriodId: periodId,
+        direction: "OUT",
+        kind: "EXPENSE",
+        amountCents: 300,
+        description,
+        occurredAt: "2026-09-06T00:00:00.000Z",
+      });
+      await submitExpense(orgId, transactionId!);
+      return transactionId!;
+    };
+    const mine = await create("Deleted by me");
+    expect(await deleteTransaction(orgId, mine)).toEqual({ transactionId: mine });
+    expect(await restoreTransaction(orgId, mine)).toEqual({ transactionId: mine });
+
+    const theirs = await create("Deleted by finance");
+    as(people.treasurer);
+    expect(await deleteTransaction(orgId, theirs)).toEqual({ transactionId: theirs });
+    as(people.member);
+    expect((await restoreTransaction(orgId, theirs)).error).toMatch(/treasurer or owner/);
+  });
+
   it("sponsorships: credits never touch the ledger, even when received", async () => {
     as(people.treasurer);
     const { sponsorId } = await createSponsor(orgId, { name: "Cloud Co" });
@@ -269,15 +407,23 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
       ownerId: people.owner.id,
     });
     expect(error).toBeUndefined();
-    expect(await updateSponsorshipStatus(orgId, sponsorshipId!, "RECEIVED")).toEqual({ sponsorshipId });
+    expect(await updateSponsorshipStatus(orgId, sponsorshipId!, "RECEIVED")).toEqual({
+      sponsorshipId,
+    });
     await updateSponsorshipStatus(orgId, sponsorshipId!, "COMMITTED");
     await updateSponsorshipStatus(orgId, sponsorshipId!, "RECEIVED");
 
     const after = await withOrgTx(orgId, async ({ db }) => ({
       sponsorship: await db.sponsorship.findUniqueOrThrow({ where: { id: sponsorshipId! } }),
-      booked: await db.transaction.count({ where: { organizationId: orgId, amountCents: 500_000 } }),
+      booked: await db.transaction.count({
+        where: { organizationId: orgId, amountCents: 500_000 },
+      }),
     }));
-    expect(after.sponsorship).toMatchObject({ type: "CREDITS", status: "RECEIVED", transactionId: null });
+    expect(after.sponsorship).toMatchObject({
+      type: "CREDITS",
+      status: "RECEIVED",
+      transactionId: null,
+    });
     expect(after.booked).toBe(0);
 
     // Anything else is refused before any write.
@@ -340,9 +486,15 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
       description: "Receipt delete test",
       occurredAt: "2026-09-04T00:00:00.000Z",
     });
-    const stored = await putBlob("receipts", orgId, [transactionId!, "itest.pdf"], Buffer.from("%PDF-1.4"), {
-      contentType: "application/pdf",
-    });
+    const stored = await putBlob(
+      "receipts",
+      orgId,
+      [transactionId!, "itest.pdf"],
+      Buffer.from("%PDF-1.4"),
+      {
+        contentType: "application/pdf",
+      },
+    );
     const receipt = await withOrgTx(orgId, ({ db, userId }) =>
       db.receipt.create({
         data: {
@@ -360,7 +512,9 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
     expect(await getBlob(stored.key)).not.toBeNull();
 
     expect(await deleteReceiptAction(orgId, receipt.id)).toEqual({});
-    expect(await withOrgTx(orgId, ({ db }) => db.receipt.count({ where: { id: receipt.id } }))).toBe(0);
+    expect(
+      await withOrgTx(orgId, ({ db }) => db.receipt.count({ where: { id: receipt.id } })),
+    ).toBe(0);
     expect(await getBlob(stored.key)).toBeNull();
   });
 
@@ -396,8 +550,8 @@ describe.skipIf(!cbc)("finance on the RLS path (throwaway org)", () => {
       db.transaction.count({ where: { organizationId: seed.id } }),
     );
     expect(foreign).toBe(0);
-    await expect(createCategory(seed.id, seed.periodId, { name: "x", allocatedCents: 0 })).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(
+      createCategory(seed.id, seed.periodId, { name: "x", allocatedCents: 0 }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

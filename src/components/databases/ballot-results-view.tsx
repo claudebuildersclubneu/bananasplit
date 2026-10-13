@@ -4,7 +4,8 @@ import type { PollResults } from "@/server/databases/ballot-results";
  * The per-question pivot of one poll: option counts and share of ballots,
  * plus first-choice counts and a Borda score for ranked questions. Cells
  * below the org's minimum group size show as '<k' for viewers without
- * access to individual votes.
+ * access to individual votes, and an option withheld so a lone '<k' can't
+ * be worked out from the total shows as "hidden" (ballot-results.ts).
  */
 export function BallotResultsView({ results }: { results: PollResults }) {
   if (results.hidden) {
@@ -27,7 +28,8 @@ export function BallotResultsView({ results }: { results: PollResults }) {
       <p className="text-muted-foreground text-sm">
         {results.turnout.toLocaleString()} counted ballot{results.turnout === 1 ? "" : "s"}. Test
         ballots and ballots outside the poll&apos;s window are not counted. Groups smaller than {k}{" "}
-        show as &lt;{k}.
+        show as &lt;{k}; when only one option in a question is that small, the next smallest is
+        hidden too.
       </p>
       {results.questions.map((q) => {
         const ranked = q.type === "slots";
@@ -58,7 +60,18 @@ export function BallotResultsView({ results }: { results: PollResults }) {
                       <tr key={o.key} className="border-t">
                         <td className="px-3 py-1.5">{o.label}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">
-                          {o.suppressed ? <span title={`Fewer than ${k}`}>&lt;{k}</span> : o.votes}
+                          {o.withheld ? (
+                            <span
+                              title="Hidden too, so the smaller count can't be worked out from the total"
+                              className="text-muted-foreground"
+                            >
+                              hidden
+                            </span>
+                          ) : o.suppressed ? (
+                            <span title={`Fewer than ${k}`}>&lt;{k}</span>
+                          ) : (
+                            o.votes
+                          )}
                         </td>
                         <td className="px-3 py-1.5">
                           {o.share !== null && (

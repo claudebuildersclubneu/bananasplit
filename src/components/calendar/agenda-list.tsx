@@ -12,7 +12,7 @@ import {
 import { useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { agendaDays } from "@/lib/calendar/grid";
+import { agendaDays, itemDayKeys } from "@/lib/calendar/grid";
 
 import { type CalendarItem, timeRange } from "./item";
 import { itemStyle, KIND_META, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
@@ -33,6 +33,7 @@ export function AgendaList({
   fromKey,
   dayCount,
   todayKey,
+  timeZone,
   openId,
   onOpen,
   showSync,
@@ -42,12 +43,17 @@ export function AgendaList({
   fromKey: string;
   dayCount: number;
   todayKey: string;
+  /** The zone timed events are placed and printed in (see hooks.ts). */
+  timeZone: string;
   openId: string | null;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   showSync: boolean;
   emptyState: React.ReactNode;
 }) {
-  const days = useMemo(() => agendaDays(items, fromKey, dayCount), [items, fromKey, dayCount]);
+  const days = useMemo(
+    () => agendaDays(items, fromKey, dayCount, timeZone),
+    [items, fromKey, dayCount, timeZone],
+  );
 
   if (days.length === 0) return <div className="cal-agenda">{emptyState}</div>;
 
@@ -67,6 +73,7 @@ export function AgendaList({
             <AgendaRow
               key={`${day.key}-${item.id}`}
               item={item}
+              timeZone={timeZone}
               open={openId === item.id}
               onOpen={onOpen}
               showSync={showSync}
@@ -80,11 +87,13 @@ export function AgendaList({
 
 function AgendaRow({
   item,
+  timeZone,
   open,
   onOpen,
   showSync,
 }: {
   item: CalendarItem;
+  timeZone: string;
   open: boolean;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   showSync: boolean;
@@ -105,7 +114,7 @@ function AgendaRow({
       {/* The dot rides in the time column so every row's dot lines up. */}
       <span className="cal-agenda__when">
         <span aria-hidden className="cal-chip__dot" />
-        {item.task ? "Due" : item.allDay ? "All day" : timeRange(item)}
+        {item.task ? "Due" : item.allDay ? "All day" : timeRange(item, timeZone)}
       </span>
 
       <span className="min-w-0">
@@ -118,7 +127,7 @@ function AgendaRow({
               <span className="truncate">{item.location}</span>
             </span>
           )}
-          {!item.allDay && isMultiDay(item) && (
+          {!item.allDay && itemDayKeys(item, timeZone).length > 1 && (
             <span className="inline-flex items-center gap-1">
               <CalendarRange aria-hidden className="size-3" />
               Runs past midnight
@@ -165,12 +174,6 @@ function AgendaRow({
       </span>
     </button>
   );
-}
-
-function isMultiDay(item: CalendarItem): boolean {
-  const start = new Date(item.start);
-  const end = new Date(item.end);
-  return end.getDate() !== start.getDate() && end.getTime() - start.getTime() > 0;
 }
 
 const headingFmt = new Intl.DateTimeFormat(undefined, {

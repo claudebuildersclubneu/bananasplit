@@ -143,6 +143,31 @@ describe.skipIf(!dbAvailable)("getDashboardData — matches independent raw SQL 
 
       await db.transaction.createMany({ data: rows });
 
+      // Last year's period, no longer active, still holds two open requests:
+      // what the club owes doesn't vanish when a new period starts.
+      const lastYear = await db.budgetPeriod.create({
+        data: {
+          organizationId: orgId,
+          label: "Last Period",
+          startsOn: new Date("2025-01-01"),
+          endsOn: new Date("2025-12-31"),
+          isActive: false,
+        },
+      });
+      await db.transaction.createMany({
+        data: [1, 2].map((n) => ({
+          organizationId: orgId,
+          budgetPeriodId: lastYear.id,
+          direction: "OUT" as const,
+          kind: "EXPENSE" as const,
+          amountCents: 7_700 + n,
+          description: `Old request ${n}`,
+          occurredAt: new Date(2025, 10, n),
+          submittedById: userId,
+          status: "SUBMITTED" as const,
+        })),
+      });
+
       // Three meetings held and one still scheduled. The board meeting, the
       // deleted event and the one before the period never count.
       const event = (
@@ -203,16 +228,20 @@ describe.skipIf(!dbAvailable)("getDashboardData — matches independent raw SQL 
     expect(data.balanceCents).toBe(Number(balance));
   });
 
-  it("outstanding reimbursements equals SUM(amount) for SUBMITTED/APPROVED expenses", async () => {
+  it("outstanding reimbursements equals SUM(amount) for SUBMITTED/APPROVED expenses in every period", async () => {
     const data = await dashboard();
 
-    const [{ total }] = await sql(
+    const [{ total, pending, pendingCents, open }] = await sql(
       ({ db }) =>
-        db.$queryRaw<{ total: bigint | null }[]>`
-        SELECT SUM("amountCents") AS total
+        db.$queryRaw<
+          { total: bigint | null; pending: bigint; pendingCents: bigint | null; open: bigint }[]
+        >`
+        SELECT SUM("amountCents") AS total,
+               COUNT(*) FILTER (WHERE status = 'SUBMITTED') AS pending,
+               SUM("amountCents") FILTER (WHERE status = 'SUBMITTED') AS "pendingCents",
+               COUNT(*) AS open
         FROM "Transaction"
         WHERE "organizationId" = ${orgId}
-          AND "budgetPeriodId" = ${periodId}
           AND kind = 'EXPENSE'
           AND status IN ('SUBMITTED', 'APPROVED')
           AND "voidedAt" IS NULL
@@ -220,6 +249,37 @@ describe.skipIf(!dbAvailable)("getDashboardData — matches independent raw SQL 
     );
 
     expect(data.outstandingReimbursementsCents).toBe(Number(total ?? 0));
+    expect(data.pendingApproval).toEqual({
+      count: Number(pending),
+      cents: Number(pendingCents ?? 0),
+    });
+    expect(data.reimbursementQueue).toHaveLength(Math.min(12, Number(open)));
+    // Oldest first: last year's requests lead the queue.
+    expect(data.reimbursementQueue.slice(0, 2).map((t) => t.description)).toEqual([
+      "Old request 1",
+      "Old request 2",
+    ]);
+  });
+
+  it("counts as unreconciled only money that really moved, over 60 days old", async () => {
+    const data = await dashboard();
+
+    const [{ count }] = await sql(
+      ({ db }) =>
+        db.$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(*) AS count
+        FROM "Transaction"
+        WHERE "organizationId" = ${orgId}
+          AND "budgetPeriodId" = ${periodId}
+          AND "voidedAt" IS NULL
+          AND "reconciledAt" IS NULL
+          AND status NOT IN ('DRAFT', 'REJECTED', 'SUBMITTED', 'APPROVED')
+          AND "occurredAt" < ${new Date(NOW.getTime() - 60 * DAY_MS)}
+      `,
+    );
+
+    expect(Number(count)).toBeGreaterThan(0);
+    expect(data.unreconciledOver60DaysCount).toBe(Number(count));
   });
 
   it("category spend equals SUM(OUT, non-voided, not draft or rejected) grouped by category", async () => {

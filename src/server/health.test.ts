@@ -25,6 +25,7 @@ function probes(over: {
         timezone: "UTC",
         statementTimeout: "15s",
         idleInTransactionTimeout: "15s",
+        transactionIsolation: "read committed",
         ...(over.role?.(role) ?? {}),
       };
     },
@@ -60,6 +61,17 @@ describe("health checks", () => {
     expect(report.ok).toBe(false);
     expect(failing(report)).toEqual(["role:app_auth"]);
     expect(report.checks.find((c) => c.name === "role:app_auth")?.detail).toMatch(/timezone.*statement_timeout/);
+  });
+
+  it("fails when a role's transactions do not default to read committed", async () => {
+    const report = await runHealthChecks(
+      probes({ role: (r) => (r === "app" ? { transactionIsolation: "serializable" } : {}) }),
+      {},
+    );
+    expect(failing(report)).toEqual(["role:app_user"]);
+    expect(report.checks.find((c) => c.name === "role:app_user")?.detail).toBe(
+      "default_transaction_isolation is serializable",
+    );
   });
 
   it("fails when a runtime URL connects as a superuser, a BYPASSRLS role, the owner or the wrong role", async () => {

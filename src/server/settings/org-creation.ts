@@ -117,7 +117,8 @@ export async function createOrganization(
     return { ok: false, error: "That URL is already taken." };
   }
 
-  // Only attempts that pass validation count, so a typo does not use up the allowance.
+  // The per-day limits slow repeated attempts, so they count every attempt
+  // that passes validation (a typo does not use them up).
   const perUser = await limited(
     rateLimitKey("org-create", user.id),
     ORG_CREATION_LIMITS.perUserPerDay,
@@ -128,15 +129,6 @@ export async function createOrganization(
       error: `You've created several organizations recently. Try again ${perUser}.`,
     };
   if (policy.openLimits) {
-    const monthly = await limited(
-      rateLimitKey("org-create-open", user.id),
-      ORG_CREATION_LIMITS.perUserOpen,
-    );
-    if (monthly)
-      return {
-        ok: false,
-        error: `You can create one organization every 30 days. Try again ${monthly}.`,
-      };
     const platform = await limited(
       rateLimitKey("org-create-platform", "all"),
       ORG_CREATION_LIMITS.platformOpenPerDay,
@@ -149,6 +141,27 @@ export async function createOrganization(
   const title = await ownPreferredTitle(user.id);
   try {
     const result = await withSystemOrgTx(orgId, { userId: user.id }, async ({ db }) => {
+      // The one-org-per-30-days allowance is spent only by an org that is
+      // actually created: its hit is counted in this transaction, so it
+      // rolls back with everything else when the creation fails (a URL taken
+      // a moment ago, a database error). The limiter's usual autocommit
+      // call would have kept it.
+      if (policy.openLimits) {
+        const { limit, windowSec } = ORG_CREATION_LIMITS.perUserOpen;
+        const rows = await db.$queryRaw<{ allowed: boolean; retry_after_ms: bigint | number }[]>`
+          SELECT allowed, retry_after_ms
+            FROM app.rate_limit_hit(${rateLimitKey("org-create-open", user.id)}, ${limit}::int, ${windowSec}::int)`;
+        if (rows[0] && !rows[0].allowed) {
+          const retry = retryAfterText({
+            allowed: false,
+            retryAfterMs: Math.max(0, Number(rows[0].retry_after_ms)),
+          });
+          return {
+            ok: false as const,
+            error: `You can create one organization every 30 days. Try again ${retry}.`,
+          };
+        }
+      }
       if (policy.requiresCode) {
         const rows = await db.$queryRaw<{ ok: boolean }[]>`
           SELECT app.redeem_org_creation_code(${hashOrgCreationCode(code)}, ${user.id}) AS ok`;

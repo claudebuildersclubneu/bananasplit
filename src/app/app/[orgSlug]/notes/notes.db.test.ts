@@ -23,6 +23,7 @@ import { withOrgTx, withSystemOrgTx } from "@/server/db/context";
 
 import { searchWorkspaceAction } from "../search/actions";
 import { createNote, deleteNote, restoreNote, updateNote } from "./actions";
+import { getNotesForList, getOrgMembersForFilter, NOTE_SNIPPET_LENGTH } from "./queries";
 
 /** The note ids the palette's search returns for `query`, as the mocked session user. */
 async function noteHits(orgId: string, query: string): Promise<string[]> {
@@ -140,6 +141,48 @@ describe.skipIf(!seeded)("notes and search on the RLS path (seeded CBC)", () => 
     as(s.oliver);
     expect(await deleteNote(s.cbcId, id)).toEqual({});
     expect(await restoreNote(s.cbcId, id)).toEqual({});
+  });
+
+  it("the Files list reads a snippet, never the body, under RLS, and emails only when asked", async () => {
+    as(s.kristine);
+    const { noteId } = await createNote(s.cbcId, { title: `Agenda ${WORD}` });
+    const id = noteId!;
+    created.push({ orgId: s.cbcId, id });
+    const words = "budget ".repeat(200);
+    const saved = await updateNote(
+      s.cbcId,
+      id,
+      {
+        title: `Agenda ${WORD}`,
+        contentJson: doc,
+        contentText: `\n\n  ${words}`,
+        visibility: "PRIVATE",
+        eventId: null,
+      },
+      1,
+    );
+    expect(saved.error).toBeUndefined();
+
+    const list = (opts?: { emails?: boolean }) =>
+      withOrgTx(s.cbcId, ({ db, user }) => getNotesForList(db, s.cbcId, user.id, { q: WORD }, opts));
+    const [row] = (await list()).filter((n) => n.id === id);
+    // The old in-app cut (trim, then 400 characters), less trailing spaces.
+    expect(row.snippet).toBe(words.trim().slice(0, NOTE_SNIPPET_LENGTH).trimEnd());
+    expect(row).not.toHaveProperty("contentJson");
+    expect(row).not.toHaveProperty("contentText");
+    expect(row.author.email).toBeUndefined();
+    expect((await list({ emails: true })).find((n) => n.id === id)?.author.email).toBe(
+      s.kristine.email,
+    );
+
+    // A PRIVATE note stays out of anyone else's list, the OWNER's included.
+    as(s.jackson);
+    expect((await list()).map((n) => n.id)).not.toContain(id);
+
+    as(s.kristine);
+    const members = await withOrgTx(s.cbcId, ({ db }) => getOrgMembersForFilter(db, s.cbcId));
+    expect(members.length).toBeGreaterThan(1);
+    expect(members.every((m) => m.user.email === undefined)).toBe(true);
   });
 
   it("nothing crosses into another org", async () => {

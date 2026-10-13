@@ -46,7 +46,8 @@ const AUDIENCES = [
 export function NotesListFilters({
   members,
 }: {
-  members: { userId: string; name: string | null; email: string }[];
+  /** Display names only: the page sends an email as the name just where the viewer may see emails. */
+  members: { userId: string; name: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,7 +114,7 @@ export function NotesListFilters({
               <UserRound className="size-4" aria-hidden="true" />
               Added by
               <span className="text-muted-foreground ms-auto max-w-28 truncate text-xs">
-                {authorMember ? (authorMember.name ?? authorMember.email) : "Anyone"}
+                {authorMember ? authorMember.name : "Anyone"}
               </span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
@@ -124,7 +125,7 @@ export function NotesListFilters({
                 <DropdownMenuRadioItem value="all">Anyone</DropdownMenuRadioItem>
                 {members.map((m) => (
                   <DropdownMenuRadioItem key={m.userId} value={m.userId}>
-                    {m.name ?? m.email}
+                    {m.name}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>

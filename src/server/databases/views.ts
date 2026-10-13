@@ -1,6 +1,6 @@
 import type { ColumnConfig, ColumnView, RowView } from "@/components/databases/column-config";
 import { resolveColumns } from "@/components/databases/column-config";
-import type { DatabaseKind, MemberVisibility, Role } from "@/generated/prisma/client";
+import { Prisma, type DatabaseKind, type MemberVisibility, type Role } from "@/generated/prisma/client";
 import { NotFoundError } from "@/lib/auth/errors";
 import { can } from "@/lib/auth/permissions";
 import { parseDbViewParams } from "@/lib/databases/href";
@@ -45,30 +45,54 @@ export async function canViewBallotRows(db: TxClient, organizationId: string, ti
   return rows[0]?.ok === true;
 }
 
+/**
+ * canViewKind for several kinds in one statement (returns the visible ones),
+ * so listing databases costs one round trip rather than one per database.
+ */
+async function visibleKinds(
+  db: TxClient,
+  organizationId: string,
+  kinds: readonly DatabaseKind[],
+  tier: Tier,
+): Promise<Set<DatabaseKind>> {
+  const unique = [...new Set(kinds)];
+  if (unique.length === 0) return new Set();
+  const rows = await db.$queryRaw<{ kind: DatabaseKind; ok: boolean }[]>`
+    SELECT k.kind, app.can_view_rows(${organizationId}, k.kind, ${tier}) AS ok
+      FROM unnest(ARRAY[${Prisma.join(unique)}]::text[]) AS k(kind)`;
+  return new Set(rows.filter((r) => r.ok === true).map((r) => r.kind));
+}
+
 function isListed(memberVisibility: MemberVisibility, tier: Tier, visible: boolean): boolean {
   if (!visible) return false;
   if (memberVisibility === "HIDDEN") return tier !== "MEMBER";
   return true;
 }
 
-/** The databases the viewer may open, in sidebar order. */
-export async function listDatabases(
+/** The live definitions matching `where` that the viewer may open, in sidebar order. */
+async function listedDatabases(
   db: TxClient,
   organizationId: string,
   role: Role,
+  where: { key?: string },
 ): Promise<DatabaseSummary[]> {
   const tier = tierOf(role);
   if (!tier) return [];
-  const defs = await db.databaseDefinition.findMany({
-    where: { organizationId, archivedAt: null },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-  });
-  const out: DatabaseSummary[] = [];
-  for (const d of defs) {
-    if (!hasSource(d.kind)) continue;
-    const visible = await canViewKind(db, organizationId, d.kind, tier);
-    if (!isListed(d.memberVisibility, tier, visible)) continue;
-    out.push({
+  const defs = (
+    await db.databaseDefinition.findMany({
+      where: { organizationId, archivedAt: null, ...where },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    })
+  ).filter((d) => hasSource(d.kind));
+  const visible = await visibleKinds(
+    db,
+    organizationId,
+    defs.map((d) => d.kind),
+    tier,
+  );
+  return defs
+    .filter((d) => isListed(d.memberVisibility, tier, visible.has(d.kind)))
+    .map((d) => ({
       id: d.id,
       key: d.key,
       name: d.name,
@@ -78,9 +102,12 @@ export async function listDatabases(
       allowEdits: d.allowEdits,
       columns: d.columns,
       canEdit: d.allowEdits && can({ role }, "databases.write"),
-    });
-  }
-  return out;
+    }));
+}
+
+/** The databases the viewer may open, in sidebar order. */
+export function listDatabases(db: TxClient, organizationId: string, role: Role): Promise<DatabaseSummary[]> {
+  return listedDatabases(db, organizationId, role, {});
 }
 
 /** One database by URL key, or NotFoundError when it does not exist or is not visible to the viewer. */
@@ -90,10 +117,43 @@ export async function getDatabase(
   role: Role,
   dbKey: string,
 ): Promise<DatabaseSummary> {
-  const list = await listDatabases(db, organizationId, role);
-  const found = list.find((d) => d.key === dbKey);
+  // Keys are unique per org, so this finds the one listDatabases would list.
+  const [found] = await listedDatabases(db, organizationId, role, { key: dbKey });
   if (!found) throw new NotFoundError();
   return found;
+}
+
+/**
+ * What the Databases index counts for each kind: the filters it used to
+ * apply one Prisma count at a time. RLS still decides which rows count,
+ * since this runs in the viewer's transaction.
+ */
+const RECORD_COUNTS: Partial<Record<DatabaseKind, (organizationId: string) => Prisma.Sql>> = {
+  SESSIONS: (org) =>
+    Prisma.sql`SELECT count(*) FROM "Event" WHERE "organizationId" = ${org} AND "deletedAt" IS NULL AND "mergedIntoId" IS NULL`,
+  ATTENDANCE: (org) =>
+    Prisma.sql`SELECT count(*) FROM "Attendance" WHERE "organizationId" = ${org} AND "suppressedAt" IS NULL`,
+  SIGNUPS: (org) =>
+    Prisma.sql`SELECT count(*) FROM "Signup" WHERE "organizationId" = ${org} AND "suppressedAt" IS NULL`,
+  PEOPLE: (org) =>
+    Prisma.sql`SELECT count(*) FROM "Contact" WHERE "organizationId" = ${org} AND "sessionsAttended" > 0`,
+  BALLOTS: (org) =>
+    Prisma.sql`SELECT count(*) FROM "BallotDefinition" WHERE "organizationId" = ${org} AND "isTest" = false`,
+};
+
+/** The index's record count for each of `kinds`, all in one statement. */
+export async function countRecords(
+  db: TxClient,
+  organizationId: string,
+  kinds: readonly DatabaseKind[],
+): Promise<Partial<Record<DatabaseKind, number>>> {
+  const parts = [...new Set(kinds)].flatMap((kind) => {
+    const count = RECORD_COUNTS[kind];
+    return count ? [Prisma.sql`SELECT ${kind}::text AS kind, (${count(organizationId)})::int AS n`] : [];
+  });
+  if (parts.length === 0) return {};
+  const rows = await db.$queryRaw<{ kind: DatabaseKind; n: number }[]>(Prisma.join(parts, " UNION ALL "));
+  return Object.fromEntries(rows.map((r) => [r.kind, r.n]));
 }
 
 export function viewContextFor(

@@ -1,6 +1,7 @@
 import { Logo } from "@/components/brand/logo";
 import { CONTACT_HREF, PRIVACY_HREF, TERMS_HREF } from "@/lib/brand/links";
 
+import { FooterAccountLink } from "./signed-in";
 import { SiteLink } from "./site-link";
 
 const COLUMNS = [
@@ -34,9 +35,10 @@ const COLUMNS = [
 
 /**
  * The logo and tagline, three columns of links, and the copyright line.
- * Signed in, "Log in" becomes "Open your club" (the app).
+ * Signed in, "Log in" becomes "Open your club" (the app), decided in the
+ * browser because the page is static (./signed-in).
  */
-export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
+export function SiteFooter() {
   return (
     <footer className="bg-cream">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-12 px-6 pt-[72px] pb-10">
@@ -53,18 +55,19 @@ export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
             {COLUMNS.map((column) => (
               <div key={column.title} className="flex flex-col gap-3">
                 <span className="text-ink text-[13px] font-bold">{column.title}</span>
-                {column.links.map((link) => {
-                  const toApp = signedIn && link.href === "/sign-in";
-                  return (
+                {column.links.map((link) =>
+                  link.href === "/sign-in" ? (
+                    <FooterAccountLink key={link.label} className="text-ink-muted text-[15px]" />
+                  ) : (
                     <SiteLink
                       key={link.label}
-                      href={toApp ? "/app" : link.href}
+                      href={link.href}
                       className="text-ink-muted text-[15px]"
                     >
-                      {toApp ? "Open your club" : link.label}
+                      {link.label}
                     </SiteLink>
-                  );
-                })}
+                  ),
+                )}
               </div>
             ))}
           </div>

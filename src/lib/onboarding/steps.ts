@@ -1,7 +1,4 @@
-import { z } from "zod";
-
-import { MAX_LINKS, type LinkKind } from "@/lib/profile/links";
-import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
+import type { LinkKind } from "@/lib/profile/links";
 
 /**
  * The two onboarding flows from the design (docs/features/onboarding-flows.md):
@@ -13,7 +10,9 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
  *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> B6 invite
  *      -> the org, as admin.
  *
- * Pure and client-safe: the pages, forms and actions share these.
+ * Pure and client-safe: the pages, forms and actions share these. The
+ * zod checks the actions run are in steps.schema.ts (server only), so the
+ * step pages never ship zod to the browser.
  */
 
 export const PROFILE_STEPS = [
@@ -108,41 +107,6 @@ export const ROLE_CHOICES = [
 export const MAX_TITLE = 80;
 /** The bio box in setup is short on purpose; the profile page allows more. */
 export const SETUP_BIO_MAX = 280;
-
-const { name, pronouns, timezone, major, gradYear, bio } = profileDetailsSchema.shape;
-
-export const basicsSchema = z.object({ name, pronouns, timezone }).strict();
-
-export const schoolSchema = z
-  .object({
-    major,
-    gradYear,
-    preferredTitle: z
-      .string()
-      .transform((s) => s.replace(/\s+/g, " ").trim())
-      .pipe(z.string().max(MAX_TITLE, `Keep your role under ${MAX_TITLE} characters.`))
-      .transform((s) => (s ? s : null))
-      .nullable()
-      .optional()
-      .transform((v) => v ?? null),
-  })
-  .strict();
-
-export const bioSchema = z
-  .object({
-    bio,
-    links: z
-      .array(profileLinkSchema)
-      .max(MAX_LINKS, `Add at most ${MAX_LINKS} links.`)
-      .optional()
-      .transform((v) => v ?? []),
-  })
-  .strict();
-
-/** A1-A3 inputs, for the forms. */
-export type BasicsInput = z.input<typeof basicsSchema>;
-export type SchoolInput = z.input<typeof schoolSchema>;
-export type BioInput = z.input<typeof bioSchema>;
 
 /** "Computer Science, Mathematics" <-> ["Computer Science", "Mathematics"] */
 export const MAJOR_SEPARATOR = ", ";

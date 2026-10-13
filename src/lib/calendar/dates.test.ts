@@ -7,6 +7,7 @@ import {
   parseDateKey,
   parseZonedDateTimeLocal,
   safeTimeZone,
+  shiftZonedDays,
   zonedDateKey,
   zonedDateTimeLocal,
   zonedMidnight,
@@ -42,10 +43,16 @@ describe("calendar dates in an org timezone", () => {
 
   it("handles DST: a skipped time moves forward, an ambiguous one takes the earlier instant", () => {
     // 2026-03-08 02:30 does not exist in New York.
-    expect(zonedTimeToInstant("2026-03-08", NY, 2, 30).toISOString()).toBe("2026-03-08T07:30:00.000Z");
+    expect(zonedTimeToInstant("2026-03-08", NY, 2, 30).toISOString()).toBe(
+      "2026-03-08T07:30:00.000Z",
+    );
     // 2026-11-01 01:30 happens twice in New York; the first is EDT (UTC-4).
-    expect(zonedTimeToInstant("2026-11-01", NY, 1, 30).toISOString()).toBe("2026-11-01T05:30:00.000Z");
-    expect(zonedTimeToInstant("2026-07-01", LA, 18, 0).toISOString()).toBe("2026-07-02T01:00:00.000Z");
+    expect(zonedTimeToInstant("2026-11-01", NY, 1, 30).toISOString()).toBe(
+      "2026-11-01T05:30:00.000Z",
+    );
+    expect(zonedTimeToInstant("2026-07-01", LA, 18, 0).toISOString()).toBe(
+      "2026-07-02T01:00:00.000Z",
+    );
   });
 
   it("reads all-day spans with exclusive and inclusive ends alike", () => {
@@ -80,6 +87,17 @@ describe("calendar dates in an org timezone", () => {
     expect(zonedDateTimeLocal(at!, NY)).toBe("2026-10-10T18:00");
     expect(parseZonedDateTimeLocal("2026-10-10T25:00", NY)).toBeNull();
     expect(parseZonedDateTimeLocal("garbage", NY)).toBeNull();
+  });
+
+  it("moves a time by whole days on the wall clock, across a DST change", () => {
+    // 6pm EDT on Friday Oct 30 to 6pm EST on Monday Nov 2: 73 hours, not 72.
+    const friday = parseZonedDateTimeLocal("2026-10-30T18:00", NY)!;
+    const monday = shiftZonedDays(friday, 3, NY);
+    expect(zonedDateTimeLocal(monday, NY)).toBe("2026-11-02T18:00");
+    expect(monday.getTime() - friday.getTime()).toBe(73 * 60 * 60 * 1000);
+    // Seconds ride along; a move back works too.
+    const withSeconds = new Date(friday.getTime() + 42_000);
+    expect(shiftZonedDays(withSeconds, -1, NY).toISOString()).toBe("2026-10-29T22:00:42.000Z");
   });
 
   it("falls back to UTC for an unknown zone", () => {

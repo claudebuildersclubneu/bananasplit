@@ -1,11 +1,21 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CalendarX2, Globe, Lock, MapPin, Pencil, Ticket } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  CalendarX2,
+  Globe,
+  Lock,
+  MapPin,
+  Pencil,
+  Ticket,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { zonedDateKey } from "@/lib/calendar/dates";
 
 import { type CalendarItem, timeRange } from "./item";
 import { KIND_META, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
@@ -55,6 +65,7 @@ export function anchorFor(chip: HTMLElement, wrapper: HTMLElement, id: string): 
 export function EventPeek({
   item,
   anchor,
+  timeZone,
   orgSlug,
   canManage,
   showSync,
@@ -63,6 +74,8 @@ export function EventPeek({
 }: {
   item: CalendarItem;
   anchor: PeekAnchor;
+  /** The zone the grid drew the chip in, so the card names the same day and time. */
+  timeZone: string;
   orgSlug: string;
   canManage: boolean;
   showSync: boolean;
@@ -89,7 +102,11 @@ export function EventPeek({
       const node = ref.current;
       if (!node) return;
       const target = event.target as Node | null;
-      if (target && !node.contains(target) && !(target as HTMLElement).closest?.("[aria-expanded]")) {
+      if (
+        target &&
+        !node.contains(target) &&
+        !(target as HTMLElement).closest?.("[aria-expanded]")
+      ) {
         onClose();
       }
     }
@@ -101,7 +118,7 @@ export function EventPeek({
     };
   }, [onClose]);
 
-  const dayKey = item.allDay ? item.start : localKey(new Date(item.start));
+  const dayKey = item.allDay ? item.start : zonedDateKey(new Date(item.start), timeZone);
 
   return (
     <div
@@ -115,7 +132,11 @@ export function EventPeek({
       aria-label={`${item.title}, detail`}
     >
       <p className="cal-pop__kind">
-        <span aria-hidden className="cal-chip__dot" style={{ ["--kind" as string]: `var(${kind.token})` }} />
+        <span
+          aria-hidden
+          className="cal-chip__dot"
+          style={{ ["--kind" as string]: `var(${kind.token})` }}
+        />
         {kind.label}
       </p>
 
@@ -123,7 +144,7 @@ export function EventPeek({
 
       <p className="mt-1 text-sm font-medium">
         {longDate(dayKey)}
-        {!item.allDay && ` · ${timeRange(item)}`}
+        {!item.allDay && ` · ${timeRange(item, timeZone)}`}
         {item.allDay && " · All day"}
       </p>
 
@@ -135,12 +156,17 @@ export function EventPeek({
       )}
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Badge variant={item.visibility === "PUBLIC" ? "secondary" : "outline"} title={visibility.hint}>
+        <Badge
+          variant={item.visibility === "PUBLIC" ? "secondary" : "outline"}
+          title={visibility.hint}
+        >
           <VisIcon aria-hidden className="size-3" />
           {visibility.label}
         </Badge>
         {item.rsvp && (
-          <Badge variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}>
+          <Badge
+            variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}
+          >
             <Ticket aria-hidden className="size-3" />
             {RSVP_META[item.rsvp].label}
           </Badge>
@@ -175,9 +201,4 @@ export function EventPeek({
       </div>
     </div>
   );
-}
-
-function localKey(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

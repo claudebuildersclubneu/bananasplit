@@ -121,7 +121,7 @@ export default async function MembersPage({
             </p>
           </div>
           <InviteForm orgId={orgId} />
-          <PendingInvites orgId={orgId} invites={inviteRows} />
+          <PendingInvites orgId={orgId} invites={inviteRows} timeZone={organization.timezone} />
         </section>
       )}
 
@@ -132,8 +132,8 @@ export default async function MembersPage({
               Invite code
             </h2>
             <p className="text-muted-foreground text-xs">
-              Share it with your members instead of emailing each one. They enter it after setting up their profile,
-              and see {organization.name}&apos;s name before they join.
+              Share it with your members instead of emailing each one. They enter it after setting
+              up their profile, and see {organization.name}&apos;s name before they join.
             </p>
           </div>
           <JoinCodeCard

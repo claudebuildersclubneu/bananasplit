@@ -1,5 +1,6 @@
 import { NotificationType, Prisma, Role } from "@/generated/prisma/client";
 import { getUserIdentity } from "@/lib/auth/email-verification";
+import { joinCodeMissesPerIpLimit } from "@/lib/auth/ip-limits";
 import type { SessionUser } from "@/lib/auth/session";
 import {
   emailOnDomain,
@@ -7,7 +8,12 @@ import {
   normalizeDomain,
   normalizeJoinCode,
 } from "@/lib/join-code";
-import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  rateLimitKey,
+  retryAfterText,
+  type RateLimitResult,
+} from "@/lib/rate-limit";
 import { writeOrgAuditLog } from "@/server/audit";
 import { invalidate } from "@/server/cache/invalidate";
 import { tags } from "@/server/cache/tags";
@@ -48,8 +54,17 @@ const joinCodeSelect = {
   rotatedAt: true,
 } satisfies Prisma.OrgJoinCodeSelect;
 
-/** Five tries at a fresh code; a collision in 7.3e8 is rare and simply retried. */
-async function insertWithFreshCode(db: TxClient, organizationId: string, userId: string) {
+/**
+ * Inserts the org's first code. A unique violation means one of two things:
+ * another admin's request created the org's code first (two people opened
+ * Members at once), which we then use, or the random code was already
+ * taken by another org (rare in 6.6e11), which gets a fresh code. Five tries.
+ */
+async function insertWithFreshCode(
+  db: TxClient,
+  organizationId: string,
+  userId: string,
+): Promise<{ row: JoinCodeView; created: boolean }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       await db.$executeRaw`SAVEPOINT join_code`;
@@ -58,10 +73,17 @@ async function insertWithFreshCode(db: TxClient, organizationId: string, userId:
         select: joinCodeSelect,
       });
       await db.$executeRaw`RELEASE SAVEPOINT join_code`;
-      return row;
+      return { row, created: true };
     } catch (error) {
       await db.$executeRaw`ROLLBACK TO SAVEPOINT join_code`;
       if (sqlStateOf(error) !== "23505") throw error;
+      // The racing insert has committed by now (ours waited on it), so a
+      // fresh read under READ COMMITTED sees it.
+      const winner = await db.orgJoinCode.findUnique({
+        where: { organizationId },
+        select: joinCodeSelect,
+      });
+      if (winner) return { row: winner, created: false };
     }
   }
   throw new Error("could not generate a unique invite code");
@@ -81,7 +103,9 @@ export async function getOrCreateJoinCode(
     select: joinCodeSelect,
   });
   if (existing) return existing;
-  const created = await insertWithFreshCode(db, organizationId, userId);
+  const { row: created, created: isNew } = await insertWithFreshCode(db, organizationId, userId);
+  // The other admin's request already logged the code it made.
+  if (!isNew) return created;
   await writeOrgAuditLog(db, {
     organizationId,
     action: "join_code.created",
@@ -158,10 +182,79 @@ export async function updateJoinCodeSettings(
 
 // ---------------------------------------------------------------- joining
 
+/*
+ * Limits on codes that match no club (misses), not on lookups. A club often
+ * joins together in one room, on one campus network: everyone types the same
+ * code, the boxes look it up as they fill, and the join looks it up again.
+ * Counting every lookup per IP ran a room into the limit after about ten
+ * people. Guessing is all misses, so only misses count; a code that works
+ * costs nothing however often it is checked.
+ *
+ * Each lookup first asks whether one more miss would still be within both
+ * limits (wouldAllowMiss) and is refused when it would not, so a caller over
+ * the limit can't keep guessing and wait for a hit. Concurrent lookups can
+ * overshoot by the few that were in flight.
+ */
+
 /** Per user: enough for typos, far too few to guess a code. */
-const LOOKUP_LIMIT = { limit: 10, windowSec: 15 * 60 };
-/** Per client IP, across accounts: guessing can't scale by signing up more. */
-const LOOKUP_IP_LIMIT = { limit: 30, windowSec: 60 * 60 };
+const MISS_LIMIT = { limit: 10, windowSec: 15 * 60 };
+/**
+ * Per client IP, across accounts, so guessing can't scale by signing up
+ * more. Sized for a room (JOIN_CODE_MISSES_PER_IP_HOUR, ip-limits.ts).
+ */
+function ipMissLimit() {
+  return { limit: joinCodeMissesPerIpLimit(), windowSec: 60 * 60 };
+}
+
+interface MissBucket {
+  key: string;
+  limit: number;
+  windowSec: number;
+}
+
+function missBuckets(userId: string, ip: string): MissBucket[] {
+  return [
+    { key: rateLimitKey("join-code-miss", userId), ...MISS_LIMIT },
+    { key: rateLimitKey("join-code-miss-ip", ip), ...ipMissLimit() },
+  ];
+}
+
+/**
+ * Whether one more miss would fit in every bucket, without counting one:
+ * app.rate_limit_hit counts and answers in one step, so it runs inside a
+ * savepoint that is rolled back. Fails open like checkRateLimit (a database
+ * blip must not stop a whole club joining).
+ */
+async function wouldAllowMiss(buckets: MissBucket[]): Promise<RateLimitResult> {
+  try {
+    return await withSystemOrgTx(null, async ({ db }) => {
+      await db.$executeRaw`SAVEPOINT join_code_limit`;
+      let result: RateLimitResult = { allowed: true };
+      for (const bucket of buckets) {
+        const rows = await db.$queryRaw<{ allowed: boolean; retry_after_ms: bigint | number }[]>`
+          SELECT allowed, retry_after_ms
+            FROM app.rate_limit_hit(${bucket.key}, ${bucket.limit}::int, ${bucket.windowSec}::int)`;
+        if (rows[0] && !rows[0].allowed) {
+          result = { allowed: false, retryAfterMs: Math.max(0, Number(rows[0].retry_after_ms)) };
+          break;
+        }
+      }
+      await db.$executeRaw`ROLLBACK TO SAVEPOINT join_code_limit`;
+      return result;
+    });
+  } catch (error) {
+    console.error(
+      "[join-code] limiter unavailable, allowing the lookup",
+      error instanceof Error ? error.message : error,
+    );
+    return { allowed: true };
+  }
+}
+
+/** Counts one miss in every bucket (each its own autocommit statement). */
+async function countMiss(buckets: MissBucket[]): Promise<void> {
+  await Promise.all(buckets.map((b) => checkRateLimit(b.key, b.limit, b.windowSec)));
+}
 
 /** A miss says nothing about why, so a guess can't tell a dead code from none. */
 const NO_MATCH = "That code doesn't match a club. Check it with whoever sent it.";
@@ -205,6 +298,8 @@ interface LookupRow {
 /**
  * Checks a code for `user` and says which org it opens. Used both to show
  * "You're joining X" before the user commits, and again by joinWithCode.
+ * Only a miss (no club, a club being deleted, a code turned off) counts
+ * against the limits; see MISS_LIMIT.
  */
 export async function checkJoinCode(
   user: SessionUser,
@@ -229,15 +324,8 @@ export async function checkJoinCode(
     };
   }
 
-  const [byUser, byIp] = await Promise.all([
-    checkRateLimit(rateLimitKey("join-code", user.id), LOOKUP_LIMIT.limit, LOOKUP_LIMIT.windowSec),
-    checkRateLimit(
-      rateLimitKey("join-code-ip", ip),
-      LOOKUP_IP_LIMIT.limit,
-      LOOKUP_IP_LIMIT.windowSec,
-    ),
-  ]);
-  const limit = !byUser.allowed ? byUser : byIp;
+  const buckets = missBuckets(user.id, ip);
+  const limit = await wouldAllowMiss(buckets);
   if (!limit.allowed) {
     return {
       ok: false,
@@ -260,9 +348,11 @@ export async function checkJoinCode(
     return { row: found, alreadyMember: Boolean(member) };
   });
 
-  if (!row) return { ok: false, reason: "not_found", message: NO_MATCH };
-  if (row.deleted) return { ok: false, reason: "org_inactive", message: NO_MATCH };
-  if (!row.enabled) return { ok: false, reason: "disabled", message: NO_MATCH };
+  const miss = !row ? "not_found" : row.deleted ? "org_inactive" : !row.enabled ? "disabled" : null;
+  if (!row || miss) {
+    await countMiss(buckets);
+    return { ok: false, reason: miss ?? "not_found", message: NO_MATCH };
+  }
   if (row.allowedDomain && !emailOnDomain(identity.email, row.allowedDomain)) {
     return {
       ok: false,
@@ -291,6 +381,9 @@ export type JoinWithCodeResult =
  * Joins the org behind `rawCode` as a MEMBER, with the title the user picked
  * during profile setup. The code is re-read under a row lock inside the
  * join transaction, so a code rotated or turned off a moment ago is refused.
+ * The check before it costs the limits nothing when the code works, so
+ * joining doesn't spend the lookup the boxes already made; a guess sent
+ * straight to the join still counts as a miss.
  */
 export async function joinWithCode(
   user: SessionUser,

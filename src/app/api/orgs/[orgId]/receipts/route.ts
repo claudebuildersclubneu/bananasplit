@@ -11,6 +11,7 @@ import {
   RECEIPT_EXTENSIONS,
   sniffMimeType,
 } from "@/lib/finance/file-sniff";
+import { receiptLockReason } from "@/lib/finance/locks";
 import { deleteReceiptBlobs } from "@/lib/finance/receipt-storage";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { withOrgAction, withOrgTx } from "@/server/db/context";
@@ -28,11 +29,13 @@ import { isCrossSite } from "@/lib/http/cross-site";
  * Order of work (0C: no network I/O inside a transaction):
  *   1. a membership check (withOrgTx; a non-member gets 404, before the body
  *      is read), then the capped body read (readUpload);
- *   2. a read transaction: the transaction row, and whether the caller may
- *      attach to it (its submitter, or OWNER/TREASURER);
+ *   2. a read transaction: the transaction row, whether the caller may
+ *      attach to it (its submitter, or OWNER/TREASURER), and whether it
+ *      still takes receipts (receiptLockReason: not once the expense is
+ *      approved, paid back, rejected or reconciled);
  *   3. the Blob put (putBlob, kind `receipts`), outside any transaction;
- *   4. a write transaction for the Receipt row (RLS repeats the attach rule);
- *      if it fails, the blob is deleted again.
+ *   4. a write transaction for the Receipt row (RLS repeats the attach rule,
+ *      the lock is checked again); if it fails, the blob is deleted again.
  * The storage key is receipts/{orgId}/{transactionId}/{random}.{ext}: the
  * client file name is stored only in Receipt.filename, never in the key.
  */
@@ -62,14 +65,36 @@ interface ReceiptRow {
   sizeBytes: number;
 }
 
-/** Step 4: the row, as app_user (the Receipt INSERT policy re-checks the attach rule). */
-const createReceiptRow = withOrgAction(async (ctx, row: ReceiptRow) => {
-  const receipt = await ctx.db.receipt.create({
-    data: { organizationId: ctx.organizationId, uploadedById: ctx.userId, ...row },
-    select: { id: true },
-  });
-  return receipt.id;
-});
+const ATTACH_SELECT = {
+  id: true,
+  submittedById: true,
+  kind: true,
+  status: true,
+  reconciledAt: true,
+} as const;
+
+/**
+ * Step 4: the row, as app_user (the Receipt INSERT policy re-checks the
+ * attach rule). The lock is checked again in this write's own transaction:
+ * the expense may have been approved while the file was uploading.
+ */
+const createReceiptRow = withOrgAction(
+  async (ctx, row: ReceiptRow): Promise<{ receiptId: string } | { locked: string }> => {
+    const transaction = await ctx.db.transaction.findFirst({
+      where: { id: row.transactionId, organizationId: ctx.organizationId },
+      select: ATTACH_SELECT,
+    });
+    const locked = transaction
+      ? receiptLockReason(transaction, can(ctx, "finance.manage"))
+      : "Transaction not found.";
+    if (locked) return { locked };
+    const receipt = await ctx.db.receipt.create({
+      data: { organizationId: ctx.organizationId, uploadedById: ctx.userId, ...row },
+      select: { id: true },
+    });
+    return { receiptId: receipt.id };
+  },
+);
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
@@ -102,19 +127,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   const target = await withOrgTx(orgId, async (ctx) => {
     const transaction = await ctx.db.transaction.findFirst({
       where: { id: transactionId, organizationId: orgId },
-      select: { id: true, submittedById: true },
+      select: ATTACH_SELECT,
     });
     if (!transaction) return null;
+    const isFinance = can(ctx, "finance.manage");
     return {
       id: transaction.id,
-      canAttach: transaction.submittedById === ctx.userId || can(ctx, "finance.manage"),
+      canAttach: transaction.submittedById === ctx.userId || isFinance,
+      locked: receiptLockReason(transaction, isFinance),
     };
   });
   if (!target) {
     return json(404, { error: "Transaction not found." });
   }
   if (!target.canAttach) {
-    return json(403, { error: "You don't have permission to attach receipts to this transaction." });
+    return json(403, {
+      error: "You don't have permission to attach receipts to this transaction.",
+    });
+  }
+  if (target.locked) {
+    return json(409, { error: target.locked });
   }
 
   const rateLimit = await checkRateLimit(
@@ -140,17 +172,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     { contentType: mimeType },
   );
 
+  let created: Awaited<ReturnType<typeof createReceiptRow>>;
   try {
-    const receiptId = await createReceiptRow(orgId, {
+    created = await createReceiptRow(orgId, {
       transactionId: target.id,
       blobKey: stored.key,
       filename: file.filename || "receipt",
       mimeType,
       sizeBytes: bytes.length,
     });
-    return json(201, { receiptId });
   } catch (error) {
     await deleteReceiptBlobs([stored.key]);
     throw error;
   }
+  if ("locked" in created) {
+    await deleteReceiptBlobs([stored.key]);
+    return json(409, { error: created.locked });
+  }
+  return json(201, { receiptId: created.receiptId });
 }

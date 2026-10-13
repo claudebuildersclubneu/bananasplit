@@ -87,6 +87,32 @@ describe("nextExpenseStatus — a member cannot approve their own expense (spec 
   });
 });
 
+describe("nextExpenseStatus — not applicable is finance's call", () => {
+  it("refuses a member marking their own draft not applicable (it would skip approval)", () => {
+    const result = nextExpenseStatus({
+      currentStatus: TransactionStatus.DRAFT,
+      transition: "MARK_NOT_APPLICABLE",
+      actorId: submitter,
+      submitterId: submitter,
+      actorHasFinanceAccess: false,
+    });
+    expect(result).toEqual({
+      error: "Only a treasurer or owner can mark an expense not applicable.",
+    });
+  });
+
+  it("lets a treasurer mark a draft not applicable", () => {
+    const result = nextExpenseStatus({
+      currentStatus: TransactionStatus.DRAFT,
+      transition: "MARK_NOT_APPLICABLE",
+      actorId: treasurer,
+      submitterId: submitter,
+      actorHasFinanceAccess: true,
+    });
+    expect(result).toEqual({ status: TransactionStatus.NOT_APPLICABLE });
+  });
+});
+
 describe("nextExpenseStatus — legal happy path", () => {
   it("walks DRAFT -> SUBMITTED -> APPROVED -> REIMBURSED", () => {
     let status: TransactionStatus = TransactionStatus.DRAFT;

@@ -5,14 +5,14 @@ import { EventCalendar, type CalendarItem } from "@/components/calendar/event-ca
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
-import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
+import { addDaysToKey, allDaySpan, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { getCalendarTasks } from "@/server/tasks/queries";
 
-import { getEventsInRange, getViewerRsvps } from "./queries";
+import { getEventsInRange, getViewerRsvps, getViewerTimeZone } from "./queries";
 
 /**
  * The org calendar. The server reads only the visible window (the view puts
@@ -34,7 +34,7 @@ export default async function CalendarPage({
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
 
-  const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
+  const { events, rsvps, tasks, viewerZone } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
       from: range.from,
       to: range.to,
@@ -43,6 +43,7 @@ export default async function CalendarPage({
     });
     return {
       events: found,
+      viewerZone: await getViewerTimeZone(db, user.id, org.timezone),
       rsvps: await getViewerRsvps(
         db,
         org.id,
@@ -133,7 +134,8 @@ export default async function CalendarPage({
           title: m.title,
         }))}
         canManage={canManage}
-        orgTodayKey={zonedDateKey(new Date(), safeTimeZone(org.timezone))}
+        serverTimeZone={viewerZone}
+        serverTodayKey={zonedDateKey(new Date(), viewerZone)}
         window={{
           fromKey: range.fromKey,
           toKey: range.toKey,

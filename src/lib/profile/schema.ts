@@ -1,24 +1,21 @@
+import "server-only";
+
 import { z } from "zod";
 
+import { PROFILE_LIMITS } from "./limits";
 import { isLinkKind, MAX_LINKS, normalizeLinkUrl, type ProfileLink } from "./links";
 import { isValidTimeZone } from "./timezone";
 
+export { PROFILE_LIMITS };
+
 /**
  * The profile forms (Phase 2): what a user may set on their own User row.
- * Shared by the client forms and the Server Actions, which re-validate
- * everything. Limits: name 1-80, pronouns 40, major 80, bio 1000, gradYear
+ * The Server Actions validate with these and answer each field's error,
+ * which the forms show; server only, so the forms never ship zod (the
+ * limits they need are in ./limits). Limits: name 1-80, pronouns 40, major 80, bio 1000, gradYear
  * 1950-2100, up to 8 links, an IANA timezone or null (follow the org).
  * Titles are not here: they are per org and set by admins in Settings.
  */
-
-export const PROFILE_LIMITS = {
-  name: 80,
-  pronouns: 40,
-  major: 80,
-  bio: 1000,
-  gradYearMin: 1950,
-  gradYearMax: 2100,
-} as const;
 
 /** Trimmed text; empty (or missing) becomes null. */
 function optionalText(max: number, label: string) {

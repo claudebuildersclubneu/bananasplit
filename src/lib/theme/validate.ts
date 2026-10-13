@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { HEX_RE, normalizeHex } from "./hex";
-import { LOGO_DISPLAYS, ROLE_KEYS, THEME_MODES, type ThemeRoles } from "./types";
+import { HEX_RE } from "./hex";
+import { LOGO_DISPLAYS, THEME_MODES } from "./types";
 
 /** Strict hex lives in ./hex (zod-free, for client code); re-exported here. */
 export { HEX_RE, isHex, normalizeHex } from "./hex";
@@ -39,19 +39,5 @@ export const themeInputSchema = z
 
 export type ThemeInput = z.infer<typeof themeInputSchema>;
 
-/**
- * Reads a stored palette (OrgTheme.light / .dark JSON). Every role must be
- * present and strict hex; anything else returns null so the caller falls
- * back (to the default theme, or to the derived dark palette).
- */
-export function parseRoles(value: unknown): ThemeRoles | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const roles = {} as ThemeRoles;
-  for (const key of ROLE_KEYS) {
-    const hex = normalizeHex(record[key]);
-    if (!hex) return null;
-    roles[key] = hex;
-  }
-  return roles;
-}
+/** Reading a stored palette is in ./roles (zod-free, for client code); re-exported here. */
+export { parseRoles } from "./roles";

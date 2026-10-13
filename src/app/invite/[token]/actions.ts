@@ -15,6 +15,9 @@ export async function acceptInvitationAction(
   if (!invitation) {
     return { error: "This invite link is invalid." };
   }
+  if (invitation.orgDeleted) {
+    return { error: ACCEPT_ERROR_MESSAGES.org_inactive };
+  }
 
   const result = await acceptInvitation(invitation, user);
   if (!result.ok) {

@@ -1,4 +1,4 @@
-import type { SectionId } from "@/lib/nav/sidebar";
+import type { SectionId } from "@/lib/nav/sections";
 
 /**
  * The shapes workspace search hands the ⌘K palette, and the filters it

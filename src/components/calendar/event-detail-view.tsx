@@ -28,6 +28,7 @@ import type { CalendarSyncState, RSVPStatus } from "@/generated/prisma/enums";
 
 import { KindBadge, SyncBadge, VisibilityBadge } from "./event-badges";
 import { EventFormDialog, type EventFormEvent } from "./event-form-dialog";
+import { useViewerTimeZone } from "./hooks";
 import { RSVP_META } from "./kinds";
 import type { CalendarMember } from "./member-picker";
 import { formatEventTimeRange } from "./utils";
@@ -64,6 +65,7 @@ export function EventDetailView({
   orgId,
   orgSlug,
   timeZone,
+  serverTimeZone,
   event,
   members,
   currentUserId,
@@ -73,6 +75,11 @@ export function EventDetailView({
   orgId: string;
   orgSlug: string;
   timeZone: string;
+  /**
+   * The zone the server prints the time in: the viewer's profile zone, else
+   * the org's. The browser's own zone replaces it once hydrated.
+   */
+  serverTimeZone: string;
   event: EventDetail;
   members: CalendarMember[];
   currentUserId: string;
@@ -85,6 +92,7 @@ export function EventDetailView({
   const [isPending, startTransition] = useTransition();
   const [confirmEl, confirm] = useConfirm();
   const [error, setError] = useState<string | null>(null);
+  const viewerZone = useViewerTimeZone(serverTimeZone);
 
   const myAttendance = event.attendees.find((a) => a.userId === currentUserId);
   const count = (s: RSVPStatus) => event.attendees.filter((a) => a.rsvp === s).length;
@@ -131,7 +139,10 @@ export function EventDetailView({
         <div className="min-w-0 flex-1">
           <h1 className="page-title break-words">{event.title}</h1>
           <p className="mt-1.5 text-sm font-medium">
-            {formatEventTimeRange(event.startsAt, event.endsAt, event.allDay, timeZone)}
+            {formatEventTimeRange(event.startsAt, event.endsAt, event.allDay, {
+              org: timeZone,
+              viewer: viewerZone,
+            })}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <KindBadge kind={event.kind} />
@@ -224,7 +235,7 @@ export function EventDetailView({
               </Button>
             )}
             <Button variant="outline" size="sm" asChild>
-              <a href={`/api/calendar/${event.id}/ics`} download>
+              <a href={`/api/calendar/${event.id}/ics?org=${encodeURIComponent(orgId)}`} download>
                 <CalendarPlus className="size-4" />
                 Download .ics
               </a>

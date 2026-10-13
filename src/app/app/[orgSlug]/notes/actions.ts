@@ -10,6 +10,8 @@ import { revokeNoteSessions } from "@/server/collab/revoke";
 import { mintNoteCollabSession, type NoteCollabSession } from "@/server/collab/session";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+import { NOTE_JSON_MAX_CHARS, NOTE_TEXT_MAX_CHARS, NOTE_TOO_BIG } from "./limits";
+
 /**
  * Note actions (0C). Each runs in one withOrgAction transaction as app_user,
  * so RLS repeats the rules checked here: PRIVATE notes are visible only to
@@ -40,8 +42,8 @@ const noteUpdateSchema = z.object({
   // object as a Server Action argument intermittently fails ("temporary
   // client reference") for large/deeply nested payloads, so the client
   // stringifies it and this parses it back after validation.
-  contentJson: z.string().max(2_000_000),
-  contentText: z.string().max(200_000),
+  contentJson: z.string().max(NOTE_JSON_MAX_CHARS, NOTE_TOO_BIG),
+  contentText: z.string().max(NOTE_TEXT_MAX_CHARS, NOTE_TOO_BIG),
   visibility: z.enum(NOTE_VISIBILITY_VALUES),
   eventId: z.string().nullable(),
 });
@@ -107,8 +109,8 @@ export const createNote = withOrgAction(
 
 const importSchema = z.object({
   title: titleSchema,
-  contentJson: z.string().max(2_000_000),
-  contentText: z.string().max(200_000),
+  contentJson: z.string().max(NOTE_JSON_MAX_CHARS, NOTE_TOO_BIG),
+  contentText: z.string().max(NOTE_TEXT_MAX_CHARS, NOTE_TOO_BIG),
   folderId: z.string().max(64).nullable().optional(),
   visibility: z.enum(NOTE_VISIBILITY_VALUES).optional(),
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
 import { Maximize2, Plus, SquareCheck, Trash2, UserMinus, UserPlus, X } from "lucide-react";
 import Link from "next/link";
@@ -89,6 +90,7 @@ export function TaskEditor({
   onDone,
   onDeleted,
   onOpenTask,
+  onChanged,
   mode = "dialog",
   initialComments,
 }: {
@@ -98,6 +100,12 @@ export function TaskEditor({
   /** After a delete (defaults to onDone). */
   onDeleted?: () => void;
   onOpenTask?: (taskId: string) => void;
+  /**
+   * After a change saved from inside the editor without closing it (a
+   * subtask, joining, taking ownership, a flag acknowledged). The side panel
+   * reloads the task here; the task's page re-renders from refresh() instead.
+   */
+  onChanged?: () => Promise<void>;
   /** "dialog": the side panel (its own header, scrolling body, footer). "page": a task's page. */
   mode?: "dialog" | "page";
   initialComments?: React.ComponentProps<typeof TaskComments>["initial"];
@@ -296,6 +304,7 @@ export function TaskEditor({
       if (action === "join") setAssigneeIds((ids) => [...ids, viewer.userId]);
       if (action === "leave") setAssigneeIds((ids) => ids.filter((id) => id !== viewer.userId));
       if (action === "claim") setOwnerId(viewer.userId);
+      await onChanged?.();
     });
   }
 
@@ -303,7 +312,11 @@ export function TaskEditor({
     if (!task) return;
     startTransition(async () => {
       const result = await acknowledgeTaskFlag(org.id, task.id, userId);
-      if (result.error) announce(result.error);
+      if (result.error) {
+        announce(result.error);
+        return;
+      }
+      await onChanged?.();
     });
   }
 
@@ -580,7 +593,9 @@ export function TaskEditor({
           Created by
           <UserAvatar user={task.createdBy} size="xs" />
           <span className="text-foreground">{task.createdBy.name ?? "a former member"}</span>
-          on {format(new Date(task.createdAt), "MMM d, yyyy")}
+          {/* In the viewer's zone, as the server renders it too: the browser's
+              own zone could name a different day and fail hydration. */}
+          on {format(new TZDate(new Date(task.createdAt), org.timezone), "MMM d, yyyy")}
         </p>
       )}
     </div>
@@ -675,6 +690,7 @@ export function TaskEditor({
           subtasks={task.subtasks}
           canAdd={canEdit}
           onOpen={onOpenTask}
+          onChanged={onChanged}
         />
       )}
       <section className="space-y-2 border-t pt-5">

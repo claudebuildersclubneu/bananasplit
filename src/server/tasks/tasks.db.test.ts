@@ -22,6 +22,7 @@ process.env.EMAIL_DELIVERY = "sink";
 import { NotificationType, TaskStatus, TaskVisibility } from "@/generated/prisma/client";
 import { addDaysToKey, localDateKey, zonedInstant } from "@/lib/tasks/dates";
 import { mentionToken } from "@/lib/tasks/mentions";
+import { compareBoardOrder } from "@/lib/tasks/rank";
 
 import { authDb, disconnectAll } from "../db/clients";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
@@ -407,6 +408,122 @@ describe.skipIf(!seeded)("tasks against the local database (seeded CBC)", () => 
         data: { emailPreferences: original?.emailPreferences ?? {} },
       });
     }
+  });
+
+  // ---- Board ranks -----------------------------------------------------------
+
+  /** A column as the board shows it: byte-order rank, then id. */
+  const boardColumn = (status: TaskStatus) =>
+    withOrgAction(async ({ db }) =>
+      (
+        await db.task.findMany({
+          where: { status, parentTaskId: null, deletedAt: null },
+          select: { id: true, rank: true, status: true },
+        })
+      ).sort(compareBoardOrder),
+    )(s.cbcId);
+
+  it("a task that changes column outside the board gets a fresh rank at the bottom of its new column", async () => {
+    as(p.oliver);
+    const a = await create({ title: "Rank test: a", ownerId: p.oliver.id, dueDate: due(20) });
+    const b = await create({ title: "Rank test: b", ownerId: p.oliver.id, dueDate: due(20) });
+    const c = await create({
+      title: "Rank test: c",
+      ownerId: p.oliver.id,
+      dueDate: due(20),
+      status: TaskStatus.IN_PROGRESS,
+    });
+
+    // The quick status path (also the dialog's and the checkbox's) ...
+    expect(
+      (await act(svc.setTaskStatus)(s.cbcId, a, TaskStatus.IN_PROGRESS)).error,
+    ).toBeUndefined();
+    let column = (await boardColumn(TaskStatus.IN_PROGRESS)).map((t) => t.id);
+    expect(column.at(-1)).toBe(a);
+    expect(column.indexOf(a)).toBeGreaterThan(column.indexOf(c));
+
+    // ... and bulk status, which gives each task its own key.
+    await act(svc.bulkUpdateStatus)(s.cbcId, [a, b], TaskStatus.COMPLETED);
+    const done = await boardColumn(TaskStatus.COMPLETED);
+    column = done.map((t) => t.id);
+    expect(column.slice(-2).sort()).toEqual([a, b].sort());
+    expect(new Set(done.map((t) => t.rank)).size).toBe(done.length);
+  });
+
+  it("a drag between two cards that share a rank lands between them, not at the bottom", async () => {
+    as(p.oliver);
+    const x = await create({ title: "Rank test: x", ownerId: p.oliver.id, dueDate: due(21) });
+    const y = await create({ title: "Rank test: y", ownerId: p.oliver.id, dueDate: due(21) });
+    const z = await create({ title: "Rank test: z", ownerId: p.oliver.id, dueDate: due(21) });
+    const moved = await create({
+      title: "Rank test: moved",
+      ownerId: p.oliver.id,
+      dueDate: due(21),
+      status: TaskStatus.IN_PROGRESS,
+    });
+    // Two cards with the same rank, as rows written before ranks were
+    // renewed on a status change still have.
+    const xRank = await read(({ db }) =>
+      db.task.findUniqueOrThrow({ where: { id: x }, select: { rank: true } }),
+    );
+    await read(({ db }) =>
+      db.task.updateMany({ where: { id: { in: [y, z] } }, data: { rank: xRank.rank } }),
+    );
+
+    // Drop between the first two of them, in the order the board shows.
+    const before = (await boardColumn(TaskStatus.NOT_STARTED)).map((t) => t.id);
+    const [first, second] = before.filter((id) => [x, y, z].includes(id));
+    const result = await act(svc.reorderTask)(s.cbcId, {
+      taskId: moved,
+      status: TaskStatus.NOT_STARTED,
+      beforeId: first!,
+      afterId: second!,
+    });
+    expect(result.error).toBeUndefined();
+
+    const after = await boardColumn(TaskStatus.NOT_STARTED);
+    const ids = after.map((t) => t.id);
+    expect(ids.indexOf(moved)).toBe(ids.indexOf(first!) + 1);
+    expect(ids.indexOf(second!)).toBe(ids.indexOf(moved) + 1);
+    // Everything else kept its order, and the column no longer shares ranks.
+    expect(ids.filter((id) => id !== moved)).toEqual(before);
+    expect(new Set(after.map((t) => t.rank)).size).toBe(after.length);
+  });
+
+  // ---- Delete and undo ---------------------------------------------------------
+
+  it("undoing a delete brings back only the subtasks deleted with it", async () => {
+    as(p.oliver);
+    const parent = await create({
+      title: "Undo test: parent",
+      ownerId: p.oliver.id,
+      dueDate: due(22),
+    });
+    const gone = await create({ title: "Undo test: deleted first", parentTaskId: parent });
+    const kept = await create({ title: "Undo test: deleted with it", parentTaskId: parent });
+    const liveIds = () =>
+      read(async ({ db }) =>
+        (
+          await db.task.findMany({
+            where: { id: { in: [parent, gone, kept] }, deletedAt: null },
+            select: { id: true },
+          })
+        )
+          .map((t) => t.id)
+          .sort(),
+      );
+
+    await act(svc.deleteTask)(s.cbcId, gone);
+    await act(svc.deleteTask)(s.cbcId, parent);
+    expect(await liveIds()).toEqual([]);
+    await act(svc.restoreTask)(s.cbcId, parent);
+    expect(await liveIds()).toEqual([parent, kept].sort());
+
+    // The table's bulk delete and its per-task undo follow the same rule.
+    await act(svc.bulkDelete)(s.cbcId, [parent]);
+    expect(await liveIds()).toEqual([]);
+    await act(svc.restoreTask)(s.cbcId, parent);
+    expect(await liveIds()).toEqual([parent, kept].sort());
   });
 
   // ---- C4: task visibility -------------------------------------------------

@@ -37,15 +37,6 @@ export function visibleTaskWhere(userId: string, isAdmin: boolean): Prisma.TaskW
   };
 }
 
-/** OWNER/ADMIN of the org: the standing audience of every private task. */
-export async function orgAdminIds(db: TxClient, organizationId: string): Promise<string[]> {
-  const rows = await db.membership.findMany({
-    where: { organizationId, role: { in: [Role.OWNER, Role.ADMIN] } },
-    select: { userId: true },
-  });
-  return rows.map((r) => r.userId);
-}
-
 export async function isOrgAdmin(
   db: TxClient,
   organizationId: string,

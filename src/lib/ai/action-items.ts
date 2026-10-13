@@ -1,13 +1,16 @@
-import { z } from "zod";
-
 import { isDateKey } from "@/lib/tasks/dates";
+
+import type { ActionItemsOutputData } from "./action-items.schema";
+
+export type { ActionItemsOutputData } from "./action-items.schema";
 
 /**
  * Action items into tasks and events (the AI import on Tasks and in Notes).
  * A model reads a pasted list or a note and answers in ActionItemsOutput;
  * normalizeActionItems() turns that into rows a person reviews and edits
  * before anything is created. Pure and client-safe: the review dialog uses
- * the same types.
+ * the same types. The zod schema the model call needs is in
+ * ./action-items.schema (server only), so the dialog never ships zod.
  *
  * The model never sees user ids or emails: members are listed under opaque
  * keys (m1, m2…) with their name and title, and only keys come back. Any
@@ -17,30 +20,8 @@ import { isDateKey } from "@/lib/tasks/dates";
 export const MAX_ACTION_TEXT = 20_000;
 export const MAX_ACTION_ITEMS = 100;
 
-const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+export const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 export type ImportPriority = (typeof PRIORITIES)[number];
-
-/** What the model must answer: every field present, null when unknown. */
-export const ActionItemsOutput = z.object({
-  items: z.array(
-    z.object({
-      kind: z.enum(["task", "event"]),
-      title: z.string(),
-      description: z.string().nullable(),
-      owner: z.string().nullable(),
-      helpers: z.array(z.string()),
-      dueDate: z.string().nullable(),
-      priority: z.enum(PRIORITIES),
-      startsAt: z.string().nullable(),
-      endsAt: z.string().nullable(),
-      allDay: z.boolean(),
-      location: z.string().nullable(),
-      sourceText: z.string(),
-    }),
-  ),
-  notes: z.array(z.string()),
-});
-export type ActionItemsOutputData = z.infer<typeof ActionItemsOutput>;
 
 /** One row of the review: a task, or an event when the text names a time. */
 export interface ProposedItem {

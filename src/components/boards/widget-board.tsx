@@ -142,6 +142,16 @@ export function WidgetBoard({
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState(initialLayout);
+  // The page hands back the layout as saved after each save's refresh, and
+  // the default one after Reset, which only the server can work out (until
+  // then Reset shows the layout the page was loaded with). Take it whenever
+  // it changes, or Reset would leave the old widgets on screen.
+  const savedKey = JSON.stringify(initialLayout);
+  const [shownKey, setShownKey] = useState(savedKey);
+  if (shownKey !== savedKey) {
+    setShownKey(savedKey);
+    setLayout(initialLayout);
+  }
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
@@ -201,7 +211,15 @@ export function WidgetBoard({
     setEditing(true);
   };
 
-  const body = (type: string) => (bodies ? bodies[type] : renderBody?.(type)) ?? null;
+  // A page may render only the widgets on the saved board (the Overview
+  // does, to skip reading data nobody sees), so a widget just added in
+  // Customize has no body until Done saves it and the page comes back.
+  const body = (type: string) =>
+    (bodies ? bodies[type] : renderBody?.(type)) ?? (
+      <p className="text-muted-foreground text-sm">
+        {editing ? "This fills in when you press Done." : "Loading…"}
+      </p>
+    );
 
   return (
     <div className="space-y-4">

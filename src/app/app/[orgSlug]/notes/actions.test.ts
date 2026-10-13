@@ -34,8 +34,16 @@ vi.mock("@/server/db/context", () => ({
 }));
 
 const { Role, NoteVisibility } = await import("@/generated/prisma/enums");
-const { createNote, updateNote, deleteNote, restoreNote, updateNoteDetails, issueNoteCollabToken } =
-  await import("./actions");
+const {
+  createNote,
+  importNote,
+  updateNote,
+  deleteNote,
+  restoreNote,
+  updateNoteDetails,
+  issueNoteCollabToken,
+} = await import("./actions");
+const { NOTE_JSON_MAX_CHARS, NOTE_TOO_BIG } = await import("./limits");
 const { verifyCollabToken } = await import("@/lib/collab/token");
 const { noteStateToContent, seedNoteState } = await import("@/lib/collab/note-doc");
 
@@ -493,6 +501,25 @@ describe("updateNoteDetails — the live editor's save for title, visibility and
     });
     await updateNoteDetails("org_1", "note_1", { visibility: NoteVisibility.PRIVATE });
     expect(state.afterCommit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("note size limits", () => {
+  it("refuses an oversized body with a message the member can act on, and writes nothing", async () => {
+    db.note.findFirst.mockResolvedValue({
+      id: "note_1",
+      authorId: MEMBER_ID,
+      visibility: NoteVisibility.ORGANIZATION,
+    });
+    const big = "x".repeat(NOTE_JSON_MAX_CHARS + 1);
+
+    const updated = await updateNote("org_1", "note_1", { ...validInput, contentJson: big }, 1);
+    const imported = await importNote("org_1", { title: "Big", contentJson: big, contentText: "" });
+
+    expect(updated.error).toBe(NOTE_TOO_BIG);
+    expect(imported.error).toBe(NOTE_TOO_BIG);
+    expect(db.note.updateMany).not.toHaveBeenCalled();
+    expect(db.note.create).not.toHaveBeenCalled();
   });
 });
 

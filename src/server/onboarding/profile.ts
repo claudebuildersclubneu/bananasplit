@@ -1,7 +1,8 @@
 import { Prisma } from "@/generated/prisma/client";
-import { busyCells, parseAvailability, type Availability } from "@/lib/availability";
+import { busyCells, type Availability } from "@/lib/availability";
+import { parseAvailability } from "@/lib/availability/schema";
 import { parseStoredLinks, type ProfileLink } from "@/lib/profile/links";
-import { parsePersonalTheme, type PersonalTheme } from "@/lib/theme/personal";
+import { parsePersonalTheme, type PersonalTheme } from "@/lib/theme/personal.schema";
 import { withUserTx } from "@/server/db/context";
 
 /**

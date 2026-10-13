@@ -38,15 +38,11 @@ const EDITORS: readonly Avatar[] = [
   { tone: "bg-ink text-cream", initial: "J" },
 ];
 
-const DATA_SOURCES = [
-  "Google Sheets",
-  "Airtable",
-  "Notion",
-  "Excel",
-  "Supabase",
-  "Postgres",
-  "CSV import",
-] as const;
+/**
+ * What a database can be fed from today: a live sync from a Supabase
+ * database (the only connector; other Postgres hosts are refused), or a CSV.
+ */
+const DATA_SOURCES = ["Supabase", "CSV import", "Google Sheets via CSV", "Excel via CSV"] as const;
 
 /** The club theme picker: the first swatch is the one chosen. */
 const THEME_SWATCHES = ["bg-banana", "bg-pine", "bg-brick", "bg-navy", "bg-ink"] as const;
@@ -198,7 +194,7 @@ function TasksTile() {
       <TileTitle tone="banana" replaces="Trello">
         Tasks
       </TileTitle>
-      <div className="relative mt-auto flex items-end gap-3.5">
+      <h3 className="relative mt-auto flex items-end gap-3.5">
         <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
           5
         </span>
@@ -207,7 +203,7 @@ function TasksTile() {
           <br />
           the same work
         </span>
-      </div>
+      </h3>
       <p className="text-bark relative mt-2.5 text-[15px] leading-[1.5]">
         Assign it once and nothing slips between meetings.
       </p>
@@ -229,11 +225,12 @@ function CalendarTile() {
   return (
     <div className={cn(PAPER_TILE, "flex flex-[1_0_auto] flex-col gap-2.5 p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
-      <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
+      <h3 className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
         Find a time, then put it on everyone&apos;s calendar.
-      </div>
+      </h3>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
-        Availability polls pick the time, and every meeting syncs both ways with Google Calendar.
+        Availability polls pick the time, and every meeting shows up in your club&apos;s Google
+        Calendar.
       </p>
     </div>
   );
@@ -319,9 +316,9 @@ function NotesTile() {
         overlap="-ml-2.5"
         className="mt-2"
       />
-      <div className="font-heading mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
+      <h3 className="font-heading mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
         Edit together, live.
-      </div>
+      </h3>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
         Meeting notes, templates, files and club storage that stay put when officers graduate.
       </p>
@@ -349,7 +346,8 @@ function DatabasesTile() {
         ))}
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55]">
-        Connect a source once and every member sees the same live list.
+        Connect your Supabase database once and every member sees the same live list, or import a
+        CSV from Sheets or Excel.
       </p>
     </div>
   );
@@ -422,9 +420,9 @@ function PeopleTile() {
           ))}
         </div>
       </div>
-      <div className="font-heading mt-auto text-[clamp(34px,3.4vw,46px)] leading-[1.02] tracking-[-0.03em]">
+      <h3 className="font-heading mt-auto text-[clamp(34px,3.4vw,46px)] leading-[1.02] tracking-[-0.03em]">
         Hand over in one click.
-      </div>
+      </h3>
       <p className="text-bark-soft text-[15px] leading-[1.55] text-pretty">
         Roles, profiles and saved org chart versions, so next year’s board starts with everything.
       </p>

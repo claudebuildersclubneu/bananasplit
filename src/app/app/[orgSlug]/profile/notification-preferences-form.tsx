@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import type { NotificationType } from "@/generated/prisma/enums";
 import {
-  applyNotificationPreferencesPatch,
+  mergeNotificationPreferencesPatch,
   NOTIFICATION_GROUP_LABELS,
   NOTIFICATION_TYPE_META,
   REMINDER_LEAD_DAYS_MAX,
@@ -73,7 +73,7 @@ export function NotificationPreferencesForm({
 
   async function save(patch: NotificationPreferencesPatch) {
     setError(null);
-    setPrefs((current) => applyNotificationPreferencesPatch(current, patch));
+    setPrefs((current) => mergeNotificationPreferencesPatch(current, patch));
     inFlight.current += 1;
     setSaving(inFlight.current);
     try {

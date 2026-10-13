@@ -28,6 +28,7 @@ export function FinanceActions({
   orgSlug,
   isFinance,
   currentUserId,
+  timeZone,
   periods,
   categories,
 }: {
@@ -35,6 +36,8 @@ export function FinanceActions({
   orgSlug: string;
   isFinance: boolean;
   currentUserId: string;
+  /** The org's timezone, for a new entry's date. */
+  timeZone?: string;
   periods: { id: string; label: string }[];
   categories: { id: string; name: string; budgetPeriodId: string }[];
 }) {
@@ -83,6 +86,7 @@ export function FinanceActions({
         isFinance={isFinance}
         request={open === "request"}
         currentUserId={currentUserId}
+        timeZone={timeZone}
       />
     </>
   );

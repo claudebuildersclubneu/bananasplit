@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { BrandField, BrandInput, FormMessage, PrimaryButton } from "@/components/brand/fields";
+import { signUpPath } from "@/lib/auth/callback-url";
 
 import { passwordSignInAction } from "./actions";
 
@@ -51,7 +52,8 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
       </PrimaryButton>
       <p className="text-ink-muted m-0 text-center text-[14px]">
         New to Bananasplit?{" "}
-        <Link href="/sign-up" className="font-bold">
+        {/* Someone sent here from a club's join link comes back to it after signing up. */}
+        <Link href={signUpPath(callbackUrl)} className="font-bold">
           Create an account
         </Link>
       </p>

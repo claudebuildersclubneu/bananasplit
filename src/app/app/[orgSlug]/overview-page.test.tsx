@@ -15,14 +15,13 @@ const mocks = vi.hoisted(() => ({
   getMyOpenTasks: vi.fn(),
   getUpcomingEvents: vi.fn(),
   getViewerRsvps: vi.fn(),
-  listPins: vi.fn(),
+  listNoteFiles: vi.fn(),
   listRecent: vi.fn(),
   loadSetupState: vi.fn(),
   loadSavedBoard: vi.fn(),
 }));
 
 const db = {
-  user: { findUnique: vi.fn() },
   task: { count: vi.fn() },
   event: { count: vi.fn() },
   availabilityPoll: { findMany: vi.fn() },
@@ -45,9 +44,9 @@ vi.mock("@/app/app/[orgSlug]/calendar/queries", () => ({
   getUpcomingEvents: mocks.getUpcomingEvents,
   getViewerRsvps: mocks.getViewerRsvps,
 }));
-vi.mock("@/server/pins", () => ({ listPins: mocks.listPins, listRecent: mocks.listRecent }));
+vi.mock("@/server/pins", () => ({ listRecent: mocks.listRecent }));
 vi.mock("@/app/app/[orgSlug]/notes/queries", () => ({ getRecentNotes: vi.fn().mockResolvedValue([]) }));
-vi.mock("@/server/notes/files", () => ({ listNoteFiles: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/server/notes/files", () => ({ listNoteFiles: mocks.listNoteFiles }));
 vi.mock("@/server/boards", () => ({ loadSavedBoard: mocks.loadSavedBoard }));
 vi.mock("@/app/app/[orgSlug]/_shell/board-actions", () => ({ saveBoardAction: vi.fn() }));
 vi.mock("@/app/app/[orgSlug]/_shell/pin-actions", () => ({
@@ -70,6 +69,20 @@ const org = {
   slug: "cbc",
   timezone: "America/New_York",
 };
+/**
+ * What getOrgContextBySlug hands the page: the viewer's own row (their
+ * timezone and name) and pins come with it, read in the layout's transaction.
+ */
+function context(role: string, pins: unknown[] = []) {
+  return {
+    user: viewer,
+    organization: org,
+    role,
+    viewer: { timezone: "America/Los_Angeles", name: "Viewer" },
+    pins,
+  };
+}
+
 const props = {
   params: Promise.resolve({ orgSlug: "cbc" }),
   searchParams: Promise.resolve({}),
@@ -85,14 +98,13 @@ async function render() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"], now: NOW });
-  mocks.getOrgContextBySlug.mockResolvedValue({ user: viewer, organization: org, role: "MEMBER" });
-  db.user.findUnique.mockResolvedValue({ timezone: "America/Los_Angeles", name: "Viewer" });
+  mocks.getOrgContextBySlug.mockResolvedValue(context("MEMBER"));
   db.task.count.mockResolvedValue(0);
   db.event.count.mockResolvedValue(0);
   mocks.getMyOpenTasks.mockResolvedValue({ tasks: [], total: 0, overdue: 0 });
   mocks.getUpcomingEvents.mockResolvedValue([]);
   mocks.getViewerRsvps.mockResolvedValue(new Map());
-  mocks.listPins.mockResolvedValue([]);
+  mocks.listNoteFiles.mockResolvedValue([]);
   mocks.listRecent.mockResolvedValue([]);
   mocks.loadSavedBoard.mockResolvedValue(null);
   db.availabilityPoll.findMany.mockResolvedValue([]);
@@ -107,7 +119,7 @@ afterEach(() => {
 
 describe("org overview", () => {
   it("shows no one the club's money, not even a treasurer", async () => {
-    mocks.getOrgContextBySlug.mockResolvedValue({ user: viewer, organization: org, role: "TREASURER" });
+    mocks.getOrgContextBySlug.mockResolvedValue(context("TREASURER"));
     const html = await render();
     expect(html).not.toContain("Money owed to you");
     expect(html).not.toContain("Club balance");
@@ -202,9 +214,11 @@ describe("org overview", () => {
   });
 
   it("lists the viewer's pins and the pages they opened recently", async () => {
-    mocks.listPins.mockResolvedValue([
-      { id: "pin_1", href: "/app/cbc/notes/n_1", label: "E-board minutes", kind: "note" },
-    ]);
+    mocks.getOrgContextBySlug.mockResolvedValue(
+      context("MEMBER", [
+        { id: "pin_1", href: "/app/cbc/notes/n_1", label: "E-board minutes", kind: "note" },
+      ]),
+    );
     mocks.listRecent.mockResolvedValue([
       {
         href: "/app/cbc/databases/sessions",
@@ -215,12 +229,17 @@ describe("org overview", () => {
     ]);
 
     const html = await render();
-    expect(mocks.listPins).toHaveBeenCalledWith(db, "org_cbc", "cbc", "u_viewer");
     expect(mocks.listRecent).toHaveBeenCalledWith(db, "org_cbc", "cbc", "u_viewer", 8);
     expect(html).toContain('href="/app/cbc/notes/n_1"');
     expect(html).toContain("E-board minutes");
     expect(html).toContain('href="/app/cbc/databases/sessions"');
     expect(html).toContain("2 hours ago");
+  });
+
+  it("asks the database for only the six files the widget shows", async () => {
+    mocks.loadSavedBoard.mockResolvedValue([{ id: "files", type: "files", w: 1, h: null }]);
+    await render();
+    expect(mocks.listNoteFiles).toHaveBeenCalledWith(db, "org_cbc", { take: 6 });
   });
 
   it("lists open polls of both kinds, newest first", async () => {

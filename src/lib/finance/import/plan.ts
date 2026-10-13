@@ -1,4 +1,9 @@
-import { calendarYear, schoolYear, semester, type PeriodDraft } from "@/lib/finance/periods";
+import {
+  calendarYear,
+  schoolYearContaining,
+  semester,
+  type PeriodDraft,
+} from "@/lib/finance/periods";
 
 /**
  * Which budget period each imported row lands in. Shared by the review (to
@@ -23,10 +28,16 @@ export type PeriodStyle = "school-year" | "semester" | "calendar-year";
 const DAY_MS = 86_400_000;
 
 /** The period covering `date`: the active one if it does, else the latest-starting one. */
-export function coveringPeriod<P extends PeriodLike>(periods: readonly P[], date: string): P | null {
+export function coveringPeriod<P extends PeriodLike>(
+  periods: readonly P[],
+  date: string,
+): P | null {
   const covering = periods.filter((p) => p.startsOn <= date && date <= p.endsOn);
   if (covering.length === 0) return null;
-  return covering.find((p) => p.isActive) ?? covering.sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0];
+  return (
+    covering.find((p) => p.isActive) ??
+    covering.sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0]
+  );
 }
 
 /** How the club splits its money: by semester when its periods are short, by calendar year when they run Jan–Dec. */
@@ -34,16 +45,17 @@ export function periodStyle(periods: readonly PeriodLike[]): PeriodStyle {
   if (periods.length === 0) return "school-year";
   const days = (p: PeriodLike) => (Date.parse(p.endsOn) - Date.parse(p.startsOn)) / DAY_MS;
   if (periods.filter((p) => days(p) < 200).length > periods.length / 2) return "semester";
-  if (periods.some((p) => p.startsOn.endsWith("-01-01") && p.endsOn.endsWith("-12-31"))) return "calendar-year";
+  if (periods.some((p) => p.startsOn.endsWith("-01-01") && p.endsOn.endsWith("-12-31")))
+    return "calendar-year";
   return "school-year";
 }
 
-/** The new period a date outside every period would go into. */
+/** The new period a date outside every period would go into (always one that covers the date). */
 export function draftPeriodFor(date: string, style: PeriodStyle): PeriodDraft {
   const at = new Date(`${date}T12:00:00`);
   if (style === "semester") return semester(at);
   if (style === "calendar-year") return calendarYear(at);
-  return schoolYear(at);
+  return schoolYearContaining(at);
 }
 
 export type PeriodTarget = { existing: string } | { draft: PeriodDraft };
@@ -68,11 +80,17 @@ export function planPeriods(
       continue;
     }
     const draft = fitDraft(draftPeriodFor(date, style), periods, date);
+    // No room for a period around this date: the row gets no target, and
+    // the import skips it ("No budget period covers ...").
+    if (!draft) continue;
     const key = `${draft.startsOn}|${draft.endsOn}`;
     let shared = drafts.get(key);
     if (!shared) {
       // Two pieces of one school year around an existing period get distinct names.
-      const taken = new Set([...periods.map((p) => p.label), ...[...drafts.values()].map((d) => d.label)]);
+      const taken = new Set([
+        ...periods.map((p) => p.label),
+        ...[...drafts.values()].map((d) => d.label),
+      ]);
       let label = draft.label;
       for (let n = 2; taken.has(label); n++) label = `${draft.label} (${n})`;
       shared = { ...draft, label };
@@ -87,13 +105,24 @@ function shiftDay(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** Trims a draft so it doesn't overlap any existing period (it still covers `date`). */
-function fitDraft(draft: PeriodDraft, periods: readonly PeriodLike[], date: string): PeriodDraft {
+/**
+ * Trims a draft so it doesn't overlap any existing period (it still covers
+ * `date`). Null when nothing is left, or the draft never covered the date:
+ * a period that ends before it starts must never be created.
+ */
+function fitDraft(
+  draft: PeriodDraft,
+  periods: readonly PeriodLike[],
+  date: string,
+): PeriodDraft | null {
   let { startsOn, endsOn } = draft;
   for (const p of periods) {
     if (p.endsOn < startsOn || p.startsOn > endsOn) continue;
-    if (p.endsOn < date) startsOn = shiftDay(p.endsOn, 1) > startsOn ? shiftDay(p.endsOn, 1) : startsOn;
-    else if (p.startsOn > date) endsOn = shiftDay(p.startsOn, -1) < endsOn ? shiftDay(p.startsOn, -1) : endsOn;
+    if (p.endsOn < date)
+      startsOn = shiftDay(p.endsOn, 1) > startsOn ? shiftDay(p.endsOn, 1) : startsOn;
+    else if (p.startsOn > date)
+      endsOn = shiftDay(p.startsOn, -1) < endsOn ? shiftDay(p.startsOn, -1) : endsOn;
   }
+  if (startsOn > endsOn || date < startsOn || date > endsOn) return null;
   return { ...draft, startsOn, endsOn };
 }

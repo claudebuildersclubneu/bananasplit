@@ -85,7 +85,11 @@ export function parseDateKey(key: string): { year: number; month: number; day: n
   if (!m) return null;
   const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const check = new Date(Date.UTC(year, month - 1, day));
-  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
     return null;
   }
   return { year, month, day };
@@ -110,24 +114,22 @@ function offsetAt(instant: number, timeZone: string): number {
  * The instant of a wall-clock time in `timeZone`. A time skipped by a DST
  * gap resolves forward; an ambiguous one resolves to the earlier instant.
  */
-export function zonedTimeToInstant(
-  key: string,
-  timeZone: string,
-  hour = 0,
-  minute = 0,
-): Date {
+export function zonedTimeToInstant(key: string, timeZone: string, hour = 0, minute = 0): Date {
   const p = parseDateKey(key);
   if (!p) throw new RangeError(`not a date key: ${key}`);
   const wall = Date.UTC(p.year, p.month - 1, p.day, hour, minute);
   // The offsets in force half a day either side cover any transition that
   // day. A candidate is right when it reads back as the same wall time.
   const HALF_DAY = 12 * 60 * 60 * 1000;
-  const candidates = [...new Set([wall - offsetAt(wall - HALF_DAY, timeZone), wall - offsetAt(wall + HALF_DAY, timeZone)])];
+  const candidates = [
+    ...new Set([
+      wall - offsetAt(wall - HALF_DAY, timeZone),
+      wall - offsetAt(wall + HALF_DAY, timeZone),
+    ]),
+  ];
   const matches = candidates.filter((t) => {
     const back = zonedParts(new Date(t), timeZone);
-    return (
-      Date.UTC(back.year, back.month - 1, back.day, back.hour, back.minute) === wall
-    );
+    return Date.UTC(back.year, back.month - 1, back.day, back.hour, back.minute) === wall;
   });
   if (matches.length > 0) return new Date(Math.min(...matches));
   // In a DST gap: the later candidate is the wall time moved forward.
@@ -155,7 +157,10 @@ export interface AllDaySpan {
  */
 export function allDaySpan(startsAt: Date, endsAt: Date, timeZone: string): AllDaySpan {
   const start = zonedDateKey(startsAt, timeZone);
-  let lastDay = endsAt.getTime() > startsAt.getTime() ? zonedDateKey(new Date(endsAt.getTime() - 1), timeZone) : start;
+  let lastDay =
+    endsAt.getTime() > startsAt.getTime()
+      ? zonedDateKey(new Date(endsAt.getTime() - 1), timeZone)
+      : start;
   if (lastDay < start) lastDay = start;
   return { start, lastDay, endExclusive: addDaysToKey(lastDay, 1) };
 }
@@ -191,4 +196,18 @@ export function parseZonedDateTimeLocal(value: string, timeZone: string): Date |
   const minute = Number(m[3]);
   if (hour > 23 || minute > 59) return null;
   return zonedTimeToInstant(m[1], timeZone, hour, minute);
+}
+
+/**
+ * The same wall-clock time `days` days later in `timeZone`. Dragging a 6pm
+ * event across a DST change keeps it at 6pm instead of drifting an hour.
+ */
+export function shiftZonedDays(date: Date, days: number, timeZone: string): Date {
+  const wall = zonedDateTimeLocal(date, timeZone);
+  const moved = parseZonedDateTimeLocal(
+    `${addDaysToKey(wall.slice(0, 10), days)}${wall.slice(10)}`,
+    timeZone,
+  );
+  // The wall-clock string stops at minutes; carry the seconds over unchanged.
+  return moved ? new Date(moved.getTime() + (date.getTime() % 60_000)) : date;
 }

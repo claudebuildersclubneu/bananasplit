@@ -4,10 +4,10 @@ import {
   blockedHoursPerWeek,
   busyCells,
   describeRule,
-  parseAvailability,
   toggleBlock,
   weeklyCells,
 } from "@/lib/availability";
+import { parseAvailability } from "@/lib/availability/schema";
 import { visibleFinanceCards } from "@/lib/finance/dashboard-cards";
 import {
   emailOnDomain,
@@ -16,23 +16,18 @@ import {
   normalizeDomain,
   normalizeJoinCode,
 } from "@/lib/join-code";
+import { describeMeeting, fiscalYearFor, MAX_SETUP_LABELS } from "@/lib/onboarding/org";
+import { taskLabelsInputSchema, teamsInputSchema } from "@/lib/onboarding/org.schema";
 import {
-  describeMeeting,
-  fiscalYearFor,
-  MAX_SETUP_LABELS,
-  taskLabelsInputSchema,
-  teamsInputSchema,
-} from "@/lib/onboarding/org";
-import {
-  basicsSchema,
   detectLinkKind,
   gradYearChoices,
   joinMajor,
   nextProfileStep,
-  schoolSchema,
   splitMajor,
 } from "@/lib/onboarding/steps";
-import { applyPersonalTheme, parsePersonalTheme, personalThemeSchema } from "@/lib/theme/personal";
+import { basicsSchema, schoolSchema } from "@/lib/onboarding/steps.schema";
+import { applyPersonalTheme } from "@/lib/theme/personal";
+import { parsePersonalTheme, personalThemeSchema } from "@/lib/theme/personal.schema";
 import { DEFAULT_RESOLVED_THEME } from "@/lib/theme/resolve";
 
 describe("availability", () => {
@@ -304,6 +299,14 @@ describe("per-IP sign-up and sign-in limits", () => {
     expect(signUpPerIpLimit({ SIGNUP_LIMIT_PER_IP_HOUR: "0" })).toBe(40);
     expect(signInPerIpLimit({ SIGNIN_LIMIT_PER_IP_15MIN: "lots" })).toBe(120);
     expect(signInPerIpLimit({ SIGNIN_LIMIT_PER_IP_15MIN: "999999" })).toBe(2000);
+  });
+
+  it("size the club-code misses per network the same way", async () => {
+    const { joinCodeMissesPerIpLimit } = await import("@/lib/auth/ip-limits");
+    expect(joinCodeMissesPerIpLimit({})).toBe(60);
+    expect(joinCodeMissesPerIpLimit({ JOIN_CODE_MISSES_PER_IP_HOUR: "150" })).toBe(150);
+    expect(joinCodeMissesPerIpLimit({ JOIN_CODE_MISSES_PER_IP_HOUR: "-3" })).toBe(60);
+    expect(joinCodeMissesPerIpLimit({ JOIN_CODE_MISSES_PER_IP_HOUR: "50000" })).toBe(1000);
   });
 });
 

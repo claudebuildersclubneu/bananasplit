@@ -14,9 +14,9 @@ import {
   REMINDER_LEAD_DAYS_MAX,
   defaultNotificationPreferences,
   emailEnabledFor,
-  parseNotificationPreferences,
   type NotificationPreferences,
 } from "@/lib/notifications/preferences";
+import { parseNotificationPreferences } from "@/lib/notifications/preferences.schema";
 
 export {
   DEFAULT_OFF_TYPES,

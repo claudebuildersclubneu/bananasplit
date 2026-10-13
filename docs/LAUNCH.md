@@ -25,7 +25,7 @@ this is what comes on top of it.
    | `AUTH_SECRET`, `CRON_SECRET`, `SECRETS_KEK_V1`, `SECRETS_KEK_CURRENT`, `SECRETS_FINGERPRINT_KEY`, the three role passwords | As in `RUNBOOK.md`. `/api/health` fails without them. |
    | `PLATFORM_ADMIN_EMAILS` | Your address. Only platform admins can create an org while creation is locked. |
    | `ANTHROPIC_API_KEY` | Optional. Reads schedule screenshots in "When can't you meet?". Without it, members mark their hours on the grid. |
-   | `SIGNUP_LIMIT_PER_IP_HOUR`, `SIGNIN_LIMIT_PER_IP_15MIN` | Optional. The defaults (40 and 120) fit a room signing up on one campus network. Raise them for a big event. |
+   | `SIGNUP_LIMIT_PER_IP_HOUR`, `SIGNIN_LIMIT_PER_IP_15MIN`, `JOIN_CODE_MISSES_PER_IP_HOUR` | Optional. The defaults (40, 120 and 60) fit a room signing up and joining on one campus network; only club codes that match no club count toward the last. Raise them for a big event. |
 
 3. **Health check.** `curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/health`
    must return `"status":"ok"`.

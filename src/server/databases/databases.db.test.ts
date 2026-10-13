@@ -19,7 +19,7 @@ const { requireUserMock } = vi.hoisted(() => ({ requireUserMock: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock, getSession: vi.fn() }));
 
 import { AttendanceMethod, RecordSource, type Role } from "@/generated/prisma/client";
-import { ForbiddenError } from "@/lib/auth/errors";
+import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
 import { withOrgAction, withOrgTx, withSystemOrgTx, type OrgContext } from "@/server/db/context";
@@ -39,7 +39,9 @@ import { setAttendanceSuppressed, deleteAttendance } from "./admin";
 import { loadPollResults, listPolls } from "./ballot-results";
 import { mergeContacts } from "./contacts";
 import { refreshRollups } from "./rollups";
-import { canViewBallotRows, canViewKind } from "./views";
+import { hasSource } from "./sources";
+import { tierOf } from "./types";
+import { canViewBallotRows, canViewKind, countRecords, getDatabase, listDatabases } from "./views";
 
 interface Person {
   id: string;
@@ -212,6 +214,56 @@ describe.skipIf(!seeded)("Databases against the local database (seeded CBC)", ()
         adminBallots: false,
         ownerBallots: true,
       });
+    });
+
+    it("the Databases index lists and counts exactly what one check per database would", async () => {
+      const byRole: Record<string, string[]> = {};
+      for (const p of [s.owner, s.admin, s.member, s.treasurer]) {
+        as(p);
+        const result = await withOrgTx(s.orgId, async ({ db, role }) => {
+          const tier = tierOf(role)!;
+          const list = await listDatabases(db, s.orgId, role);
+
+          // The previous shape: one visibility check per database...
+          const defs = await db.databaseDefinition.findMany({
+            where: { organizationId: s.orgId, archivedAt: null },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          });
+          const expected: string[] = [];
+          for (const d of defs) {
+            if (!hasSource(d.kind)) continue;
+            if (!(await canViewKind(db, s.orgId, d.kind, tier))) continue;
+            if (d.memberVisibility === "HIDDEN" && tier === "MEMBER") continue;
+            expected.push(d.key);
+          }
+
+          // ...and one Prisma count per database.
+          const countOne = {
+            SESSIONS: () =>
+              db.event.count({ where: { organizationId: s.orgId, deletedAt: null, mergedIntoId: null } }),
+            ATTENDANCE: () => db.attendance.count({ where: { organizationId: s.orgId, suppressedAt: null } }),
+            SIGNUPS: () => db.signup.count({ where: { organizationId: s.orgId, suppressedAt: null } }),
+            PEOPLE: () => db.contact.count({ where: { organizationId: s.orgId, sessionsAttended: { gt: 0 } } }),
+            BALLOTS: () => db.ballotDefinition.count({ where: { organizationId: s.orgId, isTest: false } }),
+          } as const;
+          const expectedCounts: Record<string, number> = {};
+          for (const d of list) expectedCounts[d.kind] = await countOne[d.kind as keyof typeof countOne]();
+          const counts = await countRecords(db, s.orgId, list.map((d) => d.kind));
+
+          // getDatabase opens each listed database and nothing else.
+          for (const d of list) expect(await getDatabase(db, s.orgId, role, d.key)).toEqual(d);
+          for (const d of defs.filter((d) => !expected.includes(d.key))) {
+            await expect(getDatabase(db, s.orgId, role, d.key)).rejects.toBeInstanceOf(NotFoundError);
+          }
+          return { role, listed: list.map((d) => d.key), expected, counts, expectedCounts };
+        });
+        expect(result.listed, result.role).toEqual(result.expected);
+        expect(result.counts, result.role).toEqual(result.expectedCounts);
+        byRole[result.role] = result.listed;
+      }
+      expect(byRole.OWNER.length).toBeGreaterThan(0);
+      expect(byRole.MEMBER.every((key) => byRole.OWNER.includes(key))).toBe(true);
+      expect(byRole.TREASURER).toEqual(byRole.MEMBER);
     });
 
     it("the ballot setting decides: OWNER_AND_ADMINS lets an admin see rows, NOBODY nobody", async () => {

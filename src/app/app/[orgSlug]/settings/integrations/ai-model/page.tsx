@@ -26,7 +26,7 @@ export default async function AiModelIntegrationPage({
         title="Other AI models"
         description="Optional. The AI imports (a pasted list of action items into tasks, a calendar screenshot into events) use whichever model your club connects: this one, or Claude. Members pick between them when both are set up."
       />
-      <StatusPanel dto={dto} secretLabel="API key" />
+      <StatusPanel dto={dto} secretLabel="API key" timeZone={organization.timezone} />
       <AiModelForm orgId={organization.id} dto={dto} canWrite={canWrite} />
       {dto.hasSecret && (
         <TestAndRemove
@@ -39,7 +39,10 @@ export default async function AiModelIntegrationPage({
       )}
       <p className="text-muted-foreground text-xs">
         Prefer Claude? Connect it under{" "}
-        <Link href={`/app/${orgSlug}/settings/integrations/claude`} className="underline underline-offset-2">
+        <Link
+          href={`/app/${orgSlug}/settings/integrations/claude`}
+          className="underline underline-offset-2"
+        >
           Claude API
         </Link>
         .

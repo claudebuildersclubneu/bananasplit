@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
 import { FILE_ICONS, FILE_LABELS } from "@/components/notes/file-card";
-import { DocumentPreview, FileActions } from "@/components/notes/file-preview";
+import { DocumentPreview } from "@/components/notes/document-preview";
+import { FileActions } from "@/components/notes/file-preview";
 import { Badge } from "@/components/ui/badge";
 import { can } from "@/lib/auth/permissions";
 import { familyOf, formatBytes } from "@/lib/files/types";

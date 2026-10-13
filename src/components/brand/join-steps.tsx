@@ -1,16 +1,26 @@
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Create your account", "Enter your club code", "You're in"] as const;
+const STEPS = {
+  join: ["Create your account", "Enter your club code", "You're in"],
+  create: ["Create your account", "Set up your profile", "Start your club"],
+} as const;
 
 /**
  * The three steps to joining a club, under the headline on the sign-up
  * panel: numbered 22px dots, the current one ink with a yellow numeral, the
- * rest translucent cream.
+ * rest translucent cream. `create` is the way to starting a club instead
+ * (sign-up from a pricing button).
  */
-export function JoinSteps({ current }: { current: 1 | 2 | 3 }) {
+export function JoinSteps({
+  current,
+  flow = "join",
+}: {
+  current: 1 | 2 | 3;
+  flow?: keyof typeof STEPS;
+}) {
   return (
     <ol className="m-0 flex list-none flex-col gap-2.5 p-0 text-[15px] font-semibold">
-      {STEPS.map((label, i) => {
+      {STEPS[flow].map((label, i) => {
         const n = i + 1;
         const here = n === current;
         return (

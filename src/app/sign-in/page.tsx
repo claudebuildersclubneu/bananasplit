@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { FormMessage, OrDivider } from "@/components/brand/fields";
-import { safeCallbackUrl } from "@/lib/auth/callback-url";
+import { AFTER_SIGN_IN, safeCallbackUrl } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
 
@@ -32,9 +32,10 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   // Where to go after signing in: a same-origin relative path only.
   const callbackUrl = safeCallbackUrl(rawCallbackUrl);
   // A signed-in user normally has nothing to do here, unless Auth.js sent
-  // them back with an error to explain (e.g. OAuthAccountNotLinked).
+  // them back with an error to explain (e.g. OAuthAccountNotLinked). They go
+  // on into the app, as after signing in, not back to the marketing page.
   if (session && !errorCode) {
-    redirect(callbackUrl ?? "/");
+    redirect(callbackUrl ?? AFTER_SIGN_IN);
   }
 
   const errorMessage = errorCode

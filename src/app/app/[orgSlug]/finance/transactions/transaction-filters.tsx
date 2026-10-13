@@ -15,10 +15,13 @@ import { KIND_LABELS } from "@/components/finance/transaction-kind-select";
 import { STATUS_LABELS } from "@/components/finance/transaction-status-badge";
 
 export function TransactionFilters({
+  period,
   periods,
   categories,
   members,
 }: {
+  /** The period the list shows: an id, or "all" (the page picks the active one by default). */
+  period: string;
   periods: { id: string; label: string }[];
   categories: { id: string; name: string }[];
   members: { userId: string; name: string | null; email: string }[];
@@ -29,20 +32,25 @@ export function TransactionFilters({
 
   function setParam(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== "all") {
-      params.set(key, value);
+    if (key === "period") {
+      // "all" is a real choice here: no period means the page's default.
+      params.set("period", value ?? "all");
     } else {
-      params.delete(key);
+      // Keep showing the period on screen when another filter changes,
+      // even when the page chose it (a date range alone means every period).
+      if (!params.has("period")) params.set("period", period);
+      if (value && value !== "all") {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
     }
     router.replace(`${pathname}?${params.toString()}`);
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Select
-        value={searchParams.get("period") ?? "all"}
-        onValueChange={(v) => setParam("period", v)}
-      >
+      <Select value={period} onValueChange={(v) => setParam("period", v)}>
         <SelectTrigger className="w-40">
           <SelectValue placeholder="Period" />
         </SelectTrigger>

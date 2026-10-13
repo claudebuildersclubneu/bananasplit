@@ -21,10 +21,25 @@ vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock }));
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx, withSystemOrgTx } from "@/server/db/context";
 
-import { createBudgetPeriod, deleteBudgetPeriod, deleteCategory, startBudget } from "./periods-actions";
+import {
+  createBudgetPeriod,
+  deleteBudgetPeriod,
+  deleteCategory,
+  startBudget,
+} from "./periods-actions";
 import { getTransactions } from "./queries";
-import { createSponsor, createSponsorship, deleteSponsor, deleteSponsorship } from "./sponsorships-actions";
-import { createTransaction, deleteTransaction, restoreTransaction, submitExpense } from "./transactions-actions";
+import {
+  createSponsor,
+  createSponsorship,
+  deleteSponsor,
+  deleteSponsorship,
+} from "./sponsorships-actions";
+import {
+  createTransaction,
+  deleteTransaction,
+  restoreTransaction,
+  submitExpense,
+} from "./transactions-actions";
 
 interface Person {
   id: string;
@@ -54,18 +69,29 @@ beforeAll(async () => {
       ["member2", "MEMBER"],
     ] as const) {
       people[key] = await authDb.user.create({
-        data: { email: `fis-${key}-${stamp}@example.edu`, name: `Fis ${key}`, emailVerified: new Date() },
+        data: {
+          email: `fis-${key}-${stamp}@example.edu`,
+          name: `Fis ${key}`,
+          emailVerified: new Date(),
+        },
         select: { id: true, email: true, name: true },
       });
       await withSystemOrgTx(orgId, { userId: people[key].id }, async ({ db }) => {
         if (key === "treasurer") {
-          await db.organization.create({ data: { id: orgId, name: "Finance setup itest", slug: `fis-itest-${stamp}` } });
+          await db.organization.create({
+            data: { id: orgId, name: "Finance setup itest", slug: `fis-itest-${stamp}` },
+          });
         }
-        await db.membership.create({ data: { organizationId: orgId, userId: people[key].id, role } });
+        await db.membership.create({
+          data: { organizationId: orgId, userId: people[key].id, role },
+        });
       });
     }
   } catch (error) {
-    console.warn("[finance-setup.db.test] skipped:", error instanceof Error ? error.message : error);
+    console.warn(
+      "[finance-setup.db.test] skipped:",
+      error instanceof Error ? error.message : error,
+    );
     reachable = false;
   }
 }, 30_000);
@@ -74,7 +100,9 @@ afterAll(async () => {
   if (reachable) {
     await withSystemOrgTx(orgId, ({ db }) => db.organization.deleteMany({ where: { id: orgId } }));
   }
-  const ids = Object.values(people).map((p) => p.id).filter(Boolean);
+  const ids = Object.values(people)
+    .map((p) => p.id)
+    .filter(Boolean);
   if (ids.length) await authDb.user.deleteMany({ where: { id: { in: ids } } });
   await disconnectAll();
 });
@@ -96,7 +124,9 @@ describe("finance with nothing set up", () => {
       budgetPeriodId: "",
     });
     expect(first.error).toBeUndefined();
-    const periods = await withOrgTx(orgId, ({ db }) => db.budgetPeriod.findMany({ where: { organizationId: orgId } }));
+    const periods = await withOrgTx(orgId, ({ db }) =>
+      db.budgetPeriod.findMany({ where: { organizationId: orgId } }),
+    );
     expect(periods).toHaveLength(1);
     expect(periods[0].isActive).toBe(true);
     expect(periods[0].label).toMatch(/^\d{4}–\d{2}$/);
@@ -123,10 +153,14 @@ describe("finance with nothing set up", () => {
     expect((await deleteTransaction(orgId, mine.transactionId!)).error).toMatch(/Only a treasurer/);
 
     as(people.member);
-    expect(await deleteTransaction(orgId, mine.transactionId!)).toEqual({ transactionId: mine.transactionId });
+    expect(await deleteTransaction(orgId, mine.transactionId!)).toEqual({
+      transactionId: mine.transactionId,
+    });
     as(people.treasurer);
     const listed = async (deleted?: "show") =>
-      (await withOrgTx(orgId, ({ db }) => getTransactions(db, orgId, { deleted }))).map((t) => t.description);
+      (await withOrgTx(orgId, ({ db }) => getTransactions(db, orgId, { deleted }))).map(
+        (t) => t.description,
+      );
     expect(await listed()).not.toContain("Poster printing");
     expect(await listed("show")).toContain("Poster printing");
 
@@ -142,7 +176,10 @@ describe("finance with nothing set up", () => {
     expect((await listed()).length).toBe(dues - 1);
     // The audit log has both the delete and the restore.
     const actions = await withOrgTx(orgId, ({ db }) =>
-      db.financeAuditLog.findMany({ where: { transactionId: mine.transactionId }, select: { action: true } }),
+      db.financeAuditLog.findMany({
+        where: { transactionId: mine.transactionId },
+        select: { action: true },
+      }),
     );
     expect(actions.map((a) => a.action)).toEqual(expect.arrayContaining(["VOID", "RESTORE"]));
   });
@@ -157,7 +194,10 @@ describe("finance with nothing set up", () => {
       db.budgetCategory.findMany({ where: { organizationId: orgId, budgetPeriodId: period.id } }),
     );
     const food = categories.find((c) => c.name === "Food") ?? categories[0];
-    const filed = await createTransaction(orgId, { ...expense("Snacks", 900), categoryId: food.id });
+    const filed = await createTransaction(orgId, {
+      ...expense("Snacks", 900),
+      categoryId: food.id,
+    });
     expect(filed.error).toBeUndefined();
 
     expect(await deleteCategory(orgId, food.id)).toEqual({ moved: 1 });
@@ -165,14 +205,35 @@ describe("finance with nothing set up", () => {
       db.transaction.findUniqueOrThrow({ where: { id: filed.transactionId! } }),
     );
     expect(after.categoryId).toBeNull();
+    // The move is in the finance audit log, by the treasurer.
+    const moved = await withOrgTx(orgId, ({ db }) =>
+      db.financeAuditLog.findFirstOrThrow({
+        where: { transactionId: filed.transactionId!, action: "UPDATE" },
+        select: { actorId: true, diffJson: true },
+      }),
+    );
+    expect(moved).toMatchObject({
+      actorId: people.treasurer.id,
+      diffJson: {
+        before: { categoryId: food.id, categoryName: food.name },
+        after: { categoryId: null, reason: "category deleted" },
+      },
+    });
 
     expect((await deleteBudgetPeriod(orgId, period.id)).error).toMatch(/stays for the records/);
-    const spare = await createBudgetPeriod(orgId, { label: "Spare", startsOn: "2030-01-01", endsOn: "2030-12-31" });
+    const spare = await createBudgetPeriod(orgId, {
+      label: "Spare",
+      startsOn: "2030-01-01",
+      endsOn: "2030-12-31",
+    });
     expect(spare.error).toBeUndefined();
     expect(await deleteBudgetPeriod(orgId, spare.periodId!)).toEqual({});
     // The period it replaced is active again.
     const active = await withOrgTx(orgId, ({ db }) =>
-      db.budgetPeriod.findFirst({ where: { organizationId: orgId, isActive: true }, select: { id: true } }),
+      db.budgetPeriod.findFirst({
+        where: { organizationId: orgId, isActive: true },
+        select: { id: true },
+      }),
     );
     expect(active?.id).toBe(period.id);
   });
@@ -192,7 +253,9 @@ describe("finance with nothing set up", () => {
       ownerId: people.treasurer.id,
     });
     expect(deal.error).toBeUndefined();
-    expect((await deleteSponsor(orgId, sponsor.sponsorId!)).error).toMatch(/still has 1 sponsorship/);
+    expect((await deleteSponsor(orgId, sponsor.sponsorId!)).error).toMatch(
+      /still has 1 sponsorship/,
+    );
     expect(await deleteSponsorship(orgId, deal.sponsorshipId!)).toEqual({});
     expect(await deleteSponsor(orgId, sponsor.sponsorId!)).toEqual({});
   });

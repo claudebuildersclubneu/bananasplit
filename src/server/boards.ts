@@ -1,5 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
-import { boardInputSchema } from "@/lib/boards";
+import { boardInputSchema } from "@/lib/boards/schema";
 import type { TxClient } from "@/server/db/context";
 
 /**

@@ -1,8 +1,5 @@
-import { z } from "zod";
-
 import { TransactionKind } from "@/generated/prisma/enums";
 import {
-  AMOUNT_SIGNS,
   COLUMN_ROLES,
   inferKind,
   kindFits,
@@ -15,12 +12,26 @@ import {
 } from "@/lib/finance/import/mapping";
 import { MAX_IMPORT_CENTS, parseAmount, parseDate } from "@/lib/finance/import/values";
 
+import type {
+  DocumentReadOutputData,
+  SheetReadOutputData,
+  SheetSampleData,
+} from "./finance-sheet.schema";
+
+export type {
+  DocumentReadOutputData,
+  SheetReadOutputData,
+  SheetSampleData,
+} from "./finance-sheet.schema";
+
 /**
  * The AI reader's answers for finance imports, and how they're cleaned up.
  * Two shapes: for a spreadsheet, a column mapping plus labels for its
  * distinct values (so a 2,000-row ledger costs one short request, and the
  * rows are mapped in the browser); for a PDF, a picture or pasted text, the
- * records themselves. Client-safe: the review uses the same types.
+ * records themselves. Client-safe: the review uses the same types. The zod
+ * schemas (the model's answers, the sample the browser sends) are in
+ * ./finance-sheet.schema (server only), so the import screens never ship zod.
  */
 
 export const IMPORT_KINDS = [
@@ -30,79 +41,6 @@ export const IMPORT_KINDS = [
   TransactionKind.ALLOCATION,
   TransactionKind.ADJUSTMENT,
 ] as const;
-
-const column = z.number().int().nullable();
-
-export const SheetReadOutput = z.object({
-  sheetKind: z.enum(["transactions", "budget", "other"]),
-  headerRow: z.number().int().nullable(),
-  columns: z.object({
-    date: column,
-    description: column,
-    amount: column,
-    moneyIn: column,
-    moneyOut: column,
-    type: column,
-    category: column,
-    counterparty: column,
-    paymentMethod: column,
-    allocated: column,
-  }),
-  notesColumns: z.array(z.number().int()),
-  amountSign: z.enum(AMOUNT_SIGNS),
-  typeIn: z.array(z.string()),
-  typeOut: z.array(z.string()),
-  dateOrder: z.enum(["MDY", "DMY", "YMD"]),
-  labels: z.array(
-    z.object({
-      column: z.number().int(),
-      value: z.string(),
-      category: z.string().nullable(),
-      kind: z.enum(IMPORT_KINDS).nullable(),
-    }),
-  ),
-  notes: z.array(z.string()),
-});
-export type SheetReadOutputData = z.infer<typeof SheetReadOutput>;
-
-export const DocumentReadOutput = z.object({
-  sheetKind: z.enum(["transactions", "budget", "other"]),
-  records: z.array(
-    z.object({
-      date: z.string().nullable(),
-      description: z.string(),
-      amount: z.string(),
-      direction: z.enum(["IN", "OUT"]),
-      kind: z.enum(IMPORT_KINDS).nullable(),
-      category: z.string().nullable(),
-      counterparty: z.string().nullable(),
-    }),
-  ),
-  budget: z.array(z.object({ category: z.string(), allocated: z.string() })),
-  notes: z.array(z.string()),
-});
-export type DocumentReadOutputData = z.infer<typeof DocumentReadOutput>;
-
-/** What the browser sends about a spreadsheet: a sample of rows and each text column's distinct values. */
-export const SheetSample = z.object({
-  fileName: z.string().max(200).optional(),
-  sheetName: z.string().max(200).optional(),
-  width: z.number().int().min(1).max(60),
-  rows: z
-    .array(z.object({ i: z.number().int().min(0), cells: z.array(z.string().max(200)).max(60) }))
-    .min(1)
-    .max(60),
-  values: z
-    .array(
-      z.object({
-        column: z.number().int().min(0).max(59),
-        header: z.string().max(200),
-        values: z.array(z.string().max(120)).max(150),
-      }),
-    )
-    .max(20),
-});
-export type SheetSampleData = z.infer<typeof SheetSample>;
 
 export const MAX_SAMPLE_ROWS = 40;
 export const MAX_LABEL_VALUES = 120;

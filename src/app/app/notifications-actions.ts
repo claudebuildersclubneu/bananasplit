@@ -7,7 +7,10 @@ import { withUserTx } from "@/server/db/context";
  * The notification bell: the session user's own notifications across their
  * orgs. Runs in withUserTx (app_user, no org context); the Notification
  * policies show and update only rows whose recipient is app.user_id(), and
- * app_user may update readAt alone.
+ * app_user may update readAt alone. A notification about a task shows only
+ * while its reader may open that task in the task's own org
+ * (app.can_read_task_in_its_org, 20261013120000_notification_task_read), so
+ * the list, the unread count and "Mark all read" need no org context.
  */
 
 const RECENT_LIMIT = 20;

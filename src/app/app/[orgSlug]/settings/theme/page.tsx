@@ -1,10 +1,9 @@
 import { can } from "@/lib/auth/permissions";
 import { orgLogoSource } from "@/lib/theme/logo";
 import { resolveTheme } from "@/lib/theme/resolve";
-import { parsePersonalTheme } from "@/lib/theme/personal";
+import { parsePersonalTheme } from "@/lib/theme/personal.schema";
 import { CUSTOM_PRESET_ID, findPreset } from "@/lib/theme/presets";
 import { getOrgContextBySlug } from "@/server/db/context";
-import { getViewerPrefs } from "@/server/profiles/queries";
 
 import { SettingsNoAccess } from "../settings-no-access";
 
@@ -21,14 +20,14 @@ export default async function ThemeSettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/theme">) {
   const { orgSlug } = await params;
-  const { organization, role, theme: row, user } = await getOrgContextBySlug(orgSlug);
+  const { organization, role, theme: row, viewer } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "theme.write")) {
     return <SettingsNoAccess title="Theme" who="owners and admins" />;
   }
 
   const theme = resolveTheme(row);
   const logo = orgLogoSource(organization.logo, 64);
-  const personal = parsePersonalTheme((await getViewerPrefs(user.id)).themePreference);
+  const personal = parsePersonalTheme(viewer.themePreference);
   const personalName = personal
     ? personal.preset === CUSTOM_PRESET_ID
       ? "Custom"

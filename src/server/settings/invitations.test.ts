@@ -44,6 +44,7 @@ function makeSystemDb() {
             orgName: "Org One",
             orgSlug: "org-one",
             invitedById: "admin_1",
+            orgDeleted: false,
           },
         ];
       return [{ id: "x" }];
@@ -179,6 +180,16 @@ describe("findInvitationByRawToken", () => {
     expect(fake.systemCalls[0]?.[0]).toBeNull();
     const call = fake.systemDb.$queryRaw.mock.calls[0];
     expect(call[1]).toBe(hashInvitationToken("raw-token"));
+  });
+
+  it("carries the function's flag for a club scheduled for deletion", async () => {
+    expect((await findInvitationByRawToken("raw-token"))?.orgDeleted).toBe(false);
+    const sql = (fake.systemDb.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join("?");
+    expect(sql).toContain('"orgDeleted"');
+    fake.systemDb.$queryRaw.mockResolvedValueOnce([
+      { ...invitation, role: "MEMBER", orgName: "Org One", orgSlug: "org-one", orgDeleted: true },
+    ]);
+    expect((await findInvitationByRawToken("raw-token"))?.orgDeleted).toBe(true);
   });
 
   it("ignores empty and absurdly long tokens", async () => {

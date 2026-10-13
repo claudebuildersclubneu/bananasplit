@@ -76,47 +76,10 @@ export default async function TasksPage({
   const isAdmin = can({ role }, "tasks.manageAll");
   const now = new Date();
 
-  const members = await getOrgMembersForPicker(org.id);
+  // The published chart is a cached loader on its own (service) connection,
+  // so it is read before the page's transaction rather than inside it.
   const positions = await getChartForPage(org.id);
   const chart = buildViewerChart(positions, user.id);
-
-  const base = await withOrgTx(org.id, async ({ db }) => {
-    const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
-    const labels = await getOrgLabels(db, org.id);
-    const projects = await getOrgProjects(db, org.id);
-    return { tz: effectiveTimezone(me, org), labels, projects };
-  });
-  const todayKey = localDateKey(now, base.tz);
-  const today = fromDateKey(todayKey);
-  const intakeProjects = base.projects.filter((p) => p.isIntake);
-
-  // Header badges: what is waiting in the queue, and whether this person
-  // still owes the club a Sunday update.
-  const currentWeek = weekStartKey(now, org.timezone);
-  const header = await withOrgTx(org.id, async ({ db }) => ({
-    intakeCount:
-      intakeProjects.length > 0
-        ? await db.task.count({
-            where: {
-              organizationId: org.id,
-              deletedAt: null,
-              parentTaskId: null,
-              projectId: { in: intakeProjects.map((p) => p.id) },
-              ownerId: null,
-              status: { not: "COMPLETED" },
-            },
-          })
-        : 0,
-    posted:
-      (await db.weeklyUpdate.count({
-        where: {
-          organizationId: org.id,
-          userId: user.id,
-          weekStart: fromDateKey(currentWeek),
-          postedAt: { not: null },
-        },
-      })) > 0,
-  }));
 
   // The scope chip resolves to a set of people; everything else is literal.
   const peopleIds =
@@ -136,21 +99,70 @@ export default async function TasksPage({
     visibility: ws.visibility,
   };
 
-  const content = await renderView({
-    ws,
-    filters,
-    org,
-    userId: user.id,
-    role,
-    isAdmin,
-    now,
-    today,
-    todayKey,
-    query,
-    members,
-    positions,
-    intakeProjects,
-  });
+  // Every read the page makes, in ONE transaction: the reads run one after
+  // another on its connection, and the helpers that open their own
+  // withOrgTx (the member picker, each layout's reads) join it instead of
+  // waiting for a connection of their own.
+  const { members, base, todayKey, intakeProjects, header, content } = await withOrgTx(
+    org.id,
+    async ({ db }) => {
+      const members = await getOrgMembersForPicker(org.id);
+      const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
+      const base = {
+        tz: effectiveTimezone(me, org),
+        labels: await getOrgLabels(db, org.id),
+        projects: await getOrgProjects(db, org.id),
+      };
+      const todayKey = localDateKey(now, base.tz);
+      const today = fromDateKey(todayKey);
+      const intakeProjects = base.projects.filter((p) => p.isIntake);
+
+      // Header badges: what is waiting in the queue, and whether this person
+      // still owes the club a Sunday update.
+      const currentWeek = weekStartKey(now, org.timezone);
+      const header = {
+        intakeCount:
+          intakeProjects.length > 0
+            ? await db.task.count({
+                where: {
+                  organizationId: org.id,
+                  deletedAt: null,
+                  parentTaskId: null,
+                  projectId: { in: intakeProjects.map((p) => p.id) },
+                  ownerId: null,
+                  status: { not: "COMPLETED" },
+                },
+              })
+            : 0,
+        posted:
+          (await db.weeklyUpdate.count({
+            where: {
+              organizationId: org.id,
+              userId: user.id,
+              weekStart: fromDateKey(currentWeek),
+              postedAt: { not: null },
+            },
+          })) > 0,
+      };
+
+      const content = await renderView({
+        ws,
+        filters,
+        org,
+        userId: user.id,
+        role,
+        isAdmin,
+        now,
+        today,
+        todayKey,
+        query,
+        members,
+        positions,
+        intakeProjects,
+      });
+      return { members, base, todayKey, intakeProjects, header, content };
+    },
+  );
 
   return (
     <TasksProvider

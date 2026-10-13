@@ -8,13 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AI_VENDORS, aiVendor } from "@/lib/ai/vendors";
-import { claudeModel, estimateParseCostUsd, formatUsd } from "@/lib/org-chart/models";
+import { SUPABASE_POOLER_REGIONS } from "@/lib/integrations/supabase";
 import {
   CLAUDE_MODELS,
+  claudeModel,
   DEFAULT_CLAUDE_MODEL,
-  SUPABASE_POOLER_REGIONS,
-  type IntegrationDto,
-} from "@/server/integrations/catalog";
+  estimateParseCostUsd,
+  formatUsd,
+} from "@/lib/org-chart/models";
+// Type only: the catalog's zod schemas stay on the server.
+import type { IntegrationDto } from "@/server/integrations/catalog";
 
 import {
   disconnectGoogleAction,

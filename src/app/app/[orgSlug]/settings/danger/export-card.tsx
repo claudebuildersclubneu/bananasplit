@@ -18,8 +18,6 @@ export interface ExportRow {
   requestedByName: string | null;
 }
 
-const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
-
 const STATUS: Record<string, string> = {
   PENDING: "Queued",
   RUNNING: "Preparing",
@@ -28,17 +26,29 @@ const STATUS: Record<string, string> = {
   EXPIRED: "Expired",
 };
 
+/**
+ * `timeZone`: the org's. Times are formatted in it, not in the server's or
+ * the browser's zone, so the server's HTML and the browser's first render
+ * agree (no hydration mismatch).
+ */
 export function ExportCard({
   orgId,
   orgSlug,
   exports,
   expiryDays,
+  timeZone,
 }: {
   orgId: string;
   orgSlug: string;
   exports: ExportRow[];
   expiryDays: number;
+  timeZone: string;
 }) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  });
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);

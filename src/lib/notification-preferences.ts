@@ -1,5 +1,6 @@
 import type { NotificationType } from "@/generated/prisma/enums";
-import { emailEnabledFor, parseNotificationPreferences } from "@/lib/notifications/preferences";
+import { emailEnabledFor } from "@/lib/notifications/preferences";
+import { parseNotificationPreferences } from "@/lib/notifications/preferences.schema";
 
 
 /**

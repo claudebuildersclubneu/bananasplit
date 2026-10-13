@@ -1,6 +1,7 @@
 import { GoogleIcon } from "@/components/google-icon";
 import { pill } from "@/components/brand/pill";
 import { Button } from "@/components/ui/button";
+import { AFTER_SIGN_IN } from "@/lib/auth/callback-url";
 import { signIn } from "@/lib/auth/config";
 import { cn } from "@/lib/utils";
 
@@ -10,13 +11,17 @@ import { cn } from "@/lib/utils";
  * user on first use, already verified (see google-linking.ts). Render it
  * only when googleSignInEnabled(), or it leads to Auth.js's "server
  * configuration" error.
+ *
+ * `redirectTo` defaults to /app, like the password sign-in. Without one,
+ * Auth.js returns to the page the button was on (/sign-in), which sends a
+ * signed-in visitor on, and they ended up on the marketing page.
  */
 export function GoogleSignInButton({ redirectTo }: { redirectTo?: string | null }) {
   return (
     <form
       action={async () => {
         "use server";
-        await signIn("google", redirectTo ? { redirectTo } : undefined);
+        await signIn("google", { redirectTo: redirectTo || AFTER_SIGN_IN });
       }}
     >
       <Button type="submit" variant="outline" className="w-full">
@@ -43,7 +48,7 @@ export function BrandGoogleButton({
     <form
       action={async () => {
         "use server";
-        await signIn("google", redirectTo ? { redirectTo } : undefined);
+        await signIn("google", { redirectTo: redirectTo || AFTER_SIGN_IN });
       }}
     >
       <button type="submit" className={cn(pill({ tone: "outline", size: "field" }), "w-full")}>

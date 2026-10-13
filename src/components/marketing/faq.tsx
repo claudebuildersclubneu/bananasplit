@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: "Which data sources can we connect?",
-    a: "Google Sheets, Airtable, Notion, Excel, Supabase and Postgres. Club plans include two connections and Society includes six.",
+    a: "A Supabase database, kept in sync. From Google Sheets or Excel, export a CSV and import it. Club plans include two connections and Society includes six.",
   },
   {
     q: "Can other clubs see our data?",

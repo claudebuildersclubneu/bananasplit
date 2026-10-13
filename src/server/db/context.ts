@@ -3,15 +3,10 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { notFound, redirect, unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 
-import {
-  Prisma,
-  type OrgSettings,
-  type OrgTheme,
-  type PrismaClient,
-  type Role,
-} from "@/generated/prisma/client";
+import type { Prisma, OrgSettings, OrgTheme, PrismaClient, Role } from "@/generated/prisma/client";
 import { NotFoundError } from "@/lib/auth/errors";
 import { requireUser, type SessionUser } from "@/lib/auth/session";
+import { listPins, type PinnedItem } from "@/server/pins";
 
 import { appDb, serviceDb } from "./clients";
 import { mapDbError } from "./errors";
@@ -29,10 +24,11 @@ import { mapDbError } from "./errors";
  * same round trip. RLS then enforces tenancy and membership in the database.
  *
  * Semantics shared by every wrapper:
- * - ReadCommitted, maxWait 10s, timeout 10s. No network I/O inside the
- *   transaction (email, Blob, Google, Claude, Supabase, Netlify): queue it
- *   with ctx.afterCommit(fn) or enqueue a job (app.enqueue_job runs in the
- *   same transaction, so a rolled-back write never sends anything).
+ * - Read committed (the database default, see TX_OPTIONS), maxWait 10s,
+ *   timeout 10s. No network I/O inside the transaction (email, Blob,
+ *   Google, Claude, Supabase, Netlify): queue it with ctx.afterCommit(fn)
+ *   or enqueue a job (app.enqueue_job runs in the same transaction, so a
+ *   rolled-back write never sends anything).
  * - ctx.afterCommit(fn) callbacks run in order after COMMIT and are dropped
  *   on rollback. Cache invalidation (src/server/cache/invalidate.ts) queues
  *   here too. A failing callback is logged, never thrown: the write is
@@ -103,10 +99,15 @@ interface Store {
 
 const als = new AsyncLocalStorage<Store>();
 
+// No isolationLevel here on purpose. Naming one makes the pg adapter send
+// SET TRANSACTION ISOLATION LEVEL as its own round trip after BEGIN, on
+// every transaction, and Postgres already starts each one READ COMMITTED.
+// That default is load-bearing (the wrappers are written for read
+// committed), so /api/health fails if a role's default_transaction_isolation
+// is ever anything else (src/server/health.ts).
 const TX_OPTIONS = {
   maxWait: 10_000,
   timeout: 10_000,
-  isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
 } as const;
 
 /** The transaction context of the current async call chain, if any. */
@@ -410,6 +411,24 @@ export interface MembershipSummary {
   logo: Prisma.JsonValue | null;
 }
 
+/**
+ * The session user's own User row: what the shell shows (read from the
+ * database on every request, not from the JWT, so a new name or picture
+ * shows at once) and the per-viewer settings pages need.
+ */
+export interface OrgViewer {
+  name: string | null;
+  email: string;
+  image: string | null;
+  avatar: Prisma.JsonValue | null;
+  /** NULL until profile setup is finished (the org layout sends them there). */
+  onboardedAt: Date | null;
+  /** Raw User.themePreference; parse with parsePersonalTheme. */
+  themePreference: Prisma.JsonValue | null;
+  /** The zone the user chose, or NULL to follow the org's. */
+  timezone: string | null;
+}
+
 export interface OrgContextBySlug {
   user: SessionUser;
   organization: {
@@ -427,12 +446,21 @@ export interface OrgContextBySlug {
   pendingDeletion: MembershipSummary[];
   settings: OrgSettings | null;
   theme: OrgTheme | null;
+  viewer: OrgViewer;
+  /** The member's pins in this org, with live labels (sidebar, Overview, Notes). */
+  pins: PinnedItem[];
 }
 
 /**
- * The org layout's per-request context, deduped with React cache(): the
- * session user, the org resolved from its slug, the user's Role in it, the
- * org switcher list, OrgSettings and OrgTheme, in one transaction.
+ * The org layout's per-request context, deduped with React cache() so the
+ * layout and the page share it: the session user, the org resolved from its
+ * slug, the user's Role in it, the org switcher list, OrgSettings and
+ * OrgTheme, the user's own row and their pins.
+ *
+ * Two transactions per request: the slug lookup (as the user, before there
+ * is an org to set), then everything else in one org transaction. The
+ * user's own User row is readable there (the User select policy allows
+ * self), and pins are the member's own rows in the org.
  * - Unauthenticated: redirect to /sign-in (requireUser).
  * - Unknown slug, soft-deleted org, or not a member: notFound().
  * - A retired slug (renamed org): redirect to the canonical slug.
@@ -452,7 +480,7 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
   try {
     return await withOrgTx(resolved.organizationId, async ({ db, role }) => {
       // Sequential: one connection per transaction.
-      const organization = await db.organization.findUniqueOrThrow({
+      const { settings, theme, ...organization } = await db.organization.findUniqueOrThrow({
         where: { id: resolved.organizationId },
         select: {
           id: true,
@@ -461,6 +489,8 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
           timezone: true,
           logo: true,
           activeOrgChartVersionId: true,
+          settings: true,
+          theme: true,
         },
       });
       const memberships = await db.membership.findMany({
@@ -473,12 +503,19 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
         },
         orderBy: { organization: { name: "asc" } },
       });
-      const settings = await db.orgSettings.findUnique({
-        where: { organizationId: resolved.organizationId },
+      const row = await db.user.findUnique({
+        where: { id: user.id },
+        select: {
+          name: true,
+          email: true,
+          image: true,
+          avatar: true,
+          onboardedAt: true,
+          themePreference: true,
+          timezone: true,
+        },
       });
-      const theme = await db.orgTheme.findUnique({
-        where: { organizationId: resolved.organizationId },
-      });
+      const pins = await listPins(db, organization.id, organization.slug, user.id);
       const summary = (m: (typeof memberships)[number]): MembershipSummary => ({
         organizationId: m.organization.id,
         name: m.organization.name,
@@ -494,6 +531,17 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
         pendingDeletion: memberships.filter((m) => m.organization.deletedAt !== null).map(summary),
         settings,
         theme,
+        // A missing row (deleted mid-session) never traps anyone in profile setup.
+        viewer: row ?? {
+          name: null,
+          email: user.email,
+          image: null,
+          avatar: null,
+          onboardedAt: new Date(0),
+          themePreference: null,
+          timezone: null,
+        },
+        pins,
       };
     });
   } catch (error) {

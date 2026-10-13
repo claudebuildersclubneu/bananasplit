@@ -29,7 +29,14 @@ function Question({ q, k }: { q: BallotQuestionResult; k: number }) {
             key: o.key,
             label: o.label,
             value: o.suppressed ? null : value,
-            display: o.suppressed ? (
+            display: o.withheld ? (
+              <span
+                title="Hidden too, so the smaller count can't be worked out from the total"
+                className="text-muted-foreground"
+              >
+                hidden
+              </span>
+            ) : o.suppressed ? (
               <span title={`Fewer than ${k} votes`} className="text-muted-foreground">
                 &lt;{k}
               </span>
@@ -127,7 +134,8 @@ export async function BallotsSection({ ctx }: { ctx: ReportViewContext }) {
           {!r.fullCounts ? (
             <p className="text-muted-foreground text-xs">
               Totals only. Options with fewer than {r.minCellSize} votes show as &lt;{r.minCellSize}{" "}
-              so no one&apos;s vote can be singled out.
+              so no one&apos;s vote can be singled out. When only one option is that small, the next
+              smallest is hidden too.
             </p>
           ) : null}
           <div className="flex flex-col gap-4">

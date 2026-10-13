@@ -67,10 +67,26 @@ export function StatusBadge({ status }: { status: IntegrationDto["status"] }) {
   );
 }
 
-const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
-
-/** Status, last four characters and the last check: everything a page ever shows about a secret. */
-export function StatusPanel({ dto, secretLabel }: { dto: IntegrationDto; secretLabel: string }) {
+/**
+ * Status, last four characters and the last check: everything a page ever
+ * shows about a secret. `timeZone` is the org's: the check's time is
+ * formatted in it, so the server's HTML and the browser's first render
+ * agree (no hydration mismatch).
+ */
+export function StatusPanel({
+  dto,
+  secretLabel,
+  timeZone,
+}: {
+  dto: IntegrationDto;
+  secretLabel: string;
+  timeZone: string;
+}) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  });
   return (
     <dl className="grid gap-x-6 gap-y-2 rounded-lg border p-4 text-sm sm:grid-cols-[10rem_1fr]">
       <dt className="text-muted-foreground">Status</dt>

@@ -6,6 +6,7 @@ import { TransactionDirection, TransactionKind } from "@/generated/prisma/client
 import { can, requirePermission } from "@/lib/auth/permissions";
 import { writeFinanceAuditLog } from "@/lib/finance/audit";
 import { DELETED_TRANSACTION_REASON } from "@/lib/finance/deleted";
+import { amountLockReason } from "@/lib/finance/locks";
 import {
   nextExpenseStatus,
   type ExpenseTransition,
@@ -140,7 +141,8 @@ export const createTransaction = withOrgAction(
         });
         if (!active) {
           return {
-            error: "Your club's treasurer hasn't set up the budget yet, so requests can't be filed. Ask them to open Finance once.",
+            error:
+              "Your club's treasurer hasn't set up the budget yet, so requests can't be filed. Ask them to open Finance once.",
           };
         }
         periodId = active.id;
@@ -214,6 +216,23 @@ export const updateTransaction = withOrgAction(
     }
     const data = parsed.data;
 
+    // The dialog sends every field, so only a real change counts.
+    const changesAmount =
+      data.amountCents !== undefined && data.amountCents !== existing.amountCents;
+    const changesCategory =
+      data.categoryId !== undefined && (data.categoryId ?? null) !== existing.categoryId;
+    if (changesAmount || changesCategory) {
+      const locked = amountLockReason(existing, ctx.userId);
+      if (locked) return { error: locked };
+    }
+
+    // Expenses go out and income comes in; only adjustments and allocations
+    // pick a direction, the same rule as createTransaction.
+    const fixedDirection = EXPECTED_DIRECTION[existing.kind];
+    if (fixedDirection && data.direction && data.direction !== fixedDirection) {
+      return { error: `${existing.kind} transactions must be ${fixedDirection}.` };
+    }
+
     if (data.categoryId !== undefined) {
       const categoryError = await assertCategoryBelongsToPeriod(
         ctx,
@@ -231,6 +250,7 @@ export const updateTransaction = withOrgAction(
       data: {
         categoryId: data.categoryId,
         amountCents: data.amountCents,
+        direction: fixedDirection ? undefined : data.direction,
         description: data.description,
         counterparty: data.counterparty,
         occurredAt: data.occurredAt ? new Date(data.occurredAt) : undefined,
@@ -303,10 +323,16 @@ export const deleteTransaction = withOrgAction(
       existing.kind === TransactionKind.EXPENSE &&
       (existing.status === "DRAFT" || existing.status === "SUBMITTED");
     if (!can(ctx, "finance.manage") && !ownOpen) {
-      return { error: "Only a treasurer or owner can delete this. You can delete your own requests until they're approved." };
+      return {
+        error:
+          "Only a treasurer or owner can delete this. You can delete your own requests until they're approved.",
+      };
     }
     if (existing.reconciledAt) {
-      return { error: "This transaction is reconciled against a bank statement and locked. Unlock it first." };
+      return {
+        error:
+          "This transaction is reconciled against a bank statement and locked. Unlock it first.",
+      };
     }
 
     const updated = await ctx.db.transaction.update({
@@ -324,7 +350,11 @@ export const deleteTransaction = withOrgAction(
   },
 );
 
-/** Undoes deleteTransaction (or a void): back in the lists and totals. */
+/**
+ * Undoes deleteTransaction (or a void): back in the lists and totals.
+ * Treasurers and owners restore anything; a member only undoes their own
+ * delete of their own open request, never a void or delete by finance.
+ */
 export const restoreTransaction = withOrgAction(
   async (ctx, transactionId: string): Promise<ActionResult> => {
     const existing = await ctx.db.transaction.findFirst({
@@ -332,12 +362,24 @@ export const restoreTransaction = withOrgAction(
     });
     if (!existing) return { error: "Transaction not found." };
     if (!existing.voidedAt) return { transactionId };
-    const ownOpen =
-      existing.submittedById === ctx.userId &&
-      existing.kind === TransactionKind.EXPENSE &&
-      (existing.status === "DRAFT" || existing.status === "SUBMITTED");
-    if (!can(ctx, "finance.manage") && !ownOpen) {
-      return { error: "Only a treasurer or owner can restore this." };
+    if (!can(ctx, "finance.manage")) {
+      const ownOpen =
+        existing.submittedById === ctx.userId &&
+        existing.kind === TransactionKind.EXPENSE &&
+        (existing.status === "DRAFT" || existing.status === "SUBMITTED");
+      // Who took it out: the latest VOID entry in the finance audit log.
+      const lastVoid = ownOpen
+        ? await ctx.db.financeAuditLog.findFirst({
+            where: { organizationId: ctx.organizationId, transactionId, action: "VOID" },
+            orderBy: { createdAt: "desc" },
+            select: { actorId: true },
+          })
+        : null;
+      const ownDelete =
+        existing.voidReason === DELETED_TRANSACTION_REASON && lastVoid?.actorId === ctx.userId;
+      if (!ownOpen || !ownDelete) {
+        return { error: "Only a treasurer or owner can restore this." };
+      }
     }
 
     const updated = await ctx.db.transaction.update({
@@ -376,6 +418,11 @@ async function applyExpenseTransition(
   if (!existing) return { error: "Expense not found." };
   if (existing.reconciledAt) {
     return { error: "This transaction is reconciled and locked. Unlock it first." };
+  }
+  // A voided or deleted expense is out of every total; it moves again only
+  // after a restore, so nobody approves or pays back money that isn't booked.
+  if (existing.voidedAt) {
+    return { error: "This expense was voided or deleted. Restore it first." };
   }
 
   if (transition === "REJECT" && !extra.rejectionReason?.trim()) {

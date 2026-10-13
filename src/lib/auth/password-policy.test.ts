@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { newPasswordSchema, passwordBytes } from "./password-policy";
+import { passwordBytes } from "./password-policy";
+import { newPasswordSchema } from "./password-policy.schema";
 
 describe("newPasswordSchema", () => {
   it("needs at least 8 characters", () => {

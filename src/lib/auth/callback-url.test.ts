@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { safeCallbackUrl, signInPath } from "./callback-url";
+import { safeCallbackUrl, signInPath, signUpPath } from "./callback-url";
 
 describe("safeCallbackUrl (same-origin relative only)", () => {
   it.each([
@@ -36,5 +36,13 @@ describe("safeCallbackUrl (same-origin relative only)", () => {
   it("builds the sign-in path", () => {
     expect(signInPath("/app/cbc/tasks/t1")).toBe("/sign-in?callbackUrl=%2Fapp%2Fcbc%2Ftasks%2Ft1");
     expect(signInPath("https://evil.example")).toBe("/sign-in");
+  });
+
+  it("builds the sign-up path the same way", () => {
+    expect(signUpPath("/onboarding/join?code=RPKA-YWSF")).toBe(
+      "/sign-up?callbackUrl=%2Fonboarding%2Fjoin%3Fcode%3DRPKA-YWSF",
+    );
+    expect(signUpPath(null)).toBe("/sign-up");
+    expect(signUpPath("//evil.example")).toBe("/sign-up");
   });
 });

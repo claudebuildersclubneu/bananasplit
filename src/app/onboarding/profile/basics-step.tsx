@@ -9,7 +9,7 @@ import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-field
 import { Input } from "@/components/ui/input";
 import type { UserAvatarUser } from "@/components/user-avatar";
 import { PRONOUN_CHOICES } from "@/lib/onboarding/steps";
-import { PROFILE_LIMITS } from "@/lib/profile/schema";
+import { PROFILE_LIMITS } from "@/lib/profile/limits";
 import { isValidTimeZone } from "@/lib/profile/timezone";
 
 import { saveBasicsStep } from "./actions";

@@ -29,11 +29,14 @@ export function Subtasks({
   subtasks,
   canAdd,
   onOpen,
+  onChanged,
 }: {
   parentId: string;
   subtasks: SubtaskItem[];
   canAdd: boolean;
   onOpen?: (subtaskId: string) => void;
+  /** Reloads the parent after a change, so the list shows what was saved. */
+  onChanged?: () => Promise<void>;
 }) {
   const { org, viewer, memberById, announce } = useTasks();
   const [items, setOptimistic] = useOptimistic(
@@ -55,7 +58,12 @@ export function Subtasks({
     startTransition(async () => {
       setOptimistic({ id: s.id, status: next });
       const result = await setTaskStatus(org.id, s.id, next);
-      if (result.error) announce(result.error);
+      if (result.error) {
+        announce(result.error);
+        return;
+      }
+      // Reload before the transition ends, so the tick never flips back.
+      await onChanged?.();
     });
   }
 
@@ -89,6 +97,7 @@ export function Subtasks({
       setTitle("");
       setOwnerId(null);
       setDueDate("");
+      await onChanged?.();
     });
   }
 

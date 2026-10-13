@@ -8,6 +8,7 @@ import {
   TASK_LAYOUTS,
   TASK_SCOPES,
   activeFilterCount,
+  isLayout,
   type TaskLayout,
   type TaskScope,
   type TaskView,
@@ -98,7 +99,11 @@ export function WorkspaceProvider({
       filterCount: activeFilterCount(query),
       hrefWith: (next) => write(next),
       setView: (view) => {
-        document.cookie = `${TASKS_VIEW_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
+        // Only layouts are remembered: Requests and the Sunday update are
+        // destinations, not the way you like to see your tasks.
+        if (isLayout(view)) {
+          document.cookie = `${TASKS_VIEW_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
+        }
         router.push(write({ view }));
       },
       setScope: (scope) => {

@@ -177,6 +177,9 @@ async function seedPrivateTask(q) {
            VALUES ('n_priv','org_A','u_treasA','TASK_MENTIONED','Private task','t_priv')`);
 }
 
+/** The tables that hang off a task and follow its visibility. */
+const TASK_CHILDREN = ["TaskAssignee", "TaskLabel", "TaskComment", "TaskMention", "TaskActivity"];
+
 /** What the current identity can read of the private task. */
 async function readPrivate(q) {
   return {
@@ -2082,6 +2085,301 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         collaborator_on_private: "42501",
         update_org_task: 1,
         comment_on_org_task: 1,
+      },
+    },
+  );
+
+  await tcase(
+    "PC4-05",
+    "the bell (a user with no org in context) reads task notifications exactly as far as the task itself reads",
+    "app_user",
+    A("u_memberA"),
+    async (q) => {
+      await seedPrivateTask(q);
+      // seedPrivateTask already addressed n_priv to the uninvolved u_treasA.
+      await q(`INSERT INTO "Notification" ("id","organizationId","userId","type","title","taskId") VALUES
+                 ('n_open_treas','org_A','u_treasA','TASK_ASSIGNED','Task A','t_A'),
+                 ('n_priv_admin','org_A','u_adminA','TASK_MENTIONED','Private task','t_priv'),
+                 ('n_priv_collab','org_A','u_bothAB','TASK_MENTIONED','Private task','t_priv')`);
+      const ids = `('n_priv','n_open_treas','n_priv_admin','n_priv_collab')`;
+      const bell = async (user, org = null) => {
+        await q(`SELECT app.set_context($1, $2)`, [user, org]);
+        return (
+          await q(`SELECT "id" FROM "Notification" WHERE "id" IN ${ids} ORDER BY 1`)
+        ).rows.map((r) => r.id);
+      };
+      const s = {};
+      s.uninvolved = await bell("u_treasA");
+      // "Mark all read" is an UPDATE that reads readAt, so it follows the
+      // same read rule: it reaches the open task's notice and not the other.
+      s.mark_all_read = await rc(
+        q,
+        `UPDATE "Notification" SET "readAt" = now() WHERE "id" IN ${ids} AND "readAt" IS NULL`,
+      );
+      s.admin = await bell("u_adminA");
+      s.collaborator = await bell("u_bothAB");
+      // Another of the person's clubs in context changes nothing.
+      s.collaborator_in_org_B = await bell("u_bothAB", "org_B");
+      // Inside the task's own org the answer is what app.can_read_task gives.
+      s.uninvolved_in_org_A = await bell("u_treasA", "org_A");
+      // Once they leave the club, its task notifications go dark too.
+      await q(`SELECT app.set_context('u_ownerA','org_A')`);
+      await q(`DELETE FROM "Membership" WHERE "id" = 'm_treasA'`);
+      s.after_leaving = await bell("u_treasA");
+      return s;
+    },
+    {
+      value: {
+        uninvolved: ["n_open_treas"],
+        mark_all_read: 1,
+        admin: ["n_priv_admin"],
+        collaborator: ["n_priv_collab"],
+        collaborator_in_org_B: ["n_priv_collab"],
+        uninvolved_in_org_A: ["n_open_treas"],
+        after_leaving: [],
+      },
+    },
+  );
+
+  // 20261013130000_audit_db_fixes: the children's read policies ask "Task"'s
+  // own policy (one set-based check) instead of calling app.can_read_task
+  // per row. The rule must not move by a single row, for any reader.
+  await tcase(
+    "PC4-06",
+    "a task's children read exactly as far as the task itself, for every kind of reader and org",
+    "app_user",
+    A("u_memberA"),
+    async (q) => {
+      await seedPrivateTask(q);
+      // A private task in org_B too, shared with u_bothAB, with every child.
+      await q(`SELECT app.set_context('u_memberB','org_B')`);
+      await q(`INSERT INTO "Task" ("id","organizationId","title","rank","createdById","ownerId","visibility","updatedAt")
+               VALUES ('t_privB','org_B','Private B','z0','u_memberB','u_memberB','PRIVATE',now())`);
+      await q(
+        `INSERT INTO "TaskAssignee" ("organizationId","taskId","userId") VALUES ('org_B','t_privB','u_bothAB')`,
+      );
+      await q(
+        `INSERT INTO "TaskLabel" ("organizationId","taskId","labelId") VALUES ('org_B','t_privB','l_B')`,
+      );
+      await q(`INSERT INTO "TaskComment" ("id","organizationId","taskId","authorId","body")
+               VALUES ('tc_privB','org_B','t_privB','u_memberB','secret B')`);
+      await q(`INSERT INTO "TaskMention" ("id","organizationId","taskId","sourceKey","mentionedUserId","mentionedById")
+               VALUES ('tm_privB','org_B','t_privB','desc','u_bothAB','u_memberB')`);
+      await q(`INSERT INTO "TaskActivity" ("id","organizationId","taskId","actorId","type")
+               VALUES ('ta_privB','org_B','t_privB','u_memberB','CREATED')`);
+
+      const tasks = ["t_A", "t_A2", "t_B", "t_priv", "t_priv_sub", "t_privB"];
+      // Which tasks have rows in each child table (fixtures plus the above).
+      const withRows = {
+        TaskAssignee: ["t_A", "t_B", "t_priv", "t_privB"],
+        TaskLabel: ["t_A", "t_priv", "t_privB"],
+        TaskComment: ["t_A", "t_B", "t_priv", "t_privB"],
+        TaskMention: ["t_A", "t_priv", "t_privB"],
+        TaskActivity: ["t_A", "t_B", "t_priv", "t_privB"],
+      };
+      const mismatches = [];
+      const view = async (label, user, org) => {
+        await q(`SELECT app.set_context($1, $2)`, [user, org]);
+        // The old per-row predicate, asked directly, is the oracle.
+        const readable = (
+          await q(`SELECT id FROM unnest($1::text[]) id WHERE app.can_read_task(id) ORDER BY 1`, [
+            tasks,
+          ])
+        ).rows.map((r) => r.id);
+        const out = { readable: readable.join(",") };
+        for (const t of TASK_CHILDREN) {
+          const seen = (await q(`SELECT DISTINCT "taskId" FROM "${t}" ORDER BY 1`)).rows
+            .map((r) => r.taskId)
+            .join(",");
+          const want = withRows[t].filter((id) => readable.includes(id)).join(",");
+          if (seen !== want) mismatches.push(`${label} ${t}: ${seen} != ${want}`);
+          out[t] = seen;
+        }
+        return out;
+      };
+      const s = {};
+      s.owner_and_creator = await view("owner_and_creator", "u_memberA", "org_A");
+      s.collaborator = await view("collaborator", "u_bothAB", "org_A");
+      s.admin = await view("admin", "u_adminA", "org_A");
+      s.owner_role = await view("owner_role", "u_ownerA", "org_A");
+      s.uninvolved = await view("uninvolved", "u_treasA", "org_A");
+      // The same person in their other club: that club's rows only.
+      s.collaborator_in_org_B = await view("collaborator_in_org_B", "u_bothAB", "org_B");
+      s.owner_role_in_org_B = await view("owner_role_in_org_B", "u_ownerB", "org_B");
+      // An org the caller does not belong to, and no org at all: nothing.
+      s.claims_foreign_org = await view("claims_foreign_org", "u_memberA", "org_B");
+      s.no_org = await view("no_org", "u_bothAB", null);
+      // Taken off the private task, the collaborator loses its children ...
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      await q(`DELETE FROM "TaskAssignee" WHERE "taskId" = 't_priv' AND "userId" = 'u_bothAB'`);
+      withRows.TaskAssignee = ["t_A", "t_B", "t_privB"];
+      s.collaborator_removed = await view("collaborator_removed", "u_bothAB", "org_A");
+      // ... and once the task opens up, every member reads them.
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      await q(`UPDATE "Task" SET "visibility" = 'ORG' WHERE "id" = 't_priv'`);
+      s.uninvolved_after_opened = await view("uninvolved_after_opened", "u_treasA", "org_A");
+      s.mismatches = mismatches;
+      return s;
+    },
+    {
+      check: (v) => {
+        const each = (readable, ids) => ({
+          readable,
+          ...Object.fromEntries(TASK_CHILDREN.map((t) => [t, ids])),
+        });
+        const inA = each("t_A,t_A2,t_priv,t_priv_sub", "t_A,t_priv");
+        const openA = each("t_A,t_A2", "t_A");
+        const inB = {
+          readable: "t_B,t_privB",
+          TaskAssignee: "t_B,t_privB",
+          TaskLabel: "t_privB",
+          TaskComment: "t_B,t_privB",
+          TaskMention: "t_privB",
+          TaskActivity: "t_B,t_privB",
+        };
+        const none = each("", "");
+        const want = {
+          owner_and_creator: inA,
+          // A collaborator on the parent is not one on its private subtask.
+          collaborator: { ...inA, readable: "t_A,t_A2,t_priv" },
+          admin: inA,
+          owner_role: inA,
+          uninvolved: openA,
+          collaborator_in_org_B: inB,
+          owner_role_in_org_B: inB,
+          claims_foreign_org: none,
+          no_org: none,
+          collaborator_removed: openA,
+          // (t_priv has no collaborator left to read.)
+          uninvolved_after_opened: { ...inA, TaskAssignee: "t_A" },
+          mismatches: [],
+        };
+        return JSON.stringify(v) === JSON.stringify(want);
+      },
+    },
+  );
+
+  await tcase(
+    "PC4-07",
+    "the children's read policies defer to Task's own policy instead of a per-row definer call",
+    "owner",
+    null,
+    async (q) =>
+      Object.fromEntries(
+        (
+          await q(
+            `SELECT tablename, qual FROM pg_policies
+              WHERE schemaname = 'public' AND policyname = 'app_user_select'
+                AND tablename = ANY($1::text[]) ORDER BY 1`,
+            [TASK_CHILDREN],
+          )
+        ).rows.map((r) => [
+          r.tablename,
+          !r.qual.includes("can_read_task") &&
+            r.qual.includes(`EXISTS ( SELECT 1`) &&
+            r.qual.includes(`FROM "Task" t`) &&
+            r.qual.includes(`(t.id = "${r.tablename}"."taskId")`),
+        ]),
+      ),
+    {
+      value: {
+        TaskActivity: true,
+        TaskAssignee: true,
+        TaskComment: true,
+        TaskLabel: true,
+        TaskMention: true,
+      },
+    },
+  );
+
+  // ======================= Audit DB fixes (20261013130000) =======================
+  await tcase(
+    "PAU-01",
+    'the bell and verification-token indexes exist, and Task.rank sorts byte by byte (COLLATE "C")',
+    "owner",
+    null,
+    async (q) => {
+      await q(`INSERT INTO "Task" ("id","organizationId","title","rank","createdById","updatedAt") VALUES
+                 ('t_r1','org_A','r1','a1','u_memberA',now()),
+                 ('t_r2','org_A','r2','Zz','u_memberA',now()),
+                 ('t_r3','org_A','r3','a0','u_memberA',now()),
+                 ('t_r4','org_A','r4','a0V','u_memberA',now())`);
+      return {
+        indexes: (
+          await q(`SELECT indexdef FROM pg_indexes WHERE schemaname = 'public'
+                     AND indexname IN ('Notification_userId_createdAt_idx','VerificationToken_token_idx')
+                   ORDER BY indexname`)
+        ).rows.map((r) => r.indexdef),
+        rank_collation: (
+          await q(`SELECT c.collname FROM pg_attribute a JOIN pg_collation c ON c.oid = a.attcollation
+                    WHERE a.attrelid = '"Task"'::regclass AND a.attname = 'rank'`)
+        ).rows[0]?.collname,
+        // Fractional-index keys in the order they were generated: "Zz" first.
+        order: (
+          await q(
+            `SELECT "rank" FROM "Task" WHERE "id" IN ('t_r1','t_r2','t_r3','t_r4') ORDER BY "rank"`,
+          )
+        ).rows.map((r) => r.rank),
+      };
+    },
+    {
+      value: {
+        indexes: [
+          `CREATE INDEX "Notification_userId_createdAt_idx" ON public."Notification" USING btree ("userId", "createdAt" DESC)`,
+          `CREATE INDEX "VerificationToken_token_idx" ON public."VerificationToken" USING btree (token)`,
+        ],
+        rank_collation: "C",
+        order: ["Zz", "a0", "a0V", "a1"],
+      },
+    },
+  );
+
+  await tcase(
+    "PAU-02",
+    "the onboarding Join card leaves out an invite to a club scheduled for deletion",
+    "app_user",
+    A("u_ownerA"),
+    async (q) => {
+      const pending = async () => {
+        await q(`SELECT app.set_context('u_invitee', NULL)`);
+        return (await q(`SELECT "id" FROM app.pending_invitations_for_me() ORDER BY 1`)).rows.map(
+          (r) => r.id,
+        );
+      };
+      const s = { before: await pending() };
+      await q(`SELECT app.set_context('u_ownerA','org_A')`);
+      s.scheduled = await rc(
+        q,
+        `UPDATE "Organization" SET "deletedAt" = now(), "deleteScheduledFor" = now() + interval '30 days'
+          WHERE "id" = 'org_A'`,
+      );
+      s.after = await pending();
+      return s;
+    },
+    { value: { before: ["inv_A"], scheduled: 1, after: [] } },
+  );
+
+  await tcase(
+    "PAU-03",
+    "the emailed invite link still resolves for a club scheduled for deletion, flagged orgDeleted",
+    "app_service",
+    { user: "u_ownerA", org: "org_A" },
+    async (q) => {
+      const lookup = async () =>
+        (
+          await q(
+            `SELECT "id", "orgSlug", "orgDeleted" FROM app.invitation_by_token_hash('tokhash_A')`,
+          )
+        ).rows;
+      const s = { before: await lookup() };
+      await q(`UPDATE "Organization" SET "deletedAt" = now() WHERE "id" = 'org_A'`);
+      s.after = await lookup();
+      return s;
+    },
+    {
+      value: {
+        before: [{ id: "inv_A", orgSlug: "fx-a", orgDeleted: false }],
+        after: [{ id: "inv_A", orgSlug: "fx-a", orgDeleted: true }],
       },
     },
   );

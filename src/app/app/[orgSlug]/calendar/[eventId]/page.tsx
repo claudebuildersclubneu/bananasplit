@@ -5,7 +5,7 @@ import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 
-import { getEventById } from "../queries";
+import { getEventById, getViewerTimeZone } from "../queries";
 
 export default async function EventDetailPage({
   params,
@@ -13,7 +13,10 @@ export default async function EventDetailPage({
 }: PageProps<"/app/[orgSlug]/calendar/[eventId]">) {
   const { orgSlug, eventId } = await params;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
-  const event = await withOrgTx(org.id, ({ db }) => getEventById(db, org.id, eventId, user.id));
+  const { event, viewerZone } = await withOrgTx(org.id, async ({ db }) => ({
+    event: await getEventById(db, org.id, eventId, user.id),
+    viewerZone: await getViewerTimeZone(db, user.id, org.timezone),
+  }));
   if (!event) notFound();
 
   const canEdit = can({ role }, "events.write");
@@ -29,6 +32,7 @@ export default async function EventDetailPage({
       orgId={org.id}
       orgSlug={orgSlug}
       timeZone={org.timezone}
+      serverTimeZone={viewerZone}
       event={{
         id: event.id,
         title: event.title,
@@ -57,7 +61,13 @@ export default async function EventDetailPage({
         attendeeIds: event.attendees.map((a) => a.userId),
         notes: event.notes,
       }}
-      members={members.map((m) => ({ id: m.id, name: m.name, image: m.image, avatar: m.avatar, title: m.title }))}
+      members={members.map((m) => ({
+        id: m.id,
+        name: m.name,
+        image: m.image,
+        avatar: m.avatar,
+        title: m.title,
+      }))}
       currentUserId={user.id}
       canEdit={canEdit}
       startInEdit={startInEdit}

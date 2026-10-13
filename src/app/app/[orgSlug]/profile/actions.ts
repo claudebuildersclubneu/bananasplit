@@ -4,10 +4,8 @@ import { refresh } from "next/cache";
 
 import { absoluteAppUrl } from "@/lib/app-url";
 import { requireUser } from "@/lib/auth/session";
-import {
-  notificationPreferencesPatchSchema,
-  type NotificationPreferences,
-} from "@/lib/notifications/preferences";
+import type { NotificationPreferences } from "@/lib/notifications/preferences";
+import { notificationPreferencesPatchSchema } from "@/lib/notifications/preferences.schema";
 import { profileDetailsSchema, profileFieldErrors, profileLinksSchema } from "@/lib/profile/schema";
 import {
   rotateOwnIcsToken,

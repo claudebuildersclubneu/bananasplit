@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   NotificationType,
   Prisma,
+  Role,
   TaskPriority,
   TaskStatus,
   TaskVisibility,
@@ -20,6 +21,7 @@ import {
   type TaskActor,
 } from "@/lib/tasks/access";
 import type { ViewerChart } from "@/lib/tasks/assignment";
+import { compareRank, placeInColumn } from "@/lib/tasks/rank";
 import {
   addDaysToKey,
   dueDateKey,
@@ -49,8 +51,6 @@ import {
 } from "@/lib/tasks/visibility";
 import type { OrgContext } from "@/server/db/context";
 import { notifyUsers } from "@/server/notifications";
-
-import { orgAdminIds } from "./visibility";
 
 import {
   buildViewerChart,
@@ -182,6 +182,8 @@ export interface TaskEnv {
 }
 
 export async function loadTaskEnv(ctx: OrgContext, now: Date = new Date()): Promise<TaskEnv> {
+  // Every task action starts here, so the org and its member list are read
+  // once and the admin set and the chart's version are derived from them.
   const org = await ctx.db.organization.findUniqueOrThrow({
     where: { id: ctx.organizationId },
     select: {
@@ -189,6 +191,7 @@ export async function loadTaskEnv(ctx: OrgContext, now: Date = new Date()): Prom
       slug: true,
       name: true,
       timezone: true,
+      activeOrgChartVersionId: true,
       settings: {
         select: { taskRequireOwner: true, taskRequireDueDate: true, reminderLeadDaysDefault: true },
       },
@@ -196,10 +199,15 @@ export async function loadTaskEnv(ctx: OrgContext, now: Date = new Date()): Prom
   });
   const members = await ctx.db.membership.findMany({
     where: { organizationId: ctx.organizationId },
-    select: { userId: true },
+    select: { userId: true, role: true },
   });
-  const adminIds = await orgAdminIds(ctx.db, ctx.organizationId);
-  const chart = buildViewerChart(await loadChartNodes(ctx.db, ctx.organizationId), ctx.userId);
+  const adminIds = members
+    .filter((m) => m.role === Role.OWNER || m.role === Role.ADMIN)
+    .map((m) => m.userId);
+  const chart = buildViewerChart(
+    await loadChartNodes(ctx.db, ctx.organizationId, org.activeOrgChartVersionId),
+    ctx.userId,
+  );
   return {
     ctx,
     actor: { userId: ctx.userId, isAdmin: can(ctx, "tasks.manageAll"), subtree: chart.subtree },
@@ -667,23 +675,33 @@ async function loadParent(env: TaskEnv, parentTaskId: string, childId?: string):
   return parent;
 }
 
+/**
+ * A rank below every live top-level task in a status column. Ranks only
+ * sort correctly byte by byte (src/lib/tasks/rank.ts) and the database's
+ * collation may not, hence COLLATE "C".
+ */
 async function nextRankForStatus(env: TaskEnv, status: TaskStatus): Promise<string> {
-  const last = await env.ctx.db.task.findFirst({
-    where: { organizationId: env.ctx.organizationId, status, parentTaskId: null, deletedAt: null },
-    orderBy: { rank: "desc" },
-    select: { rank: true },
-  });
-  return generateKeyBetween(last?.rank ?? null, null);
+  const last = await env.ctx.db.$queryRaw<{ rank: string }[]>`
+    SELECT "rank" FROM "Task"
+     WHERE "organizationId" = ${env.ctx.organizationId}
+       AND "status" = ${status}::"TaskStatus"
+       AND "parentTaskId" IS NULL
+       AND "deletedAt" IS NULL
+     ORDER BY "rank" COLLATE "C" DESC
+     LIMIT 1`;
+  return generateKeyBetween(last[0]?.rank ?? null, null);
 }
 
 /** Sibling rank after the last subtask (distinct ranks: fixes the identical-rank bug). */
 async function nextSubtaskRank(env: TaskEnv, parentTaskId: string): Promise<string> {
-  const last = await env.ctx.db.task.findFirst({
-    where: { organizationId: env.ctx.organizationId, parentTaskId, deletedAt: null },
-    orderBy: { rank: "desc" },
-    select: { rank: true },
-  });
-  return generateKeyBetween(last?.rank ?? null, null);
+  const last = await env.ctx.db.$queryRaw<{ rank: string }[]>`
+    SELECT "rank" FROM "Task"
+     WHERE "organizationId" = ${env.ctx.organizationId}
+       AND "parentTaskId" = ${parentTaskId}
+       AND "deletedAt" IS NULL
+     ORDER BY "rank" COLLATE "C" DESC
+     LIMIT 1`;
+  return generateKeyBetween(last[0]?.rank ?? null, null);
 }
 
 // ---- Create ----------------------------------------------------------------------
@@ -955,6 +973,13 @@ async function applyUpdate(
     nextParentId = d.parentTaskId;
     fieldEdit = true;
   }
+  // A top-level task that changes column goes to the bottom of its new one
+  // with a fresh rank. Keeping the old rank would make it share a key with a
+  // card already there (every column numbers from the same start), and a
+  // later drag between two equal ranks has no key to give.
+  if (nextStatus !== s.status && nextParentId === null && data.rank === undefined) {
+    data.rank = await nextRankForStatus(env, nextStatus);
+  }
 
   let labelChange: string[] | null = null;
   if (d.labelIds) {
@@ -1183,7 +1208,9 @@ export async function reorderTask(env: TaskEnv, input: unknown): Promise<TaskAct
   try {
     rank = generateKeyBetween(before?.rank ?? null, after?.rank ?? null);
   } catch {
-    rank = await rebalanceColumn(env, d.status, s.id);
+    // No key fits between the neighbours (they share a rank, or are out of
+    // order): renumber the column with the card where it was dropped.
+    rank = await rebalanceColumn(env, d.status, s.id, d.beforeId, d.afterId);
   }
 
   const data: Prisma.TaskUncheckedUpdateManyInput = { rank, version: { increment: 1 } };
@@ -1214,10 +1241,18 @@ export async function reorderTask(env: TaskEnv, input: unknown): Promise<TaskAct
   return { taskId: s.id, version: s.version + 1 };
 }
 
+/**
+ * Gives a column fresh, evenly spaced ranks in board order, with the moved
+ * card placed between the neighbours it was dropped between, and returns
+ * the moved card's new rank (the caller writes it with the rest of the
+ * move). The other cards keep their order and are written in one statement.
+ */
 async function rebalanceColumn(
   env: TaskEnv,
   status: TaskStatus,
   movedTaskId: string,
+  beforeId: string | null,
+  afterId: string | null,
 ): Promise<string> {
   const { db, organizationId } = env.ctx;
   const tasks = await db.task.findMany({
@@ -1228,14 +1263,27 @@ async function rebalanceColumn(
       deletedAt: null,
       id: { not: movedTaskId },
     },
-    orderBy: { rank: "asc" },
-    select: { id: true },
+    select: { id: true, rank: true },
   });
-  const keys = generateNKeysBetween(null, null, tasks.length + 1);
-  for (const [i, t] of tasks.entries()) {
-    await db.task.updateMany({ where: { id: t.id, organizationId }, data: { rank: keys[i]! } });
+  tasks.sort((a, b) => compareRank(a.rank, b.rank) || compareRank(a.id, b.id));
+  const order = placeInColumn(
+    tasks.map((t) => t.id),
+    movedTaskId,
+    beforeId,
+    afterId,
+  );
+  const keys = generateNKeysBetween(null, null, order.length);
+  const others = order.flatMap((id, i) => (id === movedTaskId ? [] : [{ id, rank: keys[i]! }]));
+  if (others.length > 0) {
+    const values = Prisma.join(others.map((o) => Prisma.sql`(${o.id}, ${o.rank})`));
+    await db.$executeRaw`
+      UPDATE "Task" AS t
+         SET "rank" = v.rank, "updatedAt" = app.utc_now()
+        FROM (VALUES ${values}) AS v (id, rank)
+       WHERE t."id" = v.id
+         AND t."organizationId" = ${organizationId}`;
   }
-  return keys[keys.length - 1]!;
+  return keys[order.indexOf(movedTaskId)]!;
 }
 
 // ---- Bulk --------------------------------------------------------------------------
@@ -1350,6 +1398,11 @@ export async function bulkAssign(env: TaskEnv, input: unknown): Promise<TaskActi
   return {};
 }
 
+// Deleting a task takes its live subtasks with it, stamped with the same
+// deletedAt. A subtask deleted on its own earlier keeps its own stamp, so
+// undoing the parent's delete (which restores only the children stamped
+// with the parent's time) cannot bring it back.
+
 export async function bulkDelete(env: TaskEnv, rawIds: unknown): Promise<TaskActionResult> {
   const tasks = await loadMany(env, rawIds);
   assertAllEditable(env, tasks, "delete");
@@ -1357,6 +1410,7 @@ export async function bulkDelete(env: TaskEnv, rawIds: unknown): Promise<TaskAct
   await env.ctx.db.task.updateMany({
     where: {
       organizationId: env.ctx.organizationId,
+      deletedAt: null,
       OR: [{ id: { in: ids } }, { parentTaskId: { in: ids } }],
     },
     data: { deletedAt: env.now },
@@ -1368,7 +1422,11 @@ export async function deleteTask(env: TaskEnv, taskId: string): Promise<TaskActi
   const s = await loadSubject(env, taskId);
   if (!canEditTask(env.actor, accessOf(s))) throw new TaskError("You can't delete this task.");
   await env.ctx.db.task.updateMany({
-    where: { organizationId: env.ctx.organizationId, OR: [{ id: s.id }, { parentTaskId: s.id }] },
+    where: {
+      organizationId: env.ctx.organizationId,
+      deletedAt: null,
+      OR: [{ id: s.id }, { parentTaskId: s.id }],
+    },
     data: { deletedAt: env.now },
   });
   return { taskId: s.id };
@@ -1377,8 +1435,12 @@ export async function deleteTask(env: TaskEnv, taskId: string): Promise<TaskActi
 export async function restoreTask(env: TaskEnv, taskId: string): Promise<TaskActionResult> {
   const s = await loadSubject(env, taskId, true);
   if (!canEditTask(env.actor, accessOf(s))) throw new TaskError("You can't restore this task.");
+  if (!s.deletedAt) return { taskId: s.id };
   await env.ctx.db.task.updateMany({
-    where: { organizationId: env.ctx.organizationId, OR: [{ id: s.id }, { parentTaskId: s.id }] },
+    where: {
+      organizationId: env.ctx.organizationId,
+      OR: [{ id: s.id }, { parentTaskId: s.id, deletedAt: s.deletedAt }],
+    },
     data: { deletedAt: null },
   });
   return { taskId: s.id };

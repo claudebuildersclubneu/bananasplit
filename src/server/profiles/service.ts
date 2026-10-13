@@ -1,11 +1,13 @@
 import { Prisma } from "@/generated/prisma/client";
 import { generateIcsToken, hashIcsToken } from "@/lib/ics-token";
+import type {
+  NotificationPreferences,
+  NotificationPreferencesPatch,
+} from "@/lib/notifications/preferences";
 import {
   applyNotificationPreferencesPatch,
   parseNotificationPreferences,
-  type NotificationPreferences,
-  type NotificationPreferencesPatch,
-} from "@/lib/notifications/preferences";
+} from "@/lib/notifications/preferences.schema";
 import type { ProfileValues } from "@/lib/profile/schema";
 import { invalidate } from "@/server/cache/invalidate";
 import { tags } from "@/server/cache/tags";

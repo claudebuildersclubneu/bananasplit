@@ -8,6 +8,8 @@ import { getClientIp } from "@/lib/request-ip";
 import { orgLogoUrl } from "@/lib/org-logo";
 import { checkJoinCode, joinWithCode } from "@/server/onboarding/join-code";
 
+import { forgetJoinCode } from "./join-code-cookie";
+
 /**
  * "Join with invite code" (onboarding A7). Two steps so the person sees
  * which organization the code opens before they join it; both re-check the
@@ -30,7 +32,11 @@ export type CheckCodeResult =
 
 export async function checkInviteCodeAction(code: string): Promise<CheckCodeResult> {
   const user = await requireUser();
-  const result = await checkJoinCode(user, typeof code === "string" ? code : "", await getClientIp());
+  const result = await checkJoinCode(
+    user,
+    typeof code === "string" ? code : "",
+    await getClientIp(),
+  );
   if (!result.ok) return { ok: false, error: result.message };
   return {
     ok: true,
@@ -47,8 +53,13 @@ export async function checkInviteCodeAction(code: string): Promise<CheckCodeResu
 
 export async function joinWithInviteCodeAction(code: string): Promise<{ error?: string }> {
   const user = await requireUser();
-  const result = await joinWithCode(user, typeof code === "string" ? code : "", await getClientIp());
+  const result = await joinWithCode(
+    user,
+    typeof code === "string" ? code : "",
+    await getClientIp(),
+  );
   if (!result.ok) return { error: result.message };
   await setActiveOrgCookie(result.orgId);
+  await forgetJoinCode();
   redirect(`/app/${result.orgSlug}`);
 }

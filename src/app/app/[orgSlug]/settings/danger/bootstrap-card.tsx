@@ -13,18 +13,21 @@ export interface BootstrapPerson {
   title: string;
 }
 
+/** `timeZone`: the org's, so the date reads the same on the server and in the browser. */
 export function BootstrapCard({
   orgId,
   people,
   members,
   suggested,
   bootstrappedAt,
+  timeZone,
 }: {
   orgId: string;
   people: BootstrapPerson[];
   members: { userId: string; name: string }[];
   suggested: Record<string, string>;
   bootstrappedAt: string | null;
+  timeZone: string;
 }) {
   const router = useRouter();
   const [mapping, setMapping] = useState<Record<string, string>>(suggested);
@@ -45,7 +48,8 @@ export function BootstrapCard({
         </p>
         {bootstrappedAt && (
           <p className="mt-1 text-sm">
-            Last run {new Date(bootstrappedAt).toLocaleString("en-US", { dateStyle: "medium" })}.
+            Last run{" "}
+            {new Date(bootstrappedAt).toLocaleString("en-US", { dateStyle: "medium", timeZone })}.
           </p>
         )}
       </div>

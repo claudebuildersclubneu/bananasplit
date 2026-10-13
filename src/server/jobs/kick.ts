@@ -31,8 +31,12 @@ const pending = new Map<string, number>();
 /**
  * A slot whose after() has not started within this long is treated as lost
  * (an aborted request whose after() never ran) and no longer suppresses kicks.
+ * Short on purpose: while a lost slot suppresses kicks, every email queued
+ * meanwhile (a verification link, an RSVP confirmation) waits for the cron
+ * pinger instead of going out in seconds. A request's own after() normally
+ * starts well within this.
  */
-const STALE_SLOT_MS = 30_000;
+const STALE_SLOT_MS = 5_000;
 
 function scheduleAfter(slot: string, work: () => Promise<unknown>): void {
   const since = pending.get(slot);

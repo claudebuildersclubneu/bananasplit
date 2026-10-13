@@ -24,6 +24,7 @@ import { TaskStatus } from "@/generated/prisma/enums";
 import { STATUS_ORDER, statusTransitionData } from "@/lib/tasks/status";
 
 import { reorderTask } from "../actions";
+import { planDrop } from "./drop";
 import { KanbanColumn } from "./kanban-column";
 
 const COLUMNS: { status: TaskStatus; title: string }[] = [
@@ -32,7 +33,6 @@ const COLUMNS: { status: TaskStatus; title: string }[] = [
   { status: TaskStatus.BLOCKED, title: "Blocked" },
   { status: TaskStatus.COMPLETED, title: "Completed" },
 ];
-const COLUMN_IDS = new Set<string>(STATUS_ORDER);
 
 /**
  * The kanban board (react-query holds the optimistic order). Dragging into
@@ -108,28 +108,11 @@ export function KanbanBoard({
     const dragged = tasks.find((t) => t.id === activeId);
     if (!dragged) return;
 
-    const overId = String(over.id);
-    let targetStatus: TaskStatus;
-    let overTaskId: string | null = null;
-    if (COLUMN_IDS.has(overId)) {
-      targetStatus = overId as TaskStatus;
-    } else {
-      const overTask = tasks.find((t) => t.id === overId);
-      if (!overTask) return;
-      targetStatus = overTask.status;
-      overTaskId = overTask.id;
-    }
-
-    const targetColumnTasks = columns[targetStatus].filter((t) => t.id !== activeId);
-    let insertIndex = targetColumnTasks.length;
-    if (overTaskId) {
-      const idx = targetColumnTasks.findIndex((t) => t.id === overTaskId);
-      if (idx !== -1) insertIndex = idx;
-    }
-    const beforeTask = insertIndex > 0 ? targetColumnTasks[insertIndex - 1] : null;
-    const afterTask =
-      insertIndex < targetColumnTasks.length ? targetColumnTasks[insertIndex] : null;
-    if (dragged.status === targetStatus && beforeTask?.id === dragged.id) return;
+    // Land where the preview showed it (see planDrop); a drop on itself or
+    // back in place saves nothing.
+    const plan = planDrop(columns, dragged, String(over.id));
+    if (!plan) return;
+    const targetStatus = plan.status;
 
     let blockedReason: string | null = null;
     if (targetStatus === TaskStatus.BLOCKED && dragged.status !== TaskStatus.BLOCKED) {
@@ -140,8 +123,8 @@ export function KanbanBoard({
     const input = {
       taskId: activeId,
       status: targetStatus,
-      beforeId: beforeTask?.id ?? null,
-      afterId: afterTask?.id ?? null,
+      beforeId: plan.beforeId,
+      afterId: plan.afterId,
       blockedReason,
     };
 

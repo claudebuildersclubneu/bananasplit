@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MajorInput } from "@/components/onboarding/major-input";
 import { gradYearChoices } from "@/lib/onboarding/steps";
-import { PROFILE_LIMITS, profileDetailsSchema, profileFieldErrors } from "@/lib/profile/schema";
+import { PROFILE_LIMITS } from "@/lib/profile/limits";
 
 import { saveProfileDetails } from "./actions";
 import { TimezoneSelect } from "./timezone-select";
@@ -62,16 +62,14 @@ export function DetailsForm({
       bio: values.bio,
       timezone: values.timezone,
     };
-    const local = profileDetailsSchema.safeParse(input);
-    if (!local.success) {
-      setErrors(profileFieldErrors(local.error));
-      return;
-    }
-    setErrors({});
+    // The action validates with the profile schema and answers each field's
+    // error, so the form needs no copy of it (and no zod in the browser).
     startTransition(async () => {
       const result = await saveProfileDetails(input);
-      if (result.ok) setSaved(true);
-      else setErrors(result.fieldErrors);
+      if (result.ok) {
+        setErrors({});
+        setSaved(true);
+      } else setErrors(result.fieldErrors);
     });
   }
 

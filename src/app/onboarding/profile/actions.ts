@@ -3,10 +3,10 @@
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/session";
-import { availabilitySchema } from "@/lib/availability";
-import { basicsSchema, bioSchema, schoolSchema } from "@/lib/onboarding/steps";
+import { availabilitySchema } from "@/lib/availability/schema";
+import { basicsSchema, bioSchema, schoolSchema } from "@/lib/onboarding/steps.schema";
 import { profileFieldErrors } from "@/lib/profile/schema";
-import { personalThemeSchema } from "@/lib/theme/personal";
+import { personalThemeSchema } from "@/lib/theme/personal.schema";
 import { markProfileSetupComplete, updateOwnOnboardingFields } from "@/server/onboarding/profile";
 import { updateOwnProfile } from "@/server/profiles/service";
 

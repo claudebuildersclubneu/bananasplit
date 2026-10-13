@@ -66,7 +66,7 @@ export default async function GoogleCalendarIntegrationPage({
           {notice}
         </p>
       )}
-      <StatusPanel dto={dto} secretLabel="Refresh token" />
+      <StatusPanel dto={dto} secretLabel="Refresh token" timeZone={organization.timezone} />
       <GoogleCalendarPanel
         orgId={organization.id}
         dto={dto}

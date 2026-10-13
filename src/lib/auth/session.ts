@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { CALLBACK_HEADER, signInPath } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
@@ -14,7 +15,16 @@ export interface Session {
   user: SessionUser;
 }
 
-export async function getSession(): Promise<Session | null> {
+/**
+ * The signed-in user's session, or null. Deduped with React cache(): a page,
+ * its layouts and their loaders all ask, and every auth() call decrypts the
+ * cookie and runs the session callbacks again, so one request works it out
+ * once. Nothing signs in and then reads the session again in the same
+ * request: the sign-in and sign-up actions redirect, and Next.js renders
+ * the page they redirect to as a request of its own. Where React has no
+ * request to share it with (tests, scripts), cache() calls straight through.
+ */
+export const getSession = cache(async (): Promise<Session | null> => {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) {
     return null;
@@ -26,7 +36,7 @@ export async function getSession(): Promise<Session | null> {
       name: session.user.name ?? null,
     },
   };
-}
+});
 
 /**
  * The signed-in user, or a redirect to sign-in that carries a callbackUrl

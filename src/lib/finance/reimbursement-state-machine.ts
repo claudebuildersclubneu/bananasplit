@@ -45,8 +45,10 @@ export function nextExpenseStatus(ctx: TransitionContext): TransitionResult {
       if (ctx.currentStatus !== TransactionStatus.DRAFT) {
         return { error: "Only a draft expense can be marked not applicable." };
       }
-      if (!isSubmitter && !ctx.actorHasFinanceAccess) {
-        return { error: "You don't have permission to do that." };
+      // Not applicable books the spending with no approval step, so it is
+      // finance's call (club money already spent), never the submitter's.
+      if (!ctx.actorHasFinanceAccess) {
+        return { error: "Only a treasurer or owner can mark an expense not applicable." };
       }
       return { status: TransactionStatus.NOT_APPLICABLE };
 

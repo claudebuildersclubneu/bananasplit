@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { OVERVIEW_WIDGETS, overviewWidgetsFor, resolveOverview } from "@/lib/overview/widgets";
 
-import { boardInputSchema, clampHeight, newWidgetId, parseBoard } from "./index";
+import { clampHeight, newWidgetId, parseBoard } from "./index";
+import { boardInputSchema } from "./schema";
 
 describe("boards", () => {
   it("snaps heights to 20px within bounds, and keeps 'fit' as null", () => {
@@ -24,6 +25,27 @@ describe("boards", () => {
       ),
     ).toEqual([{ id: "a", type: "x", w: 2, h: null }]);
     expect(parseBoard("nope", ["x"])).toBeNull();
+  });
+
+  it("reads the old { size } shape, and treats a malformed widget as no saved board", () => {
+    expect(parseBoard([{ id: "a", type: "x", size: "lg" }], ["x"])).toEqual([
+      { id: "a", type: "x", w: 4, h: null },
+    ]);
+    expect(parseBoard([{ id: "a", type: "x", h: 251 }], ["x"])).toEqual([
+      { id: "a", type: "x", w: 1, h: 260 },
+    ]);
+    for (const bad of [
+      [{ id: "Not An Id", type: "x" }],
+      [{ id: "a", type: 1 }],
+      [{ id: "a", type: "x", w: "2" }],
+      [{ id: "a", type: "x", h: "fit" }],
+      [{ id: "a", type: "x", size: "xl" }],
+      [{ id: "a", type: "x", size: "constructor" }],
+      [null],
+      [["a", "x"]],
+    ]) {
+      expect(parseBoard(bad, ["x"])).toBeNull();
+    }
   });
 
   it("accepts only well-formed layouts for saving", () => {

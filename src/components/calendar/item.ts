@@ -4,6 +4,7 @@ import type {
   EventVisibility,
   RSVPStatus,
 } from "@/generated/prisma/enums";
+import { zonedDateTimeLocal } from "@/lib/calendar/dates";
 import type { GridItem } from "@/lib/calendar/grid";
 
 /**
@@ -33,8 +34,32 @@ export interface CalendarItem extends GridItem {
   task?: { done: boolean };
 }
 
-const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const hourFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric" });
+/*
+ * Every time here is formatted in an explicit zone, passed in by the view.
+ * The grid renders on the server and hydrates in the browser; a formatter
+ * left on the runtime's zone printed "11p" for a 7pm EDT event in the
+ * server HTML (UTC on Vercel) and then changed it in the browser.
+ */
+const timeFormatters = new Map<string, Intl.DateTimeFormat>();
+const hourFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function timeFmt(timeZone: string): Intl.DateTimeFormat {
+  let f = timeFormatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone });
+    timeFormatters.set(timeZone, f);
+  }
+  return f;
+}
+
+function hourFmt(timeZone: string): Intl.DateTimeFormat {
+  let f = hourFormatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat(undefined, { hour: "numeric", timeZone });
+    hourFormatters.set(timeZone, f);
+  }
+  return f;
+}
 
 /**
  * The compact form a month chip uses: "6p", or "6:30p" when it is not on
@@ -44,25 +69,27 @@ const hourFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric" });
  *
  * Locales that do not use a meridiem fall back to their own short form.
  */
-export function chipTime(item: CalendarItem): string {
+export function chipTime(item: CalendarItem, timeZone: string): string {
   if (item.allDay) return "";
   const date = new Date(item.start);
-  const onTheHour = date.getMinutes() === 0;
-  const text = (onTheHour ? hourFmt : timeFmt).format(date);
+  // The minute in the display zone: a half-hour zone (India) puts a
+  // UTC-on-the-hour event at :30.
+  const onTheHour = zonedDateTimeLocal(date, timeZone).endsWith(":00");
+  const text = (onTheHour ? hourFmt(timeZone) : timeFmt(timeZone)).format(date);
   return text.replace(/\s*([AP])M$/i, (_, m: string) => m.toLowerCase()).replace(/\s+/g, "");
 }
 
 /** "6:00 PM", or "" for an all-day event. */
-export function shortTime(item: CalendarItem): string {
+export function shortTime(item: CalendarItem, timeZone: string): string {
   if (item.allDay) return "";
-  return timeFmt.format(new Date(item.start));
+  return timeFmt(timeZone).format(new Date(item.start));
 }
 
 /** "6:00 – 7:30 PM" on a chip and in a popover; "All day" for an all-day event. */
-export function timeRange(item: CalendarItem): string {
+export function timeRange(item: CalendarItem, timeZone: string): string {
   if (item.allDay) return "All day";
-  const start = timeFmt.format(new Date(item.start));
-  const end = timeFmt.format(new Date(item.end));
+  const start = timeFmt(timeZone).format(new Date(item.start));
+  const end = timeFmt(timeZone).format(new Date(item.end));
   if (start === end) return start;
   // Drop the meridiem from the start when both sides share it.
   const sm = start.slice(-2);
@@ -71,9 +98,14 @@ export function timeRange(item: CalendarItem): string {
 }
 
 /** The chip's accessible name: everything the visual chip drops on a phone. */
-export function itemLabel(item: CalendarItem, kindLabel: string, visibilityLabel: string): string {
+export function itemLabel(
+  item: CalendarItem,
+  kindLabel: string,
+  visibilityLabel: string,
+  timeZone: string,
+): string {
   if (item.task) return `Task: ${item.title}, due this day${item.task.done ? ", done" : ""}`;
-  const when = item.allDay ? "all day" : timeRange(item);
+  const when = item.allDay ? "all day" : timeRange(item, timeZone);
   const where = item.location ? `, ${item.location}` : "";
   return `${item.title}, ${when}${where}, ${kindLabel}, ${visibilityLabel}`;
 }

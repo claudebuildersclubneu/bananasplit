@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { safeCallbackUrl } from "@/lib/auth/callback-url";
+import { AFTER_SIGN_IN, safeCallbackUrl } from "@/lib/auth/callback-url";
 import { credentialsSignIn, SIGN_IN_UNAVAILABLE_MESSAGE } from "@/lib/auth/credentials-sign-in";
 
 export interface PasswordSignInState {
@@ -30,7 +30,7 @@ export async function passwordSignInAction(
   // Back to the page that sent them here (an email deep link), if it is a
   // same-origin relative path; otherwise the app home, which sends an
   // unverified account on to onboarding's "check your email" notice.
-  const redirectTo = safeCallbackUrl(formData.get("callbackUrl")) ?? "/app";
+  const redirectTo = safeCallbackUrl(formData.get("callbackUrl")) ?? AFTER_SIGN_IN;
 
   const result = await credentialsSignIn(email, password, redirectTo);
   if (!result.ok) return { error: MESSAGES[result.reason] };

@@ -124,6 +124,15 @@ export function TaskTable({
   const [confirmElement, confirmFlagged] = useConfirmFlagged();
   const [deleteConfirmEl, confirmDelete] = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // A selection belongs to the rows on screen. Another page, another filter
+  // or a different set of tasks starts it over, so nothing stays selected
+  // out of sight for a bulk Delete to take with it.
+  const rowsKey = `${page}:${tasks.map((t) => t.id).join(",")}`;
+  const [selectedRowsKey, setSelectedRowsKey] = useState(rowsKey);
+  if (selectedRowsKey !== rowsKey) {
+    setSelectedRowsKey(rowsKey);
+    setSelected(new Set());
+  }
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");

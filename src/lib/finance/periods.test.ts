@@ -7,6 +7,7 @@ import {
   fromDateValue,
   periodCovers,
   schoolYear,
+  schoolYearContaining,
   semester,
   toDateValue,
 } from "./periods";
@@ -15,17 +16,48 @@ const on = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12);
 
 describe("budget period presets", () => {
   it("the school year runs Aug 1 to Jul 31, starting this year from July", () => {
-    expect(schoolYear(on(2026, 9, 30))).toEqual({ label: "2026–27", startsOn: "2026-08-01", endsOn: "2027-07-31" });
-    expect(schoolYear(on(2027, 3, 2))).toEqual({ label: "2026–27", startsOn: "2026-08-01", endsOn: "2027-07-31" });
+    expect(schoolYear(on(2026, 9, 30))).toEqual({
+      label: "2026–27",
+      startsOn: "2026-08-01",
+      endsOn: "2027-07-31",
+    });
+    expect(schoolYear(on(2027, 3, 2))).toEqual({
+      label: "2026–27",
+      startsOn: "2026-08-01",
+      endsOn: "2027-07-31",
+    });
     expect(schoolYear(on(2027, 7, 15)).label).toBe("2027–28");
     expect(schoolYear(on(2099, 9, 1)).label).toBe("2099–00");
   });
 
+  it("the school year containing a date keeps July in the year that is ending", () => {
+    expect(schoolYearContaining(on(2026, 7, 15))).toEqual({
+      label: "2025–26",
+      startsOn: "2025-08-01",
+      endsOn: "2026-07-31",
+    });
+    expect(schoolYearContaining(on(2026, 7, 31)).label).toBe("2025–26");
+    expect(schoolYearContaining(on(2026, 8, 1)).label).toBe("2026–27");
+    expect(schoolYearContaining(on(2027, 3, 2)).label).toBe("2026–27");
+  });
+
   it("semesters and calendar years", () => {
-    expect(semester(on(2026, 9, 30))).toEqual({ label: "Fall 2026", startsOn: "2026-08-01", endsOn: "2026-12-31" });
-    expect(semester(on(2027, 2, 1))).toEqual({ label: "Spring 2027", startsOn: "2027-01-01", endsOn: "2027-05-31" });
+    expect(semester(on(2026, 9, 30))).toEqual({
+      label: "Fall 2026",
+      startsOn: "2026-08-01",
+      endsOn: "2026-12-31",
+    });
+    expect(semester(on(2027, 2, 1))).toEqual({
+      label: "Spring 2027",
+      startsOn: "2027-01-01",
+      endsOn: "2027-05-31",
+    });
     expect(semester(on(2027, 6, 20)).label).toBe("Summer 2027");
-    expect(calendarYear(on(2026, 9, 30))).toEqual({ label: "2026", startsOn: "2026-01-01", endsOn: "2026-12-31" });
+    expect(calendarYear(on(2026, 9, 30))).toEqual({
+      label: "2026",
+      startsOn: "2026-01-01",
+      endsOn: "2026-12-31",
+    });
   });
 });
 

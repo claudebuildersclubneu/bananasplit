@@ -84,6 +84,22 @@ describe("signUpAction (0A Fix 4(a,b))", () => {
     expect(outcome).toEqual({ redirectedTo: "/onboarding" });
   });
 
+  it("goes on to where the visitor was headed: a club's join link, or starting a club", async () => {
+    const data = form("a@example.edu");
+    data.set("callbackUrl", "/onboarding/organization");
+    expect(await submit(data)).toEqual({ redirectedTo: "/onboarding/organization" });
+    expect(signInMock).toHaveBeenCalledWith(
+      "a@example.edu",
+      "correct-horse-battery",
+      "/onboarding/organization",
+    );
+
+    // Never off-site: an unsafe value falls back to onboarding.
+    const unsafe = form("b@example.edu");
+    unsafe.set("callbackUrl", "https://evil.example/onboarding");
+    expect(await submit(unsafe)).toEqual({ redirectedTo: "/onboarding" });
+  });
+
   it("shows the check-your-email state when the automatic sign-in is refused", async () => {
     signInMock.mockResolvedValue({ ok: false, reason: "rate_limited" });
 

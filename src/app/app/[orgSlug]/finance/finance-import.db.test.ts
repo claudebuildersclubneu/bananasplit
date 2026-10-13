@@ -23,7 +23,12 @@ import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx, withSystemOrgTx } from "@/server/db/context";
 import { loadSetupState } from "@/server/finance/setup";
 
-import { checkImportDuplicates, importFinanceBudget, importFinanceRecords, undoFinanceImport } from "./import-actions";
+import {
+  checkImportDuplicates,
+  importFinanceBudget,
+  importFinanceRecords,
+  undoFinanceImport,
+} from "./import-actions";
 import { getDashboardData, getMyReimbursements } from "./queries";
 import { saveBudgetLines, setStartingBalance } from "./setup-actions";
 
@@ -40,10 +45,17 @@ let reachable = true;
 const as = (p: Person) => requireUserMock.mockResolvedValue(p);
 const batch = () => randomUUID().replace(/-/g, "").slice(0, 24);
 
-const thisYear = new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+const thisYear =
+  new Date().getMonth() >= 6 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 const day = (y: number, md: string) => `${y}-${md}`;
 
-const record = (date: string, description: string, amountCents: number, direction: "IN" | "OUT", category: string | null = null) => ({
+const record = (
+  date: string,
+  description: string,
+  amountCents: number,
+  direction: "IN" | "OUT",
+  category: string | null = null,
+) => ({
   date,
   description,
   amountCents,
@@ -61,18 +73,29 @@ beforeAll(async () => {
       ["member", "MEMBER"],
     ] as const) {
       people[key] = await authDb.user.create({
-        data: { email: `fim-${key}-${stamp}@example.edu`, name: `Fim ${key}`, emailVerified: new Date() },
+        data: {
+          email: `fim-${key}-${stamp}@example.edu`,
+          name: `Fim ${key}`,
+          emailVerified: new Date(),
+        },
         select: { id: true, email: true, name: true },
       });
       await withSystemOrgTx(orgId, { userId: people[key].id }, async ({ db }) => {
         if (key === "treasurer") {
-          await db.organization.create({ data: { id: orgId, name: "Finance import itest", slug: `fim-itest-${stamp}` } });
+          await db.organization.create({
+            data: { id: orgId, name: "Finance import itest", slug: `fim-itest-${stamp}` },
+          });
         }
-        await db.membership.create({ data: { organizationId: orgId, userId: people[key].id, role } });
+        await db.membership.create({
+          data: { organizationId: orgId, userId: people[key].id, role },
+        });
       });
     }
   } catch (error) {
-    console.warn("[finance-import.db.test] skipped:", error instanceof Error ? error.message : error);
+    console.warn(
+      "[finance-import.db.test] skipped:",
+      error instanceof Error ? error.message : error,
+    );
     reachable = false;
   }
 }, 30_000);
@@ -81,7 +104,9 @@ afterAll(async () => {
   if (reachable) {
     await withSystemOrgTx(orgId, ({ db }) => db.organization.deleteMany({ where: { id: orgId } }));
   }
-  const ids = Object.values(people).map((p) => p.id).filter(Boolean);
+  const ids = Object.values(people)
+    .map((p) => p.id)
+    .filter(Boolean);
   if (ids.length) await authDb.user.deleteMany({ where: { id: { in: ids } } });
   await disconnectAll();
 });
@@ -116,19 +141,30 @@ describe("finance setup and imports (db)", () => {
     expect(res.outcome?.categoriesCreated).toEqual(expect.arrayContaining(["Food", "Dues"]));
 
     await withSystemOrgTx(orgId, async ({ db }) => {
-      const past = await db.budgetPeriod.findFirstOrThrow({ where: { organizationId: orgId, label } });
+      const past = await db.budgetPeriod.findFirstOrThrow({
+        where: { organizationId: orgId, label },
+      });
       expect(past.isActive).toBe(false);
-      const rows = await db.transaction.findMany({ where: { organizationId: orgId }, include: { category: true } });
-      expect(rows.every((r) => r.status === "NOT_APPLICABLE" && r.submittedById === people.treasurer.id)).toBe(true);
+      const rows = await db.transaction.findMany({
+        where: { organizationId: orgId },
+        include: { category: true },
+      });
+      expect(
+        rows.every((r) => r.status === "NOT_APPLICABLE" && r.submittedById === people.treasurer.id),
+      ).toBe(true);
       expect(rows.find((r) => r.description === "Posters")?.category?.name).toBe("Marketing");
-      const audit = await db.financeAuditLog.findMany({ where: { organizationId: orgId, action: "IMPORT" } });
+      const audit = await db.financeAuditLog.findMany({
+        where: { organizationId: orgId, action: "IMPORT" },
+      });
       expect(audit).toHaveLength(3);
       expect(audit.every((a) => (a.diffJson as { batch?: string }).batch === first)).toBe(true);
       expect(audit.every((a) => a.actorId === people.treasurer.id)).toBe(true);
     });
 
     // Imported expenses are nobody's reimbursement request.
-    const mine = await withOrgTx(orgId, ({ db }) => getMyReimbursements(db, orgId, people.treasurer.id));
+    const mine = await withOrgTx(orgId, ({ db }) =>
+      getMyReimbursements(db, orgId, people.treasurer.id),
+    );
     expect(mine).toHaveLength(0);
   });
 
@@ -144,9 +180,32 @@ describe("finance setup and imports (db)", () => {
 
     const undone = await undoFinanceImport(orgId, first);
     expect(undone).toEqual({ removed: 3 });
-    const live = await withSystemOrgTx(orgId, ({ db }) => db.transaction.count({ where: { organizationId: orgId, voidedAt: null } }));
+    const live = await withSystemOrgTx(orgId, ({ db }) =>
+      db.transaction.count({ where: { organizationId: orgId, voidedAt: null } }),
+    );
     expect(live).toBe(0);
-    expect((await checkImportDuplicates(orgId, [{ date: day(thisYear - 1, "09-05"), amountCents: 8450, direction: "OUT" }])).duplicates).toEqual([]);
+    // Each row still gets its own VOID entry, the row before and after, by the treasurer.
+    const voids = await withSystemOrgTx(orgId, ({ db }) =>
+      db.financeAuditLog.findMany({
+        where: { organizationId: orgId, action: "VOID" },
+        select: { transactionId: true, actorId: true, diffJson: true },
+      }),
+    );
+    expect(voids).toHaveLength(3);
+    for (const v of voids) {
+      expect(v.actorId).toBe(people.treasurer.id);
+      expect(v.diffJson).toMatchObject({
+        before: { id: v.transactionId, voidedAt: null },
+        after: { id: v.transactionId, voidReason: "Deleted", reason: "import undone" },
+      });
+    }
+    expect(
+      (
+        await checkImportDuplicates(orgId, [
+          { date: day(thisYear - 1, "09-05"), amountCents: 8450, direction: "OUT" },
+        ])
+      ).duplicates,
+    ).toEqual([]);
     expect(await undoFinanceImport(orgId, first)).toEqual({ removed: 0 });
   });
 
@@ -157,19 +216,41 @@ describe("finance setup and imports (db)", () => {
     const res = await importFinanceRecords(orgId, {
       batch: second,
       source: "bank.csv",
-      records: [record(day(thisYear - 5, "10-01"), "Ancient", 100, "OUT"), record(day(thisYear, "10-01"), "Recent", 200, "IN")],
+      records: [
+        record(day(thisYear - 5, "10-01"), "Ancient", 100, "OUT"),
+        record(day(thisYear, "10-01"), "Recent", 200, "IN"),
+      ],
       createPeriods: false,
       createCategories: false,
       reconciled: true,
     });
     expect(res.outcome?.created).toBe(1);
-    expect(res.outcome?.skipped).toEqual([{ index: 0, reason: `No budget period covers ${day(thisYear - 5, "10-01")}.` }]);
+    expect(res.outcome?.skipped).toEqual([
+      { index: 0, reason: `No budget period covers ${day(thisYear - 5, "10-01")}.` },
+    ]);
     const row = await withSystemOrgTx(orgId, ({ db }) =>
       db.transaction.findFirstOrThrow({ where: { organizationId: orgId, description: "Recent" } }),
     );
     expect(row.reconciledById).toBe(people.treasurer.id);
     expect(row.statementRef).toBe("Imported from bank.csv");
     expect(await undoFinanceImport(orgId, second)).toEqual({ removed: 1 });
+    const undone = await withSystemOrgTx(orgId, async ({ db }) => ({
+      row: await db.transaction.findUniqueOrThrow({ where: { id: row.id } }),
+      audit: await db.financeAuditLog.findFirstOrThrow({
+        where: { transactionId: row.id, action: "VOID" },
+        select: { diffJson: true },
+      }),
+    }));
+    expect(undone.row).toMatchObject({
+      voidReason: "Deleted",
+      reconciledAt: null,
+      reconciledById: null,
+      statementRef: null,
+    });
+    expect(undone.audit.diffJson).toMatchObject({
+      before: { statementRef: "Imported from bank.csv" },
+      after: { reconciledAt: null, statementRef: null, reason: "import undone" },
+    });
   });
 
   it("puts a budget sheet's lines on the period, updating categories by name", async () => {
@@ -184,7 +265,9 @@ describe("finance setup and imports (db)", () => {
     });
     expect(res).toMatchObject({ updated: 1, created: 1 });
     const cats = await withSystemOrgTx(orgId, ({ db }) =>
-      db.budgetCategory.findMany({ where: { organizationId: orgId, budgetPeriod: { isActive: true } } }),
+      db.budgetCategory.findMany({
+        where: { organizationId: orgId, budgetPeriod: { isActive: true } },
+      }),
     );
     expect(cats.find((c) => c.name === "Food")?.allocatedCents).toBe(120000);
     expect(cats.find((c) => c.name === "Hackathon")?.allocatedCents).toBe(50000);
@@ -216,10 +299,15 @@ describe("finance setup and imports (db)", () => {
   it("saves the budget step's list: renames, amounts, removals, and keeps lines in use", async () => {
     if (!reachable) return;
     as(people.treasurer);
-    const state = await withOrgTx(orgId, ({ db }) => loadSetupState(db, orgId, people.treasurer.id));
+    const state = await withOrgTx(orgId, ({ db }) =>
+      loadSetupState(db, orgId, people.treasurer.id),
+    );
     const periodId = state.period!.id;
     const cats = await withSystemOrgTx(orgId, ({ db }) =>
-      db.budgetCategory.findMany({ where: { budgetPeriodId: periodId }, orderBy: { sortOrder: "asc" } }),
+      db.budgetCategory.findMany({
+        where: { budgetPeriodId: periodId },
+        orderBy: { sortOrder: "asc" },
+      }),
     );
     const food = cats.find((c) => c.name === "Food")!;
     const marketing = cats.find((c) => c.name === "Marketing")!;
@@ -230,13 +318,25 @@ describe("finance setup and imports (db)", () => {
     ]);
     expect(res).toEqual({ kept: 1 });
     const after = await withSystemOrgTx(orgId, ({ db }) =>
-      db.budgetCategory.findMany({ where: { budgetPeriodId: periodId }, orderBy: { sortOrder: "asc" } }),
+      db.budgetCategory.findMany({
+        where: { budgetPeriodId: periodId },
+        orderBy: { sortOrder: "asc" },
+      }),
     );
-    expect(after.map((c) => c.name).sort()).toEqual(["Food & drinks", "Marketing", "Speakers"].sort());
+    expect(after.map((c) => c.name).sort()).toEqual(
+      ["Food & drinks", "Marketing", "Speakers"].sort(),
+    );
     expect(after.find((c) => c.id === marketing.id)).toBeTruthy();
     expect(after.find((c) => c.name === "Food & drinks")?.allocatedCents).toBe(90000);
 
-    expect((await saveBudgetLines(orgId, periodId, [{ id: null, name: "A", allocatedCents: 1 }, { id: null, name: "a", allocatedCents: 2 }])).error).toMatch(/same name/);
+    expect(
+      (
+        await saveBudgetLines(orgId, periodId, [
+          { id: null, name: "A", allocatedCents: 1 },
+          { id: null, name: "a", allocatedCents: 2 },
+        ])
+      ).error,
+    ).toMatch(/same name/);
   });
 
   it("lets members do none of it", async () => {
@@ -251,11 +351,20 @@ describe("finance setup and imports (db)", () => {
       reconciled: false,
     });
     expect(res.error).toMatch(/owners and treasurers/);
-    expect((await setStartingBalance(orgId, { cents: 100, asOf: day(thisYear, "09-01") })).error).toMatch(/owners and treasurers/);
-    expect((await importFinanceBudget(orgId, { periodId: null, lines: [{ name: "X", allocatedCents: 1 }] })).error).toMatch(
+    expect(
+      (await setStartingBalance(orgId, { cents: 100, asOf: day(thisYear, "09-01") })).error,
+    ).toMatch(/owners and treasurers/);
+    expect(
+      (
+        await importFinanceBudget(orgId, {
+          periodId: null,
+          lines: [{ name: "X", allocatedCents: 1 }],
+        })
+      ).error,
+    ).toMatch(/owners and treasurers/);
+    expect((await checkImportDuplicates(orgId, [])).error).toMatch(/owners and treasurers/);
+    expect((await undoFinanceImport(orgId, "abcdefgh12345678")).error).toMatch(
       /owners and treasurers/,
     );
-    expect((await checkImportDuplicates(orgId, [])).error).toMatch(/owners and treasurers/);
-    expect((await undoFinanceImport(orgId, "abcdefgh12345678")).error).toMatch(/owners and treasurers/);
   });
 });

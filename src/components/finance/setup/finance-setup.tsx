@@ -137,7 +137,7 @@ export function FinanceSetup(props: FinanceSetupProps) {
   }, [step]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <nav aria-label="Setup steps" className="min-w-0 space-y-3">
         <div className="space-y-1.5">
           <p className="text-muted-foreground text-xs font-medium">
@@ -150,7 +150,9 @@ export function FinanceSetup(props: FinanceSetupProps) {
             />
           </div>
         </div>
-        <ol ref={strip} className="flex gap-1 overflow-x-auto lg:flex-col">
+        {/* relative: the steps' sr-only labels are absolutely positioned, and
+            without it they escape this scroller and widen the whole page. */}
+        <ol ref={strip} className="relative flex gap-1 overflow-x-auto lg:flex-col">
           {SETUP_STEPS.map((s, i) => {
             const done = stepDone(state, s.id);
             const StepIcon = STEP_ICON[s.id];

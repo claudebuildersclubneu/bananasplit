@@ -28,30 +28,27 @@ import { ownPreferredTitle } from "@/server/onboarding/title";
  * created (D6: app_service may insert a Membership only for app.user_id()).
  */
 
-interface InvitationRow {
-  id: string;
-  organizationId: string;
-  email: string;
-  role: Role;
-  expiresAt: Date;
-  acceptedAt: Date | null;
-  invitedById: string;
-  orgName: string;
-  orgSlug: string;
+/**
+ * The invitation behind an emailed link. `orgDeleted`: the club is scheduled
+ * for deletion, so the link can no longer be used (the page says so up
+ * front; acceptInvitation refuses it as org_inactive either way).
+ */
+export interface InvitationByToken extends InvitationForJoin {
+  orgDeleted: boolean;
 }
 
 /** The invitation behind an emailed link, or null for an unknown token. */
 export async function findInvitationByRawToken(
   rawToken: string,
-): Promise<InvitationForJoin | null> {
+): Promise<InvitationByToken | null> {
   if (!rawToken || rawToken.length > 200) return null;
   const hash = hashInvitationToken(rawToken);
   const rows = await withSystemOrgTx(
     null,
     ({ db }) =>
-      db.$queryRaw<InvitationRow[]>`
+      db.$queryRaw<InvitationByToken[]>`
       SELECT "id", "organizationId", "email", "role", "expiresAt", "acceptedAt", "invitedById",
-             "orgName", "orgSlug"
+             "orgName", "orgSlug", "orgDeleted"
         FROM app.invitation_by_token_hash(${hash})`,
   );
   return rows[0] ?? null;
@@ -74,7 +71,10 @@ export interface PendingInvitation {
   orgName: string;
 }
 
-/** Pending invitations to the caller's verified address (onboarding Join). */
+/**
+ * Pending invitations to the caller's verified address (onboarding Join).
+ * A club scheduled for deletion is left out by the function itself.
+ */
 export async function findPendingInvitationsForMe(userId: string): Promise<PendingInvitation[]> {
   const rows = await withUserTx(
     userId,

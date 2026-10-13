@@ -73,20 +73,26 @@ function upload(
   return POST(request, { params: Promise.resolve({ orgId: "org_1" }) });
 }
 
+const openExpense = {
+  id: "txn_1",
+  submittedById: "member_1",
+  kind: "EXPENSE",
+  status: "DRAFT",
+  reconciledAt: null,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   txKinds.length = 0;
   state.role = "MEMBER";
   state.member = true;
   getSessionMock.mockResolvedValue({ user: { id: "member_1", email: "m@example.edu", name: "M" } });
-  db.transaction.findFirst.mockResolvedValue({ id: "txn_1", submittedById: "member_1" });
+  db.transaction.findFirst.mockResolvedValue(openExpense);
   db.receipt.create.mockResolvedValue({ id: "receipt_1" });
-  putBlobMock.mockImplementation(
-    async (kind: string, scopeId: string, segments: string[]) => ({
-      key: [kind, scopeId, ...segments].join("/"),
-      url: null,
-    }),
-  );
+  putBlobMock.mockImplementation(async (kind: string, scopeId: string, segments: string[]) => ({
+    key: [kind, scopeId, ...segments].join("/"),
+    url: null,
+  }));
 });
 
 describe("POST /api/orgs/[orgId]/receipts (0A Fix 15, 0C wrappers)", () => {
@@ -151,7 +157,7 @@ describe("POST /api/orgs/[orgId]/receipts (0A Fix 15, 0C wrappers)", () => {
     const order: string[] = [];
     db.transaction.findFirst.mockImplementation(async () => {
       order.push("read");
-      return { id: "txn_1", submittedById: "member_1" };
+      return openExpense;
     });
     putBlobMock.mockImplementation(async () => {
       order.push("put");
@@ -164,9 +170,48 @@ describe("POST /api/orgs/[orgId]/receipts (0A Fix 15, 0C wrappers)", () => {
 
     await upload({ bytes: jpegOfSize(1024), name: "r.jpg", type: "image/jpeg" });
 
-    expect(order).toEqual(["read", "put", "write"]);
+    // The write transaction reads the row again before inserting (the lock).
+    expect(order).toEqual(["read", "put", "read", "write"]);
     // membership check, read, write: the write runs with action semantics.
     expect(txKinds).toEqual(["page", "page", "action"]);
+  });
+
+  it("refuses a receipt once the expense is approved, paid back, rejected or reconciled", async () => {
+    for (const locked of [
+      { status: "APPROVED" },
+      { status: "REIMBURSED" },
+      { status: "REJECTED" },
+      { reconciledAt: new Date() },
+    ]) {
+      db.transaction.findFirst.mockResolvedValue({ ...openExpense, ...locked });
+      const response = await upload({ bytes: jpegOfSize(10), name: "r.jpg", type: "image/jpeg" });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toMatch(/locked/);
+    }
+    expect(putBlobMock).not.toHaveBeenCalled();
+    expect(db.receipt.create).not.toHaveBeenCalled();
+  });
+
+  it("deletes the stored file when the expense was approved while it uploaded", async () => {
+    db.transaction.findFirst
+      .mockResolvedValueOnce(openExpense)
+      .mockResolvedValueOnce({ ...openExpense, status: "APPROVED" });
+    const response = await upload({ bytes: jpegOfSize(10), name: "r.jpg", type: "image/jpeg" });
+    expect(response.status).toBe(409);
+    expect(db.receipt.create).not.toHaveBeenCalled();
+    const segments = putBlobMock.mock.calls[0]?.[2] as string[];
+    expect(deleteMock).toHaveBeenCalledWith([`receipts/org_1/${segments.join("/")}`]);
+  });
+
+  it("only finance adds paperwork to a record outside the approval flow", async () => {
+    db.transaction.findFirst.mockResolvedValue({ ...openExpense, status: "NOT_APPLICABLE" });
+    expect(
+      (await upload({ bytes: jpegOfSize(10), name: "r.jpg", type: "image/jpeg" })).status,
+    ).toBe(409);
+    state.role = "TREASURER";
+    expect(
+      (await upload({ bytes: jpegOfSize(10), name: "r.jpg", type: "image/jpeg" })).status,
+    ).toBe(201);
   });
 
   it("deletes the blob again when the row cannot be written", async () => {
@@ -196,7 +241,7 @@ describe("POST /api/orgs/[orgId]/receipts (0A Fix 15, 0C wrappers)", () => {
   });
 
   it("only the submitter or OWNER/TREASURER may attach", async () => {
-    db.transaction.findFirst.mockResolvedValue({ id: "txn_1", submittedById: "someone_else" });
+    db.transaction.findFirst.mockResolvedValue({ ...openExpense, submittedById: "someone_else" });
     const response = await upload({ bytes: jpegOfSize(10), name: "r.jpg", type: "image/jpeg" });
     expect(response.status).toBe(403);
 
@@ -214,7 +259,7 @@ describe("POST /api/orgs/[orgId]/receipts (0A Fix 15, 0C wrappers)", () => {
     expect(response.status).toBe(404);
     expect(db.transaction.findFirst).toHaveBeenCalledWith({
       where: { id: "foreign", organizationId: "org_1" },
-      select: { id: true, submittedById: true },
+      select: { id: true, submittedById: true, kind: true, status: true, reconciledAt: true },
     });
   });
 

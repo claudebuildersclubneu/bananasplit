@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
+import { zonedTimeToInstant } from "./dates";
 import {
   agendaDays,
   bucketByDay,
   dayWindowFor,
   itemDayKeys,
-  localDayKey,
   MIN_SLOT_MINUTES,
   monthGridShape,
   monthWindowFor,
@@ -19,38 +19,61 @@ import {
 } from "./grid";
 
 /**
- * The calendar's layout maths. These run in the suite's default timezone
- * (America/New_York, see vitest config / the TZ the rest of the calendar
- * tests assume), which is also what makes the "timed events bucket by the
- * VIEWER's local day" rule observable.
+ * The calendar's layout maths, for a viewer in New York while the process
+ * itself runs in UTC: the server's zone on Vercel. Every timed event is
+ * placed in the zone passed in, so nothing here may depend on the runtime's
+ * own zone, and running the whole file in a zone that differs from the
+ * viewer's is what proves it.
  */
+const runtimeZone = process.env.TZ;
+process.env.TZ = "UTC";
+afterAll(() => {
+  if (runtimeZone === undefined) delete process.env.TZ;
+  else process.env.TZ = runtimeZone;
+});
 
-const timed = (id: string, start: string, end: string): GridItem => ({ id, start, end, allDay: false });
-const allDay = (id: string, start: string, end: string): GridItem => ({ id, start, end, allDay: true });
+const NY = "America/New_York";
 
-/** An ISO instant for a local wall-clock time. */
+const timed = (id: string, start: string, end: string): GridItem => ({
+  id,
+  start,
+  end,
+  allDay: false,
+});
+const allDay = (id: string, start: string, end: string): GridItem => ({
+  id,
+  start,
+  end,
+  allDay: true,
+});
+
+/** An ISO instant for a New York wall-clock time. */
 function at(day: string, hour: number, minute = 0): string {
-  return new Date(`${day}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString();
+  return zonedTimeToInstant(day, NY, hour, minute).toISOString();
 }
 
 describe("itemDayKeys", () => {
-  it("puts a timed event on its local day", () => {
-    expect(itemDayKeys(timed("a", at("2026-09-24", 18), at("2026-09-24", 19)))).toEqual(["2026-09-24"]);
+  it("puts a timed event on its day in the viewer's zone", () => {
+    expect(itemDayKeys(timed("a", at("2026-09-24", 18), at("2026-09-24", 19)), NY)).toEqual([
+      "2026-09-24",
+    ]);
   });
 
   it("keeps an event that ends exactly at midnight on the day it started", () => {
-    expect(itemDayKeys(timed("a", at("2026-09-24", 21), at("2026-09-25", 0)))).toEqual(["2026-09-24"]);
+    expect(itemDayKeys(timed("a", at("2026-09-24", 21), at("2026-09-25", 0)), NY)).toEqual([
+      "2026-09-24",
+    ]);
   });
 
   it("spans a timed event that runs past midnight", () => {
-    expect(itemDayKeys(timed("a", at("2026-09-24", 21), at("2026-09-25", 1)))).toEqual([
+    expect(itemDayKeys(timed("a", at("2026-09-24", 21), at("2026-09-25", 1)), NY)).toEqual([
       "2026-09-24",
       "2026-09-25",
     ]);
   });
 
   it("covers every day of an all-day span, exclusive end", () => {
-    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-27"))).toEqual([
+    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-27"), NY)).toEqual([
       "2026-09-24",
       "2026-09-25",
       "2026-09-26",
@@ -58,8 +81,8 @@ describe("itemDayKeys", () => {
   });
 
   it("treats a one-day all-day event as one day", () => {
-    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-25"))).toEqual(["2026-09-24"]);
-    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-24"))).toEqual(["2026-09-24"]);
+    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-25"), NY)).toEqual(["2026-09-24"]);
+    expect(itemDayKeys(allDay("a", "2026-09-24", "2026-09-24"), NY)).toEqual(["2026-09-24"]);
   });
 });
 
@@ -68,12 +91,12 @@ describe("bucketByDay", () => {
     const later = timed("later", at("2026-09-24", 19), at("2026-09-24", 20));
     const earlier = timed("earlier", at("2026-09-24", 9), at("2026-09-24", 10));
     const whole = allDay("whole", "2026-09-24", "2026-09-25");
-    const bucket = bucketByDay([later, earlier, whole]).get("2026-09-24");
+    const bucket = bucketByDay([later, earlier, whole], NY).get("2026-09-24");
     expect(bucket?.map((i) => i.id)).toEqual(["whole", "earlier", "later"]);
   });
 
   it("puts a multi-day event in every day it covers", () => {
-    const byDay = bucketByDay([allDay("trip", "2026-09-24", "2026-09-26")]);
+    const byDay = bucketByDay([allDay("trip", "2026-09-24", "2026-09-26")], NY);
     expect(byDay.get("2026-09-24")?.length).toBe(1);
     expect(byDay.get("2026-09-25")?.length).toBe(1);
     expect(byDay.get("2026-09-26")).toBeUndefined();
@@ -107,8 +130,8 @@ describe("monthGridShape", () => {
 describe("placeDayItems", () => {
   const day = "2026-09-24";
 
-  it("places an event by minutes from local midnight", () => {
-    const [placed] = placeDayItems(day, [timed("a", at(day, 18), at(day, 19, 30))]);
+  it("places an event by minutes from midnight in the viewer's zone", () => {
+    const [placed] = placeDayItems(day, [timed("a", at(day, 18), at(day, 19, 30))], NY);
     expect(placed.startMinutes).toBe(18 * 60);
     expect(placed.endMinutes).toBe(19 * 60 + 30);
     expect(placed.lanes).toBe(1);
@@ -116,48 +139,51 @@ describe("placeDayItems", () => {
   });
 
   it("gives overlapping events their own lanes", () => {
-    const placed = placeDayItems(day, [
-      timed("a", at(day, 18), at(day, 20)),
-      timed("b", at(day, 19), at(day, 21)),
-    ]);
+    const placed = placeDayItems(
+      day,
+      [timed("a", at(day, 18), at(day, 20)), timed("b", at(day, 19), at(day, 21))],
+      NY,
+    );
     expect(placed.map((p) => p.lane)).toEqual([0, 1]);
     expect(placed.every((p) => p.lanes === 2)).toBe(true);
   });
 
   it("reuses a lane once the earlier event has finished", () => {
-    const placed = placeDayItems(day, [
-      timed("a", at(day, 18), at(day, 19)),
-      timed("b", at(day, 19), at(day, 20)),
-    ]);
+    const placed = placeDayItems(
+      day,
+      [timed("a", at(day, 18), at(day, 19)), timed("b", at(day, 19), at(day, 20))],
+      NY,
+    );
     // Separate clusters: each gets the full width.
     expect(placed.every((p) => p.lanes === 1)).toBe(true);
   });
 
   it("separates events that only collide once drawn at the minimum height", () => {
-    const placed = placeDayItems(day, [
-      timed("a", at(day, 18), at(day, 18, 15)),
-      timed("b", at(day, 18, 20), at(day, 18, 35)),
-    ]);
+    const placed = placeDayItems(
+      day,
+      [timed("a", at(day, 18), at(day, 18, 15)), timed("b", at(day, 18, 20), at(day, 18, 35))],
+      NY,
+    );
     expect(placed.every((p) => p.lanes === 2)).toBe(true);
     expect(MIN_SLOT_MINUTES).toBeGreaterThan(15);
   });
 
   it("clamps an event that began the day before and flags it", () => {
-    const placed = placeDayItems(day, [timed("a", at("2026-09-23", 22), at(day, 1))]);
+    const placed = placeDayItems(day, [timed("a", at("2026-09-23", 22), at(day, 1))], NY);
     expect(placed[0].startMinutes).toBe(0);
     expect(placed[0].endMinutes).toBe(60);
     expect(placed[0].continuesFrom).toBe(true);
   });
 
   it("clamps an event running past midnight and flags it", () => {
-    const placed = placeDayItems(day, [timed("a", at(day, 22), at("2026-09-25", 1))]);
+    const placed = placeDayItems(day, [timed("a", at(day, 22), at("2026-09-25", 1))], NY);
     expect(placed[0].startMinutes).toBe(22 * 60);
     expect(placed[0].endMinutes).toBe(1440);
     expect(placed[0].continuesInto).toBe(true);
   });
 
   it("leaves all-day events out of the hour column", () => {
-    expect(placeDayItems(day, [allDay("a", day, "2026-09-25")])).toEqual([]);
+    expect(placeDayItems(day, [allDay("a", day, "2026-09-25")], NY)).toEqual([]);
   });
 });
 
@@ -167,12 +193,16 @@ describe("visibleHourRange", () => {
   });
 
   it("frames the events with an hour either side", () => {
-    const range = visibleHourRange([{ startMinutes: 18 * 60, endMinutes: 20 * 60 }], { minHours: 4 });
+    const range = visibleHourRange([{ startMinutes: 18 * 60, endMinutes: 20 * 60 }], {
+      minHours: 4,
+    });
     expect(range).toEqual({ startHour: 17, endHour: 21 });
   });
 
   it("widens a narrow band up to the minimum", () => {
-    const range = visibleHourRange([{ startMinutes: 18 * 60, endMinutes: 19 * 60 }], { minHours: 10 });
+    const range = visibleHourRange([{ startMinutes: 18 * 60, endMinutes: 19 * 60 }], {
+      minHours: 10,
+    });
     expect(range.endHour - range.startHour).toBe(10);
     expect(range.startHour).toBeLessThanOrEqual(17);
     expect(range.endHour).toBeLessThanOrEqual(24);
@@ -193,13 +223,14 @@ describe("agendaDays", () => {
       ],
       "2026-09-23",
       7,
+      NY,
     );
     expect(days.map((d) => d.key)).toEqual(["2026-09-24", "2026-09-26"]);
     expect(days[0].items.map((i) => i.id)).toEqual(["a"]);
   });
 
   it("is empty when the window has nothing", () => {
-    expect(agendaDays([], "2026-09-23", 7)).toEqual([]);
+    expect(agendaDays([], "2026-09-23", 7, NY)).toEqual([]);
   });
 });
 
@@ -234,10 +265,32 @@ describe("windows", () => {
   });
 });
 
-describe("localDayKey", () => {
-  it("reads the local calendar date, not the UTC one", () => {
-    // 9pm local on the 24th is the 25th in UTC for a western zone.
-    const evening = new Date(at("2026-09-24", 21));
-    expect(localDayKey(evening)).toBe("2026-09-24");
+describe("an evening event on a UTC server", () => {
+  // 8-10pm EDT on Thursday the 24th is 00:00-02:00 UTC on Friday the 25th.
+  const evening = timed("social", at("2026-09-24", 20), at("2026-09-24", 22));
+
+  it("runs this file in a zone that differs from the viewer's", () => {
+    expect(new Date(evening.start).getUTCHours()).toBe(0);
+    expect(new Date(evening.start).getHours()).toBe(0);
+  });
+
+  it("lands in the viewer's Thursday cell, not the server's Friday", () => {
+    expect(itemDayKeys(evening, NY)).toEqual(["2026-09-24"]);
+    const byDay = bucketByDay([evening], NY);
+    expect(byDay.get("2026-09-24")?.map((i) => i.id)).toEqual(["social"]);
+    expect(byDay.has("2026-09-25")).toBe(false);
+  });
+
+  it("sits at 8pm in the viewer's hour column", () => {
+    const [placed] = placeDayItems("2026-09-24", [evening], NY);
+    expect(placed.startMinutes).toBe(20 * 60);
+    expect(placed.endMinutes).toBe(22 * 60);
+    expect(placed.continuesInto).toBe(false);
+  });
+
+  it("is placed in whichever zone is passed in", () => {
+    // The same instant for a viewer in UTC really is Friday, midnight to 2am.
+    expect(itemDayKeys(evening, "UTC")).toEqual(["2026-09-25"]);
+    expect(placeDayItems("2026-09-25", [evening], "UTC")[0].startMinutes).toBe(0);
   });
 });

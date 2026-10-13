@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { MAX_IMPORT_TEXT, SheetSample } from "@/lib/ai/finance-sheet";
+import { MAX_IMPORT_TEXT } from "@/lib/ai/finance-sheet";
+import { SheetSample } from "@/lib/ai/finance-sheet.schema";
 import { SHOT_IMAGE_TYPES, type ShotImageType } from "@/lib/ai/calendar-shot";
 import { NotFoundError } from "@/lib/auth/errors";
 import { getSession } from "@/lib/auth/session";

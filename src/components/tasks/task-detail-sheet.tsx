@@ -1,9 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
-import { TaskEditor, type TaskEditorDefaults } from "./task-editor";
+import type { TaskEditorDefaults } from "./task-editor";
 import type { TaskItem } from "./types";
+
+// The editor brings markdown, mentions and comments with it. Every layout
+// renders this sheet, but most visits never open it, so the editor's code
+// is fetched the first time the panel opens rather than with the page.
+const TaskEditor = dynamic(() => import("./task-editor").then((m) => m.TaskEditor), {
+  ssr: false,
+});
 
 /**
  * The one task surface.
@@ -24,6 +33,7 @@ export function TaskDetailSheet({
   task,
   defaults,
   onOpenTask,
+  onChanged,
   busy,
 }: {
   open: boolean;
@@ -31,6 +41,8 @@ export function TaskDetailSheet({
   task: TaskItem | null;
   defaults?: TaskEditorDefaults;
   onOpenTask: (taskId: string) => void;
+  /** Reads the shown task again after a change made from the panel. */
+  onChanged: (taskId: string) => Promise<void>;
   busy?: boolean;
 }) {
   const heading = task ? task.title : defaults?.parentTaskId ? "New subtask" : "New task";
@@ -49,14 +61,19 @@ export function TaskDetailSheet({
         </SheetDescription>
         {open && (
           <TaskEditor
+            // Keyed on the version too, so a reloaded task (after joining,
+            // say) starts the form from what was saved, with the version a
+            // later Save must send.
             key={
-              task?.id ??
-              `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.projectId ?? ""}-${defaults?.dueDate ?? ""}`
+              task
+                ? `${task.id}-${task.version}`
+                : `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.projectId ?? ""}-${defaults?.dueDate ?? ""}`
             }
             task={task}
             defaults={defaults}
             onDone={() => onOpenChange(false)}
             onOpenTask={onOpenTask}
+            onChanged={task ? () => onChanged(task.id) : undefined}
           />
         )}
       </SheetContent>

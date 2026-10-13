@@ -26,7 +26,7 @@ export default async function DataSourceIntegrationPage({
         title="Website data (Supabase)"
         description="Check-ins, signups and ballots from your website's Supabase database, synced into the Databases and Reports sections. The portal connects with a read-only role that can only call the export functions."
       />
-      <StatusPanel dto={dto} secretLabel="Password" />
+      <StatusPanel dto={dto} secretLabel="Password" timeZone={organization.timezone} />
       {version && (
         <p className="text-muted-foreground text-sm">Export contract version {version}.</p>
       )}

@@ -109,6 +109,26 @@ export function TasksProvider({
     [org.id, announce],
   );
 
+  // The panel holds its own copy of the task, and the layouts' refresh()
+  // never reaches it. After a change made from inside the panel (a subtask
+  // ticked or added, joining, taking ownership, a flag acknowledged) it
+  // reads the task again, so the panel shows what was saved and a later
+  // Save sends the current version.
+  const reloadTask = useCallback(
+    async (taskId: string) => {
+      const loaded = await loadTaskDetail(org.id, taskId);
+      if (!loaded) {
+        // Leaving a private task can take it out of reach.
+        setOpen(false);
+        setTask(null);
+        announce("That task is no longer available to you.");
+        return;
+      }
+      setTask((current) => (current?.id === taskId ? loaded : current));
+    },
+    [org.id, announce],
+  );
+
   const newTask = useCallback((next?: TaskEditorDefaults) => {
     setTask(null);
     setDefaults(next);
@@ -146,6 +166,7 @@ export function TasksProvider({
         task={task}
         defaults={defaults}
         onOpenTask={openTask}
+        onChanged={reloadTask}
         busy={isLoadingTask}
       />
       <div

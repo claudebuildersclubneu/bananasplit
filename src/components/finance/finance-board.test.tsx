@@ -105,7 +105,25 @@ describe("finance board: the runway widget", () => {
     expect(html).toContain("$1,200");
     expect(html).toContain("Waiting for approval");
     expect(html).toContain("$45.00 to review");
-    expect(html).toContain('href="/app/cbc/finance/transactions?status=SUBMITTED"');
+    // Waiting requests span every period, so the list opens on all of them.
+    expect(html).toContain('href="/app/cbc/finance/transactions?status=SUBMITTED&amp;period=all"');
+  });
+
+  it("renders chart widgets without loading the chart code on the server", () => {
+    const html = render(
+      {
+        ...dashboard({}),
+        burnByMonth: [{ month: "2026-09", inCents: 10_000, outCents: 4_000 }],
+        balanceTrend: [{ date: "2026-09-01", balanceCents: 6_000 }],
+      },
+      [
+        { id: "burn", type: "burn", w: 2, h: null },
+        { id: "trend", type: "trend", w: 2, h: null },
+      ],
+    );
+    // next/dynamic with ssr: false: the placeholder, not a recharts svg.
+    expect(html).toContain("animate-pulse");
+    expect(html).not.toContain("recharts");
   });
 
   it("offers a way back when the board is empty", () => {

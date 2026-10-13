@@ -1413,9 +1413,12 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
     "app_service",
     null,
     async (q) =>
-      (await q(`SELECT "organizationId", "orgSlug" FROM app.invitation_by_token_hash('tokhash_A')`))
-        .rows,
-    { value: [{ organizationId: "org_A", orgSlug: "fx-a" }] },
+      (
+        await q(
+          `SELECT "organizationId", "orgSlug", "orgDeleted" FROM app.invitation_by_token_hash('tokhash_A')`,
+        )
+      ).rows,
+    { value: [{ organizationId: "org_A", orgSlug: "fx-a", orgDeleted: false }] },
   );
   await tcase(
     "T26b",
@@ -1936,6 +1939,10 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // policies cannot recurse into themselves. Answers only about
         // app.user_id().
         "can_read_task",
+        // The bell: the same rule asked about the task's own org, so a task
+        // notification reads without an org in context. Answers only about
+        // app.user_id().
+        "can_read_task_in_its_org",
         "can_view_ballot_rows",
         "can_view_rows",
         "cancel_job",
@@ -2149,6 +2156,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       finish_job: "s",
       ics_token_created_at: "u",
       immutable_columns: "",
+      // Recreated (new "orgDeleted" column) in 20261013130000_audit_db_fixes
+      // with the same grant.
       invitation_by_token_hash: "s",
       is_finance: "us",
       is_org_admin: "us",
@@ -2223,6 +2232,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       // grant; only the table owner fires them).
       can_read_task: "us",
       task_visibility_inherit: "",
+      // The bell's Notification read policy (app_user only)
+      can_read_task_in_its_org: "u",
       // Onboarding: "Join with invite code" (verified callers only)
       org_by_join_code: "u",
       // Another member's busy hours: never the rules, and only as the org allows

@@ -1,7 +1,7 @@
 import { SETTINGS_SECTIONS } from "@/app/app/[orgSlug]/settings/settings-nav";
 import type { Role } from "@/generated/prisma/enums";
 import { can, type Permission } from "@/lib/auth/permissions";
-import type { SectionId } from "@/lib/nav/sidebar";
+import type { SectionId } from "@/lib/nav/sections";
 import { scoreFields, type ParsedQuery } from "@/lib/search/text";
 
 /**

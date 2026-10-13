@@ -95,6 +95,11 @@ export function TransactionTable({
     router.refresh();
   }
 
+  function openTransaction(id: string) {
+    setOpenId(id);
+    setDialogOpen(true);
+  }
+
   if (transactions.length === 0) {
     return <EmptyState title="No transactions here" description={emptyDescription} />;
   }
@@ -120,13 +125,27 @@ export function TransactionTable({
             <TableRow
               key={t.id}
               className={cn("cursor-pointer", t.voidedAt && "opacity-50")}
-              onClick={() => {
-                setOpenId(t.id);
-                setDialogOpen(true);
-              }}
+              onClick={() => openTransaction(t.id)}
             >
               <TableCell className="whitespace-nowrap">{formatFinanceDate(t.occurredAt)}</TableCell>
-              <TableCell className={cn(t.voidedAt && "line-through")}>{t.description}</TableCell>
+              <TableCell>
+                {/* The row opens on a click anywhere; this button is the
+                    same thing for the keyboard and screen readers. */}
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  className={cn(
+                    "focus-visible:ring-ring/50 rounded-sm text-left outline-none hover:underline focus-visible:ring-3",
+                    t.voidedAt && "line-through",
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTransaction(t.id);
+                  }}
+                >
+                  {t.description}
+                </button>
+              </TableCell>
               <TableCell>{t.category?.name ?? "—"}</TableCell>
               <TableCell>{t.submittedBy.name ?? t.submittedBy.email}</TableCell>
               <TableCell>
@@ -144,7 +163,7 @@ export function TransactionTable({
                 {formatCents(t.amountCents)}
               </TableCell>
               <TableCell className="w-10 py-1 text-right">
-                {/* Opening it is the row click; the menu holds the rest. */}
+                {/* Opening it is the row (or its description); the menu holds the rest. */}
                 <ItemMenu
                   label={`Actions for ${t.description}`}
                   items={[

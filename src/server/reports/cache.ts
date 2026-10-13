@@ -32,7 +32,9 @@ import type { ReportId, ReportPayloads, ReportResult, ReportTier } from "./types
  * membership, derived the tier and checked visibility (visibility.ts).
  */
 
-export const REPORT_CACHE_VERSION = "v1";
+// Bump when a payload's shape or privacy rules change, so no entry computed
+// the old way is served again (v2: ballot complementary suppression).
+export const REPORT_CACHE_VERSION = "v2";
 
 /** reportsRefreshSeconds is clamped to this window (unstable_cache refuses 0). */
 export const MIN_REFRESH_SECONDS = 30;

@@ -52,7 +52,7 @@ export default async function EmailIntegrationPage({
           ? ` Your domain is ${domainStatus.replace(/_/g, " ")} in Resend.`
           : ""}
       </p>
-      <StatusPanel dto={dto} secretLabel="API key" />
+      <StatusPanel dto={dto} secretLabel="API key" timeZone={organization.timezone} />
       <EmailSenderForm
         orgId={organization.id}
         dto={dto}

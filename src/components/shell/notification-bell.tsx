@@ -24,6 +24,7 @@ interface NotificationItem {
   createdAt: Date;
 }
 
+/** How often a visible tab refreshes the bell. A hidden tab doesn't poll. */
 const POLL_INTERVAL_MS = 60_000;
 
 export function NotificationBell() {
@@ -44,11 +45,30 @@ export function NotificationBell() {
       }
     }
 
-    void refresh();
-    const interval = setInterval(refresh, POLL_INTERVAL_MS);
+    // Poll only while the tab is visible: a background tab would otherwise
+    // run a server action every minute for nobody. Showing the tab again
+    // refreshes once and restarts the clock.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    function stop() {
+      if (interval !== null) clearInterval(interval);
+      interval = null;
+    }
+    function resume() {
+      stop();
+      void refresh();
+      interval = setInterval(() => void refresh(), POLL_INTERVAL_MS);
+    }
+    function handleVisibilityChange() {
+      if (document.hidden) stop();
+      else resume();
+    }
+
+    if (!document.hidden) resume();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stop();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

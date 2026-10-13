@@ -4,12 +4,14 @@ import { FINANCE_CARD_IDS } from "@/lib/finance/dashboard-cards";
 import {
   MEETING_WEEKS_AHEAD,
   describeMeeting,
-  financeInputSchema,
   fiscalYearFor,
   meetingOccurrences,
+} from "@/lib/onboarding/org";
+import {
+  financeInputSchema,
   taskLabelsInputSchema,
   teamsInputSchema,
-} from "@/lib/onboarding/org";
+} from "@/lib/onboarding/org.schema";
 import { localDateKey } from "@/lib/tasks/dates";
 import { writeOrgAuditLog } from "@/server/audit";
 import { invalidate } from "@/server/cache/invalidate";

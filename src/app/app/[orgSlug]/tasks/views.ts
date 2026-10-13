@@ -84,6 +84,17 @@ export function parseTaskView(value: unknown): TaskView | null {
   return null;
 }
 
+/**
+ * The remembered view is only ever a layout. Requests and the Sunday update
+ * are places you go on purpose; reopening Tasks on the update composer
+ * because that was the last thing you did would be a surprise, and a cookie
+ * written before this rule may still hold one of them.
+ */
+export function parseRememberedLayout(value: unknown): TaskLayout | null {
+  const view = parseTaskView(value);
+  return isLayout(view) ? view : null;
+}
+
 export function parseScope(value: unknown): TaskScope | null {
   return TASK_SCOPES.some((s) => s.value === value) ? (value as TaskScope) : null;
 }
@@ -116,7 +127,7 @@ export function parseWorkspaceQuery(
   rememberedView: string | undefined,
 ): WorkspaceQuery {
   const raw = str(query.view);
-  const view = parseTaskView(raw) ?? parseTaskView(rememberedView) ?? DEFAULT_TASK_LAYOUT;
+  const view = parseTaskView(raw) ?? parseRememberedLayout(rememberedView) ?? DEFAULT_TASK_LAYOUT;
   const ownerId = str(query.owner);
   const assigneeId = str(query.assignee);
   const statusParam = str(query.status);

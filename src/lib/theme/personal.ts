@@ -1,10 +1,11 @@
-import { z } from "zod";
-
 import { deriveDarkRoles, deriveTheme } from "./derive";
+import type { PersonalTheme } from "./personal.schema";
 import { CUSTOM_PRESET_ID, DEFAULT_PRESET_ID, findPreset } from "./presets";
 import type { ResolvedTheme } from "./resolve";
+import { parseRoles } from "./roles";
 import type { ThemeRoles } from "./types";
-import { parseRoles, rolesSchema } from "./validate";
+
+export type { PersonalTheme } from "./personal.schema";
 
 /**
  * A member's personal theme (onboarding A4, and the profile page). It only
@@ -14,40 +15,13 @@ import { parseRoles, rolesSchema } from "./validate";
  * Stored on User.themePreference as { preset, mode, custom? }: a preset id
  * from src/lib/theme/presets.ts or "custom" with five strict-hex colours
  * (the light palette; the dark one is derived). NULL = follow the org.
+ *
+ * Client-safe (the theme picker uses it): the zod schema and
+ * parsePersonalTheme are in ./personal.schema (server only).
  */
 
 export const PERSONAL_MODES = ["light", "dark", "system"] as const;
 export type PersonalMode = (typeof PERSONAL_MODES)[number];
-
-export const personalThemeSchema = z
-  .object({
-    preset: z.string().regex(/^[a-z0-9-]{1,32}$/),
-    mode: z.enum(PERSONAL_MODES),
-    custom: rolesSchema.nullable().optional(),
-  })
-  .strict()
-  .refine((t) => t.preset === CUSTOM_PRESET_ID || findPreset(t.preset), {
-    message: "Pick a theme from the list.",
-    path: ["preset"],
-  })
-  .refine((t) => t.preset !== CUSTOM_PRESET_ID || Boolean(t.custom), {
-    message: "Pick your five colours.",
-    path: ["custom"],
-  })
-  .transform((t) => ({
-    preset: t.preset,
-    mode: t.mode,
-    custom: t.preset === CUSTOM_PRESET_ID ? (t.custom ?? null) : null,
-  }));
-
-export type PersonalTheme = z.output<typeof personalThemeSchema>;
-
-/** A stored value, or null (follow the org) when missing or malformed. */
-export function parsePersonalTheme(raw: unknown): PersonalTheme | null {
-  if (!raw) return null;
-  const parsed = personalThemeSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
-}
 
 /** The light and dark palettes a personal theme stands for. */
 export function personalPalettes(

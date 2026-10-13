@@ -1,10 +1,11 @@
-import { z } from "zod";
-
 /**
  * Boards of widgets a member arranges for themselves (the Overview, the
  * Finance dashboard). A widget is a type, a width in columns (1-4 on a wide
  * screen) and a height: null to fit its content, or pixels (dragged, or
  * picked from the presets). Saved per member and per org in MemberPrefs.
+ *
+ * Client-safe and zod-free (the board is a client component); the save
+ * action's schema is in ./schema.
  */
 
 export const BOARD_COLUMNS = 4;
@@ -50,44 +51,48 @@ export function clampHeight(h: number | null): number | null {
 
 const LEGACY_WIDTH: Record<string, number> = { sm: 1, md: 2, lg: 4 };
 
-/** Parses a saved board against the known types; also reads the old { size } shape. */
+const WIDGET_ID = /^[a-z0-9-]{1,40}$/;
+
+const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/**
+ * One saved widget, or null when it is malformed: an id, a type, and
+ * optionally a width, a height (null to fit) or the old size.
+ */
+function readWidget(
+  raw: unknown,
+): { id: string; type: string; w?: number; h?: number | null; size?: string } | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const { id, type, w, h, size } = raw as Record<string, unknown>;
+  if (typeof id !== "string" || !WIDGET_ID.test(id) || typeof type !== "string") return null;
+  if (w !== undefined && !isNumber(w)) return null;
+  if (h !== undefined && h !== null && !isNumber(h)) return null;
+  if (size !== undefined && !(typeof size === "string" && Object.hasOwn(LEGACY_WIDTH, size)))
+    return null;
+  return { id, type, w, h, size };
+}
+
+/**
+ * Parses a saved board against the known types; also reads the old { size }
+ * shape. A malformed widget makes the whole board unreadable (null), so the
+ * page falls back to the default board.
+ */
 export function parseBoard(saved: unknown, types: readonly string[]): BoardWidget[] | null {
   if (!Array.isArray(saved) || saved.length > MAX_WIDGETS) return null;
   const known = new Set(types);
   const ids = new Set<string>();
   const out: BoardWidget[] = [];
   for (const raw of saved) {
-    const item = z
-      .object({
-        id: z.string().regex(/^[a-z0-9-]{1,40}$/),
-        type: z.string(),
-        w: z.number().optional(),
-        h: z.number().nullable().optional(),
-        size: z.enum(["sm", "md", "lg"]).optional(),
-      })
-      .safeParse(raw);
-    if (!item.success) return null;
-    const { id, type } = item.data;
+    const item = readWidget(raw);
+    if (!item) return null;
+    const { id, type } = item;
     if (!known.has(type) || ids.has(id)) continue;
     ids.add(id);
-    const w = item.data.w ?? (item.data.size ? LEGACY_WIDTH[item.data.size] : 1);
-    out.push({ id, type, w: clampWidth(w), h: clampHeight(item.data.h ?? null) });
+    const w = item.w ?? (item.size ? LEGACY_WIDTH[item.size] : 1);
+    out.push({ id, type, w: clampWidth(w), h: clampHeight(item.h ?? null) });
   }
   return out;
 }
-
-export const boardInputSchema = z
-  .array(
-    z
-      .object({
-        id: z.string().regex(/^[a-z0-9-]{1,40}$/),
-        type: z.string().max(40),
-        w: z.number().int().min(1).max(BOARD_COLUMNS),
-        h: z.number().int().min(MIN_HEIGHT).max(MAX_HEIGHT).nullable(),
-      })
-      .strict(),
-  )
-  .max(MAX_WIDGETS);
 
 /** A fresh id for a widget of `type` not already on the board. */
 export function newWidgetId(type: string, layout: readonly { id: string }[]): string {

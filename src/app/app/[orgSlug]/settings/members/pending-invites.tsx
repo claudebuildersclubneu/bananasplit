@@ -19,9 +19,15 @@ export interface PendingInviteRow {
   invitedByName: string | null;
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-
-function InviteRow({ orgId, invite }: { orgId: string; invite: PendingInviteRow }) {
+function InviteRow({
+  orgId,
+  invite,
+  dateFormat,
+}: {
+  orgId: string;
+  invite: PendingInviteRow;
+  dateFormat: Intl.DateTimeFormat;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
@@ -85,16 +91,31 @@ function InviteRow({ orgId, invite }: { orgId: string; invite: PendingInviteRow 
   );
 }
 
-export function PendingInvites({ orgId, invites }: { orgId: string; invites: PendingInviteRow[] }) {
+/**
+ * `timeZone`: the org's. Expiry dates are formatted in it, not in whatever
+ * zone the server or the browser is in, so the server's HTML and the
+ * browser's first render agree (a date near midnight would otherwise
+ * differ, a hydration mismatch).
+ */
+export function PendingInvites({
+  orgId,
+  invites,
+  timeZone,
+}: {
+  orgId: string;
+  invites: PendingInviteRow[];
+  timeZone: string;
+}) {
   if (invites.length === 0) {
     return <p className="text-muted-foreground text-sm">No pending invites.</p>;
   }
+  const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone });
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-medium">Pending invites</h3>
       <ul className="space-y-2">
         {invites.map((invite) => (
-          <InviteRow key={invite.id} orgId={orgId} invite={invite} />
+          <InviteRow key={invite.id} orgId={orgId} invite={invite} dateFormat={dateFormat} />
         ))}
       </ul>
     </div>

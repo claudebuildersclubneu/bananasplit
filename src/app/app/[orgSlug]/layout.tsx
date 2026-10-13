@@ -11,12 +11,11 @@ import { can } from "@/lib/auth/permissions";
 import { getSession, requireUser } from "@/lib/auth/session";
 import { resolveSidebar, visibleSidebar } from "@/lib/nav/sidebar";
 import { orgLogoUrl } from "@/lib/org-logo";
-import { applyPersonalTheme, parsePersonalTheme } from "@/lib/theme/personal";
+import { applyPersonalTheme } from "@/lib/theme/personal";
+import { parsePersonalTheme } from "@/lib/theme/personal.schema";
 import { resolveTheme } from "@/lib/theme/resolve";
-import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
-import { listPins } from "@/server/pins";
+import { getOrgContextBySlug } from "@/server/db/context";
 import { guestPollRedirect } from "@/server/polls/guest-redirect";
-import { getShellUser, getViewerPrefs } from "@/server/profiles/queries";
 import { findPendingDeletionOrg } from "@/server/settings/deletion";
 
 import { OrgPendingDeletion } from "./org-pending-deletion";
@@ -98,21 +97,25 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
     })),
   ];
 
+  // The user's own row and pins come in the org context's transaction, so a
+  // full page load costs two transactions in all (see getOrgContextBySlug).
+  const { viewer, pins } = ctx;
   // Name and picture from the database, not the session token (Profiles).
-  const shellUser = await getShellUser(ctx.user.id, ctx.user.email);
+  const shellUser = {
+    name: viewer.name,
+    email: viewer.email,
+    image: viewer.image,
+    avatar: viewer.avatar,
+  };
   // Someone who joined through an emailed invite before finishing profile
   // setup finishes it first (the flowchart's "Profile complete?").
-  const prefs = await getViewerPrefs(ctx.user.id);
-  if (!prefs.onboardedAt) redirect("/onboarding");
+  if (!viewer.onboardedAt) redirect("/onboarding");
   // The org's OrgTheme row rides along with the per-request org context
   // (React cache()), resolved and re-validated as strict hex before render;
   // the member's personal theme (profile setup A4) goes on top of it.
   const theme = applyPersonalTheme(
     resolveTheme(ctx.theme),
-    parsePersonalTheme(prefs.themePreference),
-  );
-  const pins = await withOrgTx(ctx.organization.id, ({ db }) =>
-    listPins(db, ctx.organization.id, ctx.organization.slug, ctx.user.id),
+    parsePersonalTheme(viewer.themePreference),
   );
 
   return (

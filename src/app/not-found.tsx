@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BrandRoot } from "@/components/brand/brand-root";
@@ -5,10 +6,18 @@ import { pill } from "@/components/brand/pill";
 import { CoreMark, Logo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
-/** Any unknown URL (and every notFound()): Bananasplit's own look. */
+// Next.js adds noindex to every 404 itself; this is the tab and history title.
+export const metadata: Metadata = { title: "Page not found · Bananasplit" };
+
+/**
+ * Any unknown URL (and every notFound()): Bananasplit's own look. Rendered
+ * without reading the request (BrandRoot prerender): Next.js puts this page
+ * into every route's payload, so reading headers here would make every
+ * route dynamic.
+ */
 export default function NotFound() {
   return (
-    <BrandRoot>
+    <BrandRoot prerender>
       <header className="flex h-[72px] items-center px-6 lg:px-10">
         <Link href="/" className="text-ink" data-plain>
           <Logo />

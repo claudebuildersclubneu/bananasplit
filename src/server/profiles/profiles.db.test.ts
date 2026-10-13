@@ -29,9 +29,9 @@ import { NotFoundError } from "@/lib/auth/errors";
 import { hashIcsToken } from "@/lib/ics-token";
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
-import { withSystemOrgTx, withUserTx } from "@/server/db/context";
+import { getOrgContextBySlug, withSystemOrgTx, withUserTx } from "@/server/db/context";
 
-import { getOrgPerson, getOwnProfile, getShellUser, listOrgPeople } from "./queries";
+import { getOrgPerson, getOwnProfile, listOrgPeople } from "./queries";
 import {
   isOwnAvatar,
   removeOwnAvatar,
@@ -185,7 +185,9 @@ describe.skipIf(!seeded)("profiles against the local database", () => {
     expect(await authDb.user.findUnique({ where: { id: s.oliver.id } })).toEqual(oliverBefore);
 
     await updateOwnProfile(s.kristine.id, { name: "Kristine M." });
-    expect((await getShellUser(s.kristine.id, s.kristine.email)).name).toBe("Kristine M.");
+    // The shell's viewer row comes with the org context, read as Kristine.
+    requireUserMock.mockResolvedValue(s.kristine);
+    expect((await getOrgContextBySlug("claude-builders-club")).viewer.name).toBe("Kristine M.");
     await updateOwnProfile(s.kristine.id, { name: "Kristine Min" });
   });
 

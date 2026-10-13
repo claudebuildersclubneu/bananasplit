@@ -1,6 +1,5 @@
 "use client";
 
-import { generateJSON, generateText } from "@tiptap/core";
 import {
   CalendarDays,
   ChevronDown,
@@ -19,11 +18,12 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { importNote } from "@/app/app/[orgSlug]/notes/actions";
-import { DocumentPreview } from "@/components/notes/file-preview";
+import { NOTE_TOO_BIG, noteBodyTooBig } from "@/app/app/[orgSlug]/notes/limits";
 import { NewFolderForm } from "@/components/notes/new-folder-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +47,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { NOTE_FILE_ACCEPT } from "@/lib/files/types";
-import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { NOTE_TEMPLATES } from "@/lib/notes/templates";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +54,15 @@ type Dialogs = "word" | "google" | "upload" | "folder" | null;
 type Visibility = "ORGANIZATION" | "PRIVATE";
 
 const TEMPLATE_ICONS: Record<string, LucideIcon> = { Users, CalendarDays, Target, ListChecks };
+
+// The editor libraries (tiptap and its extensions) are large and only needed
+// once a document is previewed or a note is made, so they load on demand
+// instead of with every visit to Files.
+const DocumentPreview = dynamic(
+  () => import("@/components/notes/document-preview").then((m) => m.DocumentPreview),
+  { ssr: false, loading: () => <div className="bg-muted/40 h-64 animate-pulse rounded-lg" /> },
+);
+const loadHtmlToNote = () => import("@/components/notes/html-to-note");
 
 interface Draft {
   title: string;
@@ -174,13 +182,15 @@ export function NotesNewMenu({
     html: string,
     vis: Visibility,
     folder: string | null,
-  ) {
-    const extensions = noteSchemaExtensions();
-    const json = generateJSON(html || "<p></p>", extensions);
+  ): Promise<{ error?: string; noteId?: string }> {
+    const { htmlToNoteBody } = await loadHtmlToNote();
+    const body = htmlToNoteBody(html);
+    // Said here, before sending: a body over the server's limit would fail
+    // with no explanation.
+    if (noteBodyTooBig(body.contentJson, body.contentText)) return { error: NOTE_TOO_BIG };
     return importNote(orgId, {
       title: title.trim().slice(0, 300) || "Untitled note",
-      contentJson: JSON.stringify(json),
-      contentText: generateText(json, extensions).slice(0, 200_000),
+      ...body,
       folderId: folder,
       visibility: vis,
     });
@@ -285,6 +295,8 @@ export function NotesNewMenu({
       if (draft.file && keepOriginal) await uploadFile(draft.file, visibility, folderId);
       setOpen(null);
       router.push(`/app/${orgSlug}/notes/${result.noteId}`);
+    } catch {
+      setError("The note couldn't be created. Check your connection.");
     } finally {
       setBusy(false);
     }
@@ -375,7 +387,8 @@ export function NotesNewMenu({
 
   return (
     <>
-      <DropdownMenu>
+      {/* Opening the menu starts loading the note converter, so "New note" is quick. */}
+      <DropdownMenu onOpenChange={(o) => o && void loadHtmlToNote().catch(() => undefined)}>
         <DropdownMenuTrigger asChild>
           <Button type="button" size="sm" disabled={pending}>
             {pending ? (

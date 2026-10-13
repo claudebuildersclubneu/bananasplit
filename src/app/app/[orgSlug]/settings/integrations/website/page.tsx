@@ -24,7 +24,7 @@ export default async function WebsiteIntegrationPage({
         title="Website build hook"
         description="When public events change, the portal asks Netlify to rebuild your website so it shows the new schedule (at most once a minute)."
       />
-      <StatusPanel dto={dto} secretLabel="Hook" />
+      <StatusPanel dto={dto} secretLabel="Hook" timeZone={organization.timezone} />
       <NetlifyForm orgId={organization.id} dto={dto} canWrite={canWrite} />
       {dto.hasSecret && (
         <TestAndRemove

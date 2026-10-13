@@ -30,6 +30,7 @@ export function MonthGrid({
   fromKey,
   dayCount,
   todayKey,
+  timeZone,
   openId,
   onOpen,
   onAddOn,
@@ -45,6 +46,8 @@ export function MonthGrid({
   fromKey: string;
   dayCount: number;
   todayKey: string;
+  /** The zone timed events are placed and printed in (see hooks.ts). */
+  timeZone: string;
   openId: string | null;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   onAddOn: (dayKey: string) => void;
@@ -60,7 +63,7 @@ export function MonthGrid({
   dayProps?: (dayKey: string) => Record<string, unknown>;
 }) {
   const { rows, monthKey } = monthGridShape(fromKey, dayCount, todayKey);
-  const byDay = bucketByDay(items);
+  const byDay = bucketByDay(items, timeZone);
 
   return (
     <div className="cal-shell">
@@ -91,6 +94,7 @@ export function MonthGrid({
                   key={cell.key}
                   cell={cell}
                   items={byDay.get(cell.key) ?? []}
+                  timeZone={timeZone}
                   openId={openId}
                   onOpen={onOpen}
                   onAddOn={onAddOn}
@@ -114,6 +118,7 @@ export function MonthGrid({
 function DayCell({
   cell,
   items,
+  timeZone,
   openId,
   onOpen,
   onAddOn,
@@ -127,6 +132,7 @@ function DayCell({
 }: {
   cell: MonthCell;
   items: CalendarItem[];
+  timeZone: string;
   openId: string | null;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   onAddOn: (dayKey: string) => void;
@@ -171,6 +177,7 @@ function DayCell({
         <EventChip
           key={item.id}
           item={item}
+          timeZone={timeZone}
           open={openId === item.id}
           dragging={draggingId === item.id}
           onOpen={onOpen}
@@ -191,6 +198,7 @@ function DayCell({
 
 function EventChip({
   item,
+  timeZone,
   open,
   dragging,
   onOpen,
@@ -198,6 +206,7 @@ function EventChip({
   extra,
 }: {
   item: CalendarItem;
+  timeZone: string;
   open: boolean;
   dragging: boolean;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
@@ -216,7 +225,7 @@ function EventChip({
       data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
       data-dragging={dragging ? "true" : undefined}
       aria-expanded={open}
-      aria-label={itemLabel(item, kind.label, visibility.label)}
+      aria-label={itemLabel(item, kind.label, visibility.label, timeZone)}
       onClick={(event) => onOpen(item, event.currentTarget)}
       {...extra}
     >
@@ -224,7 +233,7 @@ function EventChip({
         <span aria-hidden className="cal-chip__dot" />
         {!item.allDay && (
           <span aria-hidden className="cal-chip__time">
-            {chipTime(item)}
+            {chipTime(item, timeZone)}
           </span>
         )}
         <span aria-hidden className="cal-chip__title">

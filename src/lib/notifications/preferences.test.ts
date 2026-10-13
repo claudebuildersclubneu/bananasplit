@@ -3,15 +3,18 @@ import { describe, expect, it } from "vitest";
 import { isEmailEnabled } from "@/lib/notification-preferences";
 
 import {
-  applyNotificationPreferencesPatch,
   defaultNotificationPreferences,
   emailEnabledFor,
+  mergeNotificationPreferencesPatch,
   NOTIFICATION_TYPE_META,
   NOTIFICATION_TYPES,
+} from "./preferences";
+import {
+  applyNotificationPreferencesPatch,
   notificationPreferencesPatchSchema,
   notificationPreferencesSchema,
   parseNotificationPreferences,
-} from "./preferences";
+} from "./preferences.schema";
 
 const DEFAULTS = {
   v: 2,
@@ -152,5 +155,15 @@ describe("preference patches", () => {
   it("labels every type except the digest, which has its own control", () => {
     const labelled = Object.keys(NOTIFICATION_TYPE_META).sort();
     expect(labelled).toEqual(NOTIFICATION_TYPES.filter((t) => t !== "TASK_DIGEST").sort());
+  });
+});
+
+describe("the profile form's merge", () => {
+  it("shows the same value the server stores, without loading zod", () => {
+    const current = parseNotificationPreferences({ TASK_DUE_SOON: false });
+    const patch = { types: { TASK_ASSIGNED: false }, digest: { hourLocal: 7 }, reminderLeadDays: 3 };
+    expect(mergeNotificationPreferencesPatch(current, patch)).toEqual(
+      applyNotificationPreferencesPatch(current, patch),
+    );
   });
 });

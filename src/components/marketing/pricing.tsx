@@ -2,11 +2,13 @@
 
 import { Fragment, useState } from "react";
 
+import { CREATE_CLUB_PATH, signUpPath } from "@/lib/auth/callback-url";
 import { CLUB_PLANS, dollars, TEAM_PLANS } from "@/lib/billing/plans";
 import { CONTACT_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
 import { SectionTitle } from "./section-title";
+import { useSignedIn } from "./signed-in";
 import { SiteLink } from "./site-link";
 
 type Audience = "clubs" | "teams";
@@ -21,7 +23,8 @@ type Tier = {
   per: string;
   note: string;
   cta: string;
-  href: string;
+  /** Where the button goes. Without one it starts a club (see startHref). */
+  href?: string;
   lead: string;
   items: readonly string[];
 };
@@ -52,7 +55,6 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       per: "per member / semester",
       note: `A 40-member club pays ${dollars(40 * CLUB_PLANS.club.perMemberPerSemester)} a semester.`,
       cta: "Create your club",
-      href: "/sign-up",
       lead: "Everything to run the club:",
       items: [
         "Tasks in five views",
@@ -72,7 +74,6 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       per: "per member / semester",
       note: `A 120-member society pays ${dollars(120 * CLUB_PLANS.society.perMemberPerSemester)} a semester.`,
       cta: "Go Society",
-      href: "/sign-up",
       lead: "Everything in Club, plus:",
       items: [
         "Public event pages, waitlists and check-in",
@@ -95,7 +96,6 @@ const TIERS: Record<Audience, readonly Tier[]> = {
       per: "per seat / month",
       note: `Or ${dollars(TEAM_PLANS.team.perSeatPerYear)} per seat billed yearly.`,
       cta: "Start your team",
-      href: "/sign-up",
       lead: "Every Society feature, plus:",
       items: [
         "Google Workspace sign-in",
@@ -138,10 +138,23 @@ const PROMISES = [
 ] as const;
 
 /**
+ * Where a plan's button starts a club: straight to club setup when signed
+ * in (sign-up would only send them back here), otherwise sign-up, which
+ * then leads to club setup and says so.
+ */
+function startHref(signedIn: boolean): string {
+  return signedIn ? CREATE_CLUB_PATH : signUpPath(CREATE_CLUB_PATH);
+}
+
+/**
  * Plans for two audiences behind a segmented toggle: per-member, per-semester
  * club plans (plus the school-wide plan), or per-seat team plans.
+ * `signedIn` defaults to what the home page learns in the browser
+ * (./signed-in): the page is static.
  */
-export function Pricing() {
+export function Pricing({ signedIn: signedInProp }: { signedIn?: boolean }) {
+  const sessionSignedIn = useSignedIn();
+  const signedIn = signedInProp ?? sessionSignedIn;
   const [audience, setAudience] = useState<Audience>("clubs");
   const copy = COPY[audience];
 
@@ -179,7 +192,7 @@ export function Pricing() {
 
       <div className="mx-auto grid w-full max-w-[940px] grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-stretch gap-4">
         {TIERS[audience].map((tier) => (
-          <TierCard key={tier.name} tier={tier} />
+          <TierCard key={tier.name} tier={tier} href={tier.href ?? startHref(signedIn)} />
         ))}
       </div>
 
@@ -201,7 +214,7 @@ export function Pricing() {
   );
 }
 
-function TierCard({ tier }: { tier: Tier }) {
+function TierCard({ tier, href }: { tier: Tier; href: string }) {
   return (
     <div
       className={cn(
@@ -213,7 +226,7 @@ function TierCard({ tier }: { tier: Tier }) {
     >
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[19px] font-bold">{tier.name}</span>
+          <h3 className="text-[19px] font-bold">{tier.name}</h3>
           {tier.featured && tier.badge && (
             <span className="bg-ink text-banana rounded-full px-2.5 py-[5px] font-mono text-[11px] tracking-[0.05em] uppercase">
               {tier.badge}
@@ -232,7 +245,7 @@ function TierCard({ tier }: { tier: Tier }) {
         <span className="text-ink-soft text-[14px]">{tier.note}</span>
       </div>
       <SiteLink
-        href={tier.href}
+        href={href}
         className={cn(
           "border-ink rounded-full border p-3.5 text-center text-[15px] font-semibold whitespace-nowrap",
           tier.featured

@@ -69,6 +69,7 @@ export default async function DangerZonePage({
         orgSlug={organization.slug}
         exports={exportRows}
         expiryDays={EXPORT_EXPIRY_DAYS}
+        timeZone={organization.timezone}
       />
       {can({ role }, "workspace.bootstrap") && isPlatformAdmin(await getUserIdentity(user.id)) && (
         <BootstrapCard
@@ -77,6 +78,7 @@ export default async function DangerZonePage({
           members={memberOptions}
           suggested={suggested}
           bootstrappedAt={settings?.bootstrappedAt?.toISOString() ?? null}
+          timeZone={organization.timezone}
         />
       )}
       <DeleteCard orgId={orgId} orgName={organization.name} slug={organization.slug} />

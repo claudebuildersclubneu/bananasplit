@@ -11,10 +11,14 @@ import { ResetPasswordForm } from "./reset-password-form";
 
 export const dynamic = "force-dynamic";
 
-/** The token is in the URL: never pass it on to another site as a referrer. */
+/**
+ * The token is in the URL: never pass it on to another site as a referrer,
+ * and keep the page out of search results.
+ */
 export const metadata: Metadata = {
   title: "Set a new password · Bananasplit",
   referrer: "no-referrer",
+  robots: { index: false, follow: false },
 };
 
 const DEAD = {

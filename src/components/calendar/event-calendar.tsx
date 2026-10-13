@@ -31,10 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { EventKind, EventVisibility } from "@/generated/prisma/enums";
-import { addDaysToKey } from "@/lib/calendar/dates";
+import { addDaysToKey, shiftZonedDays, zonedDateKey } from "@/lib/calendar/dates";
 import {
   dayWindowFor,
-  localDayKey,
   monthWindowFor,
   shiftMonthKey,
   weekWindowFor,
@@ -45,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 import { AgendaList } from "./agenda-list";
 import "./calendar.css";
-import { useTodayKey } from "./hooks";
+import { useTodayKey, useViewerTimeZone } from "./hooks";
 import { anchorFor, EventPeek, type PeekAnchor } from "./event-peek";
 import type { EventFormEvent } from "./event-form-dialog";
 import type { CalendarItem } from "./item";
@@ -111,7 +110,8 @@ export function EventCalendar({
   members,
   canManage,
   window: range,
-  orgTodayKey,
+  serverTimeZone,
+  serverTodayKey,
 }: {
   orgId: string;
   orgSlug: string;
@@ -121,8 +121,14 @@ export function EventCalendar({
   /** OWNER/ADMIN: create, edit, drag and delete (the server re-checks every write). */
   canManage: boolean;
   window: CalendarWindow;
-  /** Today in the org timezone, so the server and the first paint agree. */
-  orgTodayKey: string;
+  /**
+   * The zone the server renders timed events in: the viewer's profile
+   * timezone, else the org's. The browser's own zone replaces it once
+   * hydrated (useViewerTimeZone), so the HTML and the first paint agree.
+   */
+  serverTimeZone: string;
+  /** Today in serverTimeZone. */
+  serverTodayKey: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -139,9 +145,10 @@ export function EventCalendar({
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [shotOpen, setShotOpen] = useState(false);
 
-  // Today is read in the org timezone on the server so the first paint
-  // matches, then swapped for the viewer's own day on hydration.
-  const todayKey = useTodayKey(orgTodayKey);
+  // Times and days are drawn in one explicit zone that the server and the
+  // hydrating browser agree on, then in the browser's own zone after that.
+  const viewerZone = useViewerTimeZone(serverTimeZone);
+  const todayKey = useTodayKey(viewerZone, serverTodayKey);
 
   const dayCount = windowDays(range.fromKey, range.toKey);
   const monthKey = useMemo(
@@ -275,7 +282,7 @@ export function EventCalendar({
   function moveToDay(id: string, dayKey: string) {
     const item = items.find((i) => i.id === id && !i.task);
     if (!item) return;
-    const firstDay = item.allDay ? item.start : localDayKey(new Date(item.start));
+    const firstDay = item.allDay ? item.start : zonedDateKey(new Date(item.start), viewerZone);
     if (firstDay === dayKey) return;
     const delta = Math.round(
       (Date.parse(`${dayKey}T00:00:00Z`) - Date.parse(`${firstDay}T00:00:00Z`)) / 86_400_000,
@@ -289,9 +296,10 @@ export function EventCalendar({
         }
       : {
           allDay: false,
-          // setDate keeps the wall-clock time across a DST boundary.
-          startsAt: shiftDays(new Date(item.start), delta).toISOString(),
-          endsAt: shiftDays(new Date(item.end), delta).toISOString(),
+          // Wall-clock days in the zone the chip was drawn in, so 6pm stays
+          // 6pm across a DST boundary.
+          startsAt: shiftZonedDays(new Date(item.start), delta, viewerZone).toISOString(),
+          endsAt: shiftZonedDays(new Date(item.end), delta, viewerZone).toISOString(),
         };
     startTransition(async () => {
       const result = await moveEvent(orgId, id, times);
@@ -434,7 +442,7 @@ export function EventCalendar({
         </div>
       </div>
 
-      <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-1 [scrollbar-width:none] overflow-x-auto px-1 pb-0.5 [&::-webkit-scrollbar]:hidden">
         <div className="cal-filters">
           <button
             type="button"
@@ -504,6 +512,7 @@ export function EventCalendar({
             fromKey={range.fromKey}
             dayCount={dayCount}
             todayKey={todayKey}
+            timeZone={viewerZone}
             openId={peek?.id ?? null}
             onOpen={openPeek}
             onAddOn={addOn}
@@ -525,6 +534,7 @@ export function EventCalendar({
             fromKey={range.fromKey}
             dayCount={range.view === "timeGridDay" ? 1 : 7}
             todayKey={todayKey}
+            timeZone={viewerZone}
             openId={peek?.id ?? null}
             onOpen={openPeek}
             showSync={canManage}
@@ -537,6 +547,7 @@ export function EventCalendar({
             fromKey={range.fromKey}
             dayCount={dayCount}
             todayKey={todayKey}
+            timeZone={viewerZone}
             openId={peek?.id ?? null}
             onOpen={openPeek}
             showSync={canManage}
@@ -548,6 +559,7 @@ export function EventCalendar({
           <EventPeek
             item={openItem}
             anchor={peek}
+            timeZone={viewerZone}
             orgSlug={orgSlug}
             canManage={canManage}
             showSync={canManage}
@@ -610,12 +622,6 @@ export function EventCalendar({
       )}
     </div>
   );
-}
-
-function shiftDays(date: Date, delta: number): Date {
-  const out = new Date(date);
-  out.setDate(out.getDate() + delta);
-  return out;
 }
 
 /** The month a window is "about": the one its middle day belongs to. */

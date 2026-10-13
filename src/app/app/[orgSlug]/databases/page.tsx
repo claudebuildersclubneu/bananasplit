@@ -19,14 +19,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { fmtDateTime } from "@/server/databases/format";
-import { listDatabases } from "@/server/databases/views";
+import { countRecords, listDatabases } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadSetupState } from "@/server/setup/progress";
 import { loadSyncStatus } from "@/server/sync/status";
 import { reportTier } from "@/server/reports/tier";
 import { cn } from "@/lib/utils";
 import { PinToggle } from "@/components/pins/pins-context";
-import { listPins } from "@/server/pins";
 
 import { StepPanel } from "../setup/step-panel";
 import type { SetupStepView } from "../setup/view";
@@ -62,7 +61,7 @@ export default async function DatabasesPage({
 }: PageProps<"/app/[orgSlug]/databases">) {
   const { orgSlug } = await params;
   const sp = await searchParams;
-  const { organization, role, user } = await getOrgContextBySlug(orgSlug);
+  const { organization, role, pins } = await getOrgContextBySlug(orgSlug);
   const isAdmin = can({ role }, "databases.write");
   const canConnect = can({ role }, "integrations.write");
   const showReports = Boolean(reportTier(role)) && can({ role }, "reports.view");
@@ -71,29 +70,16 @@ export default async function DatabasesPage({
     organization.id,
     async ({ db }) => {
       const list = await listDatabases(db, organization.id, role);
+      // Every listed database's count in one query (RLS still applies).
+      const byKind = await countRecords(
+        db,
+        organization.id,
+        list.map((d) => d.kind),
+      );
       const counts: Record<string, number> = {};
       for (const d of list) {
-        if (d.kind === "SESSIONS") {
-          counts[d.key] = await db.event.count({
-            where: { organizationId: organization.id, deletedAt: null, mergedIntoId: null },
-          });
-        } else if (d.kind === "ATTENDANCE") {
-          counts[d.key] = await db.attendance.count({
-            where: { organizationId: organization.id, suppressedAt: null },
-          });
-        } else if (d.kind === "SIGNUPS") {
-          counts[d.key] = await db.signup.count({
-            where: { organizationId: organization.id, suppressedAt: null },
-          });
-        } else if (d.kind === "PEOPLE") {
-          counts[d.key] = await db.contact.count({
-            where: { organizationId: organization.id, sessionsAttended: { gt: 0 } },
-          });
-        } else if (d.kind === "BALLOTS") {
-          counts[d.key] = await db.ballotDefinition.count({
-            where: { organizationId: organization.id, isTest: false },
-          });
-        }
+        const n = byKind[d.kind];
+        if (n !== undefined) counts[d.key] = n;
       }
       const sync = isAdmin ? await loadSyncStatus(db, organization.id) : null;
       const setup = canConnect ? await loadSetupState(db, organization.id) : null;
@@ -110,7 +96,6 @@ export default async function DatabasesPage({
             connectedByName: data.connectedByName,
           }
         : null;
-      const pins = await listPins(db, organization.id, organization.slug, user.id);
       return { databases: list, counts, sync, dataStep, pinned: new Set(pins.map((p) => p.href)) };
     },
   );

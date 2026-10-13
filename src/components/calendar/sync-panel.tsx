@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { GoogleSyncStatus } from "@/server/google-calendar/requests";
 
+import { useViewerTimeZone } from "./hooks";
+
 const STATUS_LABEL: Record<string, string> = {
   CONNECTED: "Connected",
   ERROR: "Error",
@@ -54,11 +56,18 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function when(iso: string | Date | null | undefined): string {
+/**
+ * In an explicit zone: the panel renders on the server (UTC on Vercel) and
+ * hydrates in the browser, and the runtime's own zone printed a different
+ * time in each.
+ */
+function when(iso: string | Date | null | undefined, timeZone: string): string {
   if (!iso) return "never";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(new Date(iso));
 }
 
 /** The panel's cards, in page order. */
@@ -76,6 +85,7 @@ export function SyncPanel({
   orgSlug,
   canWrite,
   status,
+  timeZone,
   feed,
   sections = ALL_SECTIONS,
 }: {
@@ -83,6 +93,11 @@ export function SyncPanel({
   orgSlug: string;
   canWrite: boolean;
   status: GoogleSyncStatus;
+  /**
+   * The zone the server prints times in (the viewer's profile zone, else the
+   * org's); the browser's own replaces it once hydrated. UTC when omitted.
+   */
+  timeZone?: string;
   /** The public feed URLs; the feed card is shown only with them. */
   feed?: { json: string; ics: string };
   sections?: readonly SyncPanelSection[];
@@ -94,6 +109,7 @@ export function SyncPanel({
   const usable = google && (google.status === "CONNECTED" || google.status === "ERROR");
   const imp = google?.import ?? null;
   const show = (section: SyncPanelSection) => sections.includes(section);
+  const zone = useViewerTimeZone(timeZone ?? "UTC");
 
   function run(
     action: () => Promise<{ error?: string; queued?: number }>,
@@ -181,7 +197,7 @@ export function SyncPanel({
                     {status.counts.FAILED} failed
                   </dd>
                   <dt className="text-muted-foreground">Last Sync now</dt>
-                  <dd>{when(google.lastSyncRequestAt)}</dd>
+                  <dd>{when(google.lastSyncRequestAt, zone)}</dd>
                 </dl>
                 {google.lastError && (
                   <p className="text-destructive">Last error: {google.lastError}</p>
@@ -240,7 +256,7 @@ export function SyncPanel({
             {imp?.ranAt ? (
               <div className="space-y-1">
                 <p>
-                  {imp.mode === "apply" ? "Applied" : "Dry run"} {when(imp.ranAt)}
+                  {imp.mode === "apply" ? "Applied" : "Dry run"} {when(imp.ranAt, zone)}
                   {imp.status === "partial" && " (partial: run it again to finish)"}
                   {imp.status === "failed" && ` (failed: ${imp.error ?? "unknown error"})`}
                 </p>
@@ -323,7 +339,7 @@ export function SyncPanel({
           {status.buildHook && (
             <CardContent className="space-y-1 text-sm">
               <p className="text-muted-foreground">
-                Last successful rebuild request: {when(status.buildHook.lastVerifiedAt)}
+                Last successful rebuild request: {when(status.buildHook.lastVerifiedAt, zone)}
               </p>
               {status.buildHook.lastError && (
                 <p className="text-destructive">{status.buildHook.lastError}</p>

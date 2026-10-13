@@ -13,7 +13,7 @@ import {
   type ThemeModeValue,
   type ThemeRoles,
 } from "./types";
-import { parseRoles } from "./validate";
+import { parseRoles } from "./roles";
 
 /**
  * An OrgTheme row (or its absence) resolved into what the app renders.

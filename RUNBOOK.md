@@ -191,7 +191,8 @@ owns every table, so it bypasses RLS and the app never connects as it).
 7. **Health check (gate every deploy on it)** — `GET /api/health` returns
    `200 {"status":"ok"}` only when all three runtime URLs log in as their
    roles (not superuser, no BYPASSRLS, owning nothing) with the `UTC` /
-   `15s` / `15s` session defaults, `app.security_manifest()` is empty, and the
+   `15s` / `15s` session defaults and read committed transactions,
+   `app.security_manifest()` is empty, and the
    environment checks pass (production: `RESEND_API_KEY` plus `EMAIL_FROM` on
    the app's domain, or `EMAIL_DELIVERY=off`; `CRON_SECRET`;
    `AUTH_SECRET` (`production:auth_secret`; `NEXTAUTH_SECRET` also counts);

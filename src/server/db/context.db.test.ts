@@ -17,7 +17,7 @@ import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
 const { requireUserMock } = vi.hoisted(() => ({ requireUserMock: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock }));
 
-import { appDb, authDb, disconnectAll, serviceDb } from "./clients";
+import { appDb, authDb, disconnectAll, getClient, serviceDb } from "./clients";
 import { getOrgContextBySlug, withOrgAction, withOrgTx, withSystemOrgTx } from "./context";
 import { InvalidReferenceError } from "./errors";
 
@@ -182,6 +182,26 @@ describe.skipIf(!seeded)("data layer against the local database (seeded CBC)", (
     expect(ctx.settings?.taskRequireOwner).toBe(true);
     expect(ctx.theme?.preset).toBe("cbc");
     expect(ctx.organization.activeOrgChartVersionId).not.toBeNull();
+    // The shell's own row and pins ride along (the User policy allows self).
+    expect(ctx.viewer.email).toBe(s.jackson.email);
+    expect(ctx.viewer.name).toBe(s.jackson.name);
+    expect(Array.isArray(ctx.pins)).toBe(true);
+  });
+
+  it("getOrgContextBySlug costs two transactions: the slug lookup and the org read", async () => {
+    const spy = vi.spyOn(getClient("app"), "$transaction");
+    try {
+      await getOrgContextBySlug("claude-builders-club");
+      expect(spy).toHaveBeenCalledTimes(2);
+      // No isolation level: the database default (read committed) applies,
+      // without a SET TRANSACTION round trip.
+      for (const call of spy.mock.calls) expect(call[1]).not.toHaveProperty("isolationLevel");
+    } finally {
+      spy.mockRestore();
+    }
+    const [row] = await appDb.$queryRaw<{ iso: string }[]>`
+      SELECT current_setting('default_transaction_isolation') AS iso`;
+    expect(row?.iso).toBe("read committed");
   });
 
   it("each role reaches only its own plane", async () => {

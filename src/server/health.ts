@@ -16,7 +16,10 @@ import { blobStoreIdFromToken } from "@/server/storage/drivers";
  *   - it logs in as that role, which is not a superuser, has no BYPASSRLS
  *     and owns no relation in public;
  *   - SHOW timezone / statement_timeout / idle_in_transaction_session_timeout
- *     are UTC / 15s / 15s (the role defaults the 0B migration sets).
+ *     are UTC / 15s / 15s (the role defaults the 0B migration sets);
+ *   - default_transaction_isolation is read committed. The transaction
+ *     wrappers (src/server/db/context.ts) rely on it and no longer name an
+ *     isolation level, which would cost an extra round trip per transaction.
  * On the service role: app.security_manifest() returns no rows.
  * On VERCEL_ENV=preview: the database carries app.fixture_only = 'on'; mail
  *   is not live; the Blob stores and the KEK keyring are the preview ones
@@ -48,6 +51,8 @@ export interface RoleProbe {
   timezone: string;
   statementTimeout: string;
   idleInTransactionTimeout: string;
+  /** default_transaction_isolation, e.g. "read committed". */
+  transactionIsolation: string;
 }
 
 /** The database side, replaceable in tests. */
@@ -68,6 +73,7 @@ export const databaseProbes: HealthProbes = {
         tz: string;
         st: string;
         it: string;
+        iso: string;
       }[]
     >`
       SELECT current_user::text AS current_user, r.rolsuper, r.rolbypassrls,
@@ -75,7 +81,8 @@ export const databaseProbes: HealthProbes = {
                WHERE n.nspname = 'public' AND c.relowner = r.oid) AS owned,
              current_setting('TimeZone') AS tz,
              current_setting('statement_timeout') AS st,
-             current_setting('idle_in_transaction_session_timeout') AS it
+             current_setting('idle_in_transaction_session_timeout') AS it,
+             current_setting('default_transaction_isolation') AS iso
         FROM pg_roles r WHERE r.rolname = current_user`;
     const row = rows[0];
     if (!row) throw new Error("role not found");
@@ -87,6 +94,7 @@ export const databaseProbes: HealthProbes = {
       timezone: row.tz,
       statementTimeout: row.st,
       idleInTransactionTimeout: row.it,
+      transactionIsolation: row.iso,
     };
   },
   async manifest() {
@@ -136,6 +144,9 @@ async function roleChecks(probes: HealthProbes): Promise<HealthCheck[]> {
         if (p.statementTimeout !== "15s") problems.push(`statement_timeout is ${p.statementTimeout}`);
         if (p.idleInTransactionTimeout !== "15s") {
           problems.push(`idle_in_transaction_session_timeout is ${p.idleInTransactionTimeout}`);
+        }
+        if (p.transactionIsolation !== "read committed") {
+          problems.push(`default_transaction_isolation is ${p.transactionIsolation}`);
         }
         return { name, ok: problems.length === 0, detail: problems.join("; ") || undefined };
       } catch (error) {

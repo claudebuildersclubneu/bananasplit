@@ -1,5 +1,5 @@
 /**
- * Per-IP limits for sign-up and sign-in.
+ * Per-IP limits for sign-up, sign-in and joining a club with its code.
  *
  * A club signs up together: a whole room on campus Wi-Fi reaches the app
  * from one public IP address. The per-IP limits are there to slow a script
@@ -11,6 +11,9 @@
  * Override per deployment, e.g. for a large event:
  *   SIGNUP_LIMIT_PER_IP_HOUR   (default 40 sign-ups per IP per hour)
  *   SIGNIN_LIMIT_PER_IP_15MIN  (default 120 sign-in attempts per IP per 15 minutes)
+ *   JOIN_CODE_MISSES_PER_IP_HOUR (default 60 club codes per IP per hour that
+ *     match no club; a code that works never counts, so a room joining with
+ *     the same code only spends its typos)
  */
 
 type Env = NodeJS.ProcessEnv | Record<string, string | undefined>;
@@ -26,4 +29,8 @@ export function signUpPerIpLimit(env: Env = process.env): number {
 
 export function signInPerIpLimit(env: Env = process.env): number {
   return positiveInt(env.SIGNIN_LIMIT_PER_IP_15MIN, 120, 2000);
+}
+
+export function joinCodeMissesPerIpLimit(env: Env = process.env): number {
+  return positiveInt(env.JOIN_CODE_MISSES_PER_IP_HOUR, 60, 1000);
 }

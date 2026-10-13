@@ -128,6 +128,12 @@ export interface BallotOptionResult {
   firstChoice: number | null;
   borda: number | null;
   suppressed: boolean;
+  /**
+   * Suppressed although it isn't below k: when only one option in a question
+   * is, the total less the others would give its count away, so the next
+   * smallest is hidden with it.
+   */
+  withheld?: boolean;
 }
 
 export interface BallotQuestionResult {

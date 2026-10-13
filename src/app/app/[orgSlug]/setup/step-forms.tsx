@@ -10,11 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SUCCESS_TEXT } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
-import {
-  CLAUDE_MODELS,
-  DEFAULT_CLAUDE_MODEL,
-  SUPABASE_POOLER_REGIONS,
-} from "@/server/integrations/catalog";
+import { SUPABASE_POOLER_REGIONS } from "@/lib/integrations/supabase";
+import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from "@/lib/org-chart/models";
 
 import {
   connectClaudeAction,

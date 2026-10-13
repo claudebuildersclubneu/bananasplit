@@ -12,7 +12,8 @@ import {
   getOrgMembersForPicker,
   getOrgPeriods,
   getTransactions,
-  type TransactionFilters,
+  parseTransactionFilters,
+  TRANSACTION_LIST_LIMIT,
 } from "../queries";
 import { TransactionFilters as TransactionFiltersBar } from "./transaction-filters";
 
@@ -29,28 +30,32 @@ export default async function TransactionsPage({
     return <FinanceAccessGate orgId={org.id} orgSlug={orgSlug} role={role} />;
   }
 
-  const filters: TransactionFilters = {
-    budgetPeriodId: typeof query.period === "string" ? query.period : undefined,
-    categoryId: typeof query.category === "string" ? query.category : undefined,
-    kind: typeof query.kind === "string" ? (query.kind as TransactionFilters["kind"]) : undefined,
-    status:
-      typeof query.status === "string" ? (query.status as TransactionFilters["status"]) : undefined,
-    submittedById: typeof query.submitter === "string" ? query.submitter : undefined,
-    dateFrom: typeof query.dateFrom === "string" ? query.dateFrom : undefined,
-    dateTo: typeof query.dateTo === "string" ? query.dateTo : undefined,
-    reconciled:
-      query.reconciled === "yes" || query.reconciled === "no" ? query.reconciled : undefined,
-    deleted: query.deleted === "show" ? "show" : undefined,
+  const param = (key: string) => {
+    const value = query[key];
+    return typeof value === "string" ? value : undefined;
   };
 
-  const { transactions, periods, categories, memberships } = await withOrgTx(
+  // The active period unless the URL picks another (or "all"): every period
+  // at once grows without bound. The list stops at TRANSACTION_LIST_LIMIT
+  // rows (one more is read to know there are more); the CSV has them all.
+  const { transactions, hasMore, filters, periods, categories, memberships } = await withOrgTx(
     org.id,
     async ({ db }) => {
-      const transactions = await getTransactions(db, org.id, filters);
       const periods = await getOrgPeriods(db, org.id);
+      const filters = parseTransactionFilters(param, periods.find((p) => p.isActive)?.id);
+      const rows = await getTransactions(db, org.id, filters, {
+        take: TRANSACTION_LIST_LIMIT + 1,
+      });
       const categories = await getCategoriesForPeriods(db, org.id, periods);
       const memberships = await getOrgMembersForPicker(db, org.id);
-      return { transactions, periods, categories, memberships };
+      return {
+        transactions: rows.slice(0, TRANSACTION_LIST_LIMIT),
+        hasMore: rows.length > TRANSACTION_LIST_LIMIT,
+        filters,
+        periods,
+        categories,
+        memberships,
+      };
     },
   ).catch(handleAuthErrorInPage);
   const members = memberships.map((m) => ({
@@ -58,16 +63,28 @@ export default async function TransactionsPage({
     name: m.user.name,
     email: m.user.email,
   }));
+  const period = filters.budgetPeriodId ?? "all";
 
-  const exportQuery = new URLSearchParams(
-    Object.entries(query).filter(([, v]) => typeof v === "string") as [string, string][],
-  ).toString();
+  // The export gets the same rows, uncapped: the period is spelled out, so it
+  // matches what's on screen even when the page chose it.
+  const exportQuery = new URLSearchParams([
+    ...(Object.entries(query).filter(([k, v]) => k !== "period" && typeof v === "string") as [
+      string,
+      string,
+    ][]),
+    ["period", period],
+  ]).toString();
 
   // Add transaction is in the Finance header; Show deleted is one of the filters.
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <TransactionFiltersBar periods={periods} categories={categories} members={members} />
+        <TransactionFiltersBar
+          period={period}
+          periods={periods}
+          categories={categories}
+          members={members}
+        />
         <Button variant="outline" size="sm" asChild>
           <a href={`/app/${orgSlug}/finance/transactions/export?${exportQuery}`}>
             <Download className="size-4" aria-hidden="true" />
@@ -75,6 +92,13 @@ export default async function TransactionsPage({
           </a>
         </Button>
       </div>
+
+      {hasMore && (
+        <p className="text-muted-foreground text-sm" role="status">
+          Showing the latest {TRANSACTION_LIST_LIMIT} transactions. Narrow the filters, or export
+          the CSV to see them all.
+        </p>
+      )}
 
       <TransactionTable
         orgId={org.id}

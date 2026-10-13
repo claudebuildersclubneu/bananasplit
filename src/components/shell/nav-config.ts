@@ -1,4 +1,4 @@
-import { type ResolvedGroup } from "@/lib/nav/sidebar";
+import type { ResolvedGroup } from "@/lib/nav/sections";
 
 /**
  * The sidebar's links for one org: its sections (in the org's order, under

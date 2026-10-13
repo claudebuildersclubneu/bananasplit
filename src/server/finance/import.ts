@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { TransactionStatus, type Prisma } from "@/generated/prisma/client";
 import { IMPORT_KINDS } from "@/lib/ai/finance-sheet";
-import { writeFinanceAuditLog } from "@/lib/finance/audit";
 import { DELETED_TRANSACTION_REASON } from "@/lib/finance/deleted";
 import { kindFits } from "@/lib/finance/import/mapping";
 import { planPeriods, type PeriodLike } from "@/lib/finance/import/plan";
@@ -59,7 +58,11 @@ export interface ImportOutcome {
   categoriesCreated: string[];
 }
 
-export async function importRecords(ctx: OrgContext, input: ImportInput, now: Date = new Date()): Promise<ImportOutcome> {
+export async function importRecords(
+  ctx: OrgContext,
+  input: ImportInput,
+  now: Date = new Date(),
+): Promise<ImportOutcome> {
   const { db, organizationId } = ctx;
   const skipped: ImportOutcome["skipped"] = [];
   const records = input.records.flatMap((r, index) => {
@@ -75,7 +78,10 @@ export async function importRecords(ctx: OrgContext, input: ImportInput, now: Da
     return [{ ...r, index, day }];
   });
 
-  const active = await db.budgetPeriod.findFirst({ where: { organizationId, isActive: true }, select: { id: true } });
+  const active = await db.budgetPeriod.findFirst({
+    where: { organizationId, isActive: true },
+    select: { id: true },
+  });
   if (!active) await ensureActivePeriod(db, organizationId, now);
   const loadPeriods = async (): Promise<PeriodLike[]> =>
     (await db.budgetPeriod.findMany({ where: { organizationId } })).map((p) => ({
@@ -119,7 +125,9 @@ export async function importRecords(ctx: OrgContext, input: ImportInput, now: Da
   };
 
   // Categories by period, by lowercase name; missing ones made at $0.
-  const periodIds = [...new Set(records.map((r) => periodOf(r.date)).filter((id): id is string => id !== null))];
+  const periodIds = [
+    ...new Set(records.map((r) => periodOf(r.date)).filter((id): id is string => id !== null)),
+  ];
   const existing = await db.budgetCategory.findMany({
     where: { organizationId, budgetPeriodId: { in: periodIds } },
     select: { id: true, name: true, budgetPeriodId: true, sortOrder: true },
@@ -147,13 +155,16 @@ export async function importRecords(ctx: OrgContext, input: ImportInput, now: Da
     });
     nextSort.set(periodId, sortOrder + 1);
     byName.set(clean.toLowerCase(), created.id);
-    if (!categoriesCreated.some((n) => n.toLowerCase() === clean.toLowerCase())) categoriesCreated.push(clean);
+    if (!categoriesCreated.some((n) => n.toLowerCase() === clean.toLowerCase()))
+      categoriesCreated.push(clean);
     return created.id;
   };
 
   const data: Prisma.TransactionCreateManyInput[] = [];
   const counts = new Map<string, number>();
-  const statementRef = input.reconciled ? `Imported from ${input.source || "a spreadsheet"}`.slice(0, 200) : null;
+  const statementRef = input.reconciled
+    ? `Imported from ${input.source || "a spreadsheet"}`.slice(0, 200)
+    : null;
   for (const r of records) {
     const periodId = periodOf(r.date);
     if (!periodId) {
@@ -223,6 +234,11 @@ export async function importRecords(ctx: OrgContext, input: ImportInput, now: Da
  * Takes an import back out: every transaction it created is deleted the
  * usual way (voided as "Deleted", each audited), unlocking any that were
  * imported as reconciled first. Periods and categories it made stay.
+ *
+ * Set-based, like importRecords: two updates and one audit statement
+ * whatever the size, since a round trip per row ran a few thousand rows past
+ * the transaction's timeout. Each row still gets its own VOID entry with the
+ * row before and after.
  */
 export async function undoImport(ctx: OrgContext, batch: string): Promise<{ removed: number }> {
   const { db, organizationId } = ctx;
@@ -230,27 +246,47 @@ export async function undoImport(ctx: OrgContext, batch: string): Promise<{ remo
     where: { organizationId, action: "IMPORT", diffJson: { path: ["batch"], equals: batch } },
     select: { transactionId: true },
   });
-  const ids = [...new Set(entries.map((e) => e.transactionId).filter((id): id is string => Boolean(id)))];
+  const ids = [
+    ...new Set(entries.map((e) => e.transactionId).filter((id): id is string => Boolean(id))),
+  ];
   if (ids.length === 0) return { removed: 0 };
-  const rows = await db.transaction.findMany({ where: { organizationId, id: { in: ids }, voidedAt: null } });
-  for (const row of rows) {
-    const updated = await db.transaction.update({
-      where: { id: row.id },
-      data: {
-        voidedAt: new Date(),
-        voidReason: DELETED_TRANSACTION_REASON,
-        ...(row.reconciledAt ? { reconciledAt: null, reconciledById: null, statementRef: null } : {}),
-      },
-    });
-    await writeFinanceAuditLog(db, {
-      organizationId,
-      transactionId: row.id,
-      action: "VOID",
-      before: row,
-      after: { ...updated, reason: "import undone" },
-    });
-  }
+  const rows = await db.transaction.findMany({
+    where: { organizationId, id: { in: ids }, voidedAt: null },
+  });
   if (rows.length > 0) {
+    const now = new Date();
+    const voided = { voidedAt: now, voidReason: DELETED_TRANSACTION_REASON, updatedAt: now };
+    const unlocked = { reconciledAt: null, reconciledById: null, statementRef: null };
+    const reconciledIds = rows.filter((r) => r.reconciledAt).map((r) => r.id);
+    const otherIds = rows.filter((r) => !r.reconciledAt).map((r) => r.id);
+    if (reconciledIds.length > 0) {
+      await db.transaction.updateMany({
+        where: { organizationId, id: { in: reconciledIds } },
+        data: { ...voided, ...unlocked },
+      });
+    }
+    if (otherIds.length > 0) {
+      await db.transaction.updateMany({
+        where: { organizationId, id: { in: otherIds } },
+        data: voided,
+      });
+    }
+    const audit = rows.map((row) => ({
+      id: row.id,
+      diff: {
+        before: row,
+        after: {
+          ...row,
+          ...voided,
+          ...(row.reconciledAt ? unlocked : {}),
+          reason: "import undone",
+        },
+      },
+    }));
+    // One statement writes every row's entry (the function checks the org and the actor).
+    await db.$queryRaw`
+      SELECT app.write_finance_audit(${organizationId}, 'VOID', e->>'id', NULL, e->'diff')
+      FROM jsonb_array_elements(${JSON.stringify(audit)}::jsonb) AS e`;
     await writeOrgAuditLog(db, {
       organizationId,
       action: "finance.import_undone",
@@ -286,7 +322,10 @@ export async function importBudgetLines(
 ): Promise<{ updated: number; created: number; periodLabel: string } | { error: string }> {
   const { db, organizationId } = ctx;
   const period = input.periodId
-    ? await db.budgetPeriod.findFirst({ where: { id: input.periodId, organizationId }, select: { id: true, label: true } })
+    ? await db.budgetPeriod.findFirst({
+        where: { id: input.periodId, organizationId },
+        select: { id: true, label: true },
+      })
     : await ensureActivePeriod(db, organizationId);
   if (!period) return { error: "Budget period not found." };
   const existing = await db.budgetCategory.findMany({
@@ -300,11 +339,20 @@ export async function importBudgetLines(
   for (const line of input.lines) {
     const match = byName.get(line.name.toLowerCase());
     if (match) {
-      await db.budgetCategory.update({ where: { id: match.id }, data: { allocatedCents: line.allocatedCents } });
+      await db.budgetCategory.update({
+        where: { id: match.id },
+        data: { allocatedCents: line.allocatedCents },
+      });
       updated++;
     } else {
       const row = await db.budgetCategory.create({
-        data: { organizationId, budgetPeriodId: period.id, name: line.name, allocatedCents: line.allocatedCents, sortOrder: sortOrder++ },
+        data: {
+          organizationId,
+          budgetPeriodId: period.id,
+          name: line.name,
+          allocatedCents: line.allocatedCents,
+          sortOrder: sortOrder++,
+        },
         select: { id: true, name: true, sortOrder: true },
       });
       byName.set(line.name.toLowerCase(), row);
@@ -344,7 +392,10 @@ export const duplicateKey = (k: DuplicateKey) => `${k.date}|${k.amountCents}|${k
  * amount and direction, not deleted): the review unticks those, so
  * importing the same export twice doesn't double the money.
  */
-export async function findDuplicates(ctx: OrgContext, keys: readonly DuplicateKey[]): Promise<string[]> {
+export async function findDuplicates(
+  ctx: OrgContext,
+  keys: readonly DuplicateKey[],
+): Promise<string[]> {
   if (keys.length === 0) return [];
   const dates = keys.map((k) => k.date).sort();
   const from = fromDateValue(dates[0]);
@@ -360,7 +411,14 @@ export async function findDuplicates(ctx: OrgContext, keys: readonly DuplicateKe
     select: { occurredAt: true, amountCents: true, direction: true },
     take: 20_000,
   });
-  const found = new Set(rows.map((r) => duplicateKey({ date: toDateValue(r.occurredAt), amountCents: r.amountCents, direction: r.direction })));
+  const found = new Set(
+    rows.map((r) =>
+      duplicateKey({
+        date: toDateValue(r.occurredAt),
+        amountCents: r.amountCents,
+        direction: r.direction,
+      }),
+    ),
+  );
   return [...new Set(keys.map(duplicateKey))].filter((k) => found.has(k));
 }
-

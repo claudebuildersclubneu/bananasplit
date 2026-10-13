@@ -17,6 +17,7 @@ const { state, db, enqueueJobMock } = vi.hoisted(() => ({
     event: { findFirst: vi.fn() },
     task: { findFirst: vi.fn() },
     transaction: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    financeAuditLog: { findFirst: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }));
@@ -45,7 +46,9 @@ const { ForbiddenError } = await import("@/lib/auth/errors");
 const {
   approveExpense,
   createTransaction,
+  markExpenseNotApplicable,
   reimburseExpense,
+  restoreTransaction,
   submitExpense,
   updateTransaction,
   voidTransaction,
@@ -181,7 +184,11 @@ describe("transaction links and categories stay inside the org (0A Fix 2)", () =
     db.event.findFirst.mockImplementation(orgScopedFindFirst(new Set(["event_1"])));
     db.task.findFirst.mockImplementation(orgScopedFindFirst(new Set(["task_1"])));
     db.budgetCategory.findFirst.mockImplementation(
-      async ({ where }: { where: { id: string; organizationId?: string; budgetPeriodId: string } }) => {
+      async ({
+        where,
+      }: {
+        where: { id: string; organizationId?: string; budgetPeriodId: string };
+      }) => {
         if (!where.organizationId) throw new Error("category lookup is missing organizationId");
         return where.id === "cat_1" && where.budgetPeriodId === "period_1" ? { id: "cat_1" } : null;
       },
@@ -356,5 +363,160 @@ describe("finance-only actions and the expense workflow (0C wrappers)", () => {
     db.transaction.update.mockResolvedValue({ ...submitted, status: "SUBMITTED" });
     expect(await submitExpense("org_1", "txn_1")).toEqual({ transactionId: "txn_1" });
     expect(enqueueJobMock).not.toHaveBeenCalled();
+  });
+
+  it("a voided or deleted expense can't be approved, rejected or reimbursed", async () => {
+    actAs("treasurer_1", Role.TREASURER);
+    db.transaction.findFirst.mockResolvedValue({ ...submitted, voidedAt: new Date() });
+    expect((await approveExpense("org_1", "txn_1")).error).toMatch(/Restore it first/);
+
+    db.transaction.findFirst.mockResolvedValue({
+      ...submitted,
+      status: "APPROVED",
+      voidedAt: new Date(),
+    });
+    expect((await reimburseExpense("org_1", "txn_1", "Venmo")).error).toMatch(/Restore it first/);
+    expect(db.transaction.update).not.toHaveBeenCalled();
+    expect(enqueueJobMock).not.toHaveBeenCalled();
+  });
+
+  it("only finance marks an expense not applicable, never the submitter alone", async () => {
+    db.transaction.findFirst.mockResolvedValue({ ...submitted, status: "DRAFT" });
+    expect((await markExpenseNotApplicable("org_1", "txn_1")).error).toMatch(/treasurer or owner/);
+    expect(db.transaction.update).not.toHaveBeenCalled();
+
+    actAs("treasurer_1", Role.TREASURER);
+    db.transaction.update.mockResolvedValue({ ...submitted, status: "NOT_APPLICABLE" });
+    expect(await markExpenseNotApplicable("org_1", "txn_1")).toEqual({ transactionId: "txn_1" });
+  });
+});
+
+describe("updateTransaction — what stays locked once an expense moves on (M6)", () => {
+  const expense = {
+    id: "txn_1",
+    organizationId: "org_1",
+    budgetPeriodId: "period_1",
+    kind: "EXPENSE",
+    direction: "OUT",
+    amountCents: 1500,
+    categoryId: "cat_1",
+    submittedById: "member_1",
+    status: "APPROVED",
+    reconciledAt: null,
+    voidedAt: null,
+  };
+
+  beforeEach(() => {
+    actAs("treasurer_1", Role.TREASURER);
+    db.budgetCategory.findFirst.mockResolvedValue({ id: "cat_2" });
+    db.transaction.update.mockResolvedValue(expense);
+  });
+
+  it("refuses a new amount or category on an approved or reimbursed expense, even from finance", async () => {
+    db.transaction.findFirst.mockResolvedValue(expense);
+    expect((await updateTransaction("org_1", "txn_1", { amountCents: 9900 })).error).toMatch(
+      /approved, so its amount and category are locked/,
+    );
+    expect((await updateTransaction("org_1", "txn_1", { categoryId: "cat_2" })).error).toMatch(
+      /locked/,
+    );
+
+    db.transaction.findFirst.mockResolvedValue({ ...expense, status: "REIMBURSED" });
+    expect((await updateTransaction("org_1", "txn_1", { amountCents: 9900 })).error).toMatch(
+      /paid back/,
+    );
+    expect(db.transaction.update).not.toHaveBeenCalled();
+  });
+
+  it("still saves the other fields when the amount and category are sent unchanged", async () => {
+    db.transaction.findFirst.mockResolvedValue(expense);
+    const result = await updateTransaction("org_1", "txn_1", {
+      amountCents: 1500,
+      categoryId: "cat_1",
+      description: "Pizza, fixed typo",
+    });
+    expect(result.error).toBeUndefined();
+    expect(db.transaction.update).toHaveBeenCalledOnce();
+  });
+
+  it("nobody changes the amount of their own expense after submitting it", async () => {
+    actAs("treasurer_1", Role.TREASURER);
+    db.transaction.findFirst.mockResolvedValue({
+      ...expense,
+      submittedById: "treasurer_1",
+      status: "SUBMITTED",
+    });
+    expect((await updateTransaction("org_1", "txn_1", { amountCents: 9900 })).error).toMatch(
+      /your own request after submitting it/,
+    );
+
+    // Someone else's pending request can still be corrected by finance.
+    db.transaction.findFirst.mockResolvedValue({ ...expense, status: "SUBMITTED" });
+    expect(
+      (await updateTransaction("org_1", "txn_1", { amountCents: 9900 })).error,
+    ).toBeUndefined();
+  });
+
+  it("writes the direction of an adjustment, and refuses flipping an expense", async () => {
+    db.transaction.findFirst.mockResolvedValue({
+      ...expense,
+      kind: "ADJUSTMENT",
+      status: "NOT_APPLICABLE",
+      submittedById: "treasurer_1",
+    });
+    expect(await updateTransaction("org_1", "txn_1", { direction: "IN" })).toEqual({
+      transactionId: "txn_1",
+    });
+    expect(db.transaction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ direction: "IN" }) }),
+    );
+
+    db.transaction.update.mockClear();
+    db.transaction.findFirst.mockResolvedValue({ ...expense, status: "SUBMITTED" });
+    expect((await updateTransaction("org_1", "txn_1", { direction: "IN" })).error).toMatch(
+      /EXPENSE transactions must be OUT/,
+    );
+    expect(db.transaction.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("restoreTransaction — a member only undoes their own delete (L8)", () => {
+  const voided = {
+    id: "txn_1",
+    organizationId: "org_1",
+    kind: "EXPENSE",
+    status: "SUBMITTED",
+    submittedById: "member_1",
+    reconciledAt: null,
+    voidedAt: new Date(),
+    voidReason: "Deleted",
+  };
+
+  beforeEach(() => {
+    db.transaction.update.mockResolvedValue({ ...voided, voidedAt: null, voidReason: null });
+  });
+
+  it("undoes the member's own delete of their open request", async () => {
+    db.transaction.findFirst.mockResolvedValue(voided);
+    db.financeAuditLog.findFirst.mockResolvedValue({ actorId: "member_1" });
+    expect(await restoreTransaction("org_1", "txn_1")).toEqual({ transactionId: "txn_1" });
+  });
+
+  it("refuses a request that finance deleted or voided", async () => {
+    db.transaction.findFirst.mockResolvedValue(voided);
+    db.financeAuditLog.findFirst.mockResolvedValue({ actorId: "treasurer_1" });
+    expect((await restoreTransaction("org_1", "txn_1")).error).toMatch(/treasurer or owner/);
+
+    db.transaction.findFirst.mockResolvedValue({ ...voided, voidReason: "Duplicate" });
+    db.financeAuditLog.findFirst.mockResolvedValue({ actorId: "member_1" });
+    expect((await restoreTransaction("org_1", "txn_1")).error).toMatch(/treasurer or owner/);
+    expect(db.transaction.update).not.toHaveBeenCalled();
+  });
+
+  it("finance restores anything", async () => {
+    actAs("treasurer_1", Role.TREASURER);
+    db.transaction.findFirst.mockResolvedValue({ ...voided, voidReason: "Duplicate" });
+    expect(await restoreTransaction("org_1", "txn_1")).toEqual({ transactionId: "txn_1" });
+    expect(db.financeAuditLog.findFirst).not.toHaveBeenCalled();
   });
 });

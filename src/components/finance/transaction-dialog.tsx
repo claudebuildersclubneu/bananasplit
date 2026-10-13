@@ -2,7 +2,7 @@
 
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   approveExpense,
@@ -22,6 +22,7 @@ import {
 import {
   deleteReceiptAction,
   getSignedReceiptUrl,
+  listReceiptsAction,
 } from "@/app/app/[orgSlug]/finance/receipts-actions";
 import type { TransactionWithRelations } from "@/app/app/[orgSlug]/finance/queries";
 import { TransactionKindSelect } from "@/components/finance/transaction-kind-select";
@@ -49,6 +50,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { TransactionDirection, TransactionKind } from "@/generated/prisma/enums";
+import { zonedDateKey } from "@/lib/calendar/dates";
+import { amountLockReason, receiptLockReason } from "@/lib/finance/locks";
 import { formatCents, parseDollarsToCents } from "@/lib/finance/money";
 import { MAX_UPLOAD_BYTES, prepareReceiptForUpload } from "@/lib/finance/prepare-receipt";
 import { toDateInputValue } from "@/components/tasks/utils";
@@ -64,6 +67,8 @@ interface Props {
   /** A new entry as a reimbursement request: an expense only, whoever opens it. */
   request?: boolean;
   currentUserId: string;
+  /** The org's timezone: a new entry is dated the club's today, not UTC's. */
+  timeZone?: string;
   onSaved?: () => void;
 }
 
@@ -93,6 +98,7 @@ function TransactionForm({
   isFinance,
   request = false,
   currentUserId,
+  timeZone,
   onSaved,
 }: Omit<Props, "open">) {
   const router = useRouter();
@@ -114,14 +120,22 @@ function TransactionForm({
   const [description, setDescription] = useState(transaction?.description ?? "");
   const [counterparty, setCounterparty] = useState(transaction?.counterparty ?? "");
   const [paymentMethod, setPaymentMethod] = useState(transaction?.paymentMethod ?? "");
-  const [occurredAt, setOccurredAt] = useState(
-    transaction ? toDateInputValue(transaction.occurredAt) : toDateInputValue(new Date()),
+  // Today where the club is (at 9pm in New York it is still today there,
+  // though UTC is already tomorrow), read when the dialog opens.
+  const [occurredAt, setOccurredAt] = useState(() =>
+    transaction
+      ? toDateInputValue(transaction.occurredAt)
+      : zonedDateKey(new Date(), timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone),
   );
 
   const canEditFields =
     !transaction ||
     (isFinance && !transaction.reconciledAt) ||
     (transaction.submittedById === currentUserId && transaction.status === "DRAFT");
+  // Approved or paid-back expenses, and your own once submitted, keep their
+  // amount and category (the server refuses a change; this says why).
+  const amountLock = transaction ? amountLockReason(transaction, currentUserId) : null;
+  const canEditAmount = canEditFields && !amountLock;
 
   // Delete (a void the lists hide, with Undo): finance on anything not
   // locked; a member on their own request until it's approved.
@@ -271,7 +285,7 @@ function TransactionForm({
             id="txn-amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            disabled={!canEditFields}
+            disabled={!canEditAmount}
             placeholder="0.00"
           />
         </div>
@@ -320,7 +334,7 @@ function TransactionForm({
           <Select
             value={categoryId ?? "none"}
             onValueChange={(v) => setCategoryId(v === "none" ? null : v)}
-            disabled={!canEditFields}
+            disabled={!canEditAmount}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -360,6 +374,7 @@ function TransactionForm({
         </div>
       </div>
 
+      {canEditFields && amountLock && <p className="text-muted-foreground text-sm">{amountLock}</p>}
       {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   );
@@ -386,7 +401,7 @@ function TransactionForm({
         <Tabs defaultValue="details">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="receipts">Receipts ({transaction.receipts.length})</TabsTrigger>
+            <TabsTrigger value="receipts">Receipts ({transaction._count.receipts})</TabsTrigger>
             {isFinance && <TabsTrigger value="activity">Activity</TabsTrigger>}
           </TabsList>
           <TabsContent value="details" className="space-y-4">
@@ -406,6 +421,7 @@ function TransactionForm({
             <ReceiptsPanel
               orgId={orgId}
               transaction={transaction}
+              isFinance={isFinance}
               onChanged={() => router.refresh()}
             />
           </TabsContent>
@@ -563,14 +579,16 @@ function ExpenseActions({
     <div className="space-y-3 border-t pt-4">
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      {isExpense && !locked && (
+      {/* A voided or deleted expense doesn't move until it's restored. */}
+      {isExpense && !locked && !transaction.voidedAt && (
         <div className="flex flex-wrap gap-2">
           {transaction.status === "DRAFT" && isSubmitter && (
             <Button size="sm" onClick={() => run(() => submitExpense(orgId, transaction.id))}>
               Submit
             </Button>
           )}
-          {transaction.status === "DRAFT" && (isSubmitter || isFinance) && (
+          {/* Books the spending with no approval step: finance only. */}
+          {transaction.status === "DRAFT" && isFinance && (
             <Button
               size="sm"
               variant="outline"
@@ -666,16 +684,45 @@ function ExpenseActions({
 function ReceiptsPanel({
   orgId,
   transaction,
-  onChanged,
+  isFinance,
+  onChanged: onRefresh,
 }: {
   orgId: string;
   transaction: TransactionWithRelations;
+  isFinance: boolean;
   onChanged: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmReceiptEl, confirmReceipt] = useConfirm();
   const [error, setError] = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<{ id: string; filename: string }[] | null>(null);
+  const [loads, setLoads] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Approved, paid back, rejected or reconciled: the receipts are the record.
+  const locked = receiptLockReason(transaction, isFinance);
+
+  // The lists only carry a count: the files load when this tab opens, and
+  // again after each upload or removal.
+  useEffect(() => {
+    let live = true;
+    listReceiptsAction(orgId, transaction.id)
+      .then((result) => {
+        if (!live) return;
+        if (result.error) setError(result.error);
+        else setReceipts(result.receipts ?? []);
+      })
+      .catch(() => {
+        if (live) setError("The receipts didn't load. Close this and try again.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [orgId, transaction.id, loads]);
+
+  function onChanged() {
+    setLoads((n) => n + 1);
+    onRefresh();
+  }
 
   function handleUpload(file: File) {
     setError(null);
@@ -729,34 +776,42 @@ function ReceiptsPanel({
 
   return (
     <div className="space-y-3">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleUpload(file);
-          e.target.value = "";
-        }}
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={isPending}
-        onClick={() => inputRef.current?.click()}
-      >
-        Upload receipt
-      </Button>
+      {locked ? (
+        <p className="text-muted-foreground text-sm">{locked}</p>
+      ) : (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            Upload receipt
+          </Button>
+        </>
+      )}
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       {confirmReceiptEl}
-      {transaction.receipts.length === 0 ? (
+      {receipts === null ? (
+        !error && <p className="text-muted-foreground text-sm">Loading receipts…</p>
+      ) : receipts.length === 0 ? (
         <p className="text-muted-foreground text-sm">No receipts attached.</p>
       ) : (
         <ul className="space-y-1.5">
-          {transaction.receipts.map((r) => (
+          {receipts.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
               <button
                 type="button"
@@ -765,16 +820,18 @@ function ReceiptsPanel({
               >
                 {r.filename}
               </button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => void handleDelete(r.id, r.filename)}
-                disabled={isPending}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                Remove
-              </Button>
+              {!locked && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleDelete(r.id, r.filename)}
+                  disabled={isPending}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  Remove
+                </Button>
+              )}
             </li>
           ))}
         </ul>

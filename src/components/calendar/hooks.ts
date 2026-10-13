@@ -2,17 +2,17 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { localDayKey } from "@/lib/calendar/grid";
+import { zonedDateKey, zonedDateTimeLocal } from "@/lib/calendar/dates";
 
 /**
- * The three things the calendar needs from outside React: the viewport
- * width, the viewer's current day, and the current minute.
+ * The things the calendar needs from outside React: the viewport width,
+ * the viewer's timezone, the viewer's current day, and the current minute.
  *
- * All three are read with useSyncExternalStore rather than an effect that
- * sets state. That is what the API is for, and it matters here: the server
+ * All are read with useSyncExternalStore rather than an effect that sets
+ * state. That is what the API is for, and it matters here: the server
  * renders the grid, so each hook declares the value the server used
- * (the org's day, "not narrow", "no now line") and swaps in the real one on
- * hydration without a second render pass or a hydration mismatch.
+ * (the viewer's profile zone and its day, "not narrow", "no now line") and
+ * swaps in the real one on hydration without a hydration mismatch.
  */
 
 export function useMediaQuery(query: string): boolean {
@@ -34,22 +34,30 @@ function subscribeToMinute(onChange: () => void) {
 }
 
 /**
- * Today in the VIEWER's timezone. `serverKey` is today in the org's
- * timezone, which is what the server rendered; the two differ only for a
- * viewer who is in a different day from the club right now.
+ * Today in `timeZone` (the zone from useViewerTimeZone). `serverKey` is
+ * today in the zone the server rendered in, so the first paint matches the
+ * HTML; the two differ only for a viewer whose browser is in another day.
  */
-export function useTodayKey(serverKey: string): string {
-  return useSyncExternalStore(subscribeToMinute, () => localDayKey(new Date()), () => serverKey);
+export function useTodayKey(timeZone: string, serverKey: string): string {
+  return useSyncExternalStore(
+    subscribeToMinute,
+    () => zonedDateKey(new Date(), timeZone),
+    () => serverKey,
+  );
 }
 
-/** Minutes since local midnight, or null on the server and before hydration. */
-export function useNowMinutes(): number | null {
-  return useSyncExternalStore(subscribeToMinute, getNowMinutes, () => null);
+/** Minutes since midnight in `timeZone`, or null on the server and before hydration. */
+export function useNowMinutes(timeZone: string): number | null {
+  return useSyncExternalStore(
+    subscribeToMinute,
+    () => nowMinutesIn(timeZone),
+    () => null,
+  );
 }
 
-function getNowMinutes(): number {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
+function nowMinutesIn(timeZone: string): number {
+  const time = zonedDateTimeLocal(new Date(), timeZone).slice(11);
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 }
 
 function subscribeNever() {
@@ -62,8 +70,9 @@ function deviceTimeZone(): string {
 
 /**
  * The viewer's own timezone. `serverZone` is what the server rendered in
- * (for a poll, the poll's zone), so the first paint matches the HTML and the
- * browser's zone is swapped in on hydration.
+ * (for a poll, the poll's zone; for the calendar, the viewer's profile zone,
+ * else the org's), so the first paint matches the HTML and the browser's
+ * zone is swapped in on hydration.
  */
 export function useViewerTimeZone(serverZone: string): string {
   return useSyncExternalStore(subscribeNever, deviceTimeZone, () => serverZone);

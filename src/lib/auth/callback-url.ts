@@ -29,7 +29,11 @@ export function safeCallbackUrl(value: unknown): string | null {
   // Normalizing can turn a safe-looking path into a protocol-relative one
   // ("/..//evil.com" -> "//evil.com"), which a browser reads as a host.
   if (url.pathname.startsWith("//") || url.pathname.startsWith("/\\")) return null;
-  if (BLOCKED_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p.endsWith("/") ? p : `${p}/`))) {
+  if (
+    BLOCKED_PREFIXES.some(
+      (p) => url.pathname === p || url.pathname.startsWith(p.endsWith("/") ? p : `${p}/`),
+    )
+  ) {
     return null;
   }
   return `${url.pathname}${url.search}${url.hash}`;
@@ -40,3 +44,19 @@ export function signInPath(callbackUrl: unknown): string {
   const safe = safeCallbackUrl(callbackUrl);
   return safe ? `/sign-in?callbackUrl=${encodeURIComponent(safe)}` : "/sign-in";
 }
+
+/** /sign-up, the same way. */
+export function signUpPath(callbackUrl: unknown): string {
+  const safe = safeCallbackUrl(callbackUrl);
+  return safe ? `/sign-up?callbackUrl=${encodeURIComponent(safe)}` : "/sign-up";
+}
+
+/**
+ * Where signing in lands without a callbackUrl, by password or Google: the
+ * app's front door, which sends each person on (profile setup, their club,
+ * or onboarding).
+ */
+export const AFTER_SIGN_IN = "/app";
+
+/** Where a new club starts (the pricing buttons and sign-up's "start a club" wording). */
+export const CREATE_CLUB_PATH = "/onboarding/organization";

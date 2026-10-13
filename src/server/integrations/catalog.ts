@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { IntegrationProvider, IntegrationStatus } from "@/generated/prisma/enums";
 import { AI_MODEL_ID_PATTERN, AI_VENDOR_IDS } from "@/lib/ai/vendors";
+import { SUPABASE_POOLER_REGIONS } from "@/lib/integrations/supabase";
 
 /**
  * The org integrations (Settings > Integrations): what each one stores as
@@ -57,25 +58,9 @@ export const emailSenderConfigSchema = z.object({
     .pipe(z.email("Enter a valid reply-to address").optional()),
 });
 
-export const SUPABASE_POOLER_REGIONS = [
-  "us-east-1",
-  "us-east-2",
-  "us-west-1",
-  "us-west-2",
-  "ca-central-1",
-  "sa-east-1",
-  "eu-west-1",
-  "eu-west-2",
-  "eu-west-3",
-  "eu-central-1",
-  "eu-central-2",
-  "eu-north-1",
-  "ap-south-1",
-  "ap-southeast-1",
-  "ap-southeast-2",
-  "ap-northeast-1",
-  "ap-northeast-2",
-] as const;
+// The region list is zod-free in src/lib/integrations/supabase.ts so the
+// forms can list it without this module's schemas.
+export { SUPABASE_POOLER_REGIONS };
 
 export const supabaseConfigSchema = z.object({
   projectRef: z

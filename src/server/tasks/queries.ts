@@ -1,4 +1,5 @@
 import { Prisma, TaskStatus, TaskVisibility } from "@/generated/prisma/client";
+import { compareBoardOrder } from "@/lib/tasks/rank";
 import { OPEN_STATUSES } from "@/lib/tasks/status";
 import type { TxClient } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
@@ -77,7 +78,7 @@ export type TaskListItem = Prisma.TaskGetPayload<{ select: typeof taskListSelect
 const live = (organizationId: string) => ({ organizationId, deletedAt: null });
 
 /** Board: top-level tasks; Completed limited to those done since `completedSince`. */
-export function getBoardTasks(
+export async function getBoardTasks(
   db: TxClient,
   organizationId: string,
   filters: TaskFilters,
@@ -91,13 +92,18 @@ export function getBoardTasks(
         ],
       }
     : {};
-  return db.task.findMany({
+  const tasks = await db.task.findMany({
     where: { AND: [tableWhere(organizationId, filters, opts.today), openOrRecent] },
     select: taskListSelect,
     // Rank is a fractional-index sequence per status column: group by status first.
-    orderBy: [{ status: "asc" }, { rank: "asc" }],
+    orderBy: [{ status: "asc" }, { rank: "asc" }, { id: "asc" }],
     take: 1000,
   });
+  // The database's collation may order mixed-case ranks differently from
+  // how they were generated, and the board drops cards between the
+  // neighbours it shows, so the final order is byte order with id breaking
+  // ties (src/lib/tasks/rank.ts) - the same order the server renumbers by.
+  return tasks.sort(compareBoardOrder);
 }
 
 export function countOlderCompleted(

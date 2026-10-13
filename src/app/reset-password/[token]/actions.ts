@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { newPasswordSchema } from "@/lib/auth/password-policy";
+import { newPasswordSchema } from "@/lib/auth/password-policy.schema";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/request-ip";
 import { enqueuePasswordChangedEmail, resetPassword } from "@/server/email/password-reset";

@@ -1,7 +1,12 @@
 import { Prisma } from "@/generated/prisma/client";
 
 import { inRange, isoText, localDateText, lowerBound, num, numOrNull, pct } from "../sql";
-import type { BallotOptionResult, BallotQuestionResult, BallotResult, BallotsReport } from "../types";
+import type {
+  BallotOptionResult,
+  BallotQuestionResult,
+  BallotResult,
+  BallotsReport,
+} from "../types";
 import type { ReportQuery } from "./common";
 
 /** At most this many ballots per range (newest first). */
@@ -17,7 +22,9 @@ export const MAX_BALLOTS = 12;
  * - a MEMBER gets nothing while ballotResultsVisibleToMembers is false;
  * - excluded ballots (test, out of window) and free text are never tallied.
  * An option nobody chose is absent from the tally; for a suppressed tier it
- * is shown as '<k' too (0 is below k), so absence reveals nothing.
+ * is shown as '<k' too (0 is below k), so absence reveals nothing. And a
+ * lone '<k' in a question hides the next smallest count too, or the total
+ * would give it away (withholdComplement), before anything is cached or sent.
  *
  * Which ballots: non-test definitions whose window overlaps the range, or
  * that have a valid ballot cast in it. Results are always the ballot's full
@@ -25,7 +32,9 @@ export const MAX_BALLOTS = 12;
  * at the linked session, or n/a without one.
  */
 export const queryBallots: ReportQuery<BallotsReport> = async (db, args) => {
-  const settings = await db.$queryRaw<{ k: number | null; members_see: boolean | null; full: boolean }[]>`
+  const settings = await db.$queryRaw<
+    { k: number | null; members_see: boolean | null; full: boolean }[]
+  >`
     SELECT st."ballotMinCellSize" AS k,
            st."ballotResultsVisibleToMembers" AS members_see,
            app.can_view_ballot_rows(${args.orgId}, ${args.tier}) AS full
@@ -120,7 +129,12 @@ export const queryBallots: ReportQuery<BallotsReport> = async (db, args) => {
       ballots: count,
       linkedSession:
         d.event_id && d.event_title && d.event_date
-          ? { id: d.event_id, title: d.event_title, localDate: d.event_date, checkIns: checkIns ?? 0 }
+          ? {
+              id: d.event_id,
+              title: d.event_title,
+              localDate: d.event_date,
+              checkIns: checkIns ?? 0,
+            }
           : null,
       turnoutPct: checkIns ? pct(count, checkIns) : null,
       questions,
@@ -181,10 +195,37 @@ interface TallyCell {
 }
 
 /**
+ * Complementary suppression, for tiers that see '<k' cells. A question shows
+ * its total, so with exactly one option hidden, the total less the visible
+ * counts is that option's count: "12 answers, Yes 11, No <3" says one person
+ * voted No. Hiding the smallest visible option as well leaves two unknowns
+ * that only their sum is known for. Ranked questions measure by Borda score
+ * (the other measures go with it). Mutates `options`.
+ */
+export function withholdComplement(options: BallotOptionResult[], ranked: boolean): void {
+  if (options.filter((o) => o.suppressed).length !== 1) return;
+  const measure = (o: BallotOptionResult) => (ranked ? o.borda : o.votes) ?? 0;
+  let smallest: BallotOptionResult | null = null;
+  for (const o of options) {
+    if (!o.suppressed && (!smallest || measure(o) < measure(smallest))) smallest = o;
+  }
+  if (!smallest) return;
+  Object.assign(smallest, {
+    votes: null,
+    firstChoice: null,
+    borda: null,
+    suppressed: true,
+    withheld: true,
+  });
+}
+
+/**
  * Joins the tally onto the definition's questions and options (labels,
  * definition order), keeps options that appear only in the tally (answers
  * outside the definition), and sorts options by votes (ranked questions by
- * Borda score). Suppressed options sort last in definition order.
+ * Borda score). Suppressed options sort last in definition order. For a
+ * tier without full counts a lone hidden option takes the next smallest
+ * with it (withholdComplement), so no hidden count can be worked out.
  */
 export function buildQuestions(
   parsed: ParsedQuestion[],
@@ -199,12 +240,14 @@ export function buildQuestions(
   }
   const questions: ParsedQuestion[] = parsed.filter((q) => q.type !== "text");
   for (const key of byQuestion.keys()) {
-    if (!parsed.some((q) => q.key === key)) questions.push({ key, label: key, type: "single", options: [] });
+    if (!parsed.some((q) => q.key === key))
+      questions.push({ key, label: key, type: "single", options: [] });
   }
 
   return questions.map((q) => {
     const qCells = byQuestion.get(q.key) ?? [];
-    const ranked = q.type === "slots" || qCells.some((c) => c.first_choice !== null || c.borda !== null);
+    const ranked =
+      q.type === "slots" || qCells.some((c) => c.first_choice !== null || c.borda !== null);
     const known = new Map(q.options.map((o, i) => [o.key, { ...o, order: i }]));
     let foldedOther = false;
     for (const c of qCells) {
@@ -241,7 +284,15 @@ export function buildQuestions(
             suppressed: false,
             order: o.order,
           }
-        : { key: o.key, label: o.label, votes: null, firstChoice: null, borda: null, suppressed: true, order: o.order };
+        : {
+            key: o.key,
+            label: o.label,
+            votes: null,
+            firstChoice: null,
+            borda: null,
+            suppressed: true,
+            order: o.order,
+          };
     });
     if (foldedOther) {
       options.push({
@@ -254,6 +305,7 @@ export function buildQuestions(
         order: Number.MAX_SAFE_INTEGER,
       });
     }
+    if (!fullCounts) withholdComplement(options, ranked);
     options.sort((a, b) => {
       if (a.suppressed !== b.suppressed) return a.suppressed ? 1 : -1;
       const av = ranked ? (a.borda ?? 0) : (a.votes ?? 0);

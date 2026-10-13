@@ -81,8 +81,10 @@ describe("withOrgAction", () => {
       return `${ctx.user.id}:${ctx.organizationId}:${ctx.role}:${ctx.kind}:${a}:${b}`;
     });
     await expect(action("org1", 2, "x")).resolves.toBe("u1:org1:MEMBER:action:2:x");
+    // No isolation level: naming one costs a SET TRANSACTION round trip, and
+    // the database default is already read committed (checked by /api/health).
     expect(app.log).toEqual([
-      'app:BEGIN {"maxWait":10000,"timeout":10000,"isolationLevel":"ReadCommitted"}',
+      'app:BEGIN {"maxWait":10000,"timeout":10000}',
       "app:set_context(u1,org1)",
       "app:COMMIT",
     ]);

@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { pill } from "@/components/brand/pill";
+import { SubmitPill } from "@/components/brand/submit-pill";
 import { signInPath } from "@/lib/auth/callback-url";
 import { getSession } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
@@ -16,8 +18,15 @@ import { confirmEmailAction, resendVerificationAction } from "./actions";
  */
 export const dynamic = "force-dynamic";
 
-/** The token is in the URL: never pass it on to another site as a referrer. */
-export const metadata = { title: "Confirm your email · Bananasplit", referrer: "no-referrer" as const };
+/**
+ * The token is in the URL: never pass it on to another site as a referrer,
+ * and keep the page out of search results.
+ */
+export const metadata: Metadata = {
+  title: "Confirm your email · Bananasplit",
+  referrer: "no-referrer",
+  robots: { index: false, follow: false },
+};
 
 const RESULTS = {
   ok: {
@@ -86,9 +95,9 @@ export default async function VerifyEmailPage({
   );
   const resendButton = session ? (
     <form action={resendVerificationAction.bind(null, token)}>
-      <button type="submit" className={cn(pill({ tone: "outline", size: "field" }), "w-full")}>
+      <SubmitPill tone="outline" size="field" className="w-full" pendingLabel="Sending…">
         Send a new link
-      </button>
+      </SubmitPill>
     </form>
   ) : null;
 
@@ -136,10 +145,11 @@ export default async function VerifyEmailPage({
       title="Confirm your email."
       description="Confirm this address to finish setting up your Bananasplit account."
     >
+      {/* Disabled while it posts: a double click would spend the link and then report it as used. */}
       <form action={confirmEmailAction.bind(null, token)}>
-        <button type="submit" className={cn(pill({ raised: true }), "w-full")}>
+        <SubmitPill raised className="w-full" pendingLabel="Confirming…">
           Confirm email
-        </button>
+        </SubmitPill>
       </form>
     </Shell>
   );

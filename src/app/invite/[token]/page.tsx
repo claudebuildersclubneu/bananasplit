@@ -42,6 +42,15 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
   if (!invitation) {
     return <InviteCard title="Invite not found" description="This invite link isn't valid." />;
   }
+  // Said before anything else: signing in or verifying wouldn't help.
+  if (invitation.orgDeleted) {
+    return (
+      <InviteCard
+        title="Club no longer active"
+        description={`${invitation.orgName} is scheduled for deletion, so this invite can't be used.`}
+      />
+    );
+  }
   if (invitation.acceptedAt) {
     return <InviteCard title="Already used" description="This invite has already been accepted." />;
   }

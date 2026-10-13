@@ -20,10 +20,30 @@ export interface PeriodDraft {
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
 
-/** The school year around `today`: August 1 to July 31 ("2026–27"). */
+/** The school year that starts on August 1 of `y` ("2026–27"). */
+function schoolYearStarting(y: number): PeriodDraft {
+  return {
+    label: `${y}–${String((y + 1) % 100).padStart(2, "0")}`,
+    startsOn: ymd(y, 8, 1),
+    endsOn: ymd(y + 1, 7, 31),
+  };
+}
+
+/**
+ * The school year to budget for around `today`: August 1 to July 31
+ * ("2026–27"). From July on it is already next year's, since that's the one
+ * a treasurer is setting up then.
+ */
 export function schoolYear(today: Date = new Date()): PeriodDraft {
-  const y = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
-  return { label: `${y}–${String((y + 1) % 100).padStart(2, "0")}`, startsOn: ymd(y, 8, 1), endsOn: ymd(y + 1, 7, 31) };
+  return schoolYearStarting(today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1);
+}
+
+/**
+ * The school year `day` falls in (August 1 to July 31). Unlike schoolYear(),
+ * a July date stays in the year that is ending, so the period always covers it.
+ */
+export function schoolYearContaining(day: Date): PeriodDraft {
+  return schoolYearStarting(day.getMonth() >= 7 ? day.getFullYear() : day.getFullYear() - 1);
 }
 
 /** The semester around `today`: Fall (Aug–Dec), Spring (Jan–May) or Summer (Jun–Jul). */
@@ -61,7 +81,12 @@ export function fromDateValue(value: string): Date | null {
   return Number.isNaN(d.getTime()) || toDateValue(d) !== value ? null : d;
 }
 
-const dayFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const dayFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 /** "Aug 1, 2026" for a stored @db.Date, never shifted a day by the viewer's timezone. */
 export function formatPeriodDate(date: Date | string): string {

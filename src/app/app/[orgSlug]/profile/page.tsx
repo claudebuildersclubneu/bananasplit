@@ -5,10 +5,10 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserAvatar } from "@/components/user-avatar";
-import { parseNotificationPreferences } from "@/lib/notifications/preferences";
+import { parseNotificationPreferences } from "@/lib/notifications/preferences.schema";
 import { personHref, type ProfileSection } from "@/lib/profile/href";
 import { effectiveTimezone } from "@/lib/profile/timezone";
-import { parsePersonalTheme } from "@/lib/theme/personal";
+import { parsePersonalTheme } from "@/lib/theme/personal.schema";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { getOwnProfile } from "@/server/profiles/queries";
 

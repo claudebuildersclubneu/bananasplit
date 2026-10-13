@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { PageTabs } from "@/components/ui/page-tabs";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
+import { safeTimeZone } from "@/lib/calendar/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 
 import { getCategoriesForPeriods, getOrgPeriods } from "./queries";
@@ -38,6 +39,9 @@ export default async function FinanceLayout({
             orgSlug={orgSlug}
             isFinance={isFinance}
             currentUserId={user.id}
+            // A new entry is dated the club's today (the layout outlives a
+            // day, so the dialog reads the clock when it opens).
+            timeZone={safeTimeZone(org.timezone)}
             // The active period first: a new entry defaults to it.
             periods={[...periods]
               .sort((a, b) => Number(b.isActive) - Number(a.isActive))

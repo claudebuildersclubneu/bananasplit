@@ -22,7 +22,7 @@ import { profileHref } from "@/lib/profile/href";
 
 /**
  * The shell's user menu. `user` comes from the database on every request
- * (getShellUser in the org layout), not from the session token, so a new
+ * (OrgContextBySlug.viewer, read by the org layout), not from the session token, so a new
  * name or picture shows at once. `avatar` is User.avatar (uploaded
  * variants); UserAvatar falls back to the OAuth image, then initials.
  */

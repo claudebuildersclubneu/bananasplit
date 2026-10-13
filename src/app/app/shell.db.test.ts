@@ -8,8 +8,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The org switcher, the notification bell and bare /app on the RLS path
- * (0C), against the local seeded database. Skipped without it. The one
- * notification created here is deleted in afterAll.
+ * (0C), against the local seeded database. Skipped without it. The
+ * notifications and tasks created here are deleted in afterAll.
  */
 
 const { requireUserMock, setCookieMock, activeOrgMock } = vi.hoisted(() => ({
@@ -77,6 +77,14 @@ try {
 describe.skipIf(!seeded)("switcher, bell and /app on the RLS path (seeded CBC)", () => {
   const s = seeded!;
   const notificationId = randomUUID();
+  // The bell's task notifications: one on an open task, one on a private
+  // task Kristine is not on (and the same private task's notice to its
+  // creator, who may read it).
+  const openTaskId = randomUUID();
+  const privateTaskId = randomUUID();
+  const openNoticeId = randomUUID();
+  const privateNoticeId = randomUUID();
+  const creatorNoticeId = randomUUID();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,9 +92,14 @@ describe.skipIf(!seeded)("switcher, bell and /app on the RLS path (seeded CBC)",
   });
 
   afterAll(async () => {
-    await withSystemOrgTx(s.cbcId, ({ db }) =>
-      db.notification.deleteMany({ where: { id: notificationId } }),
-    );
+    await withSystemOrgTx(s.cbcId, async ({ db }) => {
+      await db.notification.deleteMany({
+        where: {
+          id: { in: [notificationId, openNoticeId, privateNoticeId, creatorNoticeId] },
+        },
+      });
+      await db.task.deleteMany({ where: { id: { in: [openTaskId, privateTaskId] } } });
+    });
     await disconnectAll();
   });
 
@@ -138,6 +151,93 @@ describe.skipIf(!seeded)("switcher, bell and /app on the RLS path (seeded CBC)",
       db.notification.findUnique({ where: { id: notificationId }, select: { readAt: true } }),
     );
     expect(read?.readAt).not.toBeNull();
+  });
+
+  it("the bell shows a task notification exactly when its reader may open the task", async () => {
+    // The bell reads with no org in context; task notifications used to be
+    // hidden there entirely, because the read rule asked about the org in
+    // context rather than the task's own. Start Kristine from a clean unread
+    // count (the db tests run one file at a time, so nothing else adds to it).
+    await markAllNotificationsRead();
+    await withSystemOrgTx(s.cbcId, async ({ db }) => {
+      await db.task.createMany({
+        data: [
+          {
+            id: openTaskId,
+            organizationId: s.cbcId,
+            title: "Bell test: open task",
+            rank: "zzzz0",
+            createdById: s.jackson.id,
+            ownerId: s.jackson.id,
+          },
+          {
+            id: privateTaskId,
+            organizationId: s.cbcId,
+            title: "Bell test: private task",
+            rank: "zzzz1",
+            createdById: s.jackson.id,
+            ownerId: s.jackson.id,
+            visibility: "PRIVATE",
+          },
+        ],
+      });
+      await db.notification.createMany({
+        data: [
+          {
+            id: openNoticeId,
+            organizationId: s.cbcId,
+            userId: s.kristine.id,
+            type: "TASK_ASSIGNED",
+            title: "Bell test: open task",
+            taskId: openTaskId,
+          },
+          {
+            id: privateNoticeId,
+            organizationId: s.cbcId,
+            userId: s.kristine.id,
+            type: "TASK_MENTIONED",
+            title: "Bell test: private task",
+            taskId: privateTaskId,
+          },
+          {
+            id: creatorNoticeId,
+            organizationId: s.cbcId,
+            userId: s.jackson.id,
+            type: "TASK_COMMENTED",
+            title: "Bell test: private task",
+            taskId: privateTaskId,
+          },
+        ],
+      });
+    });
+
+    // Kristine is an ordinary member who is not on the private task.
+    const before = await fetchMyNotifications();
+    const ids = before.notifications.map((n) => n.id);
+    expect(ids).toContain(openNoticeId);
+    expect(ids).not.toContain(privateNoticeId);
+    expect(before.unreadCount).toBe(1);
+
+    // Marking reads through the same rule (the unread count does too): "Mark
+    // all read" reaches the open task's notice, and the private one stays out
+    // of her reach even by id.
+    await markNotificationRead(privateNoticeId);
+    await markAllNotificationsRead();
+    const readAt = await withSystemOrgTx(s.cbcId, ({ db }) =>
+      db.notification.findMany({
+        where: { id: { in: [openNoticeId, privateNoticeId] } },
+        select: { id: true, readAt: true },
+      }),
+    );
+    expect(readAt.find((n) => n.id === openNoticeId)?.readAt).not.toBeNull();
+    expect(readAt.find((n) => n.id === privateNoticeId)?.readAt).toBeNull();
+    expect((await fetchMyNotifications()).unreadCount).toBe(0);
+
+    // The private task's creator and owner sees its notice.
+    requireUserMock.mockResolvedValue(s.jackson);
+    expect((await fetchMyNotifications()).notifications.map((n) => n.id)).toContain(
+      creatorNoticeId,
+    );
   });
 
   it("/app goes to the cookie's org only while the user belongs to it", async () => {

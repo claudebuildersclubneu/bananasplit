@@ -3,10 +3,11 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { credentialsSignIn, SIGN_IN_UNAVAILABLE_MESSAGE } from "@/lib/auth/credentials-sign-in";
 import { emailVerificationRequired } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
-import { newPasswordSchema } from "@/lib/auth/password-policy";
+import { newPasswordSchema } from "@/lib/auth/password-policy.schema";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { signUpPerIpLimit } from "@/lib/auth/ip-limits";
 import { getClientIp } from "@/lib/request-ip";
@@ -120,8 +121,11 @@ export async function signUpAction(
     }
   }
 
-  const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, "/onboarding");
-  if (signedIn.ok) redirect("/onboarding");
+  // On to onboarding, or to where the visitor was headed (a club's join
+  // link, or starting a club from the pricing), if it is a same-origin path.
+  const next = safeCallbackUrl(formData.get("callbackUrl")) ?? "/onboarding";
+  const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, next);
+  if (signedIn.ok) redirect(next);
 
   // The account exists either way. A server-side failure is said as such
   // (it is not the password); anything else falls back to signing in by hand.

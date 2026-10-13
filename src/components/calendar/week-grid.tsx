@@ -46,6 +46,7 @@ export function WeekGrid({
   fromKey,
   dayCount,
   todayKey,
+  timeZone,
   openId,
   onOpen,
   showSync,
@@ -56,12 +57,14 @@ export function WeekGrid({
   /** 7 for a week, 1 for a single day. */
   dayCount: number;
   todayKey: string;
+  /** The zone timed events are placed and printed in (see hooks.ts). */
+  timeZone: string;
   openId: string | null;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   showSync: boolean;
 }) {
   const windowKeys = useMemo(() => dayKeysBetween(fromKey, dayCount), [fromKey, dayCount]);
-  const byDay = useMemo(() => bucketByDay(items), [items]);
+  const byDay = useMemo(() => bucketByDay(items, timeZone), [items, timeZone]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // The strip's choice is derived, not synchronised: a pick that is no
@@ -88,9 +91,9 @@ export function WeekGrid({
   );
 
   const placements = useMemo(
-    () => days.map((key) => ({ key, placed: placeDayItems(key, byDay.get(key) ?? []) })),
+    () => days.map((key) => ({ key, placed: placeDayItems(key, byDay.get(key) ?? [], timeZone) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [byDay, daysKey],
+    [byDay, daysKey, timeZone],
   );
 
   const { startHour, endHour } = useMemo(
@@ -102,7 +105,7 @@ export function WeekGrid({
     [startHour, endHour],
   );
 
-  const nowOffset = useNowOffset(startHour, endHour);
+  const nowOffset = useNowOffset(startHour, endHour, timeZone);
   const todayOnScreen = days.includes(todayKey);
 
   useEffect(() => {
@@ -193,6 +196,7 @@ export function WeekGrid({
                     <AllDayChip
                       key={item.id}
                       item={item}
+                      timeZone={timeZone}
                       open={openId === item.id}
                       onOpen={onOpen}
                     />
@@ -228,6 +232,7 @@ export function WeekGrid({
                     key={placement.item.id}
                     placement={placement}
                     startHour={startHour}
+                    timeZone={timeZone}
                     open={openId === placement.item.id}
                     onOpen={onOpen}
                     showSync={showSync}
@@ -249,12 +254,14 @@ export function WeekGrid({
 function Slot({
   placement,
   startHour,
+  timeZone,
   open,
   onOpen,
   showSync,
 }: {
   placement: PlacedItem<CalendarItem>;
   startHour: number;
+  timeZone: string;
   open: boolean;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
   showSync: boolean;
@@ -284,6 +291,7 @@ function Slot({
         item,
         KIND_META[item.kind].label,
         VISIBILITY_META[item.visibility].label,
+        timeZone,
       )}
       onClick={(event) => onOpen(item, event.currentTarget)}
     >
@@ -291,7 +299,7 @@ function Slot({
           on the time. The start alone is enough there; the popover has the
           rest. */}
       <span aria-hidden className="cal-slot__time">
-        {compact ? shortTime(item) : timeRange(item)}
+        {compact ? shortTime(item, timeZone) : timeRange(item, timeZone)}
       </span>
       <span aria-hidden className="cal-slot__title">
         {item.title}
@@ -305,10 +313,12 @@ function Slot({
 
 function AllDayChip({
   item,
+  timeZone,
   open,
   onOpen,
 }: {
   item: CalendarItem;
+  timeZone: string;
   open: boolean;
   onOpen: (item: CalendarItem, anchor: HTMLElement) => void;
 }) {
@@ -325,6 +335,7 @@ function AllDayChip({
         item,
         KIND_META[item.kind].label,
         VISIBILITY_META[item.visibility].label,
+        timeZone,
       )}
       onClick={(event) => onOpen(item, event.currentTarget)}
     >
@@ -348,8 +359,8 @@ function AllDayChip({
  * outside the visible hours. Null on the server too: there is no "now" in
  * the viewer's timezone until the browser has it.
  */
-function useNowOffset(startHour: number, endHour: number): number | null {
-  const minutes = useNowMinutes();
+function useNowOffset(startHour: number, endHour: number, timeZone: string): number | null {
+  const minutes = useNowMinutes(timeZone);
   if (minutes === null) return null;
   if (minutes < startHour * 60 || minutes > endHour * 60) return null;
   return ((minutes - startHour * 60) / 60) * HOUR_PX;

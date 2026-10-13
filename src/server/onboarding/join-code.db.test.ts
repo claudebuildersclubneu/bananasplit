@@ -19,6 +19,7 @@ const { requireUserMock } = vi.hoisted(() => ({ requireUserMock: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock }));
 vi.mock("@/server/cache/invalidate", () => ({ invalidate: vi.fn() }));
 
+import { generateJoinCode } from "@/lib/join-code";
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx } from "@/server/db/context";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
@@ -34,6 +35,13 @@ import {
 const tag = randomBytes(4).toString("hex");
 const orgId = `c_jointest_${tag}`;
 const slug = `join-test-${tag}`;
+/** A second org with no code yet, for two admins creating it at once. */
+const raceOrgId = `c_joinrace_${tag}`;
+
+/** Another per-run address, for the room-on-one-network case. */
+function freshIp(): string {
+  return `198.19.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 254)}`;
+}
 
 interface U {
   id: string;
@@ -78,6 +86,12 @@ beforeAll(async () => {
     await ownerDb.membership.create({
       data: { organizationId: orgId, userId: admin.id, role: "OWNER" },
     });
+    await ownerDb.organization.create({
+      data: { id: raceOrgId, name: "Join Race", slug: `join-race-${tag}`, timezone: "UTC" },
+    });
+    await ownerDb.membership.create({
+      data: { organizationId: raceOrgId, userId: admin.id, role: "OWNER" },
+    });
   } catch {
     reachable = false;
   }
@@ -85,7 +99,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (reachable) {
-    await ownerDb.organization.deleteMany({ where: { id: orgId } });
+    await ownerDb.organization.deleteMany({ where: { id: { in: [orgId, raceOrgId] } } });
     await ownerDb.user.deleteMany({
       where: { id: { in: [admin, joiner, outsider, unverified].filter(Boolean).map((u) => u.id) } },
     });
@@ -188,7 +202,10 @@ describe("invite codes against the local database", () => {
 
     const rotated = await asAdmin(({ db }) => rotateJoinCode(db, orgId, admin.id));
     expect(rotated.code).not.toBe(old);
-    expect(await checkJoinCode(outsider, old, ip)).toMatchObject({ ok: false, reason: "not_found" });
+    expect(await checkJoinCode(outsider, old, ip)).toMatchObject({
+      ok: false,
+      reason: "not_found",
+    });
     expect(await checkJoinCode(outsider, rotated.code, ip)).toMatchObject({ ok: true });
   });
 
@@ -203,4 +220,68 @@ describe("invite codes against the local database", () => {
       withOrgTx(orgId, ({ db }) => rotateJoinCode(db, orgId, joiner.id)),
     ).rejects.toThrow();
   });
+
+  it("lets a room on one network check a working code freely; only misses use the allowance", async () => {
+    if (!reachable) return;
+    vi.stubEnv("JOIN_CODE_MISSES_PER_IP_HOUR", "3");
+    try {
+      const room = freshIp();
+      const { code } = await asAdmin(({ db }) => getOrCreateJoinCode(db, orgId, admin.id));
+      // The boxes, a ?code= link and the join's own re-check: none of it counts.
+      for (let i = 0; i < 6; i++) {
+        expect(await checkJoinCode(joiner, code, room)).toMatchObject({ ok: true });
+      }
+      expect(await joinWithCode(joiner, code, room)).toMatchObject({ ok: true });
+
+      for (let i = 0; i < 3; i++) {
+        expect(await checkJoinCode(outsider, generateJoinCode(), room)).toMatchObject({
+          reason: "not_found",
+        });
+      }
+      // The allowance is spent: even the right code waits, so guessing on can't find one.
+      expect(await checkJoinCode(joiner, code, room)).toMatchObject({ reason: "rate_limited" });
+      expect(await checkJoinCode(joiner, code, freshIp())).toMatchObject({ ok: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("gives two admins opening Members at once the same new code", async () => {
+    if (!reachable) return;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let markInserted!: () => void;
+    const inserted = new Promise<void>((resolve) => (markInserted = resolve));
+
+    requireUserMock.mockResolvedValue(admin);
+    // The first request creates the code and keeps its transaction open...
+    const first = withOrgTx(raceOrgId, async ({ db }) => {
+      const row = await getOrCreateJoinCode(db, raceOrgId, admin.id);
+      markInserted();
+      await held;
+      return row;
+    });
+    await inserted;
+    // ...so the second sees no code yet, inserts too and waits on the first.
+    const second = withOrgTx(raceOrgId, ({ db }) => getOrCreateJoinCode(db, raceOrgId, admin.id));
+    await waitForLockWait();
+    release();
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(b.code).toBe(a.code);
+    const created = await ownerDb.orgAuditLog.count({
+      where: { organizationId: raceOrgId, action: "join_code.created" },
+    });
+    expect(created).toBe(1);
+  });
 });
+
+/** Until some transaction waits on another's lock (the second insert), at most ~3s. */
+async function waitForLockWait(): Promise<void> {
+  for (let i = 0; i < 60; i++) {
+    const rows = await ownerDb.$queryRaw<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted AND locktype = 'transactionid'`;
+    if ((rows[0]?.n ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}

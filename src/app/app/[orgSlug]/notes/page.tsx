@@ -8,14 +8,15 @@ import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
 import { listFolders } from "@/server/notes/folders";
-import { listPins } from "@/server/pins";
 
 import { NotesListFilters } from "./notes-list-filters";
 import {
+  canSeeMemberEmails,
   countDeleted,
   getDeletedNotes,
   getNotesForList,
   getOrgMembersForFilter,
+  memberLabel,
   NOTE_SORTS,
   type NoteSort,
 } from "./queries";
@@ -34,10 +35,13 @@ export default async function NotesPage({
 }: PageProps<"/app/[orgSlug]/notes">) {
   const { orgSlug } = await params;
   const query = await searchParams;
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings, pins } = await getOrgContextBySlug(orgSlug);
   // `tab` narrows the list to one kind; without it, notes and files show together.
   const kind = query.tab === "files" || query.tab === "notes" ? query.tab : "all";
   const isAdmin = can({ role }, "settings.view");
+  // Everything below reaches the browser, so emails are not even selected
+  // unless the club's privacy settings let this viewer see them.
+  const emails = canSeeMemberEmails(role, settings);
 
   const str = (v: unknown) => (typeof v === "string" && v !== "all" ? v : undefined);
   const visibility = str(query.visibility) as "PRIVATE" | "ORGANIZATION" | undefined;
@@ -50,20 +54,21 @@ export default async function NotesPage({
     : "edited";
 
   const data = await withOrgTx(org.id, async ({ db }) => ({
-    notes: await getNotesForList(db, org.id, user.id, {
-      visibility,
-      authorId: author,
-      folderId,
-      q,
-      sort,
-    }),
+    notes: await getNotesForList(
+      db,
+      org.id,
+      user.id,
+      { visibility, authorId: author, folderId, q, sort },
+      { emails },
+    ),
     files: await listNoteFiles(db, org.id, { folderId, q }),
-    memberships: await getOrgMembersForFilter(db, org.id),
+    memberships: await getOrgMembersForFilter(db, org.id, { emails }),
     folders: await listFolders(db, org.id, user.id),
-    pins: await listPins(db, org.id, org.slug, user.id),
+    // Read once per request with the org context (the sidebar shows them too).
+    pins,
     trash: inTrash
       ? {
-          notes: await getDeletedNotes(db, org.id, user.id, isAdmin),
+          notes: await getDeletedNotes(db, org.id, user.id, isAdmin, { emails }),
           files: await listDeletedNoteFiles(db, org.id, user.id, isAdmin),
         }
       : null,
@@ -92,11 +97,7 @@ export default async function NotesPage({
     },
   })).catch(handleAuthErrorInPage);
 
-  const members = data.memberships.map((m) => ({
-    userId: m.userId,
-    name: m.user.name,
-    email: m.user.email,
-  }));
+  const members = data.memberships.map((m) => ({ userId: m.userId, name: memberLabel(m.user) }));
   // The notes query applies these filters itself; files get the same ones here.
   const files = data.files.filter(
     (f) => (!visibility || f.visibility === visibility) && (!author || f.uploadedBy.id === author),
@@ -130,11 +131,11 @@ export default async function NotesPage({
         notes={data.notes.map((n) => ({
           id: n.id,
           title: n.title,
-          snippet: n.contentText.trim().slice(0, 400),
+          snippet: n.snippet,
           visibility: n.visibility,
           updatedAt: n.updatedAt,
           createdAt: n.createdAt,
-          authorName: n.author.name ?? n.author.email,
+          authorName: memberLabel(n.author),
           eventTitle: n.event?.title ?? null,
           folderId: n.folderId,
           canMove: isAdmin || n.authorId === user.id,
@@ -160,7 +161,7 @@ export default async function NotesPage({
               title: n.title,
               visibility: n.visibility,
               deletedAt: n.deletedAt!,
-              authorName: n.author.name ?? n.author.email,
+              authorName: memberLabel(n.author),
             })),
             files: data.trash.files,
           }

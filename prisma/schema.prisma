@@ -282,6 +282,8 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+  // The email link is looked up by its token alone (src/server/email/verification.ts).
+  @@index([token])
 }
 
 /// A password-reset link (src/server/email/password-reset.ts). Only the
@@ -418,6 +420,8 @@ model Notification {
 
   @@unique([userId, dedupeKey])
   @@index([userId, readAt])
+  // The bell: a person's newest notifications across their orgs.
+  @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId])
   @@index([organizationId, userId, createdAt])
 }
@@ -543,6 +547,10 @@ model Task {
   priority          TaskPriority        @default(MEDIUM)
   dueDate           DateTime?
   /// Fractional-indexing rank string for kanban ordering within a status column.
+  // The column is COLLATE "C" (20261013130000_audit_db_fixes) so ORDER BY
+  // "rank" is byte order, the order the keys are generated in. Prisma's
+  // schema cannot express a column collation; keep it if this is ever
+  // regenerated.
   rank              String
   parentTaskId      String?
   createdById       String

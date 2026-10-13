@@ -1,7 +1,6 @@
-import { cache } from "react";
-
 import type { Prisma, Role } from "@/generated/prisma/client";
-import { parseAvailability, type Availability } from "@/lib/availability";
+import type { Availability } from "@/lib/availability";
+import { parseAvailability } from "@/lib/availability/schema";
 import { parseStoredLinks, type ProfileLink } from "@/lib/profile/links";
 import { withOrgTx, withUserTx } from "@/server/db/context";
 import { userPublicSelect, type UserPublic } from "@/server/members";
@@ -30,49 +29,8 @@ export const userProfileSelect = {
 
 export const PEOPLE_PAGE_SIZE = 50;
 
-// ---------------------------------------------------------------- the shell
-
-export interface ShellUserRecord {
-  name: string | null;
-  email: string;
-  image: string | null;
-  avatar: Prisma.JsonValue | null;
-}
-
-/** The viewer's own settings the org layout needs besides the shell user. */
-export interface ViewerPrefs {
-  /** NULL until profile setup is finished (the layout sends them there). */
-  onboardedAt: Date | null;
-  /** Raw User.themePreference; parse with parsePersonalTheme. */
-  themePreference: Prisma.JsonValue | null;
-}
-
-/**
- * The signed-in user as the shell shows them, read from the database on
- * every request (not from the JWT), so a name or picture change shows at
- * once without signing in again. Deduped per request.
- */
-export const getShellUser = cache(async (userId: string, fallbackEmail: string): Promise<ShellUserRecord> => {
-  const row = await getShellRow(userId);
-  if (!row) return { name: null, email: fallbackEmail, image: null, avatar: null };
-  return { name: row.name, email: row.email, image: row.image, avatar: row.avatar };
-});
-
-/** Profile-setup state and personal theme, from the same per-request read. */
-export const getViewerPrefs = cache(async (userId: string): Promise<ViewerPrefs> => {
-  const row = await getShellRow(userId);
-  // A missing row (deleted mid-session) never traps anyone in setup.
-  return { onboardedAt: row ? row.onboardedAt : new Date(0), themePreference: row?.themePreference ?? null };
-});
-
-const getShellRow = cache((userId: string) =>
-  withUserTx(userId, ({ db }) =>
-    db.user.findUnique({
-      where: { id: userId },
-      select: { name: true, email: true, image: true, avatar: true, onboardedAt: true, themePreference: true },
-    }),
-  ),
-);
+// The shell user (name, picture, profile-setup state, personal theme) is
+// read with the org context: OrgContextBySlug.viewer in src/server/db/context.ts.
 
 // ---------------------------------------------------------------- own profile
 
