@@ -345,6 +345,30 @@ describe("RSVP pages against the local database", () => {
     expect(jobs.map((j) => j.dedupeKey.split(":")[2])).toEqual(["day"]);
   });
 
+  it("gives the spot a host frees by moving a guest to the waitlist to the next in line", async () => {
+    if (!reachable) return;
+    const event = await makeEvent({ capacity: 1, waitlist: true });
+    const ann = registered(await signUp(event.id, "Ann Moved", `ann-freed-${tag}@x.test`));
+    const bo = registered(await signUp(event.id, "Bo Next", `bo-freed-${tag}@x.test`));
+    expect(bo.status).toBe("WAITLIST");
+    await setStatus(event.id, ann.registrationId, "WAITLIST");
+    const rows = await ownerDb.eventRegistration.findMany({
+      where: { eventId: event.id },
+      select: { id: true, status: true },
+    });
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.status]))).toEqual({
+      [ann.registrationId]: "WAITLIST",
+      [bo.registrationId]: "GOING",
+    });
+    const promoted = await ownerDb.job.findMany({
+      where: { organizationId: orgId, dedupeKey: { endsWith: ":promoted" } },
+      select: { dedupeKey: true },
+    });
+    const keys = promoted.map((j) => j.dedupeKey);
+    expect(keys).toContain(`rsvp-email:${bo.registrationId}:promoted`);
+    expect(keys).not.toContain(`rsvp-email:${ann.registrationId}:promoted`);
+  });
+
   it("keeps a guest a host moves to the waitlist there, without a 'spot opened' email", async () => {
     if (!reachable) return;
     const event = await makeEvent({ capacity: 1, waitlist: true });

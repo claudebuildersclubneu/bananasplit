@@ -78,9 +78,11 @@ The registration card is always paper and ink, whatever the background.
 - When someone going cancels (or a host cancels or deletes their sign-up),
   the person who has waited longest moves up and is emailed. Raising the
   capacity or removing the limit moves people up the same way.
-- A host moving a going guest to the waitlist moves nobody up: who goes is
-  the host's call there (and the guest would otherwise get the spot straight
-  back, with a "spot opened" email).
+- A host moving a going guest to the waitlist frees their spot the same
+  way: the next person in line moves up. The moved guest goes to the back
+  of the line and is skipped, so the spot never comes straight back to
+  them. A host who wants someone particular in moves that guest to going
+  (hosts may go past capacity).
 - The line is ordered by `EventRegistration.queuedAt`, when the guest last
   joined the going list or the waitlist (then `id`), and so is the place in
   line a waitlisted guest sees. Someone who cancels and signs up again goes

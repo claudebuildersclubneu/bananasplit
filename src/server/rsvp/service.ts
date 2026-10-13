@@ -234,15 +234,26 @@ export async function registerGuest(
 /**
  * Moves the guests longest in line (queuedAt) into open spots (all of them
  * when the event is unlimited) and emails each "you're in". Call under the
- * event's lock, after anything that frees a spot or adds capacity.
+ * event's lock, after anything that frees a spot or adds capacity. `skipId`
+ * stays where it is: the guest a host just moved off the going list.
  */
-export async function promoteFromWaitlist(db: Db, event: RsvpRulesEvent): Promise<number> {
+export async function promoteFromWaitlist(
+  db: Db,
+  event: RsvpRulesEvent,
+  skipId?: string,
+): Promise<number> {
   const { going, waitlist } = await registrationCounts(db, event.organizationId, event.id);
-  const n = event.endsAt <= new Date() ? 0 : promotableCount(event.rsvpCapacity, going, waitlist);
+  const waiting = skipId ? waitlist - 1 : waitlist;
+  const n = event.endsAt <= new Date() ? 0 : promotableCount(event.rsvpCapacity, going, waiting);
   if (n === 0) return 0;
   const ids = (
     await db.eventRegistration.findMany({
-      where: { organizationId: event.organizationId, eventId: event.id, status: "WAITLIST" },
+      where: {
+        organizationId: event.organizationId,
+        eventId: event.id,
+        status: "WAITLIST",
+        ...(skipId ? { id: { not: skipId } } : {}),
+      },
       orderBy: [{ queuedAt: "asc" }, { id: "asc" }],
       take: n,
       select: { id: true },
@@ -258,10 +269,10 @@ export async function promoteFromWaitlist(db: Db, event: RsvpRulesEvent): Promis
 
 /**
  * Sets a sign-up's status (the guest cancelling, or an admin moving them).
- * An admin may put someone on the going list past capacity. A spot freed by
- * a cancellation goes to the waitlist; one a host frees by moving a guest
- * to the waitlist doesn't (see below). Cancelling also lets go of the
- * guest's bring list lines.
+ * An admin may put someone on the going list past capacity. A spot freed
+ * by a cancellation, or by a host moving a guest to the waitlist, goes to
+ * whoever is next in line. Cancelling also lets go of the guest's bring
+ * list lines.
  */
 export async function setRegistrationStatus(
   db: Db,
@@ -294,11 +305,13 @@ export async function setRegistrationStatus(
   if (row.status === "WAITLIST" && status === "GOING") {
     await enqueueRsvpEmail(db, event.organizationId, row.id, "promoted");
   }
-  // Only a cancellation moves the waitlist up. A host who moves someone to
-  // the waitlist is choosing who goes: moving it up would hand the spot to
-  // whoever is first in line (or straight back to that same guest, emailed
-  // "a spot opened"), undoing what the host just did.
-  if (row.status === "GOING" && status === "CANCELLED") await promoteFromWaitlist(db, event);
+  // A freed spot never sits empty while people wait. The guest a host moved
+  // to the waitlist joins the back of the line and is skipped here, so the
+  // spot doesn't bounce straight back to them with a "spot opened" email; a
+  // host who wants someone particular in moves that guest to going.
+  if (row.status === "GOING" && status !== "GOING") {
+    await promoteFromWaitlist(db, event, status === "WAITLIST" ? row.id : undefined);
+  }
   return true;
 }
 
