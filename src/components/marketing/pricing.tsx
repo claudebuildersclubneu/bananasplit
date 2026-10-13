@@ -131,7 +131,7 @@ const SECTIONS: Record<Audience, readonly Section[]> = {
       title: "Your club",
       rows: [
         { feature: "A shared workspace for your officers", marks: [false, true, true] },
-        { feature: "Tasks in five views", marks: [false, true, true] },
+        { feature: "Tasks in four views", marks: [false, true, true] },
         { feature: "Calendar and availability polls", marks: [false, true, true] },
         { feature: "Live notes and club storage", marks: [false, "25 GB", "100 GB"] },
         { feature: "Finance board and reimbursements", marks: [false, true, true] },
@@ -198,10 +198,13 @@ export function Pricing({ signedIn = false }: { signedIn?: boolean }) {
   const plans = tiers(audience, signedIn);
 
   return (
-    <section id="pricing" className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 py-32">
+    <section
+      id="pricing"
+      className="mx-auto flex max-w-[1240px] flex-col gap-8 px-6 py-20 sm:gap-10 sm:py-32"
+    >
       <div className="flex flex-col items-center gap-[18px] text-center">
         <SectionTitle>{copy.title}</SectionTitle>
-        <p className="text-ink-muted max-w-[580px] text-[17px] leading-[1.55] text-pretty">
+        <p className="text-ink-muted max-w-[580px] text-[16px] leading-[1.55] text-pretty sm:text-[17px]">
           {copy.intro}
         </p>
         <div
@@ -244,11 +247,11 @@ export function Pricing({ signedIn = false }: { signedIn?: boolean }) {
 
       {audience === "clubs" && <SchoolsPanel />}
 
-      <div className="text-ink-muted flex flex-wrap justify-center gap-x-7 gap-y-2 text-[14px]">
+      <div className="text-ink-muted flex flex-col items-center gap-1.5 text-[14px] sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-7 sm:gap-y-2">
         {PROMISES.map((promise, i) => (
           <Fragment key={promise}>
             {i > 0 && (
-              <span aria-hidden="true" className="text-dusk">
+              <span aria-hidden="true" className="text-dusk hidden sm:inline">
                 ·
               </span>
             )}
@@ -269,7 +272,7 @@ function TierCard({ tier }: { tier: Tier }) {
   return (
     <div
       className={cn(
-        "relative flex flex-col gap-5 rounded-[28px] border p-7 tabular-nums",
+        "relative flex flex-col gap-5 rounded-[28px] border p-6 tabular-nums sm:p-7",
         tier.featured
           ? "border-banana/90 bg-paper shadow-featured"
           : "border-ink/10 bg-transparent",
@@ -288,7 +291,7 @@ function TierCard({ tier }: { tier: Tier }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-2.5">
-          <span className="font-heading text-[56px] leading-none tracking-[-0.04em]">
+          <span className="font-heading text-[48px] leading-none tracking-[-0.04em] sm:text-[56px]">
             {tier.price}
           </span>
           <span className="text-ink-muted text-[15px] leading-[1.3]">{tier.per}</span>
@@ -333,8 +336,9 @@ function MarkCell({ mark, featured }: { mark: Mark; featured?: boolean }) {
 
 /**
  * Every plan's features in one table: a row per feature, a column per plan,
- * grouped under headings. Scrolls sideways on a narrow phone rather than
- * squeezing the plan names.
+ * grouped under headings, behind a "Compare plans" toggle (a native
+ * <details>, like the FAQs) so the cards stay the first thing you see.
+ * Scrolls sideways on a narrow phone rather than squeezing the plan names.
  */
 function ComparisonTable({
   plans,
@@ -344,55 +348,75 @@ function ComparisonTable({
   sections: readonly Section[];
 }) {
   return (
-    <div className="border-ink/10 relative mx-auto w-full max-w-[1100px] overflow-x-auto rounded-[24px] border">
-      <table className="w-full min-w-[560px] border-collapse text-left">
-        <caption className="sr-only">What each plan includes</caption>
-        <thead>
-          <tr className="border-ink/10 border-b">
-            <th scope="col" className="text-ink-soft px-5 py-4 text-[14px] font-semibold">
-              Compare plans
-            </th>
-            {plans.map((tier) => (
-              <th
-                key={tier.name}
-                scope="col"
-                className={cn(
-                  "w-[22%] px-3 py-4 text-center text-[15px] font-bold",
-                  tier.featured && "bg-paper",
-                )}
-              >
-                {tier.name}
+    <details className="group border-ink/10 mx-auto w-full max-w-[1100px] rounded-[24px] border">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-6 px-5 py-4 text-[16px] font-bold sm:px-6 sm:py-5 [&::-webkit-details-marker]:hidden">
+        Compare every plan
+        <span
+          aria-hidden="true"
+          className="border-ink/14 group-hover:bg-sand group-open:bg-sand grid size-8 flex-none place-items-center rounded-full border transition-[transform,background-color] group-open:rotate-45"
+        >
+          <svg
+            viewBox="0 0 12 12"
+            className="size-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          >
+            <path d="M6 1v10M1 6h10" />
+          </svg>
+        </span>
+      </summary>
+      <div className="border-ink/10 overflow-x-auto border-t">
+        <table className="w-full min-w-[560px] border-collapse text-left">
+          <caption className="sr-only">What each plan includes</caption>
+          <thead>
+            <tr className="border-ink/10 border-b">
+              <th scope="col" className="text-ink-soft px-5 py-4 text-[14px] font-semibold">
+                Compare plans
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sections.map((section) => (
-            <Fragment key={section.title}>
-              <tr>
+              {plans.map((tier) => (
                 <th
-                  scope="colgroup"
-                  colSpan={plans.length + 1}
-                  className="text-ink-soft bg-oat/60 px-5 pt-5 pb-2 text-[12px] font-bold tracking-[0.06em] uppercase"
+                  key={tier.name}
+                  scope="col"
+                  className={cn(
+                    "w-[22%] px-3 py-4 text-center text-[15px] font-bold",
+                    tier.featured && "bg-paper",
+                  )}
                 >
-                  {section.title}
+                  {tier.name}
                 </th>
-              </tr>
-              {section.rows.map((row) => (
-                <tr key={row.feature} className="border-ink/8 border-t">
-                  <th scope="row" className="px-5 py-3 text-[15px] leading-[1.4] font-normal">
-                    {row.feature}
-                  </th>
-                  {row.marks.map((mark, i) => (
-                    <MarkCell key={i} mark={mark} featured={plans[i]?.featured} />
-                  ))}
-                </tr>
               ))}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
+            </tr>
+          </thead>
+          <tbody>
+            {sections.map((section) => (
+              <Fragment key={section.title}>
+                <tr>
+                  <th
+                    scope="colgroup"
+                    colSpan={plans.length + 1}
+                    className="text-ink-soft bg-oat/60 px-5 pt-5 pb-2 text-[12px] font-bold tracking-[0.06em] uppercase"
+                  >
+                    {section.title}
+                  </th>
+                </tr>
+                {section.rows.map((row) => (
+                  <tr key={row.feature} className="border-ink/8 border-t">
+                    <th scope="row" className="px-5 py-3 text-[15px] leading-[1.4] font-normal">
+                      {row.feature}
+                    </th>
+                    {row.marks.map((mark, i) => (
+                      <MarkCell key={i} mark={mark} featured={plans[i]?.featured} />
+                    ))}
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 
