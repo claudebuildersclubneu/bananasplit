@@ -1,15 +1,21 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rows, getSecret } = vi.hoisted(() => ({
+const { rows, plan, getSecret } = vi.hoisted(() => ({
   rows: { value: [] as unknown[] },
+  plan: { value: "SOCIETY" },
   getSecret: vi.fn(),
 }));
 
 vi.mock("@/server/db/context", () => ({
   assertNoTx: () => undefined,
   withSystemOrgTx: (_org: string, fn: (ctx: { db: unknown }) => unknown) =>
-    fn({ db: { orgIntegration: { findMany: async () => rows.value } } }),
+    fn({
+      db: {
+        orgIntegration: { findMany: async () => rows.value },
+        organization: { findUnique: async () => ({ plan: plan.value }) },
+      },
+    }),
 }));
 vi.mock("@/server/secrets", () => ({ getSecret }));
 
@@ -30,10 +36,21 @@ const otherRow = {
 
 beforeEach(() => {
   rows.value = [];
+  plan.value = "SOCIETY";
   getSecret.mockReset();
 });
 
 describe("which models a club can use", () => {
+  it("offers nothing to a club whose plan doesn't include AI", async () => {
+    rows.value = [claudeRow];
+    for (const p of ["FREE", "CLUB"]) {
+      plan.value = p;
+      expect(await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" })).toEqual([]);
+      expect(await resolveAiCredentials("org_1", "claude", {})).toBeNull();
+    }
+    expect(getSecret).not.toHaveBeenCalled();
+  });
+
   it("lists the club's own keys first, then the platform's, by label only", async () => {
     rows.value = [otherRow, claudeRow];
     const list = await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" });

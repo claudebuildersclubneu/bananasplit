@@ -348,6 +348,40 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
     (q) => rc(q, `UPDATE "Organization" SET "slug" = 'fx-a2' WHERE "id" = 'org_A'`),
     { value: 1 },
   );
+  // Club plans (20261013150000_org_plan): plan is OWNER-only like slug, so
+  // an admin can't give the club a paid plan (or take it away).
+  await tcase(
+    "T12d",
+    "ADMIN cannot change the org's plan (OWNER-only column)",
+    "app_user",
+    A("u_adminA"),
+    (q) => q(`UPDATE "Organization" SET "plan" = 'SOCIETY' WHERE "id" = 'org_A'`),
+    { error: "42501" },
+  );
+  await tcase(
+    "T12e",
+    "a MEMBER cannot change the org's plan either (RLS: the update reaches no row)",
+    "app_user",
+    A("u_memberA"),
+    (q) => rc(q, `UPDATE "Organization" SET "plan" = 'SOCIETY' WHERE "id" = 'org_A'`),
+    { value: 0 },
+  );
+  await tcase(
+    "T12f",
+    "the service path without an OWNER cannot change the plan",
+    "app_service",
+    { user: null, org: "org_A" },
+    (q) => q(`UPDATE "Organization" SET "plan" = 'SOCIETY' WHERE "id" = 'org_A'`),
+    { error: "42501" },
+  );
+  await tcase(
+    "T12g",
+    "OWNER can change the plan",
+    "app_user",
+    A("u_ownerA"),
+    (q) => rc(q, `UPDATE "Organization" SET "plan" = 'CLUB' WHERE "id" = 'org_A'`),
+    { value: 1 },
+  );
 
   // ---------------- Child tables and cross-org links ----------------
   // The assignee is a member of both orgs, so only the parent check can
@@ -1961,9 +1995,6 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "member_org_id",
         "member_role",
         "membership_history",
-        // Free RSVP pages: "Save to a club" moves the caller's own event
-        // into a club they run (OWNER/ADMIN), its rows following the FKs.
-        "move_personal_event",
         "org_by_join_code",
         "org_has_members",
         "org_has_other_owner",
@@ -1976,8 +2007,6 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "poll_vote_counts",
         "prune_jobs",
         "prune_rate_limit_buckets",
-        // Free events' guest lists, 30 days after they end (maintenance).
-        "purge_personal_rsvp_guests",
         "purge_unverified_users",
         "rate_limit_hit",
         "redeem_org_creation_code",
@@ -2189,9 +2218,6 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       rsvp_page: "s",
       rsvp_ticket: "s",
       rsvp_claim_same_event: "",
-      move_personal_event: "u",
-      purge_personal_rsvp_guests: "s",
-      organization_kind_guard: "",
       rate_limit_hit: "sa",
       secret_delete: "s",
       secret_read: "s",

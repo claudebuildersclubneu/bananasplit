@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 
@@ -94,6 +95,8 @@ export default async function AuditLogPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/settings/audit">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "auditLog");
+  if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "audit.view")) {

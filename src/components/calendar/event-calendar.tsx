@@ -112,6 +112,7 @@ export function EventCalendar({
   canManage,
   window: range,
   orgTodayKey,
+  tasksLayer = true,
 }: {
   orgId: string;
   orgSlug: string;
@@ -123,6 +124,8 @@ export function EventCalendar({
   window: CalendarWindow;
   /** Today in the org timezone, so the server and the first paint agree. */
   orgTodayKey: string;
+  /** Whether the plan has the Tasks layer (and so its filter button). */
+  tasksLayer?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -434,21 +437,25 @@ export function EventCalendar({
         </div>
       </div>
 
-      <div className="-mx-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-1 [scrollbar-width:none] overflow-x-auto px-1 pb-0.5 [&::-webkit-scrollbar]:hidden">
         <div className="cal-filters">
-          <button
-            type="button"
-            className="cal-filter"
-            data-task="open"
-            style={{ ["--kind" as string]: "var(--primary)" }}
-            aria-pressed={range.tasks}
-            title={range.tasks ? "Hide tasks' due dates" : "Show tasks' due dates"}
-            onClick={() => navigate({ ...range, tasks: !range.tasks })}
-          >
-            <span aria-hidden className="cal-chip__dot" />
-            Tasks
-          </button>
-          <span aria-hidden className="bg-border mx-0.5 h-4 w-px shrink-0" />
+          {tasksLayer && (
+            <>
+              <button
+                type="button"
+                className="cal-filter"
+                data-task="open"
+                style={{ ["--kind" as string]: "var(--primary)" }}
+                aria-pressed={range.tasks}
+                title={range.tasks ? "Hide tasks' due dates" : "Show tasks' due dates"}
+                onClick={() => navigate({ ...range, tasks: !range.tasks })}
+              >
+                <span aria-hidden className="cal-chip__dot" />
+                Tasks
+              </button>
+              <span aria-hidden className="bg-border mx-0.5 h-4 w-px shrink-0" />
+            </>
+          )}
           <span className="sr-only" id="cal-kind-filter-label">
             Filter by type
           </span>

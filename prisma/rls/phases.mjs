@@ -3488,7 +3488,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-RSVP-FREE-01",
-    "Free RSVP pages: bring lists are owners' and admins' in the suite; a club can't become a personal space; only a space's owner moves its events out",
+    "RSVP pages: bring lists are owners' and admins' in the suite; no organization can become a personal space (retired)",
     "app_user",
     A("u_adminA"),
     async (q) => {
@@ -3503,14 +3503,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `INSERT INTO "RsvpItem" ("id","organizationId","eventId","label") VALUES ('ri_2','org_A','e_A','Ice')`,
       );
-      // A club's event is no one's free event: nothing moves.
-      s.member_moves = await tryv(q, `SELECT app.move_personal_event('e_A','org_A')`);
-      s.member_purges = await tryv(q, `SELECT app.purge_personal_rsvp_guests(30)`);
       await q(`SELECT app.set_context('u_ownerA','org_A')`);
-      s.owner_moves_club_event = await tryv(q, `SELECT app.move_personal_event('e_A','org_B')`);
       s.owner_flips_kind = await tryq(
         q,
-        `UPDATE "Organization" SET "kind" = 'PERSONAL', "personalOwnerId" = 'u_ownerA' WHERE "id" = 'org_A'`,
+        `UPDATE "Organization" SET "kind" = 'PERSONAL' WHERE "id" = 'org_A'`,
       );
       await q(`SELECT app.set_context('u_memberB','org_B')`);
       s.other_org_sees = await count(q, `SELECT count(*) n FROM "RsvpItem"`);
@@ -3521,10 +3517,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         admin_adds_line: 1,
         member_sees_lines: 0,
         member_adds_line: "42501",
-        member_moves: false,
-        member_purges: "error:42501",
-        owner_moves_club_event: false,
-        owner_flips_kind: "42501",
+        owner_flips_kind: "23514",
         other_org_sees: 0,
       },
     },

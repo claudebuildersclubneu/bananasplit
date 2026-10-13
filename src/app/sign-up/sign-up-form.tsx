@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 import { signUpAction } from "./actions";
 
 /**
- * One sign-up for everyone; what the account is for is chosen next
+ * One sign-up for everyone; joining or starting a club comes next
  * (/onboarding). `google`: the "Sign up with Google" button and divider,
  * above the fields (not once it's sent). `callbackUrl`: where to go once
- * signed up, e.g. back to /rsvp/new for someone who started there.
+ * signed up, e.g. back to the invite link someone started from.
  */
 export function SignUpForm({
   google,
@@ -42,7 +42,7 @@ export function SignUpForm({
             <>
               We sent a verification link to{" "}
               <span className="font-semibold">{state.checkEmail}</span>. Open it to verify your
-              address, then log in. You need a verified email to make event pages or join a club.
+              address, then log in. You need a verified email to join or start a club.
             </>
           }
         />
@@ -58,7 +58,7 @@ export function SignUpForm({
     <>
       <AuthTitle
         title="Create your account."
-        description="It's free. Next, a quick profile, then event pages or your club."
+        description="It's free. Next, a quick profile, then join or start your club."
       />
       {google}
       <form action={formAction} className="flex flex-col gap-[18px]">

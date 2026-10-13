@@ -18,6 +18,7 @@ import {
   listVersions,
   UPLOADS_PER_DAY,
 } from "@/server/org-chart/service";
+import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Import org chart" };
 
@@ -46,6 +47,8 @@ const READER_LABEL: Record<string, string> = {
  */
 export default async function ImportPage({ params }: PageProps<"/app/[orgSlug]/org-chart/import">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "orgchart.write")) notFound();
 

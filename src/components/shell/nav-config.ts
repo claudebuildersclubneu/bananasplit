@@ -1,4 +1,6 @@
-import { type ResolvedGroup } from "@/lib/nav/sidebar";
+import type { OrgPlan } from "@/generated/prisma/enums";
+import { planIncludes } from "@/lib/billing/features";
+import { SECTION_FEATURES, type ResolvedGroup } from "@/lib/nav/sidebar";
 
 /**
  * The sidebar's links for one org: its sections (in the org's order, under
@@ -19,6 +21,8 @@ export interface NavLink {
    * other link's); otherwise also on the pages below it.
    */
   exact: boolean;
+  /** Not on the club's plan: the link opens the upgrade screen. */
+  locked?: boolean;
 }
 
 export interface NavSection {
@@ -27,19 +31,39 @@ export interface NavSection {
   items: NavLink[];
 }
 
-export function navSections(orgSlug: string, groups: readonly ResolvedGroup[]): NavSection[] {
-  return groups.map((g) => ({
-    id: g.id,
-    label: g.label,
-    items: g.items.map((i) => ({
-      id: i.id,
-      label: i.label,
-      href: `/app/${orgSlug}${i.path}`,
-      icon: i.icon,
-      also: i.also.map((p) => `/app/${orgSlug}${p}`),
-      exact: i.exact,
-    })),
-  }));
+/**
+ * With a `plan`, sections the plan lacks are left out, or (`showLocked`,
+ * for the owner and admins, who can switch plans) kept and marked locked.
+ * The Overview is always left out when the plan lacks it: a Free club's
+ * home is its events.
+ */
+export function navSections(
+  orgSlug: string,
+  groups: readonly ResolvedGroup[],
+  options: { plan?: OrgPlan; showLocked?: boolean } = {},
+): NavSection[] {
+  const { plan, showLocked = false } = options;
+  return groups
+    .map((g) => ({
+      id: g.id,
+      label: g.label,
+      items: g.items.flatMap((i): NavLink[] => {
+        const locked = plan ? !planIncludes(plan, SECTION_FEATURES[i.id]) : false;
+        if (locked && (!showLocked || i.id === "overview")) return [];
+        return [
+          {
+            id: i.id,
+            label: i.label,
+            href: `/app/${orgSlug}${i.path}`,
+            icon: i.icon,
+            also: i.also.map((p) => `/app/${orgSlug}${p}`),
+            exact: i.exact,
+            ...(locked ? { locked: true } : {}),
+          },
+        ];
+      }),
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 function matchesHref(href: string, exact: boolean, pathname: string): boolean {

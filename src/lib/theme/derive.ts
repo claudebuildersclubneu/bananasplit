@@ -76,9 +76,9 @@ export interface DerivedTheme {
 }
 
 /** Text/icons on a fill: AA for normal text, with a hair of margin for rounding. */
-const TEXT_TARGET = 4.6;
+export const TEXT_TARGET = 4.6;
 /** Non-text (focus ring, chart marks): WCAG 1.4.11. */
-const GRAPHIC_TARGET = 3.05;
+export const GRAPHIC_TARGET = 3.05;
 
 const WHITE = "#ffffff";
 const BLACK = "#000000";
@@ -87,7 +87,7 @@ const BLACK = "#000000";
  * The foreground for text on `fill`: the palette's own text or background
  * colour when one of them reads, else plain white or black.
  */
-function onFill(fill: string, palette: readonly string[]): string {
+export function onFill(fill: string, palette: readonly string[]): string {
   const preferred = bestContrast(fill, palette);
   if (contrastRatio(preferred, fill) >= TEXT_TARGET) return preferred;
   const pure = bestContrast(fill, [WHITE, BLACK]);
@@ -95,7 +95,7 @@ function onFill(fill: string, palette: readonly string[]): string {
 }
 
 /** Adjusts `color` until it clears `target` against every one of `grounds`. */
-function readableOn(color: string, grounds: readonly string[], target: number): string {
+export function readableOn(color: string, grounds: readonly string[], target: number): string {
   let result = color;
   // Two passes: fixing against one ground can undo another only marginally.
   for (let pass = 0; pass < 2; pass++) {
@@ -105,7 +105,7 @@ function readableOn(color: string, grounds: readonly string[], target: number): 
 }
 
 /** A tint of `ground` towards `tint` that keeps `text` readable on it. */
-function readableTint(ground: string, tint: string, amount: number, text: string): string {
+export function readableTint(ground: string, tint: string, amount: number, text: string): string {
   for (let t = amount; t > 0.001; t -= 0.02) {
     const candidate = mixOklab(ground, tint, t);
     if (contrastRatio(text, candidate) >= TEXT_TARGET) return candidate;

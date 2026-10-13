@@ -55,8 +55,6 @@ model User {
   passwordResetTokens PasswordResetToken[]
 
   memberships            Membership[]
-  /// The free RSVP space (/rsvp), made the first time they create an event.
-  personalSpace          Organization?        @relation("PersonalSpace")
   sentInvitations        Invitation[]         @relation("InvitationInvitedBy")
   createdTasks           Task[]               @relation("TaskCreatedBy")
   taskAssignments        TaskAssignee[]
@@ -330,14 +328,14 @@ model Organization {
   /// The published org chart (Phase 3). Written only by publish/rollback;
   /// app.assert_org_active_chart keeps it inside the org.
   activeOrgChartVersionId String?   @unique
-  /// CLUB: a club with a team. PERSONAL: one person's free RSVP space
-  /// (/rsvp), never listed as a club. Fixed at creation (organization_kind_guard).
+  /// Always CLUB (CHECK Organization_kind_club). PERSONAL was the free RSVP
+  /// space, retired in 20261013160000_retire_personal_spaces.
   kind                    OrgKind   @default(CLUB)
-  /// PERSONAL only: whose space it is (one each).
-  personalOwnerId         String?   @unique
+  /// What the club pays for (src/lib/billing/features.ts says what each
+  /// plan includes). OWNER-only (app.organization_guard); Settings > Plan.
+  plan                    OrgPlan   @default(FREE)
   createdAt               DateTime  @default(now())
 
-  personalOwner         User?             @relation("PersonalSpace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
   activeOrgChartVersion OrgChartVersion?  @relation("ActiveOrgChartVersion", fields: [activeOrgChartVersionId], references: [id], onDelete: SetNull)
   orgChartVersions      OrgChartVersion[] @relation("OrgChartVersions")
 
@@ -380,9 +378,18 @@ model Organization {
   noteFolders       NoteFolder[]
 }
 
+/// PERSONAL is retired: no organization may have it (Organization_kind_club).
 enum OrgKind {
   CLUB
   PERSONAL
+}
+
+/// FREE: RSVP pages and a simple task list. CLUB and SOCIETY: the paid
+/// plans (src/components/marketing/pricing.tsx).
+enum OrgPlan {
+  FREE
+  CLUB
+  SOCIETY
 }
 
 enum NotificationType {
@@ -885,9 +892,6 @@ model Event {
   rsvpCostNote       String?
   /// {venmo?, cashapp?, paypal?, zelle?}: where guests pay the host (src/lib/rsvp/pay.ts).
   rsvpPayTo          Json?
-  /// A free (personal space) event's guest list was cleared this long after
-  /// it ended (app.purge_personal_rsvp_guests); clubs keep theirs.
-  rsvpGuestsPurgedAt DateTime?
 
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy         User                @relation("EventCreatedBy", fields: [createdById], references: [id])

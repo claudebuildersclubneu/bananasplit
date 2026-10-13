@@ -49,7 +49,14 @@ export type TaskLayout = (typeof TASK_LAYOUTS)[number]["value"];
 export const TASK_DESTINATIONS = ["updates", "intake"] as const;
 export type TaskDestination = (typeof TASK_DESTINATIONS)[number];
 
-export type TaskView = TaskLayout | TaskDestination;
+/**
+ * The Free plan's one view: a plain list of the club's tasks. Not a layout
+ * you pick (the page sets it when the plan has no other views; see
+ * src/lib/billing/features.ts), so it is not in TASK_LAYOUTS.
+ */
+export const TASK_LIST_VIEW = "list";
+
+export type TaskView = TaskLayout | TaskDestination | typeof TASK_LIST_VIEW;
 
 export const TASK_SCOPES = [
   { value: "mine", label: "Mine" },

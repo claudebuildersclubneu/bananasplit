@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { PlanFeature } from "@/lib/billing/features";
+
 /**
  * The org's sidebar (OrgSettings.sidebar): which sections show, in what
  * order, under which heading, and what they're called. Owners and admins
@@ -56,6 +58,18 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "databases", label: "Databases", icon: "Database", path: "/databases", group: "data", description: "Attendance, sign-ups, votes and reports." },
   { id: "finance", label: "Finance", icon: "Wallet", path: "/finance", group: "data", description: "Budget, transactions and reimbursements." },
 ];
+
+/** The plan feature behind each section (src/lib/billing/features.ts). */
+export const SECTION_FEATURES: Record<SectionId, PlanFeature> = {
+  overview: "overview",
+  tasks: "tasks",
+  calendar: "rsvp",
+  notes: "files",
+  people: "people",
+  polls: "polls",
+  databases: "databases",
+  finance: "finance",
+};
 
 export const DEFAULT_GROUP_LABELS: Record<GroupId, string | null> = { main: null, club: "Club", data: "Data" };
 

@@ -1,5 +1,6 @@
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 import { LabelForm } from "./label-form";
@@ -7,6 +8,8 @@ import { LabelRow } from "./label-row";
 
 export default async function LabelsPage({ params }: PageProps<"/app/[orgSlug]/settings/labels">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "labels");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "labels.write")) {
     return <SettingsNoAccess title="Labels" who="owners and admins" />;

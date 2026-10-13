@@ -168,7 +168,8 @@
 @utility page-title {
   font-family: var(--font-heading);
   font-size: clamp(1.75rem, 1.3rem + 1.5vw, 2.5rem);
-  font-weight: 400;
+  /* 700 when Look and feel sets sans headings (src/lib/theme/style.ts). */
+  font-weight: var(--heading-weight, 400);
   line-height: 1.05;
   letter-spacing: -0.03em;
   text-wrap: balance;
@@ -194,7 +195,7 @@
 /* Big figures: the display serif. */
 @utility numeral {
   font-family: var(--font-heading);
-  font-weight: 400;
+  font-weight: var(--heading-weight, 400);
   font-variant-numeric: tabular-nums lining-nums;
   line-height: 0.9;
   letter-spacing: -0.02em;

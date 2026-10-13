@@ -8,6 +8,7 @@ import { OrgBrand } from "@/components/theme/org-brand";
 import { OrgThemeRoot } from "@/components/theme/org-theme-root";
 import { CALLBACK_HEADER } from "@/lib/auth/callback-url";
 import { can } from "@/lib/auth/permissions";
+import { planIncludes } from "@/lib/billing/features";
 import { getSession, requireUser } from "@/lib/auth/session";
 import { resolveSidebar, visibleSidebar } from "@/lib/nav/sidebar";
 import { orgLogoUrl } from "@/lib/org-logo";
@@ -84,8 +85,6 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
     }
     throw error;
   }
-  // A personal space (free RSVP pages) has no suite: its home is /rsvp.
-  if (ctx.organization.kind === "PERSONAL") redirect("/rsvp");
   const orgs: OrgSummary[] = [
     ...ctx.memberships.map((m) => ({
       slug: m.slug,
@@ -110,7 +109,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
   // (React cache()), resolved and re-validated as strict hex before render;
   // the member's personal theme (profile setup A4) goes on top of it.
   const theme = applyPersonalTheme(
-    resolveTheme(ctx.theme),
+    // Custom themes are a Society feature: other plans get the default look.
+    resolveTheme(planIncludes(ctx.organization.plan, "themes") ? ctx.theme : null),
     parsePersonalTheme(prefs.themePreference),
   );
   const pins = await withOrgTx(ctx.organization.id, ({ db }) =>
@@ -125,7 +125,11 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
         orgs={orgs}
         user={shellUser}
         pins={pins}
-        sections={navSections(ctx.organization.slug, visibleSidebar(ctx.settings?.sidebar))}
+        sections={navSections(ctx.organization.slug, visibleSidebar(ctx.settings?.sidebar), {
+          plan: ctx.organization.plan,
+          // Owners and admins see what the plan lacks (locked); members don't.
+          showLocked: can({ role: ctx.role }, "settings.view"),
+        })}
         sectionPaths={resolveSidebar(ctx.settings?.sidebar)
           .flatMap((g) => g.items)
           .map((i) => ({

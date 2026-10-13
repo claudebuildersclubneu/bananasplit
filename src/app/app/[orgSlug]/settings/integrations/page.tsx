@@ -8,6 +8,7 @@ import { resolveOrgMailRouting } from "@/server/email/mailer";
 import { PROVIDERS } from "@/server/integrations/catalog";
 import { loadIntegrations } from "@/server/integrations/service";
 import { WARNING_BOX } from "@/lib/status-tones";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 import { StatusBadge } from "./integration-ui";
@@ -27,6 +28,8 @@ export default async function IntegrationsSettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "integrations.view")) {
     return <SettingsNoAccess title="Integrations" who="owners and admins" />;

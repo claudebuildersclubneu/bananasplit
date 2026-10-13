@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, LayoutGrid } from "lucide-react";
+import { Building2, LayoutGrid, Lock } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,6 +8,17 @@ import { cn } from "@/lib/utils";
 
 import { SETTINGS_ICONS } from "./settings-icons";
 import { isSettingsItemActive, SETTINGS_GROUPS, type SettingsNavItem } from "./settings-nav";
+
+/** A section the club's plan doesn't include (its page offers the upgrade). */
+function LockMark({ locked }: { locked?: boolean }) {
+  if (!locked) return null;
+  return (
+    <>
+      <Lock className="ms-auto size-3 shrink-0 opacity-60" aria-hidden="true" />
+      <span className="sr-only"> (not on your plan)</span>
+    </>
+  );
+}
 
 /**
  * Admin panel navigation: a grouped rail beside the page on wide screens, a
@@ -38,6 +49,7 @@ export function SettingsSubnav({ items, orgSlug }: { items: SettingsNavItem[]; o
               >
                 <Icon className="size-3.5" aria-hidden="true" />
                 {item.label}
+                <LockMark locked={item.locked} />
               </Link>
             );
           })}
@@ -81,6 +93,7 @@ export function SettingsSubnav({ items, orgSlug }: { items: SettingsNavItem[]; o
                   >
                     <Icon className="size-4 shrink-0" aria-hidden="true" />
                     {item.label}
+                    <LockMark locked={item.locked} />
                   </Link>
                 );
               })}

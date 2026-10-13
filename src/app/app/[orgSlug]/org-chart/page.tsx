@@ -13,6 +13,7 @@ import { can } from "@/lib/auth/permissions";
 import type { ChartNodeDTO } from "@/lib/org-chart/types";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getPublishedOrgChart } from "@/server/org-chart/queries";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { PeopleTabs } from "../people/people-tabs";
 import { ChartHeaderActions } from "./chart-header-actions";
@@ -31,6 +32,8 @@ export default async function OrgChartPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/org-chart">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const query = await searchParams;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   const canEdit = can({ role }, "orgchart.write");

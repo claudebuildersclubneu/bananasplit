@@ -3,6 +3,7 @@ import { IntegrationHeader } from "../integration-header";
 import { StatusPanel, TestAndRemove } from "../integration-ui";
 import { loadIntegrationPage } from "../load";
 import { SupabaseForm } from "../provider-forms";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Settings > Integrations > Website data (Supabase): the structured
@@ -13,6 +14,8 @@ export default async function DataSourceIntegrationPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations/data-source">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "SUPABASE_SOURCE");
   if (!page) return <SettingsNoAccess title="Website data" who="owners and admins" />;
   const { organization, dto, canWrite, canRemove } = page;

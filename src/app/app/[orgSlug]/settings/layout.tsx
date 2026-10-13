@@ -13,12 +13,15 @@ export default async function SettingsLayout({
   children,
 }: LayoutProps<"/app/[orgSlug]/settings">) {
   const { orgSlug } = await params;
-  const { role } = await getOrgContextBySlug(orgSlug);
+  const { role, organization } = await getOrgContextBySlug(orgSlug);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
       <aside className="lg:sticky lg:top-20 lg:self-start">
-        <SettingsSubnav items={settingsNavItems(orgSlug, role)} orgSlug={orgSlug} />
+        <SettingsSubnav
+          items={settingsNavItems(orgSlug, role, organization.plan)}
+          orgSlug={orgSlug}
+        />
       </aside>
       <div className="min-w-0">{children}</div>
     </div>

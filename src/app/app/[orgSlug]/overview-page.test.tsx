@@ -46,7 +46,9 @@ vi.mock("@/app/app/[orgSlug]/calendar/queries", () => ({
   getViewerRsvps: mocks.getViewerRsvps,
 }));
 vi.mock("@/server/pins", () => ({ listPins: mocks.listPins, listRecent: mocks.listRecent }));
-vi.mock("@/app/app/[orgSlug]/notes/queries", () => ({ getRecentNotes: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/app/app/[orgSlug]/notes/queries", () => ({
+  getRecentNotes: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/server/notes/files", () => ({ listNoteFiles: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/server/boards", () => ({ loadSavedBoard: mocks.loadSavedBoard }));
 vi.mock("@/app/app/[orgSlug]/_shell/board-actions", () => ({ saveBoardAction: vi.fn() }));
@@ -56,7 +58,12 @@ vi.mock("@/app/app/[orgSlug]/_shell/pin-actions", () => ({
   togglePinAction: vi.fn(),
   unpinAction: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  redirect: (url: string) => {
+    throw new Error(`redirect:${url}`);
+  },
+}));
 vi.mock("@/server/setup/progress", () => ({ loadSetupState: mocks.loadSetupState }));
 vi.mock("@/server/onboarding/join-code", () => ({ getOrCreateJoinCode: vi.fn() }));
 vi.mock("@/components/onboarding/join-code-card", () => ({ JoinCodeCard: () => null }));
@@ -68,6 +75,7 @@ const org = {
   id: "org_cbc",
   name: "Claude Builders Club",
   slug: "cbc",
+  plan: "SOCIETY",
   timezone: "America/New_York",
 };
 const props = {
@@ -105,9 +113,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("a Free club's home", () => {
+  const free = (role: string, welcome = false) => {
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: { ...org, plan: "FREE" },
+      role,
+    });
+    return OverviewPage({
+      ...props,
+      searchParams: Promise.resolve(welcome ? { welcome: "1" } : {}),
+    } as unknown as PageProps<"/app/[orgSlug]">);
+  };
+
+  it("has no Overview board: members land on the calendar, organizers on the RSVP pages", async () => {
+    await expect(free("MEMBER")).rejects.toThrow("redirect:/app/cbc/calendar");
+    await expect(free("OWNER")).rejects.toThrow("redirect:/app/cbc/calendar/rsvp");
+    // A new club's owner lands on the invite code (Members).
+    await expect(free("OWNER", true)).rejects.toThrow("redirect:/app/cbc/settings/members");
+    expect(mocks.getMyOpenTasks).not.toHaveBeenCalled();
+  });
+});
+
 describe("org overview", () => {
   it("shows no one the club's money, not even a treasurer", async () => {
-    mocks.getOrgContextBySlug.mockResolvedValue({ user: viewer, organization: org, role: "TREASURER" });
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: org,
+      role: "TREASURER",
+    });
     const html = await render();
     expect(html).not.toContain("Money owed to you");
     expect(html).not.toContain("Club balance");
@@ -226,10 +260,20 @@ describe("org overview", () => {
   it("lists open polls of both kinds, newest first", async () => {
     mocks.loadSavedBoard.mockResolvedValue([{ id: "polls", type: "polls", w: 1, h: null }]);
     db.availabilityPoll.findMany.mockResolvedValue([
-      { id: "ap_1", title: "Exec sync time", closesAt: null, createdAt: new Date("2026-10-01T12:00:00Z") },
+      {
+        id: "ap_1",
+        title: "Exec sync time",
+        closesAt: null,
+        createdAt: new Date("2026-10-01T12:00:00Z"),
+      },
     ]);
     db.poll.findMany.mockResolvedValue([
-      { id: "qp_1", question: "Pizza or tacos?", closesAt: null, createdAt: new Date("2026-10-04T12:00:00Z") },
+      {
+        id: "qp_1",
+        question: "Pizza or tacos?",
+        closesAt: null,
+        createdAt: new Date("2026-10-04T12:00:00Z"),
+      },
     ]);
 
     const html = await render();

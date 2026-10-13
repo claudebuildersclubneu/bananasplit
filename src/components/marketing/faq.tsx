@@ -2,8 +2,8 @@ import { SectionTitle } from "./section-title";
 
 const FAQS = [
   {
-    q: "Do I need a club to use Bananasplit?",
-    a: "No. A free account makes RSVP pages for anything, with sign-ups, waitlists, QR check-in and invite links. It's just you, not a club. Start a club when you want a shared workspace for your officers, and move your events into it.",
+    q: "Do I need a club to make RSVP pages?",
+    a: "Yes, and it's free. RSVP pages are part of every club, the Free plan included: sign-ups, waitlists, QR check-in and invite links. Sign up, start your club (even if it's just you for now), and make your first page.",
   },
   {
     q: "Who counts as a member?",

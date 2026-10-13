@@ -154,7 +154,15 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Finish setup" }).click();
-  await page.waitForURL(new RegExp(`/app/${slug}\\?welcome=1$`));
+  // A new club is on the Free plan, whose home is the invite code (Members).
+  await page.waitForURL(new RegExp(`/app/${slug}(\\?welcome=1|/settings/members)$`));
+  // The flows under test use the whole workspace: switch to Society
+  // (billing isn't connected, so it applies at once).
+  await page.goto(`/app/${slug}/settings/plan`);
+  await page.getByRole("button", { name: "Switch to Society" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Switch to Society" }).click();
+  await page.getByText("Your club is on the Society plan").waitFor();
+  await page.goto(`/app/${slug}?welcome=1`);
   return slug;
 }
 

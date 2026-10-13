@@ -3,6 +3,7 @@ import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
 import { formatCents } from "@/lib/finance/money";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinanceAccessGate } from "../finance-access-gate";
 import {
@@ -16,6 +17,8 @@ export default async function MyReimbursementsPage({
   params,
 }: PageProps<"/app/[orgSlug]/finance/my-reimbursements">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "finance");
+  if (planLock) return planLock;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const isFinance = can({ role }, "finance.manage");
 

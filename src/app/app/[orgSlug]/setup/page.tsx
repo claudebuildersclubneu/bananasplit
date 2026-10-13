@@ -11,6 +11,7 @@ import { SETUP_STEPS, SETUP_TOTAL_MINUTES, isSetupStepId } from "@/server/setup/
 import { loadSetupState } from "@/server/setup/progress";
 import { loadDataSummary } from "@/server/setup/summary";
 import type { AttendanceReport } from "@/server/reports/types";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinishPanel } from "./finish-panel";
 import { ResultPanel } from "./result-panel";
@@ -41,6 +42,8 @@ export default async function SetupPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/setup">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
 
@@ -98,7 +101,10 @@ export default async function SetupPage({
   // "Change the credential" reopens the form for a step that is connected.
   const editing = sp.edit === "1";
   // Opened from org setup (onboarding B2): a way back to it.
-  const from = typeof sp.from === "string" && /^\/onboarding\/organization\/[a-z0-9-]+\/data$/.test(sp.from) ? sp.from : null;
+  const from =
+    typeof sp.from === "string" && /^\/onboarding\/organization\/[a-z0-9-]+\/data$/.test(sp.from)
+      ? sp.from
+      : null;
 
   // The first chart. Outside the transaction above: getReport opens its own
   // service transaction (it may be revalidated with no request context).

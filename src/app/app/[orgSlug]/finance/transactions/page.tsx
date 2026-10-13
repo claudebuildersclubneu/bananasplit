@@ -5,6 +5,7 @@ import { TransactionTable } from "@/components/finance/transaction-table";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinanceAccessGate } from "../finance-access-gate";
 import {
@@ -21,6 +22,8 @@ export default async function TransactionsPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/finance/transactions">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "finance");
+  if (planLock) return planLock;
   const query = await searchParams;
 
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);

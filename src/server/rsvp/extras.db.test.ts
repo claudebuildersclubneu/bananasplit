@@ -6,11 +6,9 @@ import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 /**
- * Free RSVP pages and the features around them, against the real roles,
- * policies and functions on the local database: personal spaces, "Save to a
- * club" (app.move_personal_event), the 30-day guest list purge, the bring
- * list, invite links, payments, tickets, and check-ins landing in a club's
- * attendance. Throwaway users and orgs are removed in afterAll. Skipped when
+ * The RSVP page extras, against the real roles, policies and functions on
+ * the local database: the bring list, invite links, payments, tickets, and
+ * check-ins landing in a club's attendance. Throwaway users and orgs are removed in afterAll. Skipped when
  * the database is not reachable.
  */
 
@@ -18,13 +16,12 @@ const { requireUserMock } = vi.hoisted(() => ({ requireUserMock: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: requireUserMock, getSession: vi.fn() }));
 vi.mock("@/server/cache/invalidate", () => ({ invalidate: vi.fn() }));
 
-import { authDb, disconnectAll, serviceDb } from "@/server/db/clients";
-import { withOrgTx, withSystemOrgTx, withUserTx } from "@/server/db/context";
+import { authDb, disconnectAll } from "@/server/db/clients";
+import { withOrgTx, withSystemOrgTx } from "@/server/db/context";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
 
 import { setRegistrationCheckIn } from "./checkin";
 import { loadRsvpPage } from "./page";
-import { ensurePersonalSpace, getPersonalSpace, movePersonalEvent } from "./personal";
 import {
   claimPayment,
   confirmPayment,
@@ -64,10 +61,10 @@ async function makeUser(local: string): Promise<U> {
 
 async function makeEvent(
   organizationId: string,
-  options: { endsInMs?: number; capacity?: number | null; cost?: number | null } = {},
+  options: { capacity?: number | null; cost?: number | null } = {},
 ) {
   const slug = randomSlug();
-  const end = new Date(Date.now() + (options.endsInMs ?? 3 * DAY));
+  const end = new Date(Date.now() + 3 * DAY);
   const event = await ownerDb.event.create({
     data: {
       organizationId,
@@ -126,7 +123,7 @@ beforeAll(async () => {
     await ownerDb.membership.createMany({
       data: [
         { organizationId: clubId, userId: host.id, role: "ADMIN" },
-        // In the other club the host is only a member: they can't move events in.
+        // In the other club the host is only a member: not a host there.
         { organizationId: otherClubId, userId: host.id, role: "MEMBER" },
       ],
     });
@@ -137,11 +134,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (reachable) {
-    const spaces = await ownerDb.organization.findMany({
-      where: { personalOwnerId: { in: users.map((u) => u.id) } },
-      select: { id: true },
-    });
-    const all = [...orgIds, ...spaces.map((s) => s.id)];
+    const all = orgIds;
     await ownerDb.job.deleteMany({ where: { organizationId: { in: all } } });
     await ownerDb.attendance.deleteMany({ where: { organizationId: { in: all } } });
     await ownerDb.organization.deleteMany({ where: { id: { in: all } } });
@@ -149,138 +142,6 @@ afterAll(async () => {
   }
   await disconnectAll();
   await disconnectOwnerDb();
-});
-
-describe("personal spaces", () => {
-  it("makes one space per person, theirs alone, and finds it again", async () => {
-    if (!reachable) return;
-    const sessionUser = { id: host.id, email: host.email, name: host.name };
-    const first = await ensurePersonalSpace(sessionUser, "America/Chicago");
-    const again = await ensurePersonalSpace(sessionUser, "Europe/Paris");
-    expect(first.ok && again.ok).toBe(true);
-    if (!first.ok || !again.ok) return;
-    expect(again.space.id).toBe(first.space.id);
-    expect(first.space.timezone).toBe("America/Chicago");
-    const row = await ownerDb.organization.findUniqueOrThrow({
-      where: { id: first.space.id },
-      select: {
-        kind: true,
-        personalOwnerId: true,
-        memberships: { select: { userId: true, role: true } },
-      },
-    });
-    expect(row).toEqual({
-      kind: "PERSONAL",
-      personalOwnerId: host.id,
-      memberships: [{ userId: host.id, role: "OWNER" }],
-    });
-    expect(await getPersonalSpace(stranger.id)).toBeNull();
-  });
-
-  it("can't be turned into a club, or a club into a space, by the runtime roles", async () => {
-    if (!reachable) return;
-    const space = await getPersonalSpace(host.id);
-    if (!space) throw new Error("expected a space");
-    requireUserMock.mockResolvedValue(host);
-    await expect(
-      withOrgTx(space.id, ({ db }) =>
-        db.organization.update({ where: { id: space.id }, data: { kind: "CLUB" } }),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      withOrgTx(clubId, ({ db }) =>
-        db.organization.update({ where: { id: clubId }, data: { personalOwnerId: host.id } }),
-      ),
-    ).rejects.toThrow();
-  });
-});
-
-describe("Save to a club", () => {
-  it("moves a free event with its guests, bring list and pending jobs, keeping its link", async () => {
-    if (!reachable) return;
-    const space = await getPersonalSpace(host.id);
-    if (!space) throw new Error("expected a space");
-    const event = await makeEvent(space.id);
-    const ava = await signUp(event, "Ava Free");
-    await withSystemOrgTx(space.id, async ({ db }) => {
-      await saveRsvpItems(db, event, [{ label: "Chips", slots: 2 }]);
-      const item = await db.rsvpItem.findFirstOrThrow({ where: { eventId: event.id } });
-      expect(await setItemClaim(db, event, ava.registrationId, item.id, true)).toBe("ok");
-    });
-
-    // Not theirs, or not a club they run: nothing moves.
-    expect(await movePersonalEvent(stranger.id, event.id, clubId)).toBe(false);
-    expect(await movePersonalEvent(host.id, event.id, otherClubId)).toBe(false);
-    expect(await movePersonalEvent(host.id, event.id, space.id)).toBe(false);
-
-    expect(await movePersonalEvent(host.id, event.id, clubId)).toBe(true);
-    const moved = await ownerDb.event.findUniqueOrThrow({
-      where: { id: event.id },
-      select: { organizationId: true, rsvpSlug: true, hostUserId: true },
-    });
-    expect(moved).toEqual({ organizationId: clubId, rsvpSlug: event.slug, hostUserId: host.id });
-    expect(
-      await ownerDb.eventRegistration.findMany({
-        where: { eventId: event.id },
-        select: { organizationId: true },
-      }),
-    ).toEqual([{ organizationId: clubId }]);
-    expect(
-      await ownerDb.rsvpItemClaim.findMany({
-        where: { registrationId: ava.registrationId },
-        select: { organizationId: true },
-      }),
-    ).toEqual([{ organizationId: clubId }]);
-    // The confirmation queued in the space now runs in the club.
-    expect(
-      await ownerDb.job.count({
-        where: { organizationId: space.id, dedupeKey: { contains: ava.registrationId } },
-      }),
-    ).toBe(0);
-    expect(
-      await ownerDb.job.count({
-        where: { organizationId: clubId, dedupeKey: { contains: ava.registrationId } },
-      }),
-    ).toBeGreaterThan(0);
-  });
-});
-
-describe("the free guest list purge", () => {
-  it("clears a free event's guests 30 days after it ends, and nothing a club keeps", async () => {
-    if (!reachable) return;
-    const space = await getPersonalSpace(host.id);
-    if (!space) throw new Error("expected a space");
-    const old = await makeEvent(space.id, { endsInMs: -31 * DAY });
-    const recent = await makeEvent(space.id, { endsInMs: -10 * DAY });
-    const club = await makeEvent(clubId, { endsInMs: -31 * DAY });
-    // Signed up while they were open (the page is closed to new sign-ups now).
-    for (const e of [old, recent, club]) {
-      await ownerDb.eventRegistration.create({
-        data: {
-          organizationId: e.organizationId,
-          eventId: e.id,
-          name: "Old Guest",
-          email: `old-${e.id}@x.test`,
-          phone: "+16175550100",
-          inviteCode: randomSlug(),
-          ticketCode: `${randomSlug()}abcd`,
-        },
-      });
-    }
-    const rows = await serviceDb.$queryRaw<{ n: number }[]>`
-      SELECT app.purge_personal_rsvp_guests(30) AS n`;
-    expect(Number(rows[0]?.n)).toBeGreaterThanOrEqual(1);
-    const count = (eventId: string) => ownerDb.eventRegistration.count({ where: { eventId } });
-    expect(await count(old.id)).toBe(0);
-    expect(await count(recent.id)).toBe(1);
-    expect(await count(club.id)).toBe(1);
-    expect(
-      await ownerDb.event.findUniqueOrThrow({
-        where: { id: old.id },
-        select: { rsvpEnabled: true, rsvpGuestsPurgedAt: true },
-      }),
-    ).toMatchObject({ rsvpEnabled: false, rsvpGuestsPurgedAt: expect.any(Date) });
-  });
 });
 
 describe("the bring list", () => {
@@ -519,41 +380,5 @@ describe("tickets and check-in", () => {
       }),
     );
     expect(await ownerDb.attendance.count({ where: { id: reg.attendanceId! } })).toBe(0);
-  });
-
-  it("on a free page, a check-in is just a check-in", async () => {
-    if (!reachable) return;
-    const space = await getPersonalSpace(host.id);
-    if (!space) throw new Error("expected a space");
-    const event = await makeEvent(space.id);
-    const guest = await signUp(event, "Ivo Free");
-    requireUserMock.mockResolvedValue(host);
-    const result = await withOrgTx(space.id, ({ db }) =>
-      setRegistrationCheckIn(db, {
-        organizationId: space.id,
-        eventId: event.id,
-        registrationId: guest.registrationId,
-        checkedIn: true,
-        actorUserId: host.id,
-        method: "MANUAL",
-      }),
-    );
-    expect(result).toEqual({ ok: true, name: "Ivo Free" });
-    expect(await ownerDb.attendance.count({ where: { organizationId: space.id } })).toBe(0);
-  });
-});
-
-describe("where a personal space shows up", () => {
-  it("never in the list of clubs", async () => {
-    if (!reachable) return;
-    const clubs = await withUserTx(host.id, ({ db }) =>
-      db.membership.findMany({
-        where: { userId: host.id, organization: { kind: "CLUB" } },
-        select: { organizationId: true },
-      }),
-    );
-    const space = await getPersonalSpace(host.id);
-    expect(clubs.map((c) => c.organizationId).sort()).toEqual([clubId, otherClubId].sort());
-    expect(clubs.map((c) => c.organizationId)).not.toContain(space?.id);
   });
 });

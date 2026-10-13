@@ -13,8 +13,9 @@ export const metadata = { title: "Create your account · Bananasplit" };
 
 /**
  * Sign up: one account for everyone (design: App screens, 02). Next comes
- * the choice between event pages and a club (/onboarding), unless they came
- * from somewhere specific (?callbackUrl=/rsvp/new), where they go back.
+ * a quick profile, then joining or starting a club (/onboarding), unless
+ * they came from somewhere specific (?callbackUrl=, e.g. an invite link),
+ * where they go back.
  */
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
   const callbackUrl = safeCallbackUrl((await searchParams).callbackUrl);

@@ -58,6 +58,7 @@ import { getOrgContextBySlug, withOrgTx, type OrgContext } from "@/server/db/con
 import { SIGNUP_LABELS } from "@/server/sync/supabase-map";
 import { syncIfStale } from "@/server/sync/enqueue";
 import { getOrgMembersForPicker } from "@/server/members";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * One database (Phase 4a/4b): the server-paginated table in the view URL
@@ -111,6 +112,8 @@ export default async function DatabaseViewPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/databases/[dbKey]">) {
   const { orgSlug, dbKey } = await params;
+  const planLock = await planGate(orgSlug, "databases");
+  if (planLock) return planLock;
   const sp = (await searchParams) as SearchParams;
   const { organization } = await getOrgContextBySlug(orgSlug);
   const rowId = typeof sp.row === "string" ? sp.row : undefined;

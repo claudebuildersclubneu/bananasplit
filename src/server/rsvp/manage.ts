@@ -9,8 +9,8 @@ import type { RsvpManagerProps } from "@/components/rsvp/rsvp-manager";
 import type { TxClient } from "@/server/db/context";
 
 /**
- * What the host's RSVP screen needs (the suite's /calendar/{id}/rsvp and a
- * free page's /rsvp/{id}), read in the host's own transaction: RLS lets only
+ * What the host's RSVP screen needs (the suite's /calendar/{id}/rsvp), read
+ * in the host's own transaction: RLS lets only
  * owners and admins see sign-ups. Null when the event is gone.
  */
 export async function loadRsvpManager(
@@ -26,9 +26,8 @@ export async function loadRsvpManager(
     startsAt: Date;
     endsAt: Date;
     rsvpSlug: string | null;
-    rsvpGuestsPurgedAt: Date | null;
   };
-  props: Omit<RsvpManagerProps, "links" | "personal" | "messaging" | "initialTab">;
+  props: Omit<RsvpManagerProps, "links" | "messaging" | "initialTab">;
 } | null> {
   const event = await db.event.findFirst({
     where: { id: eventId, organizationId, deletedAt: null },
@@ -54,7 +53,6 @@ export async function loadRsvpManager(
       rsvpCostCents: true,
       rsvpCostNote: true,
       rsvpPayTo: true,
-      rsvpGuestsPurgedAt: true,
     },
   });
   if (!event) return null;

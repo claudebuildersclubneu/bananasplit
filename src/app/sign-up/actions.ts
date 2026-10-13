@@ -121,8 +121,8 @@ export async function signUpAction(
     }
   }
 
-  // Someone who came to make a free event page (/rsvp/new) goes back there;
-  // everyone else goes on to find or start their club.
+  // Someone sent here from a specific page (an invite link) goes back there;
+  // everyone else goes on to join or start their club.
   const next = safeCallbackUrl(formData.get("callbackUrl")) ?? "/onboarding";
   const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, next);
   if (signedIn.ok) redirect(next);

@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import {
   Prisma,
+  type OrgPlan,
   type OrgSettings,
   type OrgTheme,
   type PrismaClient,
@@ -419,8 +420,8 @@ export interface OrgContextBySlug {
     timezone: string;
     logo: Prisma.JsonValue | null;
     activeOrgChartVersionId: string | null;
-    /** PERSONAL: someone's free RSVP space, which has no suite (/rsvp instead). */
-    kind: "CLUB" | "PERSONAL";
+    /** What the club pays for (src/lib/billing/features.ts). */
+    plan: OrgPlan;
   };
   role: Role;
   /** Every live org the user belongs to, by name. */
@@ -463,12 +464,11 @@ export const getOrgContextBySlug = cache(async (slug: string): Promise<OrgContex
           timezone: true,
           logo: true,
           activeOrgChartVersionId: true,
-          kind: true,
+          plan: true,
         },
       });
-      // Clubs only: a personal RSVP space is never a club to switch to.
       const memberships = await db.membership.findMany({
-        where: { userId: user.id, organization: { kind: "CLUB" } },
+        where: { userId: user.id },
         select: {
           role: true,
           organization: {

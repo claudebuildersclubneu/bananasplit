@@ -11,6 +11,7 @@ import { diffCharts, type DiffChange, type DiffPosition } from "@/lib/org-chart/
 import { personLabel, type ChartNodeDTO } from "@/lib/org-chart/types";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listVersions, loadVersion, type VersionDetail } from "@/server/org-chart/service";
+import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Org chart version" };
 
@@ -80,6 +81,8 @@ export default async function VersionPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/org-chart/versions/[versionId]">) {
   const { orgSlug, versionId } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const query = await searchParams;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "orgchart.write")) notFound();

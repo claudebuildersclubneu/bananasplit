@@ -12,6 +12,7 @@ import { setupStep } from "@/server/setup/catalog";
 import { diagnose } from "@/server/setup/diagnose";
 import { loadSetupState, needsAttention, type SetupStepState } from "@/server/setup/progress";
 import { loadDataSummary } from "@/server/setup/summary";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { TestButton } from "../step-controls";
 import { DisconnectButton } from "./status-rows";
@@ -52,6 +53,8 @@ export default async function SetupStatusPage({
   params,
 }: PageProps<"/app/[orgSlug]/setup/status">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
 
   if (!can({ role }, "integrations.view")) {

@@ -15,7 +15,7 @@ import { PendingInviteCard } from "./pending-invite-card";
 
 export const metadata = { title: "Welcome · Bananasplit" };
 
-/** The two ways on: a 50px row with a title, a line of detail and an arrow. */
+/** The ways on: a 50px row with a title, a line of detail and an arrow. */
 const choiceClass =
   "bg-paper border-ink/10 hover:border-ink/30 group flex items-center gap-4 rounded-2xl border px-5 py-4 text-ink transition-colors";
 
@@ -23,17 +23,20 @@ const choiceClass =
  * /onboarding: where sign-up and sign-in land for someone with no club.
  *
  * One account for everyone, then the quick profile (A1: name, photo), then
- * this page (A7): free event pages, join with a club code or an emailed
- * invite, or start a club (Flow B). The club profile (school, bio, theme,
- * availability) is its own optional setup, offered here. With a club, its
- * home.
+ * this page (A7): join with a club code or an emailed invite, or start a
+ * club (Flow B). RSVP pages come with every club. The club profile
+ * (school, bio, theme, availability) is its own optional setup, offered
+ * here. With a club, its home.
  */
 export default async function OnboardingPage() {
   const user = await requireUser();
   const profile = await getOnboardingProfile(user.id);
   if (!profile) redirect("/auth/session-ended");
-  if (profile.memberships[0]) redirect(`/app/${profile.memberships[0].slug}`);
+  // The quick profile comes first, even for someone already in a club: the
+  // club's layout sends anyone not onboarded here, so checking membership
+  // first would bounce them between the two forever.
   if (!profile.onboardedAt) redirect("/onboarding/profile/basics");
+  if (profile.memberships[0]) redirect(`/app/${profile.memberships[0].slug}`);
 
   // Clubs scheduled for deletion stay reachable at their URL, where an owner
   // can cancel during the 30-day grace period.
@@ -59,7 +62,7 @@ export default async function OnboardingPage() {
     >
       <AuthTitle
         title={firstName ? `Welcome, ${firstName}.` : "Welcome."}
-        description="What are you here for? You can always do the others later."
+        description="Join your club or start a new one. RSVP pages, tasks and the rest come with it."
       />
 
       {!profile.emailVerified && (
@@ -83,15 +86,6 @@ export default async function OnboardingPage() {
       )}
 
       <div className="flex flex-col gap-2.5">
-        <Link href="/rsvp/new" className={choiceClass}>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[16px] font-bold">Make event pages</span>
-            <span className="text-ink-soft text-[14px]">
-              Free RSVP pages with just your account. No club, no team.
-            </span>
-          </span>
-          <ArrowRight className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
-        </Link>
         {profile.emailVerified && (
           <>
             <Link href="/onboarding/join" className={choiceClass}>

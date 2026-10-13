@@ -174,7 +174,6 @@ export function RsvpSettings({
   editHref,
   going,
   items,
-  personal = false,
 }: {
   orgId: string;
   eventId: string;
@@ -188,8 +187,6 @@ export function RsvpSettings({
   /** How many are going, for the split preview. */
   going: number;
   items: BringLine[];
-  /** A free page (no club): messages go out as the person. */
-  personal?: boolean;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initial);
@@ -635,11 +632,9 @@ export function RsvpSettings({
             <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>
               A confirmation email, then reminders a day and an hour before.{" "}
-              {personal
-                ? "Sent as you via Bananasplit, with their ticket and invite link."
-                : messaging.email === "org"
-                  ? "Sent from your club's email sender."
-                  : "Sent as your club via Bananasplit until you connect your own sender in Admin panel › Integrations."}
+              {messaging.email === "org"
+                ? "Sent from your club's email sender."
+                : "Sent as your club via Bananasplit until you connect your own sender in Admin panel › Integrations."}
             </span>
           </p>
           <p className="text-muted-foreground flex gap-2 text-xs leading-relaxed">

@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
 import { JoinCodeCard } from "@/components/onboarding/join-code-card";
@@ -26,6 +27,7 @@ import { getUpcomingEvents, getViewerRsvps } from "@/app/app/[orgSlug]/calendar/
 import { getRecentNotes } from "@/app/app/[orgSlug]/notes/queries";
 import { absoluteAppUrl } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
+import { planIncludes } from "@/lib/billing/features";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { visibleSidebar } from "@/lib/nav/sidebar";
@@ -68,6 +70,12 @@ export default async function OrgOverviewPage({
   // shows the invite code and link to share (the flowchart's END).
   const welcome = (await searchParams).welcome === "1";
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
+  // A Free club has no Overview board: it lands on its events (the RSVP
+  // pages for those who run them), and a new club's owner on the invite code.
+  if (!planIncludes(org.plan, "overview")) {
+    if (!can({ role }, "events.write")) redirect(`/app/${org.slug}/calendar`);
+    redirect(`/app/${org.slug}/${welcome ? "settings/members" : "calendar/rsvp"}`);
+  }
   const canSetUp = can({ role }, "integrations.write");
   const isAdmin = can({ role }, "settings.view");
   const canAddEvents = can({ role }, "events.write");

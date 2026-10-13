@@ -11,6 +11,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { peopleHref, personTasksHref, profileHref } from "@/lib/profile/href";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { getOrgPerson, getPersonBusyHours } from "@/server/profiles/queries";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * One member's page (Phase 2). Membership-checked twice: the viewer must be
@@ -21,6 +22,8 @@ import { getOrgPerson, getPersonBusyHours } from "@/server/profiles/queries";
  */
 export default async function PersonPage({ params }: PageProps<"/app/[orgSlug]/people/[userId]">) {
   const { orgSlug, userId } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const { organization, user } = await getOrgContextBySlug(orgSlug);
   const person = await getOrgPerson(organization.id, userId);
   if (!person) notFound();

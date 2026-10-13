@@ -65,17 +65,26 @@ beforeEach(() => {
 });
 
 describe("OnboardingPage", () => {
+  it("sends a club member who never did the quick profile there, not back to the club (no loop)", async () => {
+    mocks.profile.mockResolvedValue(
+      profile({ onboardedAt: null, memberships: [{ name: "CBC", slug: "cbc" }] }),
+    );
+    await expect(render()).rejects.toMatchObject({ url: "/onboarding/profile/basics" });
+  });
+
   it("sends a new account to the quick profile first", async () => {
     mocks.profile.mockResolvedValue(profile({ onboardedAt: null }));
     await expect(render()).rejects.toMatchObject({ url: "/onboarding/profile/basics" });
   });
 
-  it("then asks what it's for: event pages, a club, and the optional club profile", async () => {
+  it("then offers joining or starting a club, and the optional club profile", async () => {
     mocks.profile.mockResolvedValue(profile());
     const html = await render();
-    expect(html).toContain("What are you here for?");
-    expect(html).toContain('href="/rsvp/new"');
+    expect(html).toContain("Join your club or start a new one.");
+    expect(html).toContain('href="/onboarding/join"');
+    expect(html).toContain('href="/onboarding/organization"');
     expect(html).toContain('href="/onboarding/profile/school"');
+    expect(html).not.toContain("/rsvp");
   });
 
   it("sends a member straight to their organization", async () => {
@@ -93,8 +102,8 @@ describe("OnboardingPage", () => {
     expect(html).toContain("Resend verification email");
     expect(html).not.toContain('href="/onboarding/join"');
     expect(html).not.toContain('href="/onboarding/organization"');
-    // Event pages need no verified address.
-    expect(html).toContain('href="/rsvp/new"');
+    // The optional club profile needs no verified address.
+    expect(html).toContain('href="/onboarding/profile/school"');
     // Invites are not even looked up for an unverified address.
     expect(mocks.pendingInvites).not.toHaveBeenCalled();
   });

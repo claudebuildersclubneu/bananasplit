@@ -110,19 +110,21 @@ export function WorkspaceToolbar() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {/* Layout: three shapes of the same question. */}
-        <Segmented
-          label="Layout"
-          value={ws.query.view}
-          onSelect={(v) => ws.setView(v as (typeof ws.layouts)[number]["value"])}
-          options={ws.layouts.map((layout, index) => ({
-            value: layout.value,
-            label: layout.label,
-            icon: LAYOUT_ICONS[layout.value],
-            compact: true,
-            title: `${layout.label}: ${layout.hint} (${index + 1})`,
-          }))}
-        />
+        {/* Layout: three shapes of the same question (none on the Free plan). */}
+        {ws.layouts.length > 0 && (
+          <Segmented
+            label="Layout"
+            value={ws.query.view}
+            onSelect={(v) => ws.setView(v as (typeof ws.layouts)[number]["value"])}
+            options={ws.layouts.map((layout, index) => ({
+              value: layout.value,
+              label: layout.label,
+              icon: LAYOUT_ICONS[layout.value],
+              compact: true,
+              title: `${layout.label}: ${layout.hint} (${index + 1})`,
+            }))}
+          />
+        )}
 
         {/* Scope: whose work. The team option only exists if you have reports. */}
         <div className="flex items-center gap-1" role="group" aria-label="Whose tasks">

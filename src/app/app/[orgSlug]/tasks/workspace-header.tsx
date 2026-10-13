@@ -58,7 +58,7 @@ export function WorkspaceHeader({
       if (document.querySelector("[role=dialog][data-state=open]")) return;
 
       const index = Number.parseInt(event.key, 10);
-      if (index >= 1 && index <= TASK_LAYOUTS.length) {
+      if (!ws.simple && index >= 1 && index <= TASK_LAYOUTS.length) {
         event.preventDefault();
         ws.setView(TASK_LAYOUTS[index - 1]!.value as TaskLayout);
         return;
@@ -83,7 +83,7 @@ export function WorkspaceHeader({
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back to tasks
             </Button>
-          ) : (
+          ) : ws.simple ? null : (
             <>
               {showIntake && (
                 <DestinationButton
@@ -108,46 +108,57 @@ export function WorkspaceHeader({
             </>
           )}
 
-          {/* New task, with "Paste a list" in its menu. */}
-          <div className="flex">
+          {/* New task, with "Paste a list" in its menu (just New task on the Free plan). */}
+          {ws.simple ? (
             <Button
               size="sm"
-              className="rounded-r-none"
               title="New task (c)"
               onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
             >
               <Plus className="size-4" aria-hidden="true" />
               New task
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
-                  aria-label="More ways to add tasks"
-                >
-                  <ChevronDown className="size-3.5" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem
-                  onSelect={() => newTask({ projectId: ws.query.projectId ?? null })}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  New task
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setImporting(true)}>
-                  <ClipboardPaste className="size-4" aria-hidden="true" />
-                  <span className="flex flex-col">
-                    Paste a list
-                    <span className="text-muted-foreground text-xs">
-                      A to-do list or meeting notes, turned into tasks
+          ) : (
+            <div className="flex">
+              <Button
+                size="sm"
+                className="rounded-r-none"
+                title="New task (c)"
+                onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                New task
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
+                    aria-label="More ways to add tasks"
+                  >
+                    <ChevronDown className="size-3.5" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuItem
+                    onSelect={() => newTask({ projectId: ws.query.projectId ?? null })}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    New task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setImporting(true)}>
+                    <ClipboardPaste className="size-4" aria-hidden="true" />
+                    <span className="flex flex-col">
+                      Paste a list
+                      <span className="text-muted-foreground text-xs">
+                        A to-do list or meeting notes, turned into tasks
+                      </span>
                     </span>
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </div>
 

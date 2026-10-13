@@ -5,6 +5,7 @@ import { EventCalendar, type CalendarItem } from "@/components/calendar/event-ca
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { planIncludes } from "@/lib/billing/features";
 import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
@@ -33,6 +34,8 @@ export default async function CalendarPage({
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
+  // The Tasks layer is one of the task views; Google sync a data connection.
+  const tasksLayer = planIncludes(org.plan, "taskViews");
 
   const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
@@ -51,7 +54,7 @@ export default async function CalendarPage({
       ),
       // A kind filter is about events; tasks stay out while one is on.
       tasks:
-        range.tasks && range.kinds.length === 0
+        tasksLayer && range.tasks && range.kinds.length === 0
           ? await getCalendarTasks(db, org.id, {
               dueFrom: fromDateKey(range.fromKey),
               dueTo: fromDateKey(addDaysToKey(range.toKey, -1)),
@@ -116,7 +119,7 @@ export default async function CalendarPage({
                 </Link>
               </Button>
             )}
-            {can({ role }, "integrations.view") && (
+            {can({ role }, "integrations.view") && planIncludes(org.plan, "integrations") && (
               <Button variant="ghost" size="icon-sm" asChild>
                 <Link
                   href={`/app/${orgSlug}/calendar/sync`}
@@ -150,8 +153,9 @@ export default async function CalendarPage({
           view: range.view,
           kinds: range.kinds,
           visibility: range.visibility,
-          tasks: range.tasks,
+          tasks: tasksLayer && range.tasks,
         }}
+        tasksLayer={tasksLayer}
       />
     </div>
   );

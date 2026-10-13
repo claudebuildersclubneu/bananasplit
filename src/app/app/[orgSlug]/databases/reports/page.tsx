@@ -25,6 +25,7 @@ import { resolveReportRange } from "@/server/reports/range";
 import { reportTier } from "@/server/reports/tier";
 import type { ReportId } from "@/server/reports/types";
 import { getVisibleReports } from "@/server/reports/visibility";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { DatabasesTabs } from "../databases-tabs";
 import { AutoRefresh, RefreshButton } from "./refresh-controls";
@@ -98,6 +99,8 @@ export default async function ReportsPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/databases/reports">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "reports");
+  if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role, settings } = await getOrgContextBySlug(orgSlug);
   const tier = reportTier(role);

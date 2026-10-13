@@ -8,6 +8,7 @@ import {
   FileText,
   FolderOpen,
   LayoutDashboard,
+  Lock,
   Network,
   NotebookText,
   Pin,
@@ -78,11 +79,17 @@ function NavItemLink({
       href={link.href}
       onClick={onNavigate}
       aria-current={pathname === link.href ? "page" : isActive ? "true" : undefined}
-      title="Drag onto Pinned to pin it"
-      className={itemClass(isActive)}
+      title={link.locked ? "Not on your club's plan" : "Drag onto Pinned to pin it"}
+      className={cn(itemClass(isActive), link.locked && !isActive && "text-sidebar-foreground/55")}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       {link.label}
+      {link.locked && (
+        <>
+          <Lock className="ms-auto size-3 shrink-0 opacity-70" aria-hidden="true" />
+          <span className="sr-only"> (not on your plan)</span>
+        </>
+      )}
     </Link>
   );
 }

@@ -63,7 +63,9 @@ export function personalPalettes(
 
 /**
  * The org's resolved theme with the member's palette and mode on top. The
- * org keeps its logo display and any light/dark lock.
+ * org keeps its logo display, any light/dark lock and its Look and feel
+ * (corners, text size, fonts); the org's accent override gives way to the
+ * member's own palette.
  */
 export function applyPersonalTheme(
   org: ResolvedTheme,
@@ -86,6 +88,7 @@ export function applyPersonalTheme(
     light: palettes.light,
     dark: palettes.dark,
     effectiveDark: palettes.dark,
+    style: { ...org.style, accent: null },
     tokens: deriveTheme(palettes.light, palettes.dark),
     // The default preset is exactly globals.css: nothing to inject.
     isDefault: personal.preset === DEFAULT_PRESET_ID,

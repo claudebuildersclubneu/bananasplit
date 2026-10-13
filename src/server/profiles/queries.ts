@@ -142,7 +142,7 @@ export async function getOwnProfile(userId: string): Promise<OwnProfile | null> 
     });
     if (!user) return null;
     const memberships = await db.membership.findMany({
-      where: { userId, organization: { kind: "CLUB" } },
+      where: { userId },
       select: {
         role: true,
         title: true,

@@ -99,6 +99,35 @@ describe("sidebar navigation", () => {
   });
 });
 
+describe("the sidebar on each plan", () => {
+  const plan = (p: "FREE" | "CLUB" | "SOCIETY", showLocked = false) =>
+    navSections("cbc", visibleSidebar(null), { plan: p, showLocked }).flatMap((s) => s.items);
+
+  it("gives a Free club its tasks and calendar, without the Overview", () => {
+    expect(plan("FREE").map((i) => i.label)).toEqual(["Tasks", "Calendar"]);
+  });
+
+  it("shows owners and admins what the plan lacks, locked (never the Overview)", () => {
+    const items = plan("FREE", true);
+    expect(items.map((i) => i.label)).not.toContain("Overview");
+    expect(items.filter((i) => i.locked).map((i) => i.label)).toEqual([
+      "Files",
+      "People",
+      "Polls",
+      "Databases",
+      "Finance",
+    ]);
+    expect(items.find((i) => i.label === "Tasks")?.locked).toBeUndefined();
+  });
+
+  it("locks nothing on Club and Society", () => {
+    for (const p of ["CLUB", "SOCIETY"] as const) {
+      expect(plan(p, true).some((i) => i.locked)).toBe(false);
+      expect(plan(p).map((i) => i.label)).toEqual(links().map((i) => i.label));
+    }
+  });
+});
+
 describe("Admin panel navigation", () => {
   const labels = (role: Parameters<typeof settingsNavItems>[1]) =>
     settingsNavItems("cbc", role).map((i) => i.label);
@@ -106,6 +135,7 @@ describe("Admin panel navigation", () => {
   it("shows each role the sections it may use", () => {
     expect(labels("OWNER")).toEqual([
       "General",
+      "Plan",
       "Sidebar",
       "Theme",
       "Labels",
@@ -119,6 +149,24 @@ describe("Admin panel navigation", () => {
     expect(labels("ADMIN")).toContain("Audit log");
     expect(labels("MEMBER")).toEqual(["Members"]);
     expect(labels("TREASURER")).toEqual(["Members"]);
+  });
+
+  it("marks the sections a plan lacks as locked, and none without a plan", () => {
+    const locked = (plan?: "FREE" | "CLUB" | "SOCIETY") =>
+      settingsNavItems("cbc", "OWNER", plan)
+        .filter((i) => i.locked)
+        .map((i) => i.label);
+    expect(locked()).toEqual([]);
+    expect(locked("FREE")).toEqual([
+      "Sidebar",
+      "Theme",
+      "Labels",
+      "Privacy",
+      "Integrations",
+      "Audit log",
+    ]);
+    expect(locked("CLUB")).toEqual(["Theme", "Audit log"]);
+    expect(locked("SOCIETY")).toEqual([]);
   });
 
   it("keeps Members active on the invitations page", () => {

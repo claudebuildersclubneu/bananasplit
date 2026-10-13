@@ -112,7 +112,7 @@ function SpotsBadge({
     <span
       className={cn(
         "rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap",
-        few ? "bg-banana text-ink" : "bg-leaf text-leaf-ink",
+        few ? "bg-banana text-banana-ink" : "bg-leaf text-leaf-ink",
       )}
     >
       {few ? `Only ${spotsLeft} left` : `${spotsLeft} spots left`}
@@ -315,7 +315,7 @@ function Signed({
         <span
           className={cn(
             "grid size-12 flex-none place-items-center rounded-full",
-            going ? "bg-banana text-ink" : "bg-butter text-honey",
+            going ? "bg-banana text-banana-ink" : "bg-butter text-honey",
           )}
         >
           {going ? (

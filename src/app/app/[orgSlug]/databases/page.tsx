@@ -36,6 +36,7 @@ import { reportTier } from "@/server/reports/tier";
 import { cn } from "@/lib/utils";
 import { PinToggle } from "@/components/pins/pins-context";
 import { listPins } from "@/server/pins";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { StepPanel } from "../setup/step-panel";
 import type { SetupStepView } from "../setup/view";
@@ -76,6 +77,8 @@ export default async function DatabasesPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/databases">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "databases");
+  if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role, user } = await getOrgContextBySlug(orgSlug);
   const isAdmin = can({ role }, "databases.write");

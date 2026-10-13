@@ -11,6 +11,9 @@ import { appUrl } from "@/lib/app-url";
 import { splitLocation } from "@/lib/rsvp/format";
 import { formatCents } from "@/lib/rsvp/pay";
 import { dateLine, timeLine } from "@/lib/rsvp/when";
+import { brandPageAccentStyle } from "@/lib/theme/accent";
+import { getPublicOrgTheme } from "@/lib/theme/loader";
+import { effectivePalettes } from "@/lib/theme/resolve";
 import { loadRsvpPage, rsvpPageTarget } from "@/server/rsvp/page";
 
 /**
@@ -45,6 +48,14 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
     );
   }
 
+  // The hosting club's accent (default theme: Bananasplit yellow), as on the page.
+  const club = await getPublicOrgTheme(target!.organizationId);
+  const accentStyle = (
+    club && !club.theme.isDefault
+      ? brandPageAccentStyle(effectivePalettes(club.theme).light.accent)
+      : {}
+  ) as React.CSSProperties;
+
   const url = appUrl(`/e/${slug}`);
   // A tear-off tab is about 0.9in of vertical text: a short name and the day.
   const tabTitle = page.title.length > 20 ? `${page.title.slice(0, 19).trimEnd()}…` : page.title;
@@ -56,7 +67,7 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
   }).format(page.startsAt);
   const short = url.replace(/^https?:\/\//, "");
   const place = page.location ? splitLocation(page.location) : null;
-  const host = page.hostPerson?.name ?? page.org.name;
+  const host = page.org.name;
   const stillNeeded = page.items.filter((i) => i.taken < i.slots).length;
   const perks = [
     page.cost
@@ -85,15 +96,12 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
           </div>
         </div>
 
-        <article className="flyer-sheet bg-cream text-ink relative flex flex-col overflow-hidden">
-          <span
-            aria-hidden="true"
-            className="bg-banana absolute -top-[1.6in] -right-[1.4in] size-[4.6in] rounded-full opacity-80"
-          />
-          <span
-            aria-hidden="true"
-            className="bg-butter absolute top-[3.2in] -left-[1.2in] size-[2.6in] rounded-full opacity-70"
-          />
+        <article
+          className="flyer-sheet bg-cream text-ink relative flex flex-col overflow-hidden"
+          style={accentStyle}
+        >
+          {/* A flat accent band across the top: no blobs or washes. */}
+          <span aria-hidden="true" className="bg-banana block h-[0.32in] flex-none" />
 
           <div className="relative flex min-h-0 flex-1 flex-col gap-[0.2in] overflow-hidden px-[0.6in] pt-[0.45in]">
             <div className="flex items-center justify-between">
@@ -180,7 +188,7 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
 
           <div className="bg-ink text-cream flex items-center justify-center gap-2 py-[0.08in] text-[9pt]">
             <CoreMark size={12} />
-            Free event pages at bananasplit · split the cost, bring lists, QR check-in
+            RSVP pages for your club, free at bananasplit · split the cost, bring lists, QR check-in
           </div>
         </article>
 

@@ -103,7 +103,7 @@ export default async function ProfileStepPage({ params }: PageProps<"/onboarding
   // is its own five-step run, which saves as it goes and can be left any time.
   const quick = step === QUICK_PROFILE_STEP;
   const steps = quick
-    ? ["Your account", "Quick profile", "Event pages or a club"]
+    ? ["Your account", "Quick profile", "Join or start a club"]
     : CLUB_PROFILE_STEPS.map((s) => STEP_NAMES[s]);
   const index = quick ? 2 : (CLUB_PROFILE_STEPS as readonly ProfileStep[]).indexOf(step) + 1;
   const total = quick ? 3 : CLUB_PROFILE_STEPS.length;

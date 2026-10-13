@@ -1,5 +1,6 @@
 import type { AiConnectionInfo } from "@/lib/ai/types";
 import { aiVendor } from "@/lib/ai/vendors";
+import { planIncludes } from "@/lib/billing/features";
 import { claudeModelLabel, DEFAULT_CLAUDE_MODEL } from "@/lib/org-chart/models";
 import { assertNoTx, withSystemOrgTx } from "@/server/db/context";
 import { getSecret } from "@/server/secrets";
@@ -19,7 +20,9 @@ import { getSecret } from "@/server/secrets";
  * listAiConnections() says what is available (labels only, no keys) to any
  * member; resolveAiCredentials() decrypts the chosen key for the one request
  * that uses it, outside any transaction, and it is never logged or returned.
- * Reading the integration rows takes the service path because members can't
+ * AI is on the Society plan: other clubs get an empty list (and so no
+ * credentials), whatever is connected. Reading the integration rows takes
+ * the service path because members can't
  * read OrgIntegration (owners and admins manage it); only labels leave here.
  */
 
@@ -68,6 +71,14 @@ interface IntegrationRow {
   config: unknown;
 }
 
+/** AI is a Society feature (src/lib/billing/features.ts): other plans get none. */
+async function aiOnPlan(orgId: string): Promise<boolean> {
+  const org = await withSystemOrgTx(orgId, ({ db }) =>
+    db.organization.findUnique({ where: { id: orgId }, select: { plan: true } }),
+  );
+  return Boolean(org && planIncludes(org.plan, "ai"));
+}
+
 async function loadRows(orgId: string): Promise<IntegrationRow[]> {
   return withSystemOrgTx(orgId, async ({ db }) =>
     (await db.orgIntegration.findMany({
@@ -100,6 +111,7 @@ function aiModelOf(row: IntegrationRow): { vendorId: string; model: string } | n
 /** What this club can use, best first. Labels only: no key leaves here. */
 export async function listAiConnections(orgId: string, env: Env = process.env): Promise<AiConnectionInfo[]> {
   assertNoTx("listAiConnections");
+  if (!(await aiOnPlan(orgId))) return [];
   const rows = await loadRows(orgId);
   const claude = rows.find((r) => r.provider === "CLAUDE");
   const other = rows.find((r) => r.provider === "OPENAI_COMPATIBLE");

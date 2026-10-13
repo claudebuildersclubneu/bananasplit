@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { PageTabs } from "@/components/ui/page-tabs";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
+import { planIncludes } from "@/lib/billing/features";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 
 import { getCategoriesForPeriods, getOrgPeriods } from "./queries";
@@ -20,6 +21,8 @@ export default async function FinanceLayout({
   const { orgSlug } = await params;
   // Unknown slug or not a member: notFound() (getOrgContextBySlug).
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  // Not on the plan: the page shows the upgrade screen, without the header.
+  if (!planIncludes(org.plan, "finance")) return children;
   const isFinance = can({ role }, "finance.manage");
   // For the header's new-entry dialog (which period, which category).
   const { periods, categories } = await withOrgTx(org.id, async ({ db }) => {
@@ -57,7 +60,9 @@ export default async function FinanceLayout({
                 { label: "Dashboard", href: base, exact: true },
                 { label: "Transactions", href: `${base}/transactions` },
                 { label: "Budget", href: `${base}/budget` },
-                { label: "Sponsorships", href: `${base}/sponsorships` },
+                ...(planIncludes(org.plan, "sponsorships")
+                  ? [{ label: "Sponsorships", href: `${base}/sponsorships` }]
+                  : []),
                 { label: "My reimbursements", href: `${base}/my-reimbursements` },
               ]}
             />

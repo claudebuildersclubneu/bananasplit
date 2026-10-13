@@ -13,6 +13,7 @@ import type { DraftPosition } from "@/lib/org-chart/draft";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { loadVersion } from "@/server/org-chart/service";
+import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Edit org chart draft" };
 
@@ -21,6 +22,8 @@ export default async function DraftPage({
   params,
 }: PageProps<"/app/[orgSlug]/org-chart/drafts/[versionId]">) {
   const { orgSlug, versionId } = await params;
+  const planLock = await planGate(orgSlug, "people");
+  if (planLock) return planLock;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "orgchart.write")) notFound();
 

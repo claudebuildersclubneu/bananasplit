@@ -9,7 +9,7 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
  *   A  Profile setup, in two parts:
  *      A1 basics, the quick profile everyone fills in right after sign-up
  *      (name, photo, pronouns, time zone); it alone completes onboarding,
- *      then A7: event pages, join with a code, or create a club (Flow B).
+ *      then A7: join with a code, or create a club (Flow B).
  *      The club profile, optional and separate: A2 school -> A3 bio ->
  *      A4 theme -> A5 availability -> A6 review.
  *   B  Create an organization, only for the person creating one:

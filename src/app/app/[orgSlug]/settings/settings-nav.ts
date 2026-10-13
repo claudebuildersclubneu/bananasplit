@@ -1,5 +1,6 @@
-import type { Role } from "@/generated/prisma/enums";
+import type { OrgPlan, Role } from "@/generated/prisma/enums";
 import { can, type Permission } from "@/lib/auth/permissions";
+import { planIncludes, type PlanFeature } from "@/lib/billing/features";
 
 /**
  * The Admin panel's navigation (the club's settings; the URL is still
@@ -15,6 +16,8 @@ export interface SettingsNavItem {
   group: SettingsGroup;
   /** Other paths under which this item is active (e.g. invitations under Members). */
   alsoActiveOn?: string[];
+  /** Not on the club's plan: the page shows the upgrade screen. */
+  locked?: boolean;
 }
 
 export const SETTINGS_GROUPS = ["Club", "People & access", "Connections", "Records"] as const;
@@ -29,6 +32,8 @@ export interface SettingsSection {
   group: SettingsGroup;
   permission?: Permission;
   alsoActiveOn?: string[];
+  /** The plan feature the page needs (src/lib/billing/features.ts); none: every plan. */
+  feature?: PlanFeature;
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -41,12 +46,21 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     permission: "settings.view",
   },
   {
+    label: "Plan",
+    segment: "plan",
+    description: "Free, Club or Society: what your club's plan includes.",
+    icon: "Gem",
+    group: "Club",
+    permission: "settings.view",
+  },
+  {
     label: "Sidebar",
     segment: "sidebar",
     description: "Which sections your club uses, their order and names.",
     icon: "PanelLeft",
     group: "Club",
     permission: "settings.view",
+    feature: "sidebar",
   },
   {
     label: "Theme",
@@ -55,6 +69,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "Palette",
     group: "Club",
     permission: "theme.write",
+    feature: "themes",
   },
   {
     label: "Labels",
@@ -63,6 +78,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "Tags",
     group: "Club",
     permission: "labels.write",
+    feature: "labels",
   },
   {
     label: "Members",
@@ -79,6 +95,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "ShieldCheck",
     group: "People & access",
     permission: "privacy.write",
+    feature: "privacy",
   },
   {
     label: "Integrations",
@@ -87,6 +104,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "Plug",
     group: "Connections",
     permission: "integrations.view",
+    feature: "integrations",
   },
   {
     label: "Audit log",
@@ -95,6 +113,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     icon: "ScrollText",
     group: "Records",
     permission: "audit.view",
+    feature: "auditLog",
   },
   {
     label: "Danger zone",
@@ -111,7 +130,16 @@ export function visibleSettingsSections(role: Role | null): SettingsSection[] {
   return SETTINGS_SECTIONS.filter((s) => !s.permission || can({ role }, s.permission));
 }
 
-export function settingsNavItems(orgSlug: string, role: Role | null): SettingsNavItem[] {
+/** Whether `plan` lacks what `section` needs (no plan given: nothing is locked). */
+export function isSettingsSectionLocked(section: SettingsSection, plan?: OrgPlan): boolean {
+  return Boolean(plan && section.feature && !planIncludes(plan, section.feature));
+}
+
+export function settingsNavItems(
+  orgSlug: string,
+  role: Role | null,
+  plan?: OrgPlan,
+): SettingsNavItem[] {
   const base = `/app/${orgSlug}/settings`;
   return visibleSettingsSections(role).map((s) => ({
     label: s.label,
@@ -119,6 +147,7 @@ export function settingsNavItems(orgSlug: string, role: Role | null): SettingsNa
     icon: s.icon,
     group: s.group,
     alsoActiveOn: s.alsoActiveOn?.map((segment) => `${base}/${segment}`),
+    ...(isSettingsSectionLocked(s, plan) ? { locked: true } : {}),
   }));
 }
 
