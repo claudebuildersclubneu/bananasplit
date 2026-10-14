@@ -1117,6 +1117,94 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
     },
     { value: { member_other: 0, own: 1, admin_other: 1 } },
   );
+  await tcase(
+    "T19c",
+    "Note sharing: shares see and (as editors) edit; only the author shares, changes access or deletes",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      // The author of n_A_priv shares it with a member as a viewer...
+      s.share = await tryq(
+        q,
+        `INSERT INTO "NoteShare" ("organizationId","noteId","userId","role","createdById","updatedAt")
+         VALUES ('org_A','n_A_priv','u_memberA','VIEWER','u_adminA',now())`,
+      );
+      // ...but never with someone outside the club, or as someone else.
+      s.outsider = await tryq(
+        q,
+        `INSERT INTO "NoteShare" ("organizationId","noteId","userId","role","createdById","updatedAt")
+         VALUES ('org_A','n_A_priv','u_memberB','VIEWER','u_adminA',now())`,
+      );
+      s.forged = await tryq(
+        q,
+        `INSERT INTO "NoteShare" ("organizationId","noteId","userId","role","createdById","updatedAt")
+         VALUES ('org_A','n_A_priv','u_ownerA','VIEWER','u_memberA',now())`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.viewer_sees = await count(q, `SELECT count(*) n FROM "Note" WHERE "id" = 'n_A_priv'`);
+      s.viewer_edits = await rc(q, `UPDATE "Note" SET "title" = 'v' WHERE "id" = 'n_A_priv'`);
+      s.viewer_shares = await tryq(
+        q,
+        `INSERT INTO "NoteShare" ("organizationId","noteId","userId","role","createdById","updatedAt")
+         VALUES ('org_A','n_A_priv','u_ownerA','EDITOR','u_memberA',now())`,
+      );
+      s.viewer_upgrades = await rc(
+        q,
+        `UPDATE "NoteShare" SET "role" = 'EDITOR' WHERE "noteId" = 'n_A_priv'`,
+      );
+      await q(`SELECT app.set_context('u_adminA','org_A')`);
+      await q(
+        `UPDATE "NoteShare" SET "role" = 'EDITOR' WHERE "noteId" = 'n_A_priv' AND "userId" = 'u_memberA'`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.editor_edits = await rc(q, `UPDATE "Note" SET "title" = 'e' WHERE "id" = 'n_A_priv'`);
+      s.editor_opens = await tryq(
+        q,
+        `UPDATE "Note" SET "visibility" = 'ORGANIZATION' WHERE "id" = 'n_A_priv'`,
+      );
+      s.editor_trashes = await tryq(
+        q,
+        `UPDATE "Note" SET "deletedAt" = now() WHERE "id" = 'n_A_priv'`,
+      );
+      s.editor_deletes = await rc(q, `DELETE FROM "Note" WHERE "id" = 'n_A_priv'`);
+      // A club note every member may edit: edits yes, access no.
+      await q(`SELECT app.set_context('u_ownerA','org_A')`);
+      await q(`UPDATE "Note" SET "memberCanEdit" = true WHERE "id" = 'n_A_org'`);
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_edits_club = await rc(q, `UPDATE "Note" SET "title" = 'm' WHERE "id" = 'n_A_org'`);
+      s.member_locks_club = await tryq(
+        q,
+        `UPDATE "Note" SET "memberCanEdit" = false WHERE "id" = 'n_A_org'`,
+      );
+      // Anyone can take themselves off a note.
+      s.leaves = await rc(
+        q,
+        `DELETE FROM "NoteShare" WHERE "noteId" = 'n_A_priv' AND "userId" = 'u_memberA'`,
+      );
+      s.after_leaving = await count(q, `SELECT count(*) n FROM "Note" WHERE "id" = 'n_A_priv'`);
+      return s;
+    },
+    {
+      value: {
+        share: 1,
+        outsider: "42501",
+        forged: "42501",
+        viewer_sees: 1,
+        viewer_edits: 0,
+        viewer_shares: "42501",
+        viewer_upgrades: 0,
+        editor_edits: 1,
+        editor_opens: "42501",
+        editor_trashes: "42501",
+        editor_deletes: 0,
+        member_edits_club: 1,
+        member_locks_club: "42501",
+        leaves: 1,
+        after_leaving: 0,
+      },
+    },
+  );
 
   await tcase(
     "T20a",
@@ -1940,8 +2028,13 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // app.user_id().
         "can_edit_database",
         "can_read_task",
+        // Note sharing: the Note and NoteShare policy predicates, which read
+        // "Note"/"NoteShare" without RLS so the two cannot recurse. Answer
+        // only about app.user_id() in its member org.
+        "can_share_note",
         "can_view_ballot_rows",
         "can_view_database",
+        "can_view_note",
         "can_view_rows",
         "cancel_job",
         "claim_jobs",
@@ -1964,6 +2057,7 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // Free RSVP pages: "Save to a club" moves the caller's own event
         // into a club they run (OWNER/ADMIN), its rows following the FKs.
         "move_personal_event",
+        "note_share_role",
         "org_by_join_code",
         "org_has_members",
         "org_has_other_owner",
@@ -2090,6 +2184,11 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "MemberPrefs:UPDATE",
         "Note:INSERT",
         "NoteFolder:INSERT",
+        // Note sharing: app.can_share_note is the role check; anyone may
+        // also take themselves off a note (DELETE).
+        "NoteShare:DELETE",
+        "NoteShare:INSERT",
+        "NoteShare:UPDATE",
         "Notification:INSERT",
         "Notification:UPDATE",
         "OrgFile:INSERT",
@@ -2259,6 +2358,12 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       member_busy_hours: "u",
       // Question poll results (counts only), for members of the poll's org
       poll_vote_counts: "u",
+      // Note sharing: the policy predicates (member path only), and the
+      // trigger that keeps who-sees-it with the author and admins.
+      note_share_role: "u",
+      can_view_note: "u",
+      can_share_note: "u",
+      note_sharing_guard: "",
     };
     await tcase(
       "T27f",

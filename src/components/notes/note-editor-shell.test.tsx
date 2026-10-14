@@ -30,7 +30,7 @@ const { actions, providers } = vi.hoisted(() => ({
 vi.mock("@/app/app/[orgSlug]/notes/actions", () => actions);
 // The AI import dialog (and the task and event actions behind it) isn't under test here.
 vi.mock("@/components/ai/action-items-import", () => ({ ActionItemsImport: () => null }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/components/notes/collab/provider", () => ({
   createHocuspocusProvider: ({ doc, events, getToken }: CollabProviderOptions) => {
     const awareness = new Awareness(doc);
@@ -63,6 +63,17 @@ const collab: NoteCollabSession = {
   user: { id: "me", name: "Me", slot: 1 },
 };
 
+const sharing = {
+  canShare: true,
+  isAuthor: true,
+  viewerId: "me",
+  myRole: null,
+  author: { id: "me", name: "Me", image: null },
+  generalAccess: "CLUB_VIEW" as const,
+  shares: [],
+  members: [],
+};
+
 function renderShell(session: NoteCollabSession | null) {
   return render(
     <NoteEditorShell
@@ -71,6 +82,7 @@ function renderShell(session: NoteCollabSession | null) {
       canEdit
       events={[]}
       note={note}
+      sharing={sharing}
       collab={session}
     />,
   );

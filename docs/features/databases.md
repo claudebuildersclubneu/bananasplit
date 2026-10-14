@@ -10,12 +10,21 @@ clubs that already keep check-ins and sign-ups there.
 
 Owners and admins make databases from **Databases › New database**:
 
-- from a template (Blank, Member roster, Equipment, Merch orders,
-  Sponsors and contacts, Event ideas; `src/lib/databases/templates.ts`);
-- or by importing a spreadsheet (CSV from Google Sheets or Excel, up to
-  4 MB and 10,000 rows). Each column becomes a field and its type is
-  guessed from the values; a value that doesn't fit is left empty and
-  counted.
+- from a template (Blank, Spreadsheet, Member roster, Equipment, Merch
+  orders, Sponsors and contacts, Event ideas;
+  `src/lib/databases/templates.ts`). **Spreadsheet** (also **New
+  spreadsheet** on the Databases page) is a blank grid: text columns A to F
+  and 20 empty rows to type straight into; rename a column or change its
+  type whenever you like;
+- or by importing a spreadsheet: an Excel workbook (.xlsx, .xlsm), a CSV or
+  a TSV, from Excel, Google Sheets or Numbers, up to 4 MB and 10,000 rows.
+  The file is read in the browser first for a preview of its first rows
+  and, for a workbook with several tabs, a choice of sheet; the server reads
+  it again to import (`src/lib/finance/import/sheet.ts`, the same reader as
+  the finance import). Old .xls files and Numbers/ODS files are refused
+  with a note to save them as .xlsx or CSV. Each column becomes a field and
+  its type is guessed from the values; a value that doesn't fit is left
+  empty and counted.
   - Phone numbers (written like phone numbers, or under a heading such as
     "Phone") become phone fields, and ids (leading zeros, digits all the
     same length, or a heading such as "Student ID") stay text, so they

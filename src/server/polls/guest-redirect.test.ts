@@ -39,6 +39,9 @@ describe("guestPollRedirect", () => {
     expect(await guestPollRedirect("club")).toBe("/poll/poll_1");
     visit("/app/club/calendar/polls/poll_1?tab=group");
     expect(await guestPollRedirect("club")).toBe("/poll/poll_1");
+    // Its address under Find a time, too.
+    visit("/app/club/calendar/find-a-time/poll_1");
+    expect(await guestPollRedirect("club")).toBe("/poll/poll_1");
   });
 
   it("sends a signed-in non-member there too", async () => {

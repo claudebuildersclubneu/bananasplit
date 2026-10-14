@@ -6,6 +6,7 @@ import { DELETED_TRANSACTION_REASON } from "@/lib/finance/deleted";
 import { formatCents, parseDollarsToCents } from "@/lib/finance/money";
 import { formatFinanceDate } from "@/lib/finance/stats";
 import { SECTIONS, type SectionId } from "@/lib/nav/sidebar";
+import { noteVisibleSql } from "@/server/notes/visibility";
 import { ago } from "@/lib/relative-time";
 import {
   containsPatterns,
@@ -138,7 +139,7 @@ interface NoteRow {
  * Notes: the body through the full-text index with every word as a prefix
  * ("quart" finds "quarterly"), or every word anywhere in the title or body
  * (inside a word, or a stop word the index drops). PRIVATE notes only for
- * their author, as RLS already guarantees. Raw SQL for the tsvector; every
+ * their author and the people they're shared with, as RLS already guarantees. Raw SQL for the tsvector; every
  * value is a bound parameter.
  */
 async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
@@ -153,7 +154,7 @@ async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
       LEFT JOIN "NoteFolder" f ON f.id = n."folderId"
       WHERE n."organizationId" = ${viewer.orgId}
         AND n."deletedAt" IS NULL
-        AND (n.visibility = 'ORGANIZATION' OR n."authorId" = ${viewer.userId})
+        AND ${noteVisibleSql("n", viewer.userId)}
       ORDER BY n."updatedAt" DESC
       LIMIT ${ctx.limit}
     `;
@@ -175,7 +176,7 @@ async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
         FROM "Note"
         WHERE "organizationId" = ${viewer.orgId}
           AND "deletedAt" IS NULL
-          AND (visibility = 'ORGANIZATION' OR "authorId" = ${viewer.userId})
+          AND ${noteVisibleSql("Note", viewer.userId)}
           AND (
             "searchVector" @@ to_tsquery('english', ${tsq})
             OR NOT EXISTS (
@@ -573,7 +574,7 @@ async function searchPolls(ctx: Ctx): Promise<SearchGroup> {
       createdAt: p.createdAt,
       hit: hit("poll", p.id, {
         title: p.title,
-        href: `${ctx.base}/calendar/polls/${p.id}`,
+        href: `${ctx.base}/calendar/find-a-time/${p.id}`,
         detail: excerptAround(p.description, q.folded) ?? "Find a time",
         meta: p.finalizedEventId ? "Scheduled" : closed(p.closesAt) ? "Closed" : "Open",
         score: scoreFields(

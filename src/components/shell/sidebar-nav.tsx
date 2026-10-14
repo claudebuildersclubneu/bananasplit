@@ -3,6 +3,7 @@
 import {
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   CheckSquare,
   Database,
   FileText,
@@ -41,6 +42,7 @@ export interface SidebarPin {
 const NAV_ICONS: Record<string, LucideIcon> = {
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   CheckSquare,
   Database,
   FolderOpen,

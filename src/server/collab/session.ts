@@ -1,7 +1,7 @@
 import type { CollabConfig } from "@/lib/collab/config";
 import { noteDocumentName, presenceSlot, type CollabUser } from "@/lib/collab/protocol";
 import { signCollabToken } from "@/lib/collab/token";
-import { canEditNote } from "@/lib/notes/access";
+import { canEditNote, type NoteAccessFields } from "@/lib/notes/access";
 import type { MemberContext } from "@/server/db/context";
 
 /** What the note editor needs to join a note's live document. */
@@ -12,7 +12,7 @@ export interface NoteCollabSession {
   token: string;
   /** ms since the epoch. */
   expiresAt: number;
-  /** Whether the token lets this user edit (the author or an OWNER/ADMIN). */
+  /** Whether the token lets this user edit (canEditNote: the author, an editor, an OWNER/ADMIN). */
   canWrite: boolean;
   /** How other editors see this user. */
   user: CollabUser;
@@ -28,7 +28,7 @@ export function mintNoteCollabSession(
   ctx: Pick<MemberContext, "userId" | "organizationId" | "role"> & {
     user: { name: string | null };
   },
-  note: { id: string; authorId: string },
+  note: { id: string } & NoteAccessFields,
 ): NoteCollabSession {
   const canWrite = canEditNote(ctx, note);
   const user: CollabUser = {

@@ -6,6 +6,7 @@ import {
   Lightbulb,
   Package,
   Plus,
+  Sheet,
   Shirt,
   Table2,
   Upload,
@@ -31,11 +32,13 @@ import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toaster";
 import { DATABASE_TEMPLATES } from "@/lib/databases/templates";
+import { readTableFile, SpreadsheetError, type SheetData } from "@/lib/finance/import/sheet";
 import { cn } from "@/lib/utils";
 import type { ImportSummary } from "@/server/databases/custom";
 
 const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   Table2,
+  Sheet,
   Users,
   Package,
   Shirt,
@@ -43,32 +46,100 @@ const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   Lightbulb,
 };
 
+/** What the import accepts: Excel workbooks, and CSV or TSV exports. */
+const IMPORT_ACCEPT = [
+  ".xlsx",
+  ".xlsm",
+  ".csv",
+  ".tsv",
+  ".txt",
+  "text/csv",
+  "text/tab-separated-values",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+].join(",");
+
+const MAX_IMPORT_BYTES = 4 * 1024 * 1024;
+
+/** A sheet of the chosen file, read in the browser for the preview. */
+interface SheetPreview {
+  name: string;
+  hidden: boolean;
+  rows: string[][];
+  rowCount: number;
+  columnCount: number;
+}
+
+function previewOf(sheet: SheetData): SheetPreview {
+  return {
+    name: sheet.name,
+    hidden: sheet.hidden,
+    rows: sheet.rows.slice(0, 4),
+    // The first row names the fields.
+    rowCount: Math.max(0, sheet.rows.length - 1),
+    columnCount: Math.max(0, ...sheet.rows.slice(0, 200).map((r) => r.length)),
+  };
+}
+
 /**
- * New database: start from a template, or bring in a spreadsheet (CSV) and
- * get a database with a field per column. Either way it's stored in
- * Bananasplit: nothing to connect or host.
+ * New database: start from a template (a blank spreadsheet among them), or
+ * bring in a spreadsheet (an Excel workbook, CSV or TSV) and get a database
+ * with a field per column. The file is read here first, for a preview and,
+ * for a workbook with several tabs, the choice of which one. Either way it's
+ * stored in Bananasplit: nothing to connect or host.
  */
 export function NewDatabaseDialog({
   orgId,
   orgSlug,
   trigger,
   defaultMode = "template",
+  defaultTemplateId = "blank",
 }: {
   orgId: string;
   orgSlug: string;
   trigger?: React.ReactNode;
   defaultMode?: "template" | "import";
+  defaultTemplateId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"template" | "import">(defaultMode);
-  const [templateId, setTemplateId] = useState("blank");
+  const [templateId, setTemplateId] = useState(defaultTemplateId);
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [sheets, setSheets] = useState<SheetPreview[] | null>(null);
+  const [sheetName, setSheetName] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
-  const template = DATABASE_TEMPLATES.find((t) => t.id === templateId)!;
+  const template = DATABASE_TEMPLATES.find((t) => t.id === templateId) ?? DATABASE_TEMPLATES[0]!;
+  const sheet = sheets?.find((s) => s.name === sheetName) ?? sheets?.[0] ?? null;
+
+  /** Reads the chosen file for the preview; the server reads it again to import. */
+  async function choose(f: File | null) {
+    setError(null);
+    setFile(f);
+    setSheets(null);
+    setSheetName(null);
+    if (!f) return;
+    if (!name) setName(f.name.replace(/\.[^.]+$/, ""));
+    if (f.size > MAX_IMPORT_BYTES) {
+      setError("That file is over 4 MB. Split it, or export fewer columns.");
+      return;
+    }
+    setReading(true);
+    try {
+      const read = readTableFile(f.name, new Uint8Array(await f.arrayBuffer())).map(previewOf);
+      setSheets(read);
+      setSheetName((read.find((s) => !s.hidden) ?? read[0])?.name ?? null);
+    } catch (e) {
+      setError(
+        e instanceof SpreadsheetError ? e.message : "That file couldn't be read as a spreadsheet.",
+      );
+    } finally {
+      setReading(false);
+    }
+  }
 
   function create() {
     setError(null);
@@ -87,10 +158,10 @@ export function NewDatabaseDialog({
         return;
       }
       if (!file) {
-        setError("Choose a CSV file first.");
+        setError("Choose a spreadsheet first.");
         return;
       }
-      if (file.size > 4 * 1024 * 1024) {
+      if (file.size > MAX_IMPORT_BYTES) {
         setError("That file is over 4 MB. Split it, or export fewer columns.");
         return;
       }
@@ -98,6 +169,7 @@ export function NewDatabaseDialog({
       const body = new FormData();
       body.set("file", file);
       body.set("name", name || file.name.replace(/\.[^.]+$/, ""));
+      if (sheet) body.set("sheet", sheet.name);
       let result: Partial<ImportSummary> & { error?: string };
       try {
         const res = await fetch(`/app/${orgSlug}/databases/import`, { method: "POST", body });
@@ -126,6 +198,7 @@ export function NewDatabaseDialog({
         setOpen(o);
         if (o) {
           setMode(defaultMode);
+          setTemplateId(defaultTemplateId);
           setError(null);
         }
       }}
@@ -200,30 +273,61 @@ export function NewDatabaseDialog({
             })}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                void choose(e.dataTransfer.files?.[0] ?? null);
+              }}
               className="hover:bg-muted/40 flex w-full flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center"
             >
               <Upload className="text-muted-foreground size-6" aria-hidden="true" />
-              <span className="text-sm font-medium">{file ? file.name : "Choose a CSV file"}</span>
+              <span className="text-sm font-medium">
+                {reading
+                  ? "Reading it…"
+                  : file
+                    ? file.name
+                    : "Choose a spreadsheet, or drop it here"}
+              </span>
               <span className="text-muted-foreground text-xs">
-                From Google Sheets or Excel: File › Download › CSV. The first row is the field
-                names; each field&apos;s type is worked out from its values. Up to 10,000 rows.
+                Excel (.xlsx), CSV or TSV, from Excel, Google Sheets or Numbers. The first row is
+                the field names; each field&apos;s type is worked out from its values. Up to 10,000
+                rows and 4 MB.
               </span>
             </button>
             <input
               ref={fileRef}
               type="file"
-              accept=".csv,text/csv"
+              accept={IMPORT_ACCEPT}
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
-                setFile(f);
-                if (f && !name) setName(f.name.replace(/\.[^.]+$/, ""));
+                e.target.value = "";
+                void choose(f);
               }}
             />
+            {sheets && sheets.length > 1 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="new-db-sheet">Sheet</Label>
+                <select
+                  id="new-db-sheet"
+                  value={sheet?.name ?? ""}
+                  onChange={(e) => setSheetName(e.target.value)}
+                  className="border-input h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
+                >
+                  {sheets.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.name}
+                      {s.hidden ? " (hidden)" : ""} · {s.rowCount.toLocaleString()} rows
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {sheet && <SheetPreviewTable sheet={sheet} />}
           </div>
         )}
 
@@ -249,7 +353,11 @@ export function NewDatabaseDialog({
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={create} disabled={pending || (mode === "import" && !file)}>
+          <Button
+            type="button"
+            onClick={create}
+            disabled={pending || reading || (mode === "import" && (!file || !sheet))}
+          >
             {pending
               ? mode === "import"
                 ? "Importing…"
@@ -261,5 +369,53 @@ export function NewDatabaseDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const PREVIEW_COLUMNS = 6;
+
+/** The first rows of the sheet about to be imported, as the grid will show them. */
+function SheetPreviewTable({ sheet }: { sheet: SheetPreview }) {
+  const [header, ...rows] = sheet.rows;
+  const columns = Math.min(PREVIEW_COLUMNS, sheet.columnCount);
+  const more = sheet.columnCount - columns;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-muted-foreground text-xs">
+        {sheet.rowCount.toLocaleString()} {sheet.rowCount === 1 ? "row" : "rows"} ·{" "}
+        {sheet.columnCount} {sheet.columnCount === 1 ? "field" : "fields"}
+        {sheet.columnCount > 60 && " (the first 60 come in)"}
+      </p>
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/60">
+            <tr>
+              {Array.from({ length: columns }, (_, i) => (
+                <th key={i} className="px-2 py-1.5 text-left font-medium whitespace-nowrap">
+                  {header?.[i]?.trim() || `Column ${i + 1}`}
+                </th>
+              ))}
+              {more > 0 && (
+                <th className="text-muted-foreground px-2 py-1.5 text-left font-normal whitespace-nowrap">
+                  +{more} more
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r} className="border-t">
+                {Array.from({ length: columns }, (_, i) => (
+                  <td key={i} className="max-w-40 truncate px-2 py-1.5 whitespace-nowrap">
+                    {row[i] ?? ""}
+                  </td>
+                ))}
+                {more > 0 && <td />}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

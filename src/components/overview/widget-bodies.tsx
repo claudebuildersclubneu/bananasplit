@@ -199,7 +199,7 @@ export function PollList({
         return (
           <li key={p.id}>
             <Link
-              href={`/app/${orgSlug}/calendar/polls/${p.id}`}
+              href={`/app/${orgSlug}/calendar/${p.kind === "question" ? "polls" : "find-a-time"}/${p.id}`}
               className="hover:bg-accent/50 -mx-2 flex items-start gap-2.5 rounded-md px-2 py-2"
             >
               <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />

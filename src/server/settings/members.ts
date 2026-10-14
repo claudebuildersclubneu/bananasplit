@@ -136,7 +136,7 @@ async function untieOrgChart(db: TxClient, organizationId: string, userId: strin
 /**
  * The service-path half of a departure, after the Membership delete has
  * committed: the member's notifications from this org (app_user can only
- * read and mark its OWN notifications) and the org-chart step (for a member
+ * read and mark its OWN notifications), the notes shared with them, and the org-chart step (for a member
  * who left on their own, whose RLS cannot touch the chart). Idempotent.
  * `actorId` is recorded as app.user_id().
  */
@@ -147,6 +147,8 @@ export async function cleanupAfterDeparture(
 ): Promise<void> {
   await withSystemOrgTx(organizationId, { userId: actorId }, async ({ db }) => {
     await db.notification.deleteMany({ where: { organizationId, userId } });
+    // Notes shared with them by name (they can't open them any more anyway).
+    await db.noteShare.deleteMany({ where: { organizationId, userId } });
     await untieOrgChart(db, organizationId, userId);
   });
   invalidate([tags.orgChart(organizationId), tags.members(organizationId)]);

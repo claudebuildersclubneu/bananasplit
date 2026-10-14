@@ -64,6 +64,8 @@ const SUBPAGES: Record<string, string> = {
   "calendar/polls": "Polls",
   "calendar/polls/ask": "Ask a question",
   "calendar/polls/new": "Find a time",
+  "calendar/find-a-time": "Find a time",
+  "calendar/find-a-time/new": "New find-a-time poll",
   "calendar/rsvp": "RSVP pages",
   "calendar/sync": "Calendar sync",
   "databases/reports": "Reports",
@@ -181,7 +183,7 @@ export function describePath(orgSlug: string, address: string): PageInfo | null 
   }
   if (
     section === "calendar" &&
-    second === "polls" &&
+    (second === "polls" || second === "find-a-time") &&
     third &&
     parts.length === 3 &&
     ID.test(third)

@@ -22,6 +22,8 @@ export interface DatabaseTemplate {
   description: string;
   icon: string;
   fields: TemplateField[];
+  /** Empty rows it starts with (a spreadsheet's grid to type into). */
+  rows?: number;
 }
 
 export const DATABASE_TEMPLATES: readonly DatabaseTemplate[] = [
@@ -35,6 +37,16 @@ export const DATABASE_TEMPLATES: readonly DatabaseTemplate[] = [
       { name: "Name", type: "TEXT" },
       { name: "Notes", type: "LONG_TEXT" },
     ],
+  },
+  {
+    id: "spreadsheet",
+    name: "Spreadsheet",
+    defaultName: "Untitled spreadsheet",
+    description:
+      "A blank grid, columns A to F and 20 rows, to type straight into. Rename a column or change its type any time.",
+    icon: "Sheet",
+    fields: ["A", "B", "C", "D", "E", "F"].map((name) => ({ name, type: "TEXT" as const })),
+    rows: 20,
   },
   {
     id: "roster",

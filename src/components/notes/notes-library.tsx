@@ -19,6 +19,7 @@ import {
   NotebookText,
   Pencil,
   Trash2,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -89,6 +90,12 @@ export interface LibraryNote {
   eventTitle: string | null;
   folderId: string | null;
   canMove: boolean;
+  /** How many people it's shared with by name. */
+  shareCount: number;
+  /** A private note someone shared with the viewer. */
+  sharedWithMe: boolean;
+  /** A club note every member may edit. */
+  memberCanEdit: boolean;
 }
 
 export interface LibraryFile {
@@ -410,7 +417,14 @@ export function NotesLibrary({
             )}
             <p className="flex min-w-0 items-center gap-1.5 pe-16 text-sm font-medium">
               {n.visibility === "PRIVATE" ? (
-                <Lock className="text-muted-foreground size-3 shrink-0" aria-label="Only you" />
+                n.sharedWithMe || n.shareCount > 0 ? (
+                  <Users
+                    className="text-muted-foreground size-3 shrink-0"
+                    aria-label={n.sharedWithMe ? "Shared with you" : "Shared with some people"}
+                  />
+                ) : (
+                  <Lock className="text-muted-foreground size-3 shrink-0" aria-label="Only you" />
+                )
               ) : null}
               <span className="truncate">{name}</span>
             </p>
@@ -423,6 +437,15 @@ export function NotesLibrary({
               <span className="truncate">
                 Note · {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
               </span>
+              {(n.sharedWithMe || n.shareCount > 0 || n.memberCanEdit) && (
+                <span className="truncate">
+                  {n.sharedWithMe
+                    ? "Shared with you"
+                    : n.memberCanEdit
+                      ? "Club can edit"
+                      : `Shared with ${n.shareCount}`}
+                </span>
+              )}
               {n.eventTitle && (
                 <span className="inline-flex items-center gap-1 truncate">
                   <CalendarDays className="size-3" aria-hidden="true" />

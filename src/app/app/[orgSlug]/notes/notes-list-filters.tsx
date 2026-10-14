@@ -34,7 +34,8 @@ const KINDS = [
 
 const AUDIENCES = [
   ["all", "Anyone"],
-  ["PRIVATE", "Only me"],
+  ["PRIVATE", "Private"],
+  ["SHARED", "Shared with me"],
   ["ORGANIZATION", "Everyone in the club"],
 ] as const;
 

@@ -23,6 +23,7 @@ import { withOrgTx, type OrgContext } from "@/server/db/context";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
 
 import { choicesVersion } from "@/lib/databases/fields";
+import { parseDelimited } from "@/lib/finance/import/sheet";
 
 import {
   addChoice,
@@ -376,7 +377,9 @@ describe("club-made databases against the local database", () => {
       "Hoodie,1,$35.50,yes,M,e@x.test",
       "T-shirt,1,$15.00,yes,L,f@x.test",
     ].join("\n");
-    const summary = await as(ownerA, orgA, (a) => importDatabase(a, { name: `Merch ${tag}`, csv }));
+    const summary = await as(ownerA, orgA, (a) =>
+      importDatabase(a, { name: `Merch ${tag}`, rows: parseDelimited(csv).rows }),
+    );
     expect(summary).toMatchObject({ rows: 6, fields: 6, skippedCells: 0 });
     const db = await as(ownerA, orgA, (a) => loadCustomDatabase(a, summary.key));
     expect(db.fields.map((f) => f.type)).toEqual([
@@ -398,7 +401,9 @@ describe("club-made databases against the local database", () => {
       "Maya,5551234567,001234567,3.14159",
       "Jay,5559876543,002345678,2.5",
     ].join("\n");
-    const summary = await as(ownerA, orgA, (a) => importDatabase(a, { name: `Ids ${tag}`, csv }));
+    const summary = await as(ownerA, orgA, (a) =>
+      importDatabase(a, { name: `Ids ${tag}`, rows: parseDelimited(csv).rows }),
+    );
     const db = await as(ownerA, orgA, (a) => loadCustomDatabase(a, summary.key));
     expect(db.fields.map((f) => f.type)).toEqual(["TEXT", "PHONE", "TEXT", "NUMBER"]);
     expect(db.fields[3]!.options.decimals).toBeUndefined();

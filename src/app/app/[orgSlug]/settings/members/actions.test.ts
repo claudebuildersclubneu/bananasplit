@@ -91,6 +91,7 @@ function makeDb() {
 function makeSystemDb() {
   return {
     notification: { deleteMany: vi.fn() },
+    noteShare: { deleteMany: vi.fn() },
     orgChartPosition: { updateMany: vi.fn() },
     $executeRaw: vi.fn(async () => 0),
   };
@@ -255,6 +256,7 @@ describe("removeMember", () => {
     expect(auditAt).toBeLessThan(deleteAt);
     expect(fake.systemCalls).toContainEqual(["org_1", { userId: "actor" }]);
     expect(fake.systemDb.notification.deleteMany).toHaveBeenCalledWith({ where });
+    expect(fake.systemDb.noteShare.deleteMany).toHaveBeenCalledWith({ where });
   });
 
   it("rejects an ADMIN removing an OWNER", async () => {

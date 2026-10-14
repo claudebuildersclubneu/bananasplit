@@ -281,10 +281,19 @@
   flex: 1;
 }
 
+.tiptap .tableWrapper {
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
 .tiptap table {
   border-collapse: collapse;
   width: 100%;
   margin: 1rem 0;
+}
+
+.tiptap .tableWrapper table {
+  margin: 0;
 }
 
 .tiptap th,
@@ -298,6 +307,20 @@
   background: var(--muted);
   font-weight: 600;
   text-align: left;
+}
+
+.tiptap th,
+.tiptap td {
+  position: relative;
+}
+
+/* Cells picked by dragging across a table (to merge them, or delete rows). */
+.tiptap .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--primary) 14%, transparent);
+  pointer-events: none;
 }
 
 /*

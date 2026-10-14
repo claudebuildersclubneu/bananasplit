@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import type { Editor, Range } from "@tiptap/core";
 
+import { insertTable } from "./table-tools";
+
 export interface SlashCommandItem {
   title: string;
   description: string;
@@ -83,16 +85,13 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   },
   {
     title: "Table",
-    description: "3x3 table",
+    description: "3 × 3 to start, or type a size: /4x6",
     icon: TableIcon,
     keywords: ["table", "grid"],
-    run: (editor, range) =>
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-        .run(),
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      insertTable(editor, { rows: 3, cols: 3 });
+    },
   },
   {
     title: "Divider",
@@ -102,3 +101,17 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     run: (editor, range) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 ];
+
+/** "/4x6" (or "/table 4x6"): a table of that size, rows by columns. */
+export function sizedTableItem(size: { rows: number; cols: number }): SlashCommandItem {
+  return {
+    title: `Table ${size.rows} × ${size.cols}`,
+    description: `${size.rows} rows, ${size.cols} columns`,
+    icon: TableIcon,
+    keywords: [],
+    run: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      insertTable(editor, size);
+    },
+  };
+}

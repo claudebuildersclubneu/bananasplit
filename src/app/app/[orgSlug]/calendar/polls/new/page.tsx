@@ -1,8 +1,9 @@
-import { getOrgContextBySlug } from "@/server/db/context";
-import { PollForm } from "@/components/calendar/poll-form";
+import { redirect } from "next/navigation";
 
-export default async function NewPollPage({ params }: PageProps<"/app/[orgSlug]/calendar/polls/new">) {
+/** Where "Find a time" used to start: the form lives under Find a time now. */
+export default async function NewPollPage({
+  params,
+}: PageProps<"/app/[orgSlug]/calendar/polls/new">) {
   const { orgSlug } = await params;
-  const { organization: org } = await getOrgContextBySlug(orgSlug);
-  return <PollForm orgId={org.id} orgSlug={orgSlug} defaultTimezone={org.timezone} />;
+  redirect(`/app/${orgSlug}/calendar/find-a-time/new`);
 }

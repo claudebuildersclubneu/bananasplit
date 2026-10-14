@@ -221,6 +221,7 @@ export const NOTIFICATION_TYPE_META: Record<
   EVENT_UPDATED: { label: "An event I'm going to changes", group: "events" },
   EVENT_CANCELLED: { label: "An event I'm going to is cancelled", group: "events" },
   INVITE_ACCEPTED: { label: "Someone accepts an invite I sent", group: "org" },
+  NOTE_SHARED: { label: "Someone shares a note with me", group: "org" },
   INTEGRATION_ERROR: {
     label: "An integration stops working",
     group: "org",

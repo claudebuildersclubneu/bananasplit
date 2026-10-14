@@ -15,6 +15,7 @@ export const SECTION_IDS = [
   "notes",
   "people",
   "polls",
+  "find-a-time",
   "databases",
   "finance",
 ] as const;
@@ -52,7 +53,8 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", group: "main", description: "Meetings and events." },
   { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", group: "main", description: "Notes, documents and uploads." },
   { id: "people", label: "People", icon: "Users", path: "/people", also: ["/org-chart"], group: "club", description: "The member directory and the org chart." },
-  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club anything, or find a time that works." },
+  { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club anything and let people vote." },
+  { id: "find-a-time", label: "Find a time", icon: "CalendarRange", path: "/calendar/find-a-time", group: "club", description: "Offer some days and hours, and see when most people are free." },
   { id: "databases", label: "Databases", icon: "Database", path: "/databases", group: "data", description: "Attendance, sign-ups, votes and reports." },
   { id: "finance", label: "Finance", icon: "Wallet", path: "/finance", group: "data", description: "Budget, transactions and reimbursements." },
 ];

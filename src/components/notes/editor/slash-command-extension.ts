@@ -2,8 +2,9 @@ import { Extension, type Editor, type Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 
-import { SLASH_COMMAND_ITEMS, type SlashCommandItem } from "./slash-command-items";
+import { SLASH_COMMAND_ITEMS, sizedTableItem, type SlashCommandItem } from "./slash-command-items";
 import { SlashCommandList, type SlashCommandListHandle } from "./slash-command-list";
+import { parseTableSize } from "./table-tools";
 
 export const SlashCommand = Extension.create({
   name: "slashCommand",
@@ -14,6 +15,8 @@ export const SlashCommand = Extension.create({
         char: "/",
         startOfLine: false,
         items: ({ query }: { query: string }) => {
+          const size = parseTableSize(query);
+          if (size) return [sizedTableItem(size)];
           const needle = query.toLowerCase();
           return SLASH_COMMAND_ITEMS.filter(
             (item) =>

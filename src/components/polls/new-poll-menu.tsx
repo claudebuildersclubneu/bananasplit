@@ -27,7 +27,7 @@ const CHOICES: readonly Choice[] = [
     icon: Vote,
   },
   {
-    path: "/calendar/polls/new",
+    path: "/calendar/find-a-time/new",
     label: "Find a time",
     description: "Offer days and hours; see when people are free.",
     icon: CalendarRange,

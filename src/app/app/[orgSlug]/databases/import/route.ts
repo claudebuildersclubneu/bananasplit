@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
 import { requireUser } from "@/lib/auth/session";
+import { readTableFile, SpreadsheetError } from "@/lib/finance/import/sheet";
 import { isCrossSite } from "@/lib/http/cross-site";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { DatabaseInputError, importDatabase } from "@/server/databases/custom";
@@ -11,8 +12,9 @@ import { readUpload, UploadError } from "@/server/storage/upload";
 
 /**
  * A new club-made database from a spreadsheet (Databases › New database ›
- * Import a spreadsheet): POST multipart with the CSV as `file` and the
- * database's `name`. A route handler, not a Server Action, because a Server
+ * Import a spreadsheet): POST multipart with the file as `file` (an Excel
+ * workbook, CSV or TSV), the database's `name`, and for a workbook the
+ * `sheet` to import. A route handler, not a Server Action, because a Server
  * Action's body is capped at 1 MB and a spreadsheet may be 4 MB. The body
  * is capped before it is read (readUpload), parsed in memory and never
  * stored. Owners and admins only (importDatabase checks the role, RLS the
@@ -69,16 +71,18 @@ export async function POST(request: Request, ctx: { params: Promise<{ orgSlug: s
     }
     throw error;
   }
-  const csv = upload.file.bytes.toString("utf8");
-  // A spreadsheet saved as .xlsx (or any binary file) is full of NUL bytes.
-  if (csv.includes("\u0000")) {
-    return json(
-      {
-        error:
-          "That doesn't look like a CSV file. In Google Sheets or Excel: File › Download › CSV.",
-      },
-      400,
-    );
+  // Excel workbooks (.xlsx, .xlsm) by their bytes, CSV or TSV text otherwise.
+  // A workbook's `sheet` field names the tab to import (the dialog lets the
+  // member pick one); without it, the first tab with rows.
+  let rows: string[][];
+  try {
+    const sheets = readTableFile(upload.file.filename, upload.file.bytes);
+    const wanted = upload.fields.sheet;
+    const sheet = (wanted && sheets.find((s) => s.name === wanted)) || sheets[0]!;
+    rows = sheet.rows;
+  } catch (error) {
+    if (error instanceof SpreadsheetError) return json({ error: error.message }, 400);
+    throw error;
   }
   const name = (upload.fields.name ?? "").slice(0, 200);
 
@@ -86,7 +90,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ orgSlug: s
     const summary = await withOrgTx(orgId, (octx) =>
       importDatabase(
         { db: octx.db, organizationId: orgId, userId: octx.userId, role: octx.role },
-        { name, csv },
+        { name, rows },
       ),
     );
     return json(summary);

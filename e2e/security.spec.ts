@@ -91,14 +91,14 @@ test("public poll: guests keep separate answers, non-members answer as guests, o
 }) => {
   const orgSlug = await createOrg(page, "Poll Owner");
 
-  await page.goto(`/app/${orgSlug}/calendar/polls/new`);
+  await page.goto(`/app/${orgSlug}/calendar/find-a-time/new`);
   await page.getByLabel("Title").fill(`E2E guest poll ${uniqueSuffix()}`);
   await page
     .getByRole("button", { name: dayButtonName(new Date(Date.now() + 24 * 60 * 60 * 1000)) })
     .click();
   await page.getByRole("button", { name: "Create poll" }).click();
-  // Not /polls/new itself: wait for the created poll's page.
-  await expect(page).toHaveURL(/\/calendar\/polls\/(?!new$)[a-z0-9]+$/);
+  // Not /find-a-time/new itself: wait for the created poll's page.
+  await expect(page).toHaveURL(/\/calendar\/find-a-time\/(?!new$)[a-z0-9]+$/);
   await page.getByRole("grid", { name: "Your availability" }).waitFor();
   const pollId = new URL(page.url()).pathname.split("/").pop()!;
 

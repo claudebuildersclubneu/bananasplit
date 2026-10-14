@@ -1,20 +1,19 @@
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { NewPollMenu } from "@/components/polls/new-poll-menu";
-import { PollList, type PollListItem } from "@/components/polls/poll-list";
+import { PollList } from "@/components/polls/poll-list";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { isPollOpen } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
-import { listQuestionPolls, type QuestionPollSummary } from "@/server/polls/question-polls";
+import { listQuestionPolls } from "@/server/polls/question-polls";
 
-import { getOrgPolls } from "../queries";
-
-type AvailabilityRow = Awaited<ReturnType<typeof getOrgPolls>>[number];
+import { questionItem } from "./list-items";
 
 /**
- * Every poll in the org, both kinds, newest first: questions people vote on
- * and find-a-time (availability) polls, split into open and closed.
+ * Polls: questions people vote on, newest first, split into open and
+ * closed. Find-a-time (availability) polls have their own page and sidebar
+ * section, /calendar/find-a-time.
  */
 export default async function PollsListPage({
   params,
@@ -22,38 +21,24 @@ export default async function PollsListPage({
   const { orgSlug } = await params;
 
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
-  const { availability, questions } = await withOrgTx(org.id, async ({ db }) => ({
-    availability: await getOrgPolls(db, org.id),
-    questions: await listQuestionPolls(db, org.id),
-  }));
+  const questions = await withOrgTx(org.id, ({ db }) => listQuestionPolls(db, org.id));
   const now = new Date();
   const isAdmin = can({ role }, "events.write");
   const base = `/app/${orgSlug}/calendar/polls`;
+  const timeZone = safeTimeZone(org.timezone);
 
-  const all = [
-    ...availability.map((p) => ({
-      createdAt: p.createdAt,
-      open: availabilityOpen(p, now),
-      item: availabilityItem(p, base, now, p.createdById === user.id || isAdmin),
-    })),
-    ...questions.map((p) => ({
-      createdAt: p.createdAt,
+  const all = [...questions]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((p) => ({
       open: isPollOpen(p, now),
-      item: questionItem(
-        p,
-        base,
-        now,
-        safeTimeZone(org.timezone),
-        p.createdById === user.id || isAdmin,
-      ),
-    })),
-  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      item: questionItem(p, base, now, timeZone, p.createdById === user.id || isAdmin),
+    }));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Polls"
-        description="Ask the club a question, or find a time that works for everyone."
+        description="Ask the club a question and let people vote."
         actions={<NewPollMenu orgSlug={orgSlug} />}
       />
 
@@ -61,7 +46,7 @@ export default async function PollsListPage({
         // The header's New poll is always on screen, so no second set of buttons here.
         <EmptyState
           title="No polls yet"
-          description="Start one with New poll: ask a question and let people vote, or offer some days and hours and see when most people are free."
+          description="Start one with New poll: ask a question, give some options, and let people vote. To find a meeting time, use Find a time."
         />
       ) : (
         <PollList
@@ -72,100 +57,4 @@ export default async function PollsListPage({
       )}
     </div>
   );
-}
-
-function people(n: number, verb: string): string {
-  if (n === 0) return verb === "voted" ? "No votes yet" : "No responses yet";
-  return n === 1 ? `1 person ${verb}` : `${n} people ${verb}`;
-}
-
-function shortDate(at: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone }).format(at);
-}
-
-function questionItem(
-  poll: QuestionPollSummary,
-  base: string,
-  now: Date,
-  timeZone: string,
-  canDelete: boolean,
-): PollListItem {
-  const open = isPollOpen(poll, now);
-  return {
-    id: poll.id,
-    kind: "question",
-    title: poll.question,
-    href: `${base}/${poll.id}`,
-    status: open
-      ? {
-          tone: "open",
-          label: poll.closesAt ? `Open until ${shortDate(poll.closesAt, timeZone)}` : "Open",
-        }
-      : { tone: "closed", label: "Closed" },
-    meta: [
-      `${poll.optionCount} options`,
-      poll.multiple ? "Pick any" : null,
-      poll.anonymous ? "Anonymous" : null,
-      people(poll.voterCount, "voted"),
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    canDelete,
-  };
-}
-
-function availabilityOpen(poll: AvailabilityRow, now: Date): boolean {
-  return !poll.finalizedEventId && !(poll.closesAt && poll.closesAt.getTime() < now.getTime());
-}
-
-function availabilityItem(
-  poll: AvailabilityRow,
-  base: string,
-  now: Date,
-  canDelete: boolean,
-): PollListItem {
-  const zone = safeTimeZone(poll.timezone);
-  const status: PollListItem["status"] = poll.finalizedEventId
-    ? {
-        tone: "scheduled",
-        label: poll.finalizedEvent
-          ? `Scheduled ${shortDate(poll.finalizedEvent.startsAt, zone)}`
-          : "Scheduled",
-      }
-    : availabilityOpen(poll, now)
-      ? {
-          tone: "open",
-          label: poll.closesAt ? `Open until ${shortDate(poll.closesAt, zone)}` : "Open",
-        }
-      : { tone: "closed", label: "Closed" };
-  return {
-    id: poll.id,
-    kind: "availability",
-    title: poll.title,
-    href: `${base}/${poll.id}`,
-    takesGuests: status.tone === "open",
-    status,
-    meta: [
-      dateSpan(poll),
-      `${poll.durationMinutes}-minute meeting`,
-      people(poll.respondentCount, "responded"),
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    canDelete,
-    deleteNote: poll.finalizedEventId ? "The event it scheduled stays on the calendar." : undefined,
-  };
-}
-
-/** "Sep 29 – Oct 3" in the poll's own zone, the days it offers. */
-function dateSpan(poll: AvailabilityRow): string | null {
-  if (!poll.firstSlotAt || !poll.lastSlotEndsAt) return null;
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: safeTimeZone(poll.timezone),
-  });
-  // The last slot's end, less a minute, so a window ending at midnight stays on its day.
-  const last = new Date(poll.lastSlotEndsAt.getTime() - 60_000);
-  return fmt.formatRange(poll.firstSlotAt, last);
 }

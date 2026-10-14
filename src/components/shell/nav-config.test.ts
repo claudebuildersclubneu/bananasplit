@@ -20,6 +20,7 @@ describe("sidebar navigation", () => {
       "Files",
       "People",
       "Polls",
+      "Find a time",
       "Databases",
       "Finance",
     ]);
@@ -63,6 +64,23 @@ describe("sidebar navigation", () => {
     expect(active("Calendar", "/app/cbc/calendar/polls/abc")).toBe(false);
     expect(active("Calendar", "/app/cbc/calendar/sync")).toBe(true);
     expect(active("Polls", "/app/cbc/calendar")).toBe(false);
+  });
+
+  it("gives find-a-time polls their own section under Club", () => {
+    const club = navSections("cbc", visibleSidebar(null)).find((s) => s.id === "club")!;
+    expect(club.items.map((i) => i.label)).toEqual(["People", "Polls", "Find a time"]);
+    expect(item("Find a time").href).toBe("/app/cbc/calendar/find-a-time");
+    expect(active("Find a time", "/app/cbc/calendar/find-a-time/abc")).toBe(true);
+    expect(active("Find a time", "/app/cbc/calendar/find-a-time/new")).toBe(true);
+    expect(active("Polls", "/app/cbc/calendar/find-a-time/abc")).toBe(false);
+    expect(active("Calendar", "/app/cbc/calendar/find-a-time")).toBe(false);
+  });
+
+  it("adds Find a time to a sidebar saved before it existed, under Club", () => {
+    const saved = toConfig(resolveSidebar(null));
+    saved.items = saved.items.filter((i) => i.id !== "find-a-time");
+    const club = navSections("cbc", visibleSidebar(saved)).find((s) => s.id === "club")!;
+    expect(club.items.map((i) => i.label)).toContain("Find a time");
   });
 
   it("follows the org's sidebar: hidden, renamed, moved and reordered sections", () => {

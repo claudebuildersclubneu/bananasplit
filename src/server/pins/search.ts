@@ -1,5 +1,6 @@
 import { describePath, type PinKind } from "@/lib/pins/pages";
 import type { TxClient } from "@/server/db/context";
+import { noteVisibleWhere } from "@/server/notes/visibility";
 
 /**
  * "Pin something": everything a member can pin, searchable. Each read runs
@@ -32,6 +33,7 @@ const PAGES = [
   "/tasks?view=intake",
   "/calendar",
   "/calendar/polls",
+  "/calendar/find-a-time",
   "/notes",
   "/notes?tab=files",
   "/people",
@@ -88,7 +90,7 @@ export async function searchPinnables(
     where: {
       organizationId: orgId,
       deletedAt: null,
-      OR: [{ visibility: "ORGANIZATION" }, { authorId: userId }],
+      ...noteVisibleWhere(userId),
       ...(contains ? { AND: [{ OR: [{ title: contains }, { contentText: contains }] }] } : {}),
     },
     orderBy: { updatedAt: "desc" },
@@ -172,15 +174,15 @@ export async function searchPinnables(
     take: 4,
   });
   const polls = [
-    ...timePolls.map((p) => ({ id: p.id, label: p.title, createdAt: p.createdAt, detail: "Find a time" })),
-    ...questionPolls.map((p) => ({ id: p.id, label: p.question, createdAt: p.createdAt, detail: "Question poll" })),
+    ...timePolls.map((p) => ({ id: p.id, label: p.title, createdAt: p.createdAt, detail: "Find a time", path: "find-a-time" })),
+    ...questionPolls.map((p) => ({ id: p.id, label: p.question, createdAt: p.createdAt, detail: "Question poll", path: "polls" })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   groups.push({
     id: "polls",
     label: "Polls",
     items: polls
       .slice(0, PER_KIND)
-      .map((p) => ({ href: `${base}/calendar/polls/${p.id}`, label: p.label, kind: "event" as const, detail: p.detail })),
+      .map((p) => ({ href: `${base}/calendar/${p.path}/${p.id}`, label: p.label, kind: "event" as const, detail: p.detail })),
   });
 
   const databases = await db.databaseDefinition.findMany({

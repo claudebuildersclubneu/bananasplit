@@ -2,21 +2,32 @@
 
 import { z } from "zod";
 
-import { NoteVisibility } from "@/generated/prisma/client";
+import { NoteShareRole, NoteVisibility, NotificationType } from "@/generated/prisma/client";
 import { collabConfig } from "@/lib/collab/config";
 import { applyContentToState, InvalidNoteContentError, seedNoteState } from "@/lib/collab/note-doc";
-import { canEditNote, isNoteVisibleTo } from "@/lib/notes/access";
+import {
+  canEditNote,
+  canShareNote,
+  fromGeneralAccess,
+  isNoteVisibleTo,
+  toNoteAccess,
+  type NoteGeneralAccess,
+} from "@/lib/notes/access";
 import { revokeNoteSessions } from "@/server/collab/revoke";
 import { mintNoteCollabSession, type NoteCollabSession } from "@/server/collab/session";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
+import { listNoteShares, type NoteShareRow } from "@/server/notes/sharing";
+import { notifyUsers } from "@/server/notifications";
 
 /**
  * Note actions (0C). Each runs in one withOrgAction transaction as app_user,
- * so RLS repeats the rules checked here: PRIVATE notes are visible only to
- * their author, and only the author or an OWNER/ADMIN may edit or delete a
- * note (policy 6.8, immutable authorId). Error semantics: every action
- * returns its { error } before its single write, so nothing commits on an
- * error path.
+ * so RLS repeats the rules checked here (src/lib/notes/access.ts): a
+ * PRIVATE note is visible only to its author and the people it is shared
+ * with; editors are its author, its EDITOR shares, and on a club note every
+ * member when it lets them (else owners and admins); only the author (or an
+ * owner/admin, on a club note) shares or deletes it (policy 6.8, immutable
+ * authorId, app.note_sharing_guard). Error semantics: every action returns
+ * its { error } before its first write, so nothing commits on an error path.
  *
  * Live collaboration (docs/features/collaboration.md) adds three things:
  * issueNoteCollabToken; updateNoteDetails, the live editor's save for the
@@ -42,7 +53,9 @@ const noteUpdateSchema = z.object({
   // stringifies it and this parses it back after validation.
   contentJson: z.string().max(2_000_000),
   contentText: z.string().max(200_000),
-  visibility: z.enum(NOTE_VISIBILITY_VALUES),
+  // Who sees it is the share dialog's (updateNoteAccess); an editor's save
+  // leaves it out. Still taken from the author, for older clients.
+  visibility: z.enum(NOTE_VISIBILITY_VALUES).optional(),
   eventId: z.string().nullable(),
 });
 
@@ -64,6 +77,29 @@ interface ActionResult {
   version?: number;
 }
 
+const NOT_FOUND = "Note not found.";
+const NO_SHARING =
+  "Only the note's author (or an admin, on a club note) can change who has access.";
+
+/**
+ * The note and the caller's access to it (their own share included), or
+ * null when it doesn't exist in this org or they can't see it. Deleted
+ * notes only when asked for (restore).
+ */
+async function loadNote(ctx: OrgContext, noteId: string, { deleted = false } = {}) {
+  const row = await ctx.db.note.findFirst({
+    where: {
+      id: noteId,
+      organizationId: ctx.organizationId,
+      ...(deleted ? {} : { deletedAt: null }),
+    },
+    include: { shares: { where: { userId: ctx.userId }, select: { role: true }, take: 1 } },
+  });
+  if (!row) return null;
+  const note = toNoteAccess(row);
+  return isNoteVisibleTo(ctx.userId, note) ? note : null;
+}
+
 async function assertEventBelongsToOrg(ctx: OrgContext, eventId: string | null) {
   if (!eventId) return null;
   const event = await ctx.db.event.findFirst({
@@ -74,8 +110,9 @@ async function assertEventBelongsToOrg(ctx: OrgContext, eventId: string | null) 
 }
 
 /**
- * A note leaving everyone else's view (turned PRIVATE, or deleted): close
- * its live sessions after commit, so other editors reconnect and are refused.
+ * A note whose access changed (turned PRIVATE, deleted, shared differently):
+ * close its live sessions after commit, so everyone reconnects with a fresh
+ * token, and whoever lost access is refused.
  */
 function revokeAfterCommit(ctx: OrgContext, noteId: string) {
   ctx.afterCommit(() => revokeNoteSessions(ctx.organizationId, noteId));
@@ -161,12 +198,8 @@ export const importNote = withOrgAction(async (ctx, input: unknown): Promise<Act
 
 export const updateNote = withOrgAction(
   async (ctx, noteId: string, input: unknown, expectedVersion: number): Promise<ActionResult> => {
-    const existing = await ctx.db.note.findFirst({
-      where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
-    });
-    if (!existing || !isNoteVisibleTo(ctx.userId, existing)) {
-      return { error: "Note not found." };
-    }
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
     if (!canEditNote(ctx, existing)) {
       return { error: "You don't have permission to edit this note." };
     }
@@ -176,6 +209,10 @@ export const updateNote = withOrgAction(
       return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
     const data = parsed.data;
+    const visibility = data.visibility ?? existing.visibility;
+    if (visibility !== existing.visibility && !canShareNote(ctx, existing)) {
+      return { error: NO_SHARING };
+    }
 
     let contentJson: object;
     try {
@@ -213,7 +250,7 @@ export const updateNote = withOrgAction(
         title: data.title,
         contentJson,
         contentText: data.contentText,
-        visibility: data.visibility,
+        visibility,
         eventId: data.eventId,
         updatedById: ctx.userId,
         version: { increment: 1 },
@@ -225,10 +262,7 @@ export const updateNote = withOrgAction(
       return { error: "This note was updated by someone else — reload.", conflict: true };
     }
 
-    if (
-      existing.visibility !== NoteVisibility.PRIVATE &&
-      data.visibility === NoteVisibility.PRIVATE
-    ) {
+    if (existing.visibility !== NoteVisibility.PRIVATE && visibility === NoteVisibility.PRIVATE) {
       revokeAfterCommit(ctx, noteId);
     }
     return { noteId, version: expectedVersion + 1 };
@@ -244,13 +278,8 @@ export const updateNote = withOrgAction(
  */
 export const updateNoteDetails = withOrgAction(
   async (ctx, noteId: string, input: unknown): Promise<ActionResult> => {
-    const existing = await ctx.db.note.findFirst({
-      where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
-      select: { authorId: true, visibility: true },
-    });
-    if (!existing || !isNoteVisibleTo(ctx.userId, existing)) {
-      return { error: "Note not found." };
-    }
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
     if (!canEditNote(ctx, existing)) {
       return { error: "You don't have permission to edit this note." };
     }
@@ -260,6 +289,13 @@ export const updateNoteDetails = withOrgAction(
       return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
     }
     const patch = parsed.data;
+    if (
+      patch.visibility !== undefined &&
+      patch.visibility !== existing.visibility &&
+      !canShareNote(ctx, existing)
+    ) {
+      return { error: NO_SHARING };
+    }
     if (patch.eventId !== undefined) {
       const eventError = await assertEventBelongsToOrg(ctx, patch.eventId);
       if (eventError) return { error: eventError };
@@ -295,23 +331,16 @@ export const issueNoteCollabToken = withOrgAction(
     const config = collabConfig();
     if (!config) return { error: "Live editing is off." };
 
-    const note = await ctx.db.note.findFirst({
-      where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
-      select: { id: true, authorId: true, visibility: true },
-    });
-    if (!note || !isNoteVisibleTo(ctx.userId, note)) return { error: "Note not found." };
+    const note = await loadNote(ctx, noteId);
+    if (!note) return { error: NOT_FOUND };
     return { session: mintNoteCollabSession(config, ctx, note) };
   },
 );
 
 export const deleteNote = withOrgAction(async (ctx, noteId: string): Promise<ActionResult> => {
-  const existing = await ctx.db.note.findFirst({
-    where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
-  });
-  if (!existing || !isNoteVisibleTo(ctx.userId, existing)) {
-    return { error: "Note not found." };
-  }
-  if (!canEditNote(ctx, existing)) {
+  const existing = await loadNote(ctx, noteId);
+  if (!existing) return { error: NOT_FOUND };
+  if (!canShareNote(ctx, existing)) {
     return { error: "You don't have permission to delete this note." };
   }
 
@@ -324,13 +353,9 @@ export const deleteNote = withOrgAction(async (ctx, noteId: string): Promise<Act
 });
 
 export const restoreNote = withOrgAction(async (ctx, noteId: string): Promise<ActionResult> => {
-  const existing = await ctx.db.note.findFirst({
-    where: { id: noteId, organizationId: ctx.organizationId },
-  });
-  if (!existing || !isNoteVisibleTo(ctx.userId, existing)) {
-    return { error: "Note not found." };
-  }
-  if (!canEditNote(ctx, existing)) {
+  const existing = await loadNote(ctx, noteId, { deleted: true });
+  if (!existing) return { error: NOT_FOUND };
+  if (!canShareNote(ctx, existing)) {
     return { error: "You don't have permission to restore this note." };
   }
 
@@ -340,3 +365,164 @@ export const restoreNote = withOrgAction(async (ctx, noteId: string): Promise<Ac
   });
   return {};
 });
+
+// ---- Sharing ------------------------------------------------------------------
+
+export interface SharingResult {
+  error?: string;
+  /** Who the note is shared with now, for the share dialog. */
+  shares?: NoteShareRow[];
+}
+
+const GENERAL_ACCESS = ["RESTRICTED", "CLUB_VIEW", "CLUB_EDIT"] as const;
+const SHARE_ROLES = Object.values(NoteShareRole) as [NoteShareRole, ...NoteShareRole[]];
+const userIdSchema = z.string().min(1).max(64);
+
+/**
+ * General access, from the share dialog: only the people it's shared with
+ * (PRIVATE), everyone in the club can view, or everyone in the club can
+ * edit. Only the author makes a club note private: RLS keeps a note visible
+ * to whoever writes it, and an admin would lock themselves out.
+ */
+export const updateNoteAccess = withOrgAction(
+  async (ctx, noteId: string, access: unknown): Promise<ActionResult> => {
+    const parsed = z.enum(GENERAL_ACCESS).safeParse(access);
+    if (!parsed.success) return { error: "Choose who has access." };
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
+    if (!canShareNote(ctx, existing)) return { error: NO_SHARING };
+    const next = fromGeneralAccess(parsed.data as NoteGeneralAccess);
+    if (next.visibility === NoteVisibility.PRIVATE && existing.authorId !== ctx.userId) {
+      return { error: "Only the note's author can make it private." };
+    }
+    if (next.visibility === existing.visibility && next.memberCanEdit === existing.memberCanEdit) {
+      return { noteId };
+    }
+    await ctx.db.note.updateMany({
+      where: { id: noteId, organizationId: ctx.organizationId },
+      data: { ...next, updatedById: ctx.userId },
+    });
+    // Everyone gets a token for what they may do now: a member who could
+    // edit may only watch, one who could watch may edit, or not see it at all.
+    revokeAfterCommit(ctx, noteId);
+    return { noteId };
+  },
+);
+
+const shareSchema = z.object({
+  userIds: z.array(userIdSchema).min(1, "Pick someone to share it with.").max(50),
+  role: z.enum(SHARE_ROLES),
+  /** An optional line for the notice the people get. */
+  message: z.string().trim().max(500).optional(),
+});
+
+/**
+ * Shares a note with members as viewers or editors (or changes the role of
+ * people it's already shared with), and tells the ones newly added. Only
+ * members of the club; the author is never a share of their own note.
+ */
+export const shareNote = withOrgAction(
+  async (ctx, noteId: string, input: unknown): Promise<SharingResult> => {
+    const parsed = shareSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
+    if (!canShareNote(ctx, existing)) return { error: NO_SHARING };
+
+    const wanted = [...new Set(parsed.data.userIds)].filter((id) => id !== existing.authorId);
+    if (wanted.length === 0) return { error: "The author already has access." };
+    const members = await ctx.db.membership.findMany({
+      where: { organizationId: ctx.organizationId, userId: { in: wanted } },
+      select: { userId: true },
+    });
+    if (members.length !== wanted.length) {
+      return { error: "Notes can only be shared with members of the club." };
+    }
+    const before = await ctx.db.noteShare.findMany({
+      where: { noteId, organizationId: ctx.organizationId, userId: { in: wanted } },
+      select: { userId: true, role: true },
+    });
+    const had = new Map(before.map((s) => [s.userId, s.role]));
+    const { role } = parsed.data;
+    for (const userId of wanted) {
+      if (had.get(userId) === role) continue;
+      await ctx.db.noteShare.upsert({
+        where: { noteId_userId: { noteId, userId } },
+        create: {
+          organizationId: ctx.organizationId,
+          noteId,
+          userId,
+          role,
+          createdById: ctx.userId,
+        },
+        update: { role },
+      });
+    }
+
+    const added = wanted.filter((id) => !had.has(id));
+    if (added.length > 0) {
+      const org = await ctx.db.organization.findUnique({
+        where: { id: ctx.organizationId },
+        select: { slug: true },
+      });
+      const sharer = ctx.user.name?.trim() || "Someone";
+      if (org) {
+        await notifyUsers(ctx.db, ctx.organizationId, added, {
+          type: NotificationType.NOTE_SHARED,
+          title: `${sharer} shared “${existing.title}” with you`,
+          body:
+            parsed.data.message ||
+            (role === NoteShareRole.EDITOR ? "You can edit it." : "You can view it."),
+          linkUrl: `/app/${org.slug}/notes/${noteId}`,
+          actorId: ctx.userId,
+        });
+      }
+    }
+    // A role that changed takes effect on the next token; this makes it now.
+    if (before.some((s) => s.role !== role)) revokeAfterCommit(ctx, noteId);
+    return { shares: await listNoteShares(ctx.db, ctx.organizationId, noteId) };
+  },
+);
+
+/** Changes what one person the note is shared with may do. */
+export const updateNoteShare = withOrgAction(
+  async (ctx, noteId: string, userId: string, role: unknown): Promise<SharingResult> => {
+    const parsedRole = z.enum(SHARE_ROLES).safeParse(role);
+    if (!parsedRole.success || !userIdSchema.safeParse(userId).success) {
+      return { error: "Invalid input" };
+    }
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
+    if (!canShareNote(ctx, existing)) return { error: NO_SHARING };
+    const result = await ctx.db.noteShare.updateMany({
+      where: { noteId, userId, organizationId: ctx.organizationId },
+      data: { role: parsedRole.data },
+    });
+    if (result.count === 0) return { error: "It isn't shared with them any more." };
+    revokeAfterCommit(ctx, noteId);
+    return { shares: await listNoteShares(ctx.db, ctx.organizationId, noteId) };
+  },
+);
+
+/**
+ * Takes someone off a note: the author (or an admin, on a club note) for
+ * anyone, and anyone for themselves ("Remove me").
+ */
+export const removeNoteShare = withOrgAction(
+  async (ctx, noteId: string, userId: string): Promise<SharingResult> => {
+    if (!userIdSchema.safeParse(userId).success) return { error: "Invalid input" };
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
+    if (userId !== ctx.userId && !canShareNote(ctx, existing)) return { error: NO_SHARING };
+    await ctx.db.noteShare.deleteMany({
+      where: { noteId, userId, organizationId: ctx.organizationId },
+    });
+    revokeAfterCommit(ctx, noteId);
+    // Someone who just removed themselves from a private note can't list it any more.
+    const shares =
+      userId === ctx.userId && !canShareNote(ctx, existing)
+        ? []
+        : await listNoteShares(ctx.db, ctx.organizationId, noteId);
+    return { shares };
+  },
+);

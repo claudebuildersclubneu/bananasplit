@@ -19,13 +19,14 @@ import {
   Redo2,
   SquareCode,
   Strikethrough,
-  Table as TableIcon,
   Underline as UnderlineIcon,
   Undo2,
   type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
+import { TableInsertButton, TableTools } from "./table-tools";
 
 interface Tool {
   label: string;
@@ -127,12 +128,6 @@ const GROUPS: Tool[][] = [
       active: (e) => e.isActive("codeBlock"),
       run: (e) => e.chain().focus().toggleCodeBlock().run(),
     },
-    {
-      label: "Table",
-      icon: TableIcon,
-      active: (e) => e.isActive("table"),
-      run: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-    },
     { label: "Divider", icon: Minus, run: (e) => e.chain().focus().setHorizontalRule().run() },
   ],
 ];
@@ -141,7 +136,8 @@ const GROUPS: Tool[][] = [
 const PRESSED = "aria-pressed:bg-muted aria-pressed:text-foreground";
 
 /**
- * The note's toolbar: text style, formatting, lists and blocks, a link, and
+ * The note's toolbar: text style, formatting, lists and blocks, a table (any
+ * size, with row and column tools while the cursor is in one), a link, and
  * undo/redo (hidden in a live note, whose undo lives in the collaboration
  * extension and only undoes your own edits; Ctrl+Z still works). Every tool
  * is the app's small ghost icon button.
@@ -161,6 +157,7 @@ export function EditorToolbar({
     selector: ({ editor: e }) => ({
       active: GROUPS.flat().map((t) => (t.active ? t.active(e) : false)),
       link: e.isActive("link"),
+      table: e.isActive("table"),
       canUndo: showHistory && e.can().undo(),
       canRedo: showHistory && e.can().redo(),
     }),
@@ -199,6 +196,7 @@ export function EditorToolbar({
           })}
         </div>
       ))}
+      <TableInsertButton editor={editor} active={state.table} />
       <span className="bg-border mx-1 h-5 w-px" aria-hidden="true" />
       <Button
         type="button"
@@ -239,6 +237,7 @@ export function EditorToolbar({
           </Button>
         </div>
       )}
+      <TableTools editor={editor} />
     </div>
   );
 }

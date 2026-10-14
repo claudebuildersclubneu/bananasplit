@@ -3,6 +3,7 @@
 import {
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   CheckSquare,
   Database,
   Eye,
@@ -31,6 +32,7 @@ import { saveSidebarAction } from "./actions";
 const ICONS: Record<string, LucideIcon> = {
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   CheckSquare,
   Database,
   LayoutDashboard,

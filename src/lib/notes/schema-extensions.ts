@@ -23,7 +23,9 @@ export function noteSchemaExtensions({ collaborative = false } = {}): Extensions
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: false }),
+    // Wrapped so a wide table scrolls sideways instead of squeezing its
+    // columns (each keeps cellMinWidth pixels).
+    Table.configure({ resizable: false, renderWrapper: true, cellMinWidth: 64 }),
     TableRow,
     TableCell,
     TableHeader,
