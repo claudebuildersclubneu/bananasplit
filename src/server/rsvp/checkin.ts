@@ -56,7 +56,7 @@ export async function setRegistrationCheckIn(
         select: {
           startsAt: true,
           term: true,
-          organization: { select: { kind: true, timezone: true } },
+          organization: { select: { timezone: true } },
         },
       },
     },
@@ -72,9 +72,6 @@ export async function setRegistrationCheckIn(
     where: { id: reg.id },
     data: { checkedInAt: input.checkedIn ? now : null },
   });
-
-  const club = reg.event.organization.kind === "CLUB";
-  if (!club) return { ok: true, name: reg.name };
 
   let attendance = false;
   await db.$executeRaw`SAVEPOINT rsvp_attendance`;

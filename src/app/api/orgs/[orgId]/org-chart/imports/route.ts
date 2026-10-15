@@ -9,7 +9,12 @@ import { normalizeOrgChart, type NormalizedChart } from "@/lib/org-chart/normali
 import type { ParseReport } from "@/lib/org-chart/types";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { withOrgAction, withOrgTx } from "@/server/db/context";
-import { extractSource, preflightSource, sniffSource, SourceRejectedError } from "@/server/org-chart/extract";
+import {
+  extractSource,
+  preflightSource,
+  sniffSource,
+  SourceRejectedError,
+} from "@/server/org-chart/extract";
 import { BUILTIN_CONFIDENCE_THRESHOLD, parseOrgChartText } from "@/server/org-chart/parse";
 import {
   assertUploadAllowed,
@@ -59,7 +64,7 @@ function json(status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-const createVersion = withOrgAction(createUploadVersion);
+const createVersion = withOrgAction(createUploadVersion, { feature: "people" });
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
@@ -80,7 +85,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     if (error instanceof NotFoundError) return json(404, { error: "Not found." });
     throw error;
   }
-  if (!access.allowed) return json(403, { error: "Only owners and admins can import an org chart." });
+  if (!access.allowed)
+    return json(403, { error: "Only owners and admins can import an org chart." });
 
   const limited = await checkRateLimit(
     rateLimitKey("orgchart-upload", session.user.id),
@@ -138,9 +144,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
   }
 
   const versionId = newVersionId();
-  const stored = await putBlob("org-chart", orgId, [versionId, `${randomKeyId()}.${sniffed.extension}`], bytes, {
-    contentType: sniffed.mimeType,
-  });
+  const stored = await putBlob(
+    "org-chart",
+    orgId,
+    [versionId, `${randomKeyId()}.${sniffed.extension}`],
+    bytes,
+    {
+      contentType: sniffed.mimeType,
+    },
+  );
 
   try {
     const created = await createVersion(orgId, {

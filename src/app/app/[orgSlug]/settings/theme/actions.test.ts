@@ -59,6 +59,7 @@ vi.mock("@/server/db/context", () => {
 const { resetOrgTheme, saveOrgTheme } = await import("./actions");
 const { CBC_PRESET } = await import("@/lib/theme/presets");
 const { deriveTheme } = await import("@/lib/theme/derive");
+const { DEFAULT_THEME_STYLE } = await import("@/lib/theme/style");
 const { Prisma } = await import("@/generated/prisma/client");
 
 const ORG = "org_1";
@@ -121,7 +122,11 @@ describe("saveOrgTheme", () => {
       updatedById: "u1",
     });
     expect(create.dark).toBe(Prisma.DbNull);
-    expect(create.tokens).toEqual(deriveTheme(INPUT.light, null));
+    // An input from before Look and feel (no `style`) stores the default look.
+    expect(create.tokens).toEqual({
+      ...deriveTheme(INPUT.light, null),
+      style: DEFAULT_THEME_STYLE,
+    });
     expect(update).toMatchObject({ preset: "custom", mode: "DARK" });
     expect(db.$queryRaw).toHaveBeenCalledTimes(1); // app.write_org_audit
     expect(calls).toEqual(["commit", `updateTag:org:${ORG}:theme`, "refresh"]);
@@ -150,6 +155,46 @@ describe("saveOrgTheme", () => {
       expect(result.warnings.some((w) => w.pair === "text-background")).toBe(true);
     }
     expect(db.orgTheme.upsert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("saveOrgTheme: Look and feel", () => {
+  it("stores the style with the tokens and derives the tokens with its accent", async () => {
+    const style = {
+      accent: "#2E8B57",
+      radius: "round",
+      textSize: "large",
+      headingFont: "sans",
+      bodyFont: "system",
+    };
+    const result = await saveOrgTheme(ORG, { ...INPUT, preset: "cbc", style });
+    expect(result.ok).toBe(true);
+    const args = db.orgTheme.upsert.mock.calls[0] as unknown as [
+      { create: Record<string, unknown> },
+    ];
+    const tokens = args[0].create.tokens as {
+      light: Record<string, string>;
+      dark: Record<string, string>;
+      style: unknown;
+    };
+    // The preset's palettes are stored as picked; the accent lives in style.
+    expect(args[0].create.light).toEqual(CBC_PRESET.light);
+    expect(tokens.style).toEqual({ ...style, accent: "#2e8b57" });
+    expect(tokens.light["brand-accent"]).toBe("#2e8b57");
+    expect(tokens.dark["brand-accent"]).not.toBe(CBC_PRESET.dark.accent);
+  });
+
+  it("rejects an unknown option or a malicious accent", async () => {
+    for (const style of [
+      { radius: "pill" },
+      { accent: "red" },
+      { accent: "#fff;}</style>" },
+      { fontFamily: "Comic Sans" },
+    ]) {
+      const result = await saveOrgTheme(ORG, { ...INPUT, style });
+      expect(result.ok).toBe(false);
+    }
+    expect(db.orgTheme.upsert).not.toHaveBeenCalled();
   });
 });
 

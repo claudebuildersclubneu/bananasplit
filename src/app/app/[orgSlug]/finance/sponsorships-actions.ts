@@ -12,6 +12,10 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { writeFinanceAuditLog } from "@/lib/finance/audit";
 import { withOrgAction } from "@/server/db/context";
 
+/** Every action here belongs to sponsorships (withOrgAction's space check). */
+const sponsorshipsAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "sponsorships" });
+
 /**
  * Sponsors and sponsorships (0C). These used to call requireFinanceAccess
  * directly; each now runs in one withOrgAction transaction as app_user,
@@ -37,7 +41,7 @@ const sponsorInputSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
-export const createSponsor = withOrgAction(
+export const createSponsor = sponsorshipsAction(
   async (ctx, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
 
@@ -77,7 +81,7 @@ const sponsorshipInputSchema = z.object({
   ownerId: z.string(),
 });
 
-export const createSponsorship = withOrgAction(
+export const createSponsorship = sponsorshipsAction(
   async (ctx, input: unknown): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -136,7 +140,7 @@ export const createSponsorship = withOrgAction(
  * silently disappears from the audit trail. Credits never touch the ledger:
  * no money changes hands, so their status is all that changes.
  */
-export const updateSponsorshipStatus = withOrgAction(
+export const updateSponsorshipStatus = sponsorshipsAction(
   async (ctx, sponsorshipId: string, status: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -245,7 +249,7 @@ export const updateSponsorshipStatus = withOrgAction(
  * that under Transactions if it was a mistake too. The audit log keeps the
  * deleted row.
  */
-export const deleteSponsorship = withOrgAction(
+export const deleteSponsorship = sponsorshipsAction(
   async (ctx, sponsorshipId: string): Promise<ActionResult> => {
     requirePermission(ctx, "finance.manage");
     const organizationId = ctx.organizationId;
@@ -266,23 +270,27 @@ export const deleteSponsorship = withOrgAction(
 );
 
 /** Deletes a sponsor with no sponsorships left (delete those first). */
-export const deleteSponsor = withOrgAction(async (ctx, sponsorId: string): Promise<ActionResult> => {
-  requirePermission(ctx, "finance.manage");
-  const organizationId = ctx.organizationId;
-  const sponsor = await ctx.db.sponsor.findFirst({
-    where: { id: sponsorId, organizationId },
-    include: { _count: { select: { sponsorships: true } } },
-  });
-  if (!sponsor) return { error: "Sponsor not found." };
-  if (sponsor._count.sponsorships > 0) {
-    const n = sponsor._count.sponsorships;
-    return { error: `${sponsor.name} still has ${n} sponsorship${n === 1 ? "" : "s"}. Delete ${n === 1 ? "it" : "them"} first.` };
-  }
-  await ctx.db.sponsor.delete({ where: { id: sponsor.id } });
-  await writeFinanceAuditLog(ctx.db, {
-    organizationId,
-    action: "SPONSOR_DELETE",
-    before: { id: sponsor.id, name: sponsor.name },
-  });
-  return {};
-});
+export const deleteSponsor = sponsorshipsAction(
+  async (ctx, sponsorId: string): Promise<ActionResult> => {
+    requirePermission(ctx, "finance.manage");
+    const organizationId = ctx.organizationId;
+    const sponsor = await ctx.db.sponsor.findFirst({
+      where: { id: sponsorId, organizationId },
+      include: { _count: { select: { sponsorships: true } } },
+    });
+    if (!sponsor) return { error: "Sponsor not found." };
+    if (sponsor._count.sponsorships > 0) {
+      const n = sponsor._count.sponsorships;
+      return {
+        error: `${sponsor.name} still has ${n} sponsorship${n === 1 ? "" : "s"}. Delete ${n === 1 ? "it" : "them"} first.`,
+      };
+    }
+    await ctx.db.sponsor.delete({ where: { id: sponsor.id } });
+    await writeFinanceAuditLog(ctx.db, {
+      organizationId,
+      action: "SPONSOR_DELETE",
+      before: { id: sponsor.id, name: sponsor.name },
+    });
+    return {};
+  },
+);

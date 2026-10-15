@@ -11,6 +11,7 @@ import { exclusionLabel, readDefinition } from "@/server/databases/ballot-defini
 import { fmtDate } from "@/server/databases/format";
 import { getDatabase } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Ballots > Poll definitions (OWNER/ADMIN): import the website's poll files
@@ -23,6 +24,8 @@ export default async function BallotDefinitionsPage({
   params,
 }: PageProps<"/app/[orgSlug]/databases/[dbKey]/definitions">) {
   const { orgSlug, dbKey } = await params;
+  const planLock = await planGate(orgSlug, "databases");
+  if (planLock) return planLock;
   const { organization } = await getOrgContextBySlug(orgSlug);
 
   let data;

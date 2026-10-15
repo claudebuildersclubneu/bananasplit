@@ -80,7 +80,7 @@ squeezing their columns.
 | List and search       | `src/server/notes/visibility.ts` (`noteVisibleWhere`, `noteVisibleSql`)                                          |
 
 The database enforces the same rules with row-level security
-(`20261013130000_note_sharing`):
+(`20261014130000_note_sharing`):
 
 - `app.note_share_role(note)` is the caller's own share, read without RLS so
   the Note and NoteShare policies don't recurse into each other.

@@ -254,7 +254,7 @@ export function InviteFriends({
       title="Bring your friends"
       aside={
         invitedCount > 0 ? (
-          <span className="bg-banana text-ink rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap">
+          <span className="bg-banana text-banana-ink rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap">
             {invitedCount} joined with your link
           </span>
         ) : null

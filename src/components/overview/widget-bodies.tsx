@@ -18,6 +18,7 @@ import { PIN_ICONS } from "@/components/shell/pin-icons";
 import { UserAvatar, type UserAvatarUser } from "@/components/user-avatar";
 import { familyOf } from "@/lib/files/types";
 import type { PinKind } from "@/lib/pins/pages";
+import { pollHref } from "@/lib/polls/paths";
 import { ago } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +113,7 @@ export function TaskStats({
               <Icon className={cn("size-3.5 shrink-0", c.value > 0 && c.tone)} aria-hidden="true" />
               {c.label}
             </span>
-            <span className={cn("numeral mt-1.5 block text-5xl", c.value > 0 && c.tone)}>
+            <span className={cn("mt-1.5 block text-2xl font-semibold tabular-nums", c.value > 0 && c.tone)}>
               {c.value}
             </span>
           </Link>
@@ -199,7 +200,7 @@ export function PollList({
         return (
           <li key={p.id}>
             <Link
-              href={`/app/${orgSlug}/calendar/${p.kind === "question" ? "polls" : "find-a-time"}/${p.id}`}
+              href={pollHref(`/app/${orgSlug}`, p.kind, p.id)}
               className="hover:bg-accent/50 -mx-2 flex items-start gap-2.5 rounded-md px-2 py-2"
             >
               <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />

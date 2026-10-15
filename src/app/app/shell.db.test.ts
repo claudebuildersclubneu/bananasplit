@@ -140,11 +140,17 @@ describe.skipIf(!seeded)("switcher, bell and /app on the RLS path (seeded CBC)",
     expect(read?.readAt).not.toBeNull();
   });
 
-  it("/app goes to the cookie's org only while the user belongs to it", async () => {
-    activeOrgMock.mockResolvedValue(s.roboticsId);
-    expect(await redirectTarget(() => AppIndexPage())).toBe("/app/claude-builders-club");
-
+  it("/app goes to the cookie's club only while the user belongs to it, else Personal", async () => {
     activeOrgMock.mockResolvedValue(s.cbcId);
     expect(await redirectTarget(() => AppIndexPage())).toBe("/app/claude-builders-club");
+
+    // Not a member of Robotics: their Personal space (made here if missing).
+    activeOrgMock.mockResolvedValue(s.roboticsId);
+    const personal = await redirectTarget(() => AppIndexPage());
+    expect(personal).toMatch(/^\/app\/me-[a-z0-9]{10}$/);
+
+    // No cookie at all: Personal, the same one.
+    activeOrgMock.mockResolvedValue(null);
+    expect(await redirectTarget(() => AppIndexPage())).toBe(personal);
   });
 });

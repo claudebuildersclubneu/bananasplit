@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Where "Find a time" used to start: the form lives under Find a time now. */
+/** Find a time has its own section now; old links and bookmarks land there. */
 export default async function NewPollPage({
   params,
 }: PageProps<"/app/[orgSlug]/calendar/polls/new">) {

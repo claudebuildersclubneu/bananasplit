@@ -11,16 +11,20 @@ import {
   type FolderResult,
 } from "@/server/notes/folders";
 
+/** Every action here belongs to files (withOrgAction's space check). */
+const filesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "files" });
+
 /** Folders in Files: every write runs as the member, under RLS. */
 
 const id = z.string().min(1).max(64);
 
-export const createFolderAction = withOrgAction(
+export const createFolderAction = filesAction(
   async (ctx, name: unknown, color: unknown): Promise<FolderResult> =>
     createFolder(ctx.db, ctx.organizationId, ctx.userId, name, color),
 );
 
-export const updateFolderAction = withOrgAction(
+export const updateFolderAction = filesAction(
   async (
     ctx,
     folderId: string,
@@ -29,12 +33,12 @@ export const updateFolderAction = withOrgAction(
     updateFolder(ctx.db, ctx.organizationId, id.parse(folderId), patch ?? {}),
 );
 
-export const deleteFolderAction = withOrgAction(
+export const deleteFolderAction = filesAction(
   async (ctx, folderId: string): Promise<FolderResult> =>
     deleteFolder(ctx.db, ctx.organizationId, id.parse(folderId)),
 );
 
-export const moveToFolderAction = withOrgAction(
+export const moveToFolderAction = filesAction(
   async (
     ctx,
     items: { noteIds?: string[]; fileIds?: string[] },

@@ -1,62 +1,24 @@
 "use client";
 
-import {
-  BadgeCheck,
-  BookOpen,
-  ClipboardList,
-  CodeXml,
-  Crown,
-  GraduationCap,
-  Handshake,
-  Megaphone,
-  NotebookPen,
-  PartyPopper,
-  PenLine,
-  PenTool,
-  PiggyBank,
-  Plus,
-  Star,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
+import { BookOpen, GraduationCap, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { MajorInput } from "@/components/onboarding/major-input";
 import { Chip, FieldError, FieldLabel } from "@/components/onboarding/step-fields";
-import { Input } from "@/components/ui/input";
-import {
-  gradYearChoices,
-  joinMajor,
-  MAX_TITLE,
-  ROLE_CHOICES,
-  splitMajor,
-} from "@/lib/onboarding/steps";
+import { gradYearChoices, joinMajor, splitMajor } from "@/lib/onboarding/steps";
 import { PROFILE_LIMITS } from "@/lib/profile/schema";
 
 import { saveSchoolStep } from "./actions";
 import { StepNav, useStepSave } from "./step-nav";
 
-const OTHER = "__other__";
-
-const ROLE_ICONS: Record<(typeof ROLE_CHOICES)[number], LucideIcon> = {
-  President: Crown,
-  "Vice President": Star,
-  Treasurer: PiggyBank,
-  Secretary: NotebookPen,
-  "Project Manager": ClipboardList,
-  Developer: CodeXml,
-  Designer: PenTool,
-  Marketing: Megaphone,
-  Events: PartyPopper,
-  Outreach: Handshake,
-  Member: UserRound,
-};
-
-/** A2 · School + role: major (and a second one), grad year, role. */
+/**
+ * Step 2 · School: major (and a second one) and grad year. About you, not
+ * a club: your role is per club, picked when you join one.
+ */
 export function SchoolStep({
   initial,
 }: {
-  initial: { major: string | null; gradYear: number | null; preferredTitle: string | null };
+  initial: { major: string | null; gradYear: number | null };
 }) {
   const { pending, errors, saveAndContinue } = useStepSave("school");
   const [first, second] = splitMajor(initial.major);
@@ -70,24 +32,12 @@ export function SchoolStep({
     initial.gradYear !== null && allYears.includes(initial.gradYear) ? initial.gradYear : null,
   );
   const [yearOther, setYearOther] = useState(gradYear !== null && laterYears.includes(gradYear));
-  const knownRole =
-    initial.preferredTitle && (ROLE_CHOICES as readonly string[]).includes(initial.preferredTitle);
-  const [role, setRole] = useState<string>(
-    initial.preferredTitle ? (knownRole ? initial.preferredTitle : OTHER) : "",
-  );
-  const [customRole, setCustomRole] = useState(knownRole ? "" : (initial.preferredTitle ?? ""));
 
   const joined = joinMajor(major, showMinor ? minor : "");
   const tooLong = joined.length > PROFILE_LIMITS.major;
 
   function submit() {
-    saveAndContinue(() =>
-      saveSchoolStep({
-        major: joined || null,
-        gradYear,
-        preferredTitle: role === OTHER ? customRole : role || null,
-      }),
-    );
+    saveAndContinue(() => saveSchoolStep({ major: joined || null, gradYear }));
   }
 
   return (
@@ -178,42 +128,6 @@ export function SchoolStep({
           </div>
         )}
         <FieldError message={errors.gradYear} />
-      </div>
-
-      <div className="grid gap-1.5">
-        <FieldLabel id="ob-role-label" icon={BadgeCheck} aside="Admins can change this later">
-          Your role
-        </FieldLabel>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="ob-role-label">
-          {ROLE_CHOICES.map((r) => (
-            <Chip
-              key={r}
-              icon={ROLE_ICONS[r]}
-              selected={role === r}
-              onClick={() => setRole(role === r ? "" : r)}
-            >
-              {r}
-            </Chip>
-          ))}
-          <Chip
-            icon={PenLine}
-            selected={role === OTHER}
-            onClick={() => setRole(role === OTHER ? "" : OTHER)}
-          >
-            Something else
-          </Chip>
-        </div>
-        {role === OTHER && (
-          <Input
-            aria-label="Your role"
-            placeholder="e.g. Head of Partnerships"
-            maxLength={MAX_TITLE}
-            value={customRole}
-            onChange={(e) => setCustomRole(e.target.value)}
-            autoFocus
-          />
-        )}
-        <FieldError message={errors.preferredTitle} />
       </div>
 
       <FieldError message={errors.form} />

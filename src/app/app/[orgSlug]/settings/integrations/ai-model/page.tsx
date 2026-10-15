@@ -5,6 +5,7 @@ import { IntegrationHeader } from "../integration-header";
 import { StatusPanel, TestAndRemove } from "../integration-ui";
 import { loadIntegrationPage } from "../load";
 import { AiModelForm } from "../provider-forms";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Settings > Integrations > Other AI models: an OpenAI-compatible API
@@ -15,6 +16,8 @@ export default async function AiModelIntegrationPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations/ai-model">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "ai");
+  if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "OPENAI_COMPATIBLE");
   if (!page) return <SettingsNoAccess title="Other AI models" who="owners and admins" />;
   const { organization, dto, canWrite, canRemove } = page;
@@ -39,7 +42,10 @@ export default async function AiModelIntegrationPage({
       )}
       <p className="text-muted-foreground text-xs">
         Prefer Claude? Connect it under{" "}
-        <Link href={`/app/${orgSlug}/settings/integrations/claude`} className="underline underline-offset-2">
+        <Link
+          href={`/app/${orgSlug}/settings/integrations/claude`}
+          className="underline underline-offset-2"
+        >
           Claude API
         </Link>
         .

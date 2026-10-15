@@ -4,6 +4,7 @@ import { can } from "@/lib/auth/permissions";
 import { safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { toDateValue } from "@/lib/finance/periods";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinanceAccessGate } from "../finance-access-gate";
 import { getCategoriesForPeriods, getOrgPeriods } from "../queries";
@@ -13,6 +14,8 @@ export default async function FinanceImportPage({
   params,
 }: PageProps<"/app/[orgSlug]/finance/import">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "finance");
+  if (planLock) return planLock;
   const { organization: org, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "finance.manage")) {
     return <FinanceAccessGate orgId={org.id} orgSlug={orgSlug} role={role} />;

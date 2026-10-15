@@ -5,6 +5,10 @@ import { requestGoogleImport, requestGoogleSync } from "@/server/google-calendar
 
 import { actionError } from "../action-result";
 
+/** Every action here belongs to integrations (withOrgAction's space check). */
+const integrationsAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "integrations" });
+
 /**
  * Calendar > Sync and website feed (and its import card on Settings >
  * Integrations > Google Calendar). ADMIN+ (integrations.write), checked in
@@ -17,7 +21,7 @@ interface Result {
   queued?: number;
 }
 
-const syncNowTx = withOrgAction(async (ctx): Promise<Result> => {
+const syncNowTx = integrationsAction(async (ctx): Promise<Result> => {
   const result = await requestGoogleSync(ctx);
   return result.ok ? { queued: result.queued ?? 0 } : { error: result.error };
 });
@@ -31,14 +35,17 @@ export async function syncGoogleNow(organizationId: string): Promise<Result> {
   }
 }
 
-const importTx = withOrgAction(async (ctx, mode: "dry-run" | "apply"): Promise<Result> => {
+const importTx = integrationsAction(async (ctx, mode: "dry-run" | "apply"): Promise<Result> => {
   if (mode !== "dry-run" && mode !== "apply") return { error: "Unknown import mode." };
   const result = await requestGoogleImport(ctx, mode);
   return result.ok ? {} : { error: result.error };
 });
 
 /** "Import existing events": the dry run, then applying it. */
-export async function importGoogleEvents(organizationId: string, mode: "dry-run" | "apply"): Promise<Result> {
+export async function importGoogleEvents(
+  organizationId: string,
+  mode: "dry-run" | "apply",
+): Promise<Result> {
   try {
     return await importTx(organizationId, mode);
   } catch (error) {

@@ -1,6 +1,8 @@
 import { ThemeProvider } from "@/components/theme-provider";
+import { accentStyleSheet } from "@/lib/theme/accent";
 import { themeStyleSheet } from "@/lib/theme/css";
-import { themeProviderMode, type ResolvedTheme } from "@/lib/theme/resolve";
+import { effectivePalettes, themeProviderMode, type ResolvedTheme } from "@/lib/theme/resolve";
+import { lookStyleSheet } from "@/lib/theme/style";
 import { getNonce } from "@/lib/security/nonce";
 
 /**
@@ -17,6 +19,12 @@ import { getNonce } from "@/lib/security/nonce";
  * - No nonce on the <style>: the CSP allows inline styles
  *   (style-src 'self' 'unsafe-inline'). next-themes' inline script gets the
  *   request nonce.
+ * - The brand's yellow names (bg-banana, bg-butter, text-honey ..., see
+ *   src/lib/theme/accent.ts) are pointed at the theme's accent in both
+ *   modes, always (the default theme too, so dark mode gets dark tints).
+ *   Pages outside a club never render this, so they keep Bananasplit yellow.
+ * - Look and feel (corners, text size, fonts) from fixed tables
+ *   (src/lib/theme/style.ts); nothing when it is the default.
  */
 export async function OrgThemeRoot({
   theme,
@@ -28,10 +36,15 @@ export async function OrgThemeRoot({
   const nonce = await getNonce();
   const { defaultTheme, forcedTheme } = themeProviderMode(theme);
   const css = theme.isDefault ? "" : themeStyleSheet(theme.tokens);
+  const palettes = effectivePalettes(theme);
+  const accents = accentStyleSheet(palettes.light, palettes.dark);
+  const look = lookStyleSheet(theme.style);
 
   return (
     <ThemeProvider defaultTheme={defaultTheme} forcedTheme={forcedTheme} nonce={nonce}>
       {css && <style data-org-theme="" dangerouslySetInnerHTML={{ __html: css }} />}
+      {accents && <style data-org-accents="" dangerouslySetInnerHTML={{ __html: accents }} />}
+      {look && <style data-org-look="" dangerouslySetInnerHTML={{ __html: look }} />}
       {children}
     </ThemeProvider>
   );

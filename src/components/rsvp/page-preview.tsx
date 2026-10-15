@@ -49,7 +49,7 @@ export function PagePreview({
             className="size-14 flex-none rounded-lg object-cover shadow-sm"
           />
         ) : (
-          <span className="bg-peel font-heading text-ink grid size-14 flex-none place-items-center rounded-lg text-2xl">
+          <span className="bg-banana font-heading text-banana-ink grid size-14 flex-none place-items-center rounded-lg text-2xl">
             {title.trim()[0]?.toUpperCase() ?? "B"}
           </span>
         )}

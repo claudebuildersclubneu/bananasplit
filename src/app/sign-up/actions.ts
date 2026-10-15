@@ -8,6 +8,7 @@ import { credentialsSignIn, SIGN_IN_UNAVAILABLE_MESSAGE } from "@/lib/auth/crede
 import { emailVerificationRequired } from "@/lib/auth/email-verification";
 import { hashPassword } from "@/lib/auth/password";
 import { newPasswordSchema } from "@/lib/auth/password-policy";
+import { onboardingHref } from "@/lib/onboarding/steps";
 import { checkRateLimit, rateLimitKey, retryAfterText } from "@/lib/rate-limit";
 import { signUpPerIpLimit } from "@/lib/auth/ip-limits";
 import { getClientIp } from "@/lib/request-ip";
@@ -43,7 +44,7 @@ export interface SignUpState {
 /**
  * Credentials sign-up (0A Fix 4(b)). The account is created unverified and a
  * verification link goes to the address; the user is signed in right away
- * and lands on onboarding, which shows the 'check your email' state. An
+ * and lands on "Your profile", which shows the 'check your email' state. An
  * unverified account can sign in but cannot create or join an organization
  * (Fix 4(c)), and an abandoned one is purged after 72 hours.
  */
@@ -121,9 +122,9 @@ export async function signUpAction(
     }
   }
 
-  // Someone who came to make a free event page (/rsvp/new) goes back there;
-  // everyone else goes on to find or start their club.
-  const next = safeCallbackUrl(formData.get("callbackUrl")) ?? "/onboarding";
+  // On to "Your profile"; someone sent here from a specific page (an invite
+  // link, a poll, "Start a club") goes back there after its first step.
+  const next = onboardingHref(safeCallbackUrl(formData.get("callbackUrl")));
   const signedIn = await credentialsSignIn(parsed.data.email, parsed.data.password, next);
   if (signedIn.ok) redirect(next);
 

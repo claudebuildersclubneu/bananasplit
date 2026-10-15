@@ -33,16 +33,18 @@ describe("describePath", () => {
       label: "Ask a question",
     });
     expect(describePath("cbc", "/app/cbc/calendar/polls/new")?.lookup).toBeUndefined();
-    // Find-a-time polls live under their own section.
-    expect(describePath("cbc", "/app/cbc/calendar/find-a-time/p_2")).toMatchObject({
-      kind: "event",
-      lookup: { type: "poll", id: "p_2" },
-    });
-    expect(describePath("cbc", "/app/cbc/calendar/find-a-time")).toMatchObject({
+    // Find a time is a section of its own; its polls are polls all the same.
+    expect(describePath("cbc", "/app/cbc/calendar/find-a-time")).toEqual({
+      href: "/app/cbc/calendar/find-a-time",
       kind: "page",
       label: "Find a time",
     });
     expect(describePath("cbc", "/app/cbc/calendar/find-a-time/new")?.lookup).toBeUndefined();
+    expect(describePath("cbc", "/app/cbc/calendar/find-a-time/p_1")).toMatchObject({
+      kind: "event",
+      lookup: { type: "poll", id: "p_1" },
+    });
+    expect(describePath("cbc", "/app/cbc/calendar/rsvp")?.label).toBe("RSVPs");
     expect(describePath("cbc", "/app/cbc/people/u_1")?.kind).toBe("person");
   });
 

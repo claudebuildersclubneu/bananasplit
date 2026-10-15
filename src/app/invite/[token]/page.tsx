@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
+import { ClubPreview } from "@/app/onboarding/join/club-preview";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import { Button } from "@/components/ui/button";
@@ -9,9 +11,18 @@ import { getUserIdentity } from "@/lib/auth/email-verification";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
 import { sameEmail } from "@/lib/auth/normalize-email";
 import { getSession } from "@/lib/auth/session";
+import { orgLogoUrl } from "@/lib/org-logo";
+import { getPublicOrgTheme } from "@/lib/theme/loader";
+import { needsProfileSetup } from "@/server/onboarding/profile";
 import { findInvitationByRawToken } from "@/server/settings/invitations";
 
 import { JoinButton } from "./join-button";
+
+/** "a member", "an admin", "an owner". */
+function roleName(role: string): string {
+  const name = role.toLowerCase();
+  return /^[aeiou]/.test(name) ? `an ${name}` : `a ${name}`;
+}
 
 function InviteCard({
   title,
@@ -35,8 +46,16 @@ function InviteCard({
   );
 }
 
+/**
+ * An emailed invite link: who's inviting you (the club, with its logo and
+ * the role you'd join as), then Join, then the one small club step, "Your
+ * role in <club>" (/onboarding/join/[orgSlug]). Signed out: sign in, or
+ * create an account and come straight back here after the first profile
+ * step. A joiner never sees a price or a trial.
+ */
 export default async function InvitePage({ params }: PageProps<"/invite/[token]">) {
   const { token } = await params;
+  const here = `/invite/${token}`;
 
   const invitation = await findInvitationByRawToken(token);
   if (!invitation) {
@@ -50,6 +69,7 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
   }
 
   const session = await getSession();
+  const signUpHref = `/sign-up?callbackUrl=${encodeURIComponent(here)}`;
 
   if (!session) {
     return (
@@ -59,31 +79,31 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
       >
         {googleSignInEnabled() ? (
           <>
-            <GoogleSignInButton redirectTo={`/invite/${token}`} />
+            <GoogleSignInButton redirectTo={here} />
             <p className="text-muted-foreground mt-3 text-center text-sm">
               Or{" "}
-              <Link href={signInPath(`/invite/${token}`)} className="underline underline-offset-4">
+              <Link href={signInPath(here)} className="underline underline-offset-4">
                 sign in
               </Link>{" "}
               or{" "}
-              <Link href="/sign-up" className="underline underline-offset-4">
+              <Link href={signUpHref} className="underline underline-offset-4">
                 create an account
               </Link>{" "}
-              with your email, verify it, then open this link again.
+              with {invitation.email}. You&apos;ll come back here.
             </p>
           </>
         ) : (
           <>
             {/* Without a Google client configured, email and password only. */}
             <Button asChild className="w-full">
-              <Link href={signInPath(`/invite/${token}`)}>Sign in</Link>
+              <Link href={signInPath(here)}>Sign in</Link>
             </Button>
             <p className="text-muted-foreground mt-3 text-center text-sm">
               New here?{" "}
-              <Link href="/sign-up" className="underline underline-offset-4">
+              <Link href={signUpHref} className="underline underline-offset-4">
                 Create an account
               </Link>{" "}
-              with this email, verify it, then open this link again.
+              with {invitation.email}. You&apos;ll come back here.
             </p>
           </>
         )}
@@ -104,6 +124,14 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
     );
   }
 
+  // "Your profile", step 1, comes first (it makes the account's Personal
+  // space); it brings them straight back here.
+  if (await needsProfileSetup(session.user.id)) {
+    redirect(`/onboarding/profile/basics?callbackUrl=${encodeURIComponent(here)}`);
+  }
+
+  // The verified-address gate stays (0A Fix 4): an invite link can be
+  // forwarded, so opening it doesn't prove the invited mailbox is yours.
   if (!identity.emailVerified) {
     return (
       <InviteCard
@@ -115,12 +143,20 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
     );
   }
 
+  const club = await getPublicOrgTheme(invitation.organizationId);
   return (
     <InviteCard
       title={`Join ${invitation.orgName}`}
-      description={`You're invited as ${invitation.role.toLowerCase()}.`}
+      description={`You're invited to join as ${roleName(invitation.role)}.`}
     >
-      <JoinButton token={token} orgName={invitation.orgName} />
+      <div className="flex flex-col gap-4">
+        <ClubPreview
+          name={invitation.orgName}
+          logoUrl={orgLogoUrl(club?.logo, 64)}
+          detail={`Invite for ${invitation.email}`}
+        />
+        <JoinButton token={token} orgName={invitation.orgName} />
+      </div>
     </InviteCard>
   );
 }

@@ -80,13 +80,26 @@ describe("createOrganization", () => {
   it("lets a platform admin create in production: org, OWNER membership and audit in one service tx", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("PLATFORM_ADMIN_EMAILS", "Jackson@example.edu");
+    const before = Date.now();
     const result = await createOrganization(user, input);
     expect(result).toMatchObject({ ok: true, slug: "new-club" });
     const orgId = (result as { orgId: string }).orgId;
     expect(fake.systemCalls).toContainEqual([orgId, { userId: "user_1" }]);
+    // A new club starts its 30-day trial (docs/features/personal-and-clubs.md).
     expect(fake.systemDb.organization.create).toHaveBeenCalledWith({
-      data: { id: orgId, name: "New Club", slug: "new-club", timezone: "America/New_York" },
+      data: {
+        id: orgId,
+        name: "New Club",
+        slug: "new-club",
+        timezone: "America/New_York",
+        plan: "TRIAL",
+        trialEndsAt: expect.any(Date),
+      },
     });
+    const { trialEndsAt } = fake.systemDb.organization.create.mock.calls[0][0].data;
+    const days = (trialEndsAt.getTime() - before) / 86_400_000;
+    expect(days).toBeGreaterThan(29.99);
+    expect(days).toBeLessThan(30.01);
     expect(fake.systemDb.membership.create).toHaveBeenCalledWith({
       data: { organizationId: orgId, userId: "user_1", role: "OWNER", title: "Project Manager" },
     });

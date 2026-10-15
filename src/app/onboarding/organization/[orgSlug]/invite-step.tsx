@@ -36,7 +36,8 @@ const AVATAR_TONES = ["bg-banana", "bg-wheat", "bg-dusk", "bg-spot text-cream"] 
 /**
  * B6 · Invite officers: email invites (the same invites as Settings >
  * Members, valid for 7 days) and the club's code, which anyone can use to
- * join as a member. Finishing opens the club as its admin.
+ * join as a member. Then B7: bring things in from Personal (or straight
+ * into the club as its admin when there's nothing to bring).
  */
 export function InviteStep({
   orgId,
@@ -241,8 +242,8 @@ export function InviteStep({
             : undefined
         }
       >
-        <ContinuePill pending={finishing} pendingLabel="Opening your club…" onClick={finish}>
-          Finish setup
+        <ContinuePill pending={finishing} pendingLabel="One moment…" onClick={finish}>
+          Continue
         </ContinuePill>
       </StepFooter>
     </SetupCard>

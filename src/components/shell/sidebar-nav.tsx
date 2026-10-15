@@ -2,17 +2,20 @@
 
 import {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
-  CalendarRange,
   CheckSquare,
   Database,
   FileText,
   FolderOpen,
+  House,
   LayoutDashboard,
+  Lock,
   Network,
   NotebookText,
   Pin,
   Plus,
+  Ticket,
   Users,
   Wallet,
   X,
@@ -41,14 +44,16 @@ export interface SidebarPin {
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   CalendarCheck,
+  CalendarClock,
   CalendarDays,
-  CalendarRange,
   CheckSquare,
   Database,
   FolderOpen,
+  House,
   LayoutDashboard,
   Network,
   NotebookText,
+  Ticket,
   Users,
   Wallet,
 };
@@ -80,11 +85,17 @@ function NavItemLink({
       href={link.href}
       onClick={onNavigate}
       aria-current={pathname === link.href ? "page" : isActive ? "true" : undefined}
-      title="Drag onto Pinned to pin it"
-      className={itemClass(isActive)}
+      title={link.locked ? "Not on your club's plan" : "Drag onto Pinned to pin it"}
+      className={cn(itemClass(isActive), link.locked && !isActive && "text-sidebar-foreground/55")}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       {link.label}
+      {link.locked && (
+        <>
+          <Lock className="ms-auto size-3 shrink-0 opacity-70" aria-hidden="true" />
+          <span className="sr-only"> (not on your plan)</span>
+        </>
+      )}
     </Link>
   );
 }
@@ -202,11 +213,14 @@ export function SidebarNav({
   sections,
   orgId,
   pins = [],
+  spaces,
   onNavigate,
 }: {
   sections: NavSection[];
   orgId: string;
   pins?: SidebarPin[];
+  /** Personal and the clubs (SpaceList), at the foot, always in view. */
+  spaces?: React.ReactNode;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -231,6 +245,7 @@ export function SidebarNav({
         ))}
         <PinnedList pins={pins} orgId={orgId} pathname={pathname} onNavigate={onNavigate} />
       </div>
+      {spaces && <div className="border-sidebar-border mt-3 border-t pt-3">{spaces}</div>}
       <div className="border-sidebar-border mt-3 border-t pt-3">
         {/* The platform's signature, under the club's own nav: quiet, and the way back to the home page. */}
         <Link

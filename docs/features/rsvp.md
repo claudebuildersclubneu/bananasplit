@@ -1,7 +1,7 @@
 # RSVP pages
 
 A public sign-up page for an event. An owner or admin turns it on for any
-event, or anyone makes one for free at /rsvp without a club; anyone with
+event (every club has them, the Free plan included); anyone with
 the link signs up with a name, an email and a phone number. Guests get a
 confirmation email (with their ticket and invite link), then a reminder
 (email, and a text once Twilio is set up) a day and an hour before.
@@ -20,7 +20,11 @@ in the club's People and Attendance databases.
   and kept when the page is turned off and on again, so a shared link
   survives. Pages aren't indexed by search engines.
 - **In the suite:**
-  - _Calendar › RSVP pages_ lists every event that has one.
+  - **RSVPs** (a sidebar section in every club and in Personal,
+    `/app/{slug}/calendar/rsvp`): owners and admins see every event with a
+    page, with sign-ups at a glance; everyone else sees the club's events
+    taking sign-ups, each opening its public page. Everyone sees their own
+    tickets there too (in Personal, from every space).
   - Each event's page has an **RSVP page** card.
   - _New event_ has **Take RSVPs with a public page**, which creates the
     page and opens its settings.
@@ -31,7 +35,7 @@ in the club's People and Attendance databases.
       export to CSV.
     - **Page settings:** cover image, background, spots, waitlist, open or
       closed, directions, and privacy.
-- Owners and admins only (`events.write`).
+- Managing a page is for owners and admins only (`events.write`).
 
 ## What the page shows
 
@@ -48,8 +52,7 @@ in the club's People and Attendance databases.
 - **Who's going:** one name a line, in full ("Jackson Lamoureux"), with
   initials avatars and, when the guest shared it, a link to their
   Instagram (`EventRegistration.instagram`, optional on the sign-up form,
-  stored without the @). A free page's "Hosted by" links the host's
-  Instagram from their Bananasplit profile. Instagram profile pictures
+  stored without the @). Instagram profile pictures
   aren't pulled in: Instagram offers no way for other sites to load them.
 - The online meeting link, only to someone who is going (not the waitlist).
 
@@ -161,34 +164,18 @@ backstop cron, they arrive late.
 - Turning a page off keeps its sign-ups. Deleting the event soft-deletes
   it, and its guests are emailed that it's cancelled.
 
-## Free pages (no club)
+## Part of every club
 
-- **/rsvp** is the home for someone who only wants event pages: their
-  events, what a free page does, and free page vs. club. **/rsvp/new**
-  makes one (sign-in first; sign-up from there skips club onboarding and
-  comes back). A verified email is required, like for a club.
-- The first free event makes the person's **personal space**: an
-  `Organization` with `kind = PERSONAL` and `personalOwnerId` = them, and an
-  OWNER membership (`src/server/rsvp/personal.ts`). Events, sign-ups, jobs
-  and row security work exactly as in a club. `kind` and `personalOwnerId`
-  can't change after creation (`app.organization_kind_guard`).
-- A personal space is never a club: the org switcher, `/app`, onboarding
-  and the profile page list `kind = CLUB` only, and `/app/{its slug}`
-  redirects to /rsvp. Its host screens live at `/rsvp/{eventId}` (the same
-  `RsvpManager` as the suite), `/rsvp/{eventId}/edit` and `/door`.
-- The public page says **Hosted by** the person (name and avatar).
-- **Guest lists are kept 30 days after the event** (`PERSONAL_GUEST_DAYS`).
-  The daily maintenance job runs `app.purge_personal_rsvp_guests(30)`,
-  which deletes the sign-ups (claims go with them), turns the page off and
-  stamps `Event.rsvpGuestsPurgedAt`. Clubs keep theirs.
-- **Save to a club** (`/rsvp/{eventId}/save`): `app.move_personal_event`
-  moves the event into a club the caller owns or runs as an admin. The
-  composite foreign keys carry the sign-ups, bring list and claims; pending
-  `rsvp-email`/`rsvp-fanout` jobs move with it; the link (`rsvpSlug`) stays.
-  With no club yet, "Start a club" remembers the event in a cookie
-  (`bs-rsvp-save`) and creating the club moves it in.
-- Every public page ends with **Make a page like this one. Free.**: create a
-  free RSVP page, or start a club on Bananasplit.
+RSVP pages come with every club, the Free plan included; there is no
+separate personal product. To make one, sign up and join or start a club.
+Free personal spaces (`Organization.kind = PERSONAL`, /rsvp) were retired
+in `20261013160000_retire_personal_spaces`: each became an ordinary club on
+the Free plan, owned by the person who made it and named after them
+("Maya's events" unless it had a name), so its event pages, guests and
+links carry on. `Organization.kind` stays, and a check keeps it `CLUB`.
+
+Every public page ends with **Make RSVP pages for your club, free**, which
+goes to sign-up.
 
 ## Split the cost
 
@@ -225,13 +212,13 @@ link; the host's list shows "Invited by" and who brought the most friends.
   a host of the event (signed in, owner or admin) who opens the same URL,
   for instance by scanning it with the phone's camera, gets a one-tap
   check-in (and "Mark paid"). `app.rsvp_ticket` finds it on the service path.
-- **Door mode** (`/app/{slug}/calendar/{id}/rsvp/door`, `/rsvp/{id}/door`):
+- **Door mode** (`/app/{slug}/calendar/{id}/rsvp/door`):
   search and tap, or scan tickets in the browser where it has
   `BarcodeDetector`. Scanning a waitlisted guest's ticket doesn't check
   them in: it warns they're on the waitlist, and the host can tap their name
-  to let them in anyway. Those two routes allow the camera
+  to let them in anyway. That route allows the camera
   (`DOOR_PERMISSIONS_HEADER`); every other page keeps `camera=()`.
-- In a club, a check-in also finds or makes the guest's `Contact` (by
+- A check-in also finds or makes the guest's `Contact` (by
   email) and an `Attendance` row (method QR or MANUAL), linked through
   `EventRegistration.attendanceId`; undoing it removes only that row. A
   check-in the club already had is left alone. This is best effort: if the

@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ACCENT_SCALE_NAMES, accentScale, withAccent, type AccentScale } from "@/lib/theme/accent";
 import { formatRatio } from "@/lib/theme/color";
 import { contrastWarnings, type ContrastWarning } from "@/lib/theme/contrast";
 import { deriveDarkRoles, deriveTheme, TOKEN_NAMES, type DerivedTheme } from "@/lib/theme/derive";
@@ -39,6 +40,13 @@ import {
   THEME_PRESETS,
   type ThemePreset,
 } from "@/lib/theme/presets";
+import {
+  DEFAULT_THEME_STYLE,
+  sameStyle,
+  styleDeclarations,
+  TEXT_SIZE_VALUES,
+  type ThemeStyle,
+} from "@/lib/theme/style";
 import {
   ROLE_KEYS,
   ROLE_LABELS,
@@ -52,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { saveThemeStep } from "@/app/onboarding/profile/actions";
 
 import { resetOrgTheme, saveOrgTheme } from "./actions";
+import { LookAndFeel } from "./look-and-feel";
 import { ThemePreview } from "./theme-preview";
 
 // Only admins who open Custom download the editor.
@@ -68,6 +77,8 @@ export interface ThemeDraft {
   light: ThemeRoles;
   /** null = derived from light. */
   dark: ThemeRoles | null;
+  /** Look and feel: accent override, corners, text size, fonts. */
+  style: ThemeStyle;
 }
 
 const MODE_OPTIONS: { value: ThemeModeValue; label: string; hint: string }[] = [
@@ -102,7 +113,8 @@ function sameDraft(a: ThemeDraft, b: ThemeDraft): boolean {
     a.lockMode === b.lockMode &&
     a.logoDisplay === b.logoDisplay &&
     sameRoles(a.light, b.light) &&
-    sameRoles(a.dark, b.dark)
+    sameRoles(a.dark, b.dark) &&
+    sameStyle(a.style, b.style)
   );
 }
 
@@ -143,13 +155,22 @@ export function ThemeSettings({
   useLayoutEffect(() => () => setPreviewApp(false), []);
 
   const dirty = !sameDraft(draft, saved);
-  const tokens = useMemo(() => deriveTheme(draft.light, draft.dark), [draft.light, draft.dark]);
+  // What the app paints with: the palettes plus Look and feel's accent (as
+  // the save action and resolve.ts compute it).
+  const palettes = useMemo(
+    () => withAccent(draft.light, draft.dark ?? deriveDarkRoles(draft.light), draft.style.accent),
+    [draft.light, draft.dark, draft.style.accent],
+  );
+  const tokens = useMemo(() => deriveTheme(palettes.light, palettes.dark), [palettes]);
+  const accents = useMemo(
+    () => ({ light: accentScale(palettes.light), dark: accentScale(palettes.dark) }),
+    [palettes],
+  );
   // The fix search re-derives the theme many times: keep typing responsive.
-  const deferredLight = useDeferredValue(draft.light);
-  const deferredDark = useDeferredValue(draft.dark);
+  const deferredPalettes = useDeferredValue(palettes);
   const warnings = useMemo(
-    () => contrastWarnings(deferredLight, deferredDark),
-    [deferredLight, deferredDark],
+    () => contrastWarnings(deferredPalettes.light, deferredPalettes.dark),
+    [deferredPalettes],
   );
 
   function update(patch: Partial<ThemeDraft>) {
@@ -172,6 +193,11 @@ export function ThemeSettings({
   function applyFix(warning: ContrastWarning) {
     const fix = warning.fix;
     if (!fix) return;
+    // The accent is Look and feel's while it overrides the palette.
+    if (fix.role === "accent" && draft.style.accent) {
+      if (fix.mode === "light") update({ style: { ...draft.style, accent: fix.value } });
+      return;
+    }
     if (fix.mode === "light") {
       update({ preset: CUSTOM_PRESET_ID, light: { ...draft.light, [fix.role]: fix.value } });
     } else {
@@ -197,7 +223,8 @@ export function ThemeSettings({
         setPreviewApp(false);
         // The admin sees the mode they just chose (a mode picked earlier
         // from the user menu would otherwise keep winning in this browser).
-        if (!usingOwn) setTheme(draft.mode === "LIGHT" ? "light" : draft.mode === "DARK" ? "dark" : "system");
+        if (!usingOwn)
+          setTheme(draft.mode === "LIGHT" ? "light" : draft.mode === "DARK" ? "dark" : "system");
         const count = result.warnings.length;
         setStatus({
           kind: "ok",
@@ -229,6 +256,7 @@ export function ThemeSettings({
           logoDisplay: "LOGO_AND_NAME",
           light: defaults.light,
           dark: defaults.dark,
+          style: DEFAULT_THEME_STYLE,
         };
         setDraft(next);
         setSaved(next);
@@ -247,7 +275,7 @@ export function ThemeSettings({
 
   return (
     <div className="space-y-10">
-      <WholeAppPreview enabled={previewApp} tokens={tokens} />
+      <WholeAppPreview enabled={previewApp} tokens={tokens} accents={accents} style={draft.style} />
 
       <section aria-labelledby="theme-presets" className="space-y-3">
         <SectionHeading id="theme-presets" title="Palette">
@@ -300,13 +328,39 @@ export function ThemeSettings({
         </section>
       )}
 
+      <section aria-labelledby="theme-look" className="space-y-3">
+        <SectionHeading id="theme-look" title="Look and feel">
+          Fine-tune the palette: your own accent colour for highlights, badges and charts, plus
+          corners, text size and fonts. These apply to everyone, on every page of the club.
+        </SectionHeading>
+        <LookAndFeel
+          groupId={`${groupId}-look`}
+          style={draft.style}
+          paletteAccent={draft.light.accent}
+          tokens={tokens}
+          onChange={(style) => update({ style })}
+        />
+      </section>
+
       <section aria-labelledby="theme-preview" className="space-y-3">
         <SectionHeading id="theme-preview" title="Preview">
           Unsaved changes show here first.
         </SectionHeading>
         <div className="grid gap-4 lg:grid-cols-2">
-          <ThemePreview tokens={tokens.light} mode="light" orgName={orgName} />
-          <ThemePreview tokens={tokens.dark} mode="dark" orgName={orgName} />
+          <ThemePreview
+            tokens={tokens.light}
+            accents={accents.light}
+            style={draft.style}
+            mode="light"
+            orgName={orgName}
+          />
+          <ThemePreview
+            tokens={tokens.dark}
+            accents={accents.dark}
+            style={draft.style}
+            mode="dark"
+            orgName={orgName}
+          />
         </div>
         <div className="flex items-center gap-3">
           <Switch id="preview-app" checked={previewApp} onCheckedChange={setPreviewApp} />
@@ -453,7 +507,9 @@ export function ThemeSettings({
                   const result = await saveThemeStep(null);
                   if (!result.ok) return;
                   setUsingOwn(false);
-                  setTheme(saved.mode === "LIGHT" ? "light" : saved.mode === "DARK" ? "dark" : "system");
+                  setTheme(
+                    saved.mode === "LIGHT" ? "light" : saved.mode === "DARK" ? "dark" : "system",
+                  );
                   setStatus({ kind: "ok", text: "Saved. You see the club theme now too." });
                   router.refresh();
                 })
@@ -679,24 +735,43 @@ function ResetButton({ disabled, onConfirm }: { disabled: boolean; onConfirm: ()
 }
 
 /**
- * The optional whole-app preview: writes the draft's tokens (for the mode
- * the viewer is in) as inline custom properties on <html>, which beat both
- * globals.css and the org's <style>. Everything it set is removed when it is
- * switched off, on save, on discard and when the page unmounts.
+ * The optional whole-app preview: writes the draft's tokens and accent
+ * scale (for the mode the viewer is in) and its Look and feel as inline
+ * custom properties on <html>, which beat both globals.css and the org's
+ * <style>. Everything it set is removed when it is switched off, on save,
+ * on discard and when the page unmounts.
  */
-function WholeAppPreview({ enabled, tokens }: { enabled: boolean; tokens: DerivedTheme }) {
+function WholeAppPreview({
+  enabled,
+  tokens,
+  accents,
+  style,
+}: {
+  enabled: boolean;
+  tokens: DerivedTheme;
+  accents: { light: AccentScale; dark: AccentScale };
+  style: ThemeStyle;
+}) {
   const { resolvedTheme } = useTheme();
   const mode: ColorMode = resolvedTheme === "dark" ? "dark" : "light";
   const active = tokens[mode];
+  const scale = accents[mode];
 
   useEffect(() => {
     if (!enabled) return;
     const root = document.documentElement;
+    const look = styleDeclarations(style);
     for (const name of TOKEN_NAMES) root.style.setProperty(`--${name}`, active[name]);
+    for (const name of ACCENT_SCALE_NAMES) root.style.setProperty(`--color-${name}`, scale[name]);
+    for (const [name, value] of Object.entries(look)) root.style.setProperty(name, value);
+    root.style.fontSize = TEXT_SIZE_VALUES[style.textSize];
     return () => {
       for (const name of TOKEN_NAMES) root.style.removeProperty(`--${name}`);
+      for (const name of ACCENT_SCALE_NAMES) root.style.removeProperty(`--color-${name}`);
+      for (const name of Object.keys(look)) root.style.removeProperty(name);
+      root.style.removeProperty("font-size");
     };
-  }, [enabled, active]);
+  }, [enabled, active, scale, style]);
 
   return null;
 }

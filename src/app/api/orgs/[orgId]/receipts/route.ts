@@ -63,13 +63,16 @@ interface ReceiptRow {
 }
 
 /** Step 4: the row, as app_user (the Receipt INSERT policy re-checks the attach rule). */
-const createReceiptRow = withOrgAction(async (ctx, row: ReceiptRow) => {
-  const receipt = await ctx.db.receipt.create({
-    data: { organizationId: ctx.organizationId, uploadedById: ctx.userId, ...row },
-    select: { id: true },
-  });
-  return receipt.id;
-});
+const createReceiptRow = withOrgAction(
+  async (ctx, row: ReceiptRow) => {
+    const receipt = await ctx.db.receipt.create({
+      data: { organizationId: ctx.organizationId, uploadedById: ctx.userId, ...row },
+      select: { id: true },
+    });
+    return receipt.id;
+  },
+  { feature: "finance" },
+);
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
@@ -114,7 +117,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     return json(404, { error: "Transaction not found." });
   }
   if (!target.canAttach) {
-    return json(403, { error: "You don't have permission to attach receipts to this transaction." });
+    return json(403, {
+      error: "You don't have permission to attach receipts to this transaction.",
+    });
   }
 
   const rateLimit = await checkRateLimit(

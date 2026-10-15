@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-
+import { SignedInAs } from "@/components/auth/signed-in-as";
+import { AlreadySignedIn } from "@/components/auth/already-signed-in";
 import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { FormMessage, OrDivider } from "@/components/brand/fields";
@@ -31,10 +31,17 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const errorCode = typeof error === "string" ? error : undefined;
   // Where to go after signing in: a same-origin relative path only.
   const callbackUrl = safeCallbackUrl(rawCallbackUrl);
-  // A signed-in user normally has nothing to do here, unless Auth.js sent
-  // them back with an error to explain (e.g. OAuthAccountNotLinked).
-  if (session && !errorCode) {
-    redirect(callbackUrl ?? "/");
+  // Signed in already: say as whom, and offer a way out of that account
+  // (unless Auth.js sent them back with an error to explain, e.g.
+  // OAuthAccountNotLinked).
+  if (session?.user?.email && !errorCode) {
+    return (
+      <AlreadySignedIn
+        email={session.user.email}
+        name={session.user.name ?? null}
+        continueTo={callbackUrl ?? "/app"}
+      />
+    );
   }
 
   const errorMessage = errorCode
@@ -45,7 +52,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const googleEnabled = googleSignInEnabled();
 
   return (
-    <AuthCard>
+    <AuthCard footer={<SignedInAs />}>
       <AuthTitle title="Welcome back." description="Log in to your club workspace." />
       {notice === "password-reset" && !errorMessage && (
         <FormMessage tone="info">Your password is changed. Log in with the new one.</FormMessage>

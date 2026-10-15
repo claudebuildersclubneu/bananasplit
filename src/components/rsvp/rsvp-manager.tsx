@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  Building2,
-  Check,
-  Copy,
-  ExternalLink,
-  Printer,
-  PowerOff,
-  ScanLine,
-  Ticket,
-} from "lucide-react";
+import { Check, Copy, ExternalLink, Printer, PowerOff, ScanLine, Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -34,7 +25,7 @@ import { RsvpGuests, type RsvpGuest } from "./rsvp-guests";
 import { RsvpSettings, type RsvpSettingsValue } from "./rsvp-settings";
 
 /**
- * An event's RSVP page, from the suite or a free page at /rsvp: its link,
+ * An event's RSVP page (Calendar > RSVP pages in a club): its link,
  * the numbers, and two tabs, Guests (the list, check-in, payments, moving
  * people) and Page (how it looks, what it costs, the bring list, what it
  * shows). Before the page is on, one card explains it and turns it on.
@@ -63,13 +54,11 @@ export interface RsvpManagerProps {
   owes: number | null;
   messaging: { email: "org" | "platform"; texts: boolean };
   links: RsvpManagerLinks;
-  /** A free page: when its guest list goes, and where to save it to a club. */
-  personal?: { purgeOn: string | null; purged: boolean; saveHref: string } | null;
   initialTab?: "guests" | "page";
 }
 
 export function RsvpManager(props: RsvpManagerProps) {
-  const { orgId, event, page, guests, links, personal } = props;
+  const { orgId, event, page, guests, links } = props;
   const router = useRouter();
   const [tab, setTab] = useState<"guests" | "page">(props.initialTab ?? "guests");
   const [pending, start] = useTransition();
@@ -124,8 +113,8 @@ export function RsvpManager(props: RsvpManagerProps) {
 
   const header = (
     <PageHeader
-      title={personal ? event.title : "RSVP page"}
-      description={personal ? event.when : `${event.title} · ${event.when}`}
+      title="RSVP page"
+      description={`${event.title} · ${event.when}`}
       actions={
         page.enabled && page.url ? (
           <>
@@ -170,32 +159,6 @@ export function RsvpManager(props: RsvpManagerProps) {
       <BackLink href={links.back.href} label={links.back.label} />
       {header}
 
-      {personal && (
-        <section className="bg-card flex flex-wrap items-center gap-4 rounded-xl border p-4">
-          <span className="bg-primary/10 text-primary grid size-10 flex-none place-items-center rounded-lg">
-            <Building2 className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="text-sm font-semibold">
-              {personal.purged
-                ? "This free page's guest list was cleared after the event"
-                : personal.purgeOn
-                  ? `Free pages keep their guest list until ${personal.purgeOn}`
-                  : "Free pages keep their guest list for 30 days after the event"}
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Save it to a club to keep every guest for good, see who keeps coming back, and run it
-              with your team. The link stays the same.
-            </p>
-          </div>
-          {!personal.purged && (
-            <Button asChild size="sm">
-              <Link href={personal.saveHref}>Save to a club</Link>
-            </Button>
-          )}
-        </section>
-      )}
-
       {!page.enabled && (
         <section className="bg-card overflow-hidden rounded-xl border">
           <div className="grid gap-6 p-6 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
@@ -211,16 +174,14 @@ export function RsvpManager(props: RsvpManagerProps) {
                   ? "Turn it back on and the same link works again. Everyone who signed up is still on the list below."
                   : "A public page for this event: the time and place with a map, who's hosting and who's going, and a sign-up form. Split the cost, hand out a bring list, give every guest an invite link and a QR ticket, and check them in at the door."}
               </p>
-              {!personal?.purged && (
-                <Button onClick={turnOn} disabled={pending}>
-                  <Ticket aria-hidden="true" />
-                  {pending
-                    ? "Turning on…"
-                    : page.url
-                      ? "Turn the page back on"
-                      : "Turn on the RSVP page"}
-                </Button>
-              )}
+              <Button onClick={turnOn} disabled={pending}>
+                <Ticket aria-hidden="true" />
+                {pending
+                  ? "Turning on…"
+                  : page.url
+                    ? "Turn the page back on"
+                    : "Turn on the RSVP page"}
+              </Button>
             </div>
             <PagePreview
               cover={page.cover}
@@ -325,7 +286,6 @@ export function RsvpManager(props: RsvpManagerProps) {
               editHref={links.edit}
               going={going.length}
               items={props.items}
-              personal={Boolean(personal)}
             />
           )}
         </>

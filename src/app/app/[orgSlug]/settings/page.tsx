@@ -1,14 +1,15 @@
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight, Lock } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import { orgLogoUrl } from "@/lib/org-logo";
 import { cn } from "@/lib/utils";
 import { getOrgContextBySlug } from "@/server/db/context";
 
 import { SETTINGS_ICONS } from "./settings-icons";
-import { SETTINGS_GROUPS, visibleSettingsSections } from "./settings-nav";
+import { isSettingsSectionLocked, SETTINGS_GROUPS, visibleSettingsSections } from "./settings-nav";
 
 /**
  * The Admin panel's overview (the club's settings; reached from the club
@@ -18,7 +19,7 @@ import { SETTINGS_GROUPS, visibleSettingsSections } from "./settings-nav";
 export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]/settings">) {
   const { orgSlug } = await params;
   const { organization, role } = await getOrgContextBySlug(orgSlug);
-  const sections = visibleSettingsSections(role);
+  const sections = visibleSettingsSections(role, organization);
   const logo = orgLogoUrl(organization.logo, 256);
 
   return (
@@ -43,14 +44,16 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
           </span>
         )}
         <div>
-          <h1 className="page-title">Admin panel</h1>
+          <h1 className="page-title">
+            {organization.kind === "PERSONAL" ? "Settings" : "Admin panel"}
+          </h1>
           <p className="text-muted-foreground text-sm">
             {organization.name} · {role ? role.charAt(0) + role.slice(1).toLowerCase() : "Member"}
           </p>
         </div>
       </div>
 
-      {can({ role }, "integrations.write") && (
+      {can({ role }, "integrations.write") && spaceIncludes(organization, "integrations") && (
         <div className="bg-card flex flex-wrap items-center gap-4 rounded-xl border p-4">
           <div className="min-w-0 flex-1">
             <p className="font-medium">Guided setup</p>
@@ -94,9 +97,18 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
                         />
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium">{section.label}</span>
+                        <span className="flex items-center gap-1.5 text-sm font-medium">
+                          {section.label}
+                          {isSettingsSectionLocked(section, organization) && (
+                            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs font-normal">
+                              <Lock className="size-3" aria-hidden="true" />
+                              Not on your plan
+                            </span>
+                          )}
+                        </span>
                         <span className="text-muted-foreground block text-sm">
-                          {section.description}
+                          {(organization.kind === "PERSONAL" && section.personalDescription) ||
+                            section.description}
                         </span>
                       </span>
                       <ChevronRight

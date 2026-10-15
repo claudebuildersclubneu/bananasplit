@@ -13,6 +13,7 @@ import { PinButton, VisitTracker } from "@/components/shell/pin-button";
 import type { NavSection } from "@/components/shell/nav-config";
 import { SectionGate } from "@/components/shell/section-gate";
 import { SidebarNav, type SidebarPin } from "@/components/shell/sidebar-nav";
+import { SpaceList } from "@/components/shell/space-list";
 import { UserMenu } from "@/components/shell/user-menu";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/toaster";
@@ -32,6 +33,7 @@ export function AppShell({
   role = null,
   isAdmin = false,
   canInvite = false,
+  banner,
   children,
 }: {
   orgSlug: string;
@@ -54,6 +56,8 @@ export function AppShell({
   isAdmin?: boolean;
   /** May invite members (the club menu's "Invite people"). */
   canInvite?: boolean;
+  /** Above every page: the club's trial or paused notice (SpaceBanner). */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -66,6 +70,7 @@ export function AppShell({
     <OrgSwitcher
       orgs={orgs}
       activeSlug={orgSlug}
+      user={user}
       brand={brand}
       isAdmin={isAdmin}
       canInvite={canInvite}
@@ -95,7 +100,12 @@ export function AppShell({
 
         <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-3 border-r p-3 md:sticky md:top-0 md:flex md:h-screen">
           {clubMenu}
-          <SidebarNav sections={sections} orgId={orgId} pins={pins} />
+          <SidebarNav
+            sections={sections}
+            orgId={orgId}
+            pins={pins}
+            spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} />}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-col">
@@ -124,6 +134,14 @@ export function AppShell({
                     sections={sections}
                     orgId={orgId}
                     pins={pins}
+                    spaces={
+                      <SpaceList
+                        orgs={orgs}
+                        activeSlug={orgSlug}
+                        user={user}
+                        onNavigate={() => setMobileNavOpen(false)}
+                      />
+                    }
                     onNavigate={() => setMobileNavOpen(false)}
                   />
                 </div>
@@ -155,6 +173,7 @@ export function AppShell({
             id="main-content"
             className="reveal-page relative isolate min-w-0 flex-1 p-4 md:p-6"
           >
+            {banner}
             <SectionGate orgSlug={orgSlug} sectionPaths={sectionPaths} isAdmin={isAdmin}>
               {children}
             </SectionGate>

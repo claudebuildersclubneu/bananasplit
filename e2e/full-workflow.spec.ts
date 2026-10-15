@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  chooseClubRole,
   completeProfileSetup,
   createOrgViaOnboarding,
   dayButtonName,
@@ -53,6 +54,7 @@ test("full workspace workflow", async ({ page }) => {
   await verifyEmail(page, member.email);
   await completeProfileSetup(page, "join");
   await page.getByRole("button", { name: "Join", exact: true }).click();
+  await chooseClubRole(page, orgSlug, "Treasurer");
   await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}$`));
 
   await signOut(page);
@@ -125,9 +127,7 @@ test("full workspace workflow", async ({ page }) => {
   await page.getByRole("tab", { name: /Everyone/ }).click();
   await page.getByRole("button", { name: "Schedule", exact: true }).first().click();
   await page.getByRole("dialog").getByRole("button", { name: "Schedule" }).click();
-  await expect(page).toHaveURL(
-    new RegExp(`/app/${orgSlug}/calendar/(?!polls|find-a-time)[a-z0-9]+$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}/calendar/(?!find-a-time)[a-z0-9]+$`));
 
   // --- download the .ics for the finalized event ---
   const downloadPromise = page.waitForEvent("download");

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { NotFoundError } from "@/lib/auth/errors";
 import { getDatabase } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 const HELP: Record<string, { columns: string; example: string }> = {
   ATTENDANCE: {
@@ -27,6 +28,8 @@ export default async function ImportPage({
   params,
 }: PageProps<"/app/[orgSlug]/databases/[dbKey]/import">) {
   const { orgSlug, dbKey } = await params;
+  const planLock = await planGate(orgSlug, "databases");
+  if (planLock) return planLock;
   const { organization } = await getOrgContextBySlug(orgSlug);
   let database;
   try {

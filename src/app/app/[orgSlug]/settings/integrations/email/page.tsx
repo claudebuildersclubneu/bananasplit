@@ -2,6 +2,7 @@ import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { resolveOrgMailRouting } from "@/server/email/mailer";
 import { WARNING_BOX } from "@/lib/status-tones";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../../settings-no-access";
 import { IntegrationHeader } from "../integration-header";
@@ -25,6 +26,8 @@ export default async function EmailIntegrationPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations/email">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "EMAIL_RESEND");
   if (!page) return <SettingsNoAccess title="Email sender" who="owners and admins" />;
   const { organization, dto, canWrite, canRemove, role } = page;

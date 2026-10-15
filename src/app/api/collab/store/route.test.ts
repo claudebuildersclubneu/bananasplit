@@ -71,6 +71,9 @@ beforeEach(() => {
         findFirst: vi.fn(async () => noteRow),
         updateMany: vi.fn(async () => ({ count: 1 })),
       },
+      organization: {
+        findUnique: vi.fn(async () => ({ kind: "CLUB", plan: "SOCIETY", trialEndsAt: null })),
+      },
     },
   });
 });

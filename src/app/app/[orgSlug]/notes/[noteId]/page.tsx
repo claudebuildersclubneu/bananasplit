@@ -7,6 +7,7 @@ import { collabConfig } from "@/lib/collab/config";
 import { canEditNote, canShareNote, generalAccessOf, toNoteAccess } from "@/lib/notes/access";
 import { mintNoteCollabSession } from "@/server/collab/session";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 import { userPublicSelect } from "@/server/members";
 import { listNoteShares } from "@/server/notes/sharing";
 
@@ -16,6 +17,8 @@ export default async function NoteDetailPage({
   params,
 }: PageProps<"/app/[orgSlug]/notes/[noteId]">) {
   const { orgSlug, noteId } = await params;
+  const planLock = await planGate(orgSlug, "files");
+  if (planLock) return planLock;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
 
   const { note, events, shares, members } = await withOrgTx(org.id, async ({ db }) => {

@@ -2,6 +2,7 @@ import { SponsorshipsView } from "@/components/finance/sponsorships-view";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinanceAccessGate } from "../finance-access-gate";
 import { getActivePeriod, getOrgMembersForPicker, getSponsors, getSponsorships } from "../queries";
@@ -10,6 +11,8 @@ export default async function SponsorshipsPage({
   params,
 }: PageProps<"/app/[orgSlug]/finance/sponsorships">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "sponsorships");
+  if (planLock) return planLock;
   const { organization: org, role } = await getOrgContextBySlug(orgSlug);
   // Not an owner or treasurer: who is, and what to do instead (never an error page).
   if (!can({ role }, "finance.manage")) {

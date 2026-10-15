@@ -1,19 +1,37 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rows, getSecret } = vi.hoisted(() => ({
+const { rows, plan, getSecret } = vi.hoisted(() => ({
   rows: { value: [] as unknown[] },
+  plan: { value: "SOCIETY" },
   getSecret: vi.fn(),
 }));
 
 vi.mock("@/server/db/context", () => ({
   assertNoTx: () => undefined,
   withSystemOrgTx: (_org: string, fn: (ctx: { db: unknown }) => unknown) =>
-    fn({ db: { orgIntegration: { findMany: async () => rows.value } } }),
+    fn({
+      db: {
+        orgIntegration: { findMany: async () => rows.value },
+        organization: {
+          findUnique: async () =>
+            plan.value === "FREE"
+              ? { kind: "PERSONAL", plan: "FREE", trialEndsAt: null }
+              : plan.value === "PAUSED"
+                ? { kind: "CLUB", plan: "TRIAL", trialEndsAt: new Date(Date.now() - 1000) }
+                : { kind: "CLUB", plan: plan.value, trialEndsAt: null },
+        },
+      },
+    }),
 }));
 vi.mock("@/server/secrets", () => ({ getSecret }));
 
-import { listAiConnections, platformModel, resolveAiCredentials, standinEnabled } from "./connections";
+import {
+  listAiConnections,
+  platformModel,
+  resolveAiCredentials,
+  standinEnabled,
+} from "./connections";
 
 const claudeRow = {
   provider: "CLAUDE",
@@ -30,10 +48,23 @@ const otherRow = {
 
 beforeEach(() => {
   rows.value = [];
+  plan.value = "SOCIETY";
   getSecret.mockReset();
 });
 
 describe("which models a club can use", () => {
+  it("offers nothing to Personal, a Club plan or a paused club", async () => {
+    rows.value = [claudeRow];
+    for (const p of ["FREE", "CLUB", "PAUSED"]) {
+      plan.value = p;
+      expect(await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" })).toEqual(
+        [],
+      );
+      expect(await resolveAiCredentials("org_1", "claude", {})).toBeNull();
+    }
+    expect(getSecret).not.toHaveBeenCalled();
+  });
+
   it("lists the club's own keys first, then the platform's, by label only", async () => {
     rows.value = [otherRow, claudeRow];
     const list = await listAiConnections("org_1", { ANTHROPIC_API_KEY: "sk-ant-platform" });
@@ -45,7 +76,10 @@ describe("which models a club can use", () => {
   });
 
   it("skips a disconnected or keyless integration, and offers nothing when none is set up", async () => {
-    rows.value = [{ ...claudeRow, status: "DISCONNECTED" }, { ...otherRow, secretFingerprint: null }];
+    rows.value = [
+      { ...claudeRow, status: "DISCONNECTED" },
+      { ...otherRow, secretFingerprint: null },
+    ];
     expect(await listAiConnections("org_1", {})).toEqual([]);
     expect(await resolveAiCredentials("org_1", null, {})).toBeNull();
   });
@@ -64,7 +98,12 @@ describe("which models a club can use", () => {
     });
     expect(getSecret).toHaveBeenCalledTimes(1);
     const fallback = await resolveAiCredentials("org_1", "made-up", {});
-    expect(fallback).toMatchObject({ id: "claude", protocol: "anthropic", apiKey: "sk-ant-club", model: "claude-sonnet-5" });
+    expect(fallback).toMatchObject({
+      id: "claude",
+      protocol: "anthropic",
+      apiKey: "sk-ant-club",
+      model: "claude-sonnet-5",
+    });
   });
 });
 
@@ -77,7 +116,9 @@ describe("environment switches", () => {
 
   it("the platform model is a Claude id from the environment, or Sonnet 5", () => {
     expect(platformModel({})).toBe("claude-sonnet-5");
-    expect(platformModel({ AI_IMPORT_MODEL: "claude-haiku-4-5-20251001" })).toBe("claude-haiku-4-5-20251001");
+    expect(platformModel({ AI_IMPORT_MODEL: "claude-haiku-4-5-20251001" })).toBe(
+      "claude-haiku-4-5-20251001",
+    );
     expect(platformModel({ AI_IMPORT_MODEL: "gpt-4o; rm -rf" })).toBe("claude-sonnet-5");
   });
 });

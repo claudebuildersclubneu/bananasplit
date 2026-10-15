@@ -9,6 +9,10 @@ import { tags } from "@/server/cache/tags";
 import { invalidate } from "@/server/cache/invalidate";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+/** Every action here belongs to privacy (withOrgAction's space check). */
+const privacyAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "privacy" });
+
 /**
  * Settings > Privacy, on app_user through withOrgAction. OWNER/ADMIN edit
  * everything except who may see individual ballots, which is OWNER-only
@@ -41,7 +45,7 @@ function refresh(ctx: OrgContext) {
   ]);
 }
 
-export const updatePrivacy = withOrgAction(
+export const updatePrivacy = privacyAction(
   async (ctx, input: PrivacyInput): Promise<PrivacyResult> => {
     requirePermission(ctx, "privacy.write");
     const parsed = privacySchema.safeParse(input);
@@ -81,7 +85,7 @@ export const updatePrivacy = withOrgAction(
   },
 );
 
-export const updateBallotVisibility = withOrgAction(
+export const updateBallotVisibility = privacyAction(
   async (ctx, value: string): Promise<PrivacyResult> => {
     requirePermission(ctx, "privacy.ballots");
     const parsed = z.enum(BallotVisibility).safeParse(value);
@@ -107,7 +111,7 @@ export const updateBallotVisibility = withOrgAction(
   },
 );
 
-export const updateDatabaseVisibility = withOrgAction(
+export const updateDatabaseVisibility = privacyAction(
   async (ctx, databaseId: string, value: string): Promise<PrivacyResult> => {
     requirePermission(ctx, "privacy.write");
     const id = z.string().min(1).max(100).parse(databaseId);

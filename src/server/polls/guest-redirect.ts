@@ -7,8 +7,8 @@ import { withSystemOrgTx } from "@/server/db/context";
 
 /**
  * The guest page for an availability poll opened at its in-app address
- * (/app/{slug}/calendar/find-a-time/{pollId}, or /calendar/polls/{pollId}
- * from before Find a time had its own section) by someone who isn't a member of the
+ * (/app/{slug}/calendar/find-a-time/{pollId}, or the /polls/ address it had
+ * before Find a time was its own section) by someone who isn't a member of the
  * poll's org: signed out, or signed in without a membership there. That
  * address is what an organizer copies from the address bar, and without
  * this a guest would go through sign-in, sign-up and onboarding just to say

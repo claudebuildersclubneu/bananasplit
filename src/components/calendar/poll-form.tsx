@@ -161,7 +161,7 @@ export function PollForm({
     <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-8" noValidate>
       <div className="space-y-3">
         <BackLink href={`/app/${orgSlug}/calendar/find-a-time`} label="Find a time" />
-        {/* Named as the New poll menu and the command palette name it. */}
+        {/* Named as the sidebar section and the command palette name it. */}
         <PageHeader
           title="Find a time"
           description="Offer some days and hours; people mark when they're free, and an admin schedules the best time."

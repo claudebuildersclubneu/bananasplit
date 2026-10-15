@@ -67,12 +67,17 @@ function orgCtx(organizationId: string, afterCommit: (fn: () => unknown) => void
   };
 }
 
+// The space checks (paused clubs, features) are the real withOrgAction's;
+// unit tests run the handler as if the space allowed it.
+const fakeWithOrgAction =
+  (handler: (ctx: any, ...args: any[]) => Promise<unknown>) =>
+  (organizationId: string, ...args: any[]) =>
+    withQueue((afterCommit) => handler(orgCtx(organizationId, afterCommit, "action"), ...args));
+
 export function fakeContextModule() {
   return {
-    withOrgAction:
-      (handler: (ctx: any, ...args: any[]) => Promise<unknown>) =>
-      (organizationId: string, ...args: any[]) =>
-        withQueue((afterCommit) => handler(orgCtx(organizationId, afterCommit, "action"), ...args)),
+    withOrgAction: fakeWithOrgAction,
+    SpaceRefusedError: class SpaceRefusedError extends Error {},
     withOrgTx: (organizationId: string, fn: (ctx: any) => Promise<unknown>) =>
       withQueue((afterCommit) => fn(orgCtx(organizationId, afterCommit, "page"))),
     withUserTx: (userId: string, fn: (ctx: any) => Promise<unknown>) =>

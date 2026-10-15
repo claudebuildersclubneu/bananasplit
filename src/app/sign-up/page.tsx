@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-
+import { AlreadySignedIn } from "@/components/auth/already-signed-in";
 import { BrandGoogleButton } from "@/components/auth/google-sign-in-button";
 import { AuthCard, AuthHeadline } from "@/components/brand/auth-card";
 import { OrDivider } from "@/components/brand/fields";
@@ -7,21 +6,30 @@ import { JoinSteps } from "@/components/brand/join-steps";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { auth } from "@/lib/auth/config";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
+import { onboardingHref } from "@/lib/onboarding/steps";
 
 import { SignUpForm } from "./sign-up-form";
 
 export const metadata = { title: "Create your account · Bananasplit" };
 
 /**
- * Sign up: one account for everyone (design: App screens, 02). Next comes
- * the choice between event pages and a club (/onboarding), unless they came
- * from somewhere specific (?callbackUrl=/rsvp/new), where they go back.
+ * Sign up: one account for everyone (design: App screens, 02), free
+ * forever for your own things. Next comes "Your profile" (/onboarding),
+ * then the Personal dashboard, unless they came from somewhere specific
+ * (?callbackUrl=, e.g. an invite link), where step 1 of the profile
+ * returns them. Already signed in: say so, with Continue and Sign out.
  */
 export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">) {
   const callbackUrl = safeCallbackUrl((await searchParams).callbackUrl);
   const session = await auth();
-  if (session) {
-    redirect(callbackUrl ?? "/");
+  if (session?.user?.email) {
+    return (
+      <AlreadySignedIn
+        email={session.user.email}
+        name={session.user.name ?? null}
+        continueTo={callbackUrl ?? "/app"}
+      />
+    );
   }
 
   // Only offered when the Google client is configured (as on /sign-in).
@@ -43,7 +51,10 @@ export default async function SignUpPage({ searchParams }: PageProps<"/sign-up">
         google={
           googleEnabled ? (
             <>
-              <BrandGoogleButton label="Sign up with Google" redirectTo={callbackUrl} />
+              <BrandGoogleButton
+                label="Sign up with Google"
+                redirectTo={onboardingHref(callbackUrl)}
+              />
               <OrDivider />
             </>
           ) : null

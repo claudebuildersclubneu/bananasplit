@@ -3,12 +3,15 @@ import { IntegrationHeader } from "../integration-header";
 import { StatusPanel, TestAndRemove } from "../integration-ui";
 import { loadIntegrationPage } from "../load";
 import { ClaudeForm } from "../provider-forms";
+import { planGate } from "@/server/billing/plan-gate";
 
 /** Settings > Integrations > Claude API: the org's own key and default model. */
 export default async function ClaudeIntegrationPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/integrations/claude">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "ai");
+  if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "CLAUDE");
   if (!page) return <SettingsNoAccess title="Claude API" who="owners and admins" />;
   const { organization, dto, canWrite, canRemove } = page;

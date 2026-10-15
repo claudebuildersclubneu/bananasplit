@@ -5,6 +5,10 @@ import { deleteReceiptBlobs } from "@/lib/finance/receipt-storage";
 import { receiptDownloadUrl } from "@/lib/finance/receipt-signed-url";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 
+/** Every action here belongs to finance (withOrgAction's space check). */
+const financeAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { onRefused: "return", ...options, feature: "finance" });
+
 // Uploads go through POST /api/orgs/{orgId}/receipts (0A Fix 15): a route
 // handler, because Server Actions accept 1 MB bodies and receipts are
 // phone photos.
@@ -25,7 +29,7 @@ function canAccessTransaction(ctx: OrgContext, transaction: { submittedById: str
  * a row pointing at nothing). Error semantics: { error } before the write
  * (case a); the Blob delete is network I/O and runs after commit (case d).
  */
-export const deleteReceiptAction = withOrgAction(
+export const deleteReceiptAction = financeAction(
   async (ctx, receiptId: string): Promise<ActionResult> => {
     const receipt = await ctx.db.receipt.findFirst({
       where: { id: receiptId, organizationId: ctx.organizationId },
@@ -50,7 +54,7 @@ export const deleteReceiptAction = withOrgAction(
  * permission check as the parent transaction (spec 5.5) — never the raw
  * blob key/URL.
  */
-export const getSignedReceiptUrl = withOrgAction(
+export const getSignedReceiptUrl = financeAction(
   async (ctx, receiptId: string): Promise<{ url?: string; error?: string }> => {
     const receipt = await ctx.db.receipt.findFirst({
       where: { id: receiptId, organizationId: ctx.organizationId },
@@ -63,4 +67,5 @@ export const getSignedReceiptUrl = withOrgAction(
 
     return { url: receiptDownloadUrl(receiptId, ctx.organizationId) };
   },
+  { whenPaused: "allow" },
 );

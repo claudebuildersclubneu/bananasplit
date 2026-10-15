@@ -5,6 +5,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { TasksProvider } from "@/components/tasks/tasks-context";
 import { WorkspaceProvider } from "@/components/tasks/workspace-context";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import {
   effectiveTimezone,
   fromDateKey,
@@ -41,7 +42,16 @@ import { TaskTable } from "./table/task-table";
 import { UpdatesView, type PostedUpdate } from "./updates/updates-view";
 import { WeekView } from "./week/week-view";
 import { WorkspaceHeader } from "./workspace-header";
-import { parseWorkspaceQuery, TASKS_VIEW_COOKIE, type WorkspaceQuery } from "./views";
+import { ListView } from "./list/list-view";
+import {
+  DEFAULT_TASK_LAYOUT,
+  isDestination,
+  parseScope,
+  parseWorkspaceQuery,
+  TASK_LIST_VIEW,
+  TASKS_VIEW_COOKIE,
+  type WorkspaceQuery,
+} from "./views";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -68,11 +78,24 @@ export default async function TasksPage({
   const { orgSlug } = await params;
   const query = await searchParams;
   // Tasks' due dates live on the main calendar now (its Tasks layer).
-  if (query.view === "calendar") redirect(`/app/${orgSlug}/calendar`);
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
+  if (query.view === "calendar" && spaceIncludes(org, "taskViews")) {
+    redirect(`/app/${orgSlug}/calendar`);
+  }
 
   const cookieStore = await cookies();
-  const ws = parseWorkspaceQuery(query, cookieStore.get(TASKS_VIEW_COOKIE)?.value);
+  const parsed = parseWorkspaceQuery(query, cookieStore.get(TASKS_VIEW_COOKIE)?.value);
+  // The Free plan has the List only: any other ?view= (or a remembered
+  // layout) opens the List too, so a typed URL doesn't reach the others.
+  const simple = !spaceIncludes(org, "taskViews");
+  // Requests and the Sunday update are work between people: a Personal
+  // space has every layout but neither destination.
+  const teamwork = spaceIncludes(org, "teamwork");
+  const ws: WorkspaceQuery = simple
+    ? { ...parsed, view: TASK_LIST_VIEW, scope: parseScope(query.scope) ?? "all" }
+    : !teamwork && isDestination(parsed.view)
+      ? { ...parsed, view: DEFAULT_TASK_LAYOUT }
+      : parsed;
   const isAdmin = can({ role }, "tasks.manageAll");
   const now = new Date();
 
@@ -167,11 +190,12 @@ export default async function TasksPage({
       labels={base.labels}
       projects={base.projects}
     >
-      <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0}>
+      <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
         <WorkspaceHeader
           intakeCount={header.intakeCount}
           showIntake={intakeProjects.length > 0 || isAdmin}
           posted={header.posted}
+          teamwork={teamwork}
         />
         {content}
       </WorkspaceProvider>
@@ -199,6 +223,28 @@ async function renderView(input: {
   const { ws, filters, org, userId, now, today, todayKey, query, members } = input;
 
   switch (ws.view) {
+    case "list": {
+      const limit = Math.min(
+        Math.max(Number.parseInt(param(query.limit) ?? "100", 10) || 100, 20),
+        1000,
+      );
+      const agenda = await withOrgTx(org.id, ({ db }) =>
+        getAgendaTasks(db, org.id, filters, {
+          completedSince: new Date(now.getTime() - 7 * DAY_MS),
+          limit,
+          today,
+        }),
+      );
+      return (
+        <ListView
+          open={agenda.open}
+          completed={agenda.completed}
+          hasMore={agenda.hasMore}
+          moreLimit={limit + 100}
+        />
+      );
+    }
+
     case "week": {
       const limit = Math.min(
         Math.max(Number.parseInt(param(query.limit) ?? "100", 10) || 100, 20),

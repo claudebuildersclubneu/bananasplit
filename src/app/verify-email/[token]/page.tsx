@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SignedInAs } from "@/components/auth/signed-in-as";
 import { AuthCard, AuthTitle } from "@/components/brand/auth-card";
 import { pill } from "@/components/brand/pill";
 import { signInPath } from "@/lib/auth/callback-url";
@@ -17,7 +18,10 @@ import { confirmEmailAction, resendVerificationAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 /** The token is in the URL: never pass it on to another site as a referrer. */
-export const metadata = { title: "Confirm your email · Bananasplit", referrer: "no-referrer" as const };
+export const metadata = {
+  title: "Confirm your email · Bananasplit",
+  referrer: "no-referrer" as const,
+};
 
 const RESULTS = {
   ok: {
@@ -64,7 +68,7 @@ function Shell({
   children?: React.ReactNode;
 }) {
   return (
-    <AuthCard>
+    <AuthCard footer={<SignedInAs />}>
       <AuthTitle title={title} description={description} />
       {children}
     </AuthCard>

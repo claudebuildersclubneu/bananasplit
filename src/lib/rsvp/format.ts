@@ -144,7 +144,7 @@ export function googleCalendarUrl(event: {
 
 /** The brand tones initials avatars cycle through, picked by the name. */
 const AVATAR_TONES = [
-  "bg-banana text-ink",
+  "bg-banana text-banana-ink",
   "bg-wheat text-ink",
   "bg-butter text-honey",
   "bg-ink text-cream",

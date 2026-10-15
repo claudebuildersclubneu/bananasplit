@@ -5,6 +5,7 @@ import { appUrl } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getGoogleSyncStatus } from "@/server/google-calendar/requests";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
  * Calendar > Sync and website feed (OWNER/ADMIN): the public feed URLs and
@@ -13,15 +14,21 @@ import { getGoogleSyncStatus } from "@/server/google-calendar/requests";
  * hook's state. Connecting Google, the hook secret and the feed switch live
  * in Settings (Integrations and Privacy).
  */
-export default async function CalendarSyncPage({ params }: PageProps<"/app/[orgSlug]/calendar/sync">) {
+export default async function CalendarSyncPage({
+  params,
+}: PageProps<"/app/[orgSlug]/calendar/sync">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "integrations");
+  if (planLock) return planLock;
   const { organization: org, role } = await getOrgContextBySlug(orgSlug);
 
   if (!can({ role }, "integrations.view")) {
     return (
       <div className="mx-auto max-w-2xl space-y-3">
         <h1 className="page-title">Sync and website feed</h1>
-        <p className="text-muted-foreground text-sm">Only owners and admins manage calendar sync.</p>
+        <p className="text-muted-foreground text-sm">
+          Only owners and admins manage calendar sync.
+        </p>
       </div>
     );
   }
@@ -31,13 +38,16 @@ export default async function CalendarSyncPage({ params }: PageProps<"/app/[orgS
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <Link href={`/app/${orgSlug}/calendar`} className="text-muted-foreground text-sm hover:underline">
+        <Link
+          href={`/app/${orgSlug}/calendar`}
+          className="text-muted-foreground text-sm hover:underline"
+        >
           ← Back to calendar
         </Link>
         <h1 className="page-title mt-1">Sync and website feed</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          The suite is the source of truth for events. Public events are mirrored to Google Calendar and published
-          to the website feed; internal events never are.
+          The suite is the source of truth for events. Public events are mirrored to Google Calendar
+          and published to the website feed; internal events never are.
         </p>
       </div>
       <SyncPanel

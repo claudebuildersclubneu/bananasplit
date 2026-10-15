@@ -8,6 +8,7 @@ import { pill } from "@/components/brand/pill";
 import { JOIN_CODE_LENGTH, SHORT_JOIN_CODE_LENGTH } from "@/lib/join-code-format";
 import { cn } from "@/lib/utils";
 
+import { ClubPreview } from "./club-preview";
 import { checkInviteCodeAction, joinWithInviteCodeAction, type CheckCodeResult } from "./actions";
 
 type Found = Extract<CheckCodeResult, { ok: true }>;
@@ -83,26 +84,21 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
       </div>
 
       {org && ready && (
-        <div className="bg-cream border-ink/8 flex items-center gap-3.5 rounded-2xl border px-4 py-3.5">
-          {org.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
-            <img src={org.logoUrl} alt="" className="size-11 flex-none rounded-xl object-cover" />
-          ) : (
-            <span className="bg-pine text-cream font-heading grid size-11 flex-none place-items-center rounded-xl text-[20px]">
-              {org.name.trim()[0]?.toUpperCase()}
-            </span>
-          )}
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate text-[16px] font-bold">{org.name}</span>
-            <span className="text-ink-soft text-[13px]">
+        <ClubPreview
+          name={org.name}
+          logoUrl={org.logoUrl}
+          detail={
+            <>
               {org.memberCount} {org.memberCount === 1 ? "member" : "members"} ·{" "}
-              {found.alreadyMember ? "you're already a member" : "you'll join as Member"}
+              {found.alreadyMember ? "you're already a member" : "you'll join as a member"}
+            </>
+          }
+          badge={
+            <span className="bg-leaf text-leaf-ink flex-none rounded-full px-2.5 py-[5px] text-[12px] font-bold">
+              ✓ Found
             </span>
-          </span>
-          <span className="bg-leaf text-leaf-ink flex-none rounded-full px-2.5 py-[5px] text-[12px] font-bold">
-            ✓ Found
-          </span>
-        </div>
+          }
+        />
       )}
 
       {error && (

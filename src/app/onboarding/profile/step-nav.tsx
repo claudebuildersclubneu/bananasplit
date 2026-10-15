@@ -5,6 +5,7 @@ import { useState, useTransition, type ReactNode } from "react";
 
 import { ContinuePill, StepFooter } from "@/components/onboarding/setup-shell";
 import {
+  FIRST_PROFILE_STEP,
   nextProfileStep,
   previousProfileStep,
   profileStepHref,
@@ -14,11 +15,22 @@ import {
 import type { StepSaveResult } from "./actions";
 
 /**
- * Back + Continue for a profile-setup step. Continue saves the step first
- * and only moves on when the save worked; field errors come back to the
- * form through onErrors.
+ * Where a step goes once it's done (saved or skipped). Step 1 goes back to
+ * `after` (a safe callbackUrl: where sign-up started, like an invite link)
+ * when there is one; the rest of the profile waits on the dashboard's
+ * "Finish your profile". Otherwise on to the next step.
  */
-export function useStepSave(step: ProfileStep) {
+function nextHref(step: ProfileStep, after?: string | null): string {
+  if (step === FIRST_PROFILE_STEP && after) return after;
+  const next = nextProfileStep(step);
+  return next ? profileStepHref(next) : "/onboarding";
+}
+
+/**
+ * Continue for a profile step: saves the step first and only moves on when
+ * the save worked; field errors come back to the form through onErrors.
+ */
+export function useStepSave(step: ProfileStep, after?: string | null) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,39 +43,42 @@ export function useStepSave(step: ProfileStep) {
         setErrors(result.fieldErrors);
         return;
       }
-      const next = nextProfileStep(step);
-      router.push(next ? profileStepHref(next) : "/onboarding");
+      router.push(nextHref(step, after));
     });
   }
 
   return { pending, errors, setErrors, saveAndContinue };
 }
 
+/**
+ * Back, Skip and Continue for a profile step. Every step after the first
+ * shows Skip: it moves on without saving anything.
+ */
 export function StepNav({
   step,
   pending,
   onContinue,
   continueLabel = "Continue",
-  continueStyle,
   disabled,
 }: {
   step: ProfileStep;
   pending: boolean;
   onContinue: () => void;
   continueLabel?: ReactNode;
-  /** A4 colours its button with the picked theme. */
-  continueStyle?: React.CSSProperties;
   disabled?: boolean;
 }) {
+  const router = useRouter();
   const previous = previousProfileStep(step);
   return (
-    <StepFooter back={previous ? { href: profileStepHref(previous) } : undefined}>
-      <ContinuePill
-        pending={pending}
-        onClick={onContinue}
-        disabled={disabled}
-        style={continueStyle}
-      >
+    <StepFooter
+      back={previous ? { href: profileStepHref(previous) } : undefined}
+      skip={
+        step === FIRST_PROFILE_STEP
+          ? undefined
+          : { onClick: () => router.push(nextHref(step)), disabled: pending }
+      }
+    >
+      <ContinuePill pending={pending} onClick={onContinue} disabled={disabled}>
         {continueLabel}
       </ContinuePill>
     </StepFooter>

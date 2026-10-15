@@ -1,7 +1,9 @@
 import { Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
+import { PersonalHome } from "@/components/personal/personal-home";
 import { JoinCodeCard } from "@/components/onboarding/join-code-card";
 import { GettingStartedCard } from "@/components/overview/getting-started-card";
 import { MyTasksCard } from "@/components/overview/my-tasks-card";
@@ -26,6 +28,7 @@ import { getUpcomingEvents, getViewerRsvps } from "@/app/app/[orgSlug]/calendar/
 import { getRecentNotes } from "@/app/app/[orgSlug]/notes/queries";
 import { absoluteAppUrl } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { visibleSidebar } from "@/lib/nav/sidebar";
@@ -36,6 +39,7 @@ import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listNoteFiles } from "@/server/notes/files";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
 import { listPins, listRecent } from "@/server/pins";
+import { loadPersonalHome } from "@/server/personal/home";
 import { listOpenPolls } from "@/server/polls/open-polls";
 import { loadSetupState } from "@/server/setup/progress";
 import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
@@ -68,6 +72,15 @@ export default async function OrgOverviewPage({
   // shows the invite code and link to share (the flowchart's END).
   const welcome = (await searchParams).welcome === "1";
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
+  // A Personal space's home is the Personal dashboard, not a club's board.
+  if (org.kind === "PERSONAL") {
+    return <PersonalHome data={await loadPersonalHome(user.id)} orgSlug={org.slug} />;
+  }
+  // A club whose plan has no Overview board lands on its events.
+  if (!spaceIncludes(org, "overview")) {
+    if (!can({ role }, "events.write")) redirect(`/app/${org.slug}/calendar`);
+    redirect(`/app/${org.slug}/${welcome ? "settings/members" : "calendar/rsvp"}`);
+  }
   const canSetUp = can({ role }, "integrations.write");
   const isAdmin = can({ role }, "settings.view");
   const canAddEvents = can({ role }, "events.write");

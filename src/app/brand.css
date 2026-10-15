@@ -9,6 +9,13 @@
  * border-ink/10, bg-banana ...), never raw values. `.brand` (BrandRoot) also
  * points the app's own tokens at the palette, so shared components (Input,
  * Button, Select) inside these pages print in ink on cream.
+ *
+ * Inside a club the yellow names (banana, banana-ink, lemon, gold, ripe,
+ * butter, slice, honey*, core, bark*) are re-pointed at the club's accent
+ * (src/lib/theme/accent.ts, injected by OrgThemeRoot and the RSVP page), so
+ * anything below that mixes them reads var(--color-banana) rather than a
+ * literal, and follows. Pair `bg-banana` with `text-banana-ink`, never
+ * `text-ink`: a club's accent may be dark.
  */
 
 @theme {
@@ -36,6 +43,8 @@
   --color-butter: #f6e7b4;
   --color-lemon: #f7d660;
   --color-banana: #f2c230;
+  /* The label on banana, lemon, gold and ripe fills (ink here; a club's accent may need white). */
+  --color-banana-ink: #1c1810;
   --color-gold: #e9b41c;
   --color-ripe: #e3a90a;
   --color-slice: #f7ebc4;
@@ -74,7 +83,9 @@
   --shadow-float: 0 1px 2px rgb(28 24 16 / 0.06), 0 24px 40px -20px rgb(28 24 16 / 0.35);
   --shadow-cta: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 12px 24px -12px rgb(28 24 16 / 0.5);
   --shadow-cta-soft: 0 12px 24px -12px rgb(28 24 16 / 0.5);
-  --shadow-featured: 0 0 0 4px rgb(242 194 48 / 0.25), 0 30px 60px -30px rgb(28 24 16 / 0.35);
+  --shadow-featured:
+    0 0 0 4px color-mix(in oklab, var(--color-banana) 25%, transparent),
+    0 30px 60px -30px rgb(28 24 16 / 0.35);
   --shadow-frame: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.35);
   --shadow-frame-soft: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.3);
   --shadow-segment: 0 1px 2px rgb(28 24 16 / 0.12);
@@ -93,7 +104,7 @@
   &:focus-visible {
     outline: none;
     border-color: var(--color-ink);
-    box-shadow: 0 0 0 4px rgb(242 194 48 / 0.35);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-banana) 35%, transparent);
   }
 }
 
@@ -101,7 +112,7 @@
 @utility focus-within-banana {
   &:focus-within {
     border-color: var(--color-ink);
-    box-shadow: 0 0 0 4px rgb(242 194 48 / 0.35);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-banana) 35%, transparent);
   }
 }
 
@@ -111,7 +122,7 @@
   &:focus-visible {
     outline: none;
     border-color: var(--color-ink);
-    box-shadow: 0 0 0 3px rgb(242 194 48 / 0.35);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-banana) 35%, transparent);
   }
 }
 
@@ -175,16 +186,32 @@
   background: radial-gradient(circle, rgb(255 240 180 / 0.7), transparent 70%);
 }
 @utility bg-glow-banana {
-  background: radial-gradient(circle, rgb(242 194 48 / 0.26), transparent 70%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 26%, transparent),
+    transparent 70%
+  );
 }
 @utility bg-glow-banana-22 {
-  background: radial-gradient(circle, rgb(242 194 48 / 0.22), transparent 65%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 22%, transparent),
+    transparent 65%
+  );
 }
 @utility bg-glow-banana-20 {
-  background: radial-gradient(circle, rgb(242 194 48 / 0.2), transparent 65%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 20%, transparent),
+    transparent 65%
+  );
 }
 @utility bg-glow-banana-10 {
-  background: radial-gradient(circle, rgb(242 194 48 / 0.1), transparent 65%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 10%, transparent),
+    transparent 65%
+  );
 }
 
 /* Ripeness swatches with their brown spots. */

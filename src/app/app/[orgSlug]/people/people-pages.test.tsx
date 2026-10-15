@@ -19,7 +19,9 @@ const { getOrgContextBySlugMock, getOrgPersonMock, listOrgPeopleMock } = vi.hois
 vi.mock("@/server/db/context", () => ({ getOrgContextBySlug: getOrgContextBySlugMock }));
 vi.mock("@/components/pins/pins-context", () => ({ PinToggle: () => null }));
 vi.mock("@/server/profiles/queries", async () => {
-  const actual = await vi.importActual<typeof import("@/server/profiles/queries")>("@/server/profiles/queries");
+  const actual = await vi.importActual<typeof import("@/server/profiles/queries")>(
+    "@/server/profiles/queries",
+  );
   return {
     ...actual,
     getOrgPerson: getOrgPersonMock,
@@ -28,7 +30,9 @@ vi.mock("@/server/profiles/queries", async () => {
   };
 });
 vi.mock("next/form", () => ({
-  default: ({ children, ...props }: React.ComponentProps<"form">) => <form {...props}>{children}</form>,
+  default: ({ children, ...props }: React.ComponentProps<"form">) => (
+    <form {...props}>{children}</form>
+  ),
 }));
 
 const { notFound } = await import("next/navigation");
@@ -41,11 +45,18 @@ function isNotFound(error: unknown): boolean {
 }
 
 const viewer = { id: "u_viewer", email: "viewer@example.edu", name: "Viewer" };
-const org = { id: "org_cbc", name: "Claude Builders Club", slug: "cbc", timezone: "America/New_York" };
+const org = {
+  id: "org_cbc",
+  name: "Claude Builders Club",
+  slug: "cbc",
+  timezone: "America/New_York",
+  plan: "SOCIETY",
+};
 
-const personParams = (userId: string) => ({
-  params: Promise.resolve({ orgSlug: "cbc", userId }),
-}) as unknown as PageProps<"/app/[orgSlug]/people/[userId]">;
+const personParams = (userId: string) =>
+  ({
+    params: Promise.resolve({ orgSlug: "cbc", userId }),
+  }) as unknown as PageProps<"/app/[orgSlug]/people/[userId]">;
 const peopleParams = {
   params: Promise.resolve({ orgSlug: "cbc" }),
   searchParams: Promise.resolve({}),

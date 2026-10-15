@@ -8,6 +8,7 @@ import { resolveLayout } from "@/lib/finance/widgets";
 import { loadSavedBoard } from "@/server/boards";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadSetupState } from "@/server/finance/setup";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { FinanceAccessGate } from "../finance-access-gate";
 import { getCategoriesForPeriods, getOrgMembersForPicker, getOrgPeriods } from "../queries";
@@ -17,6 +18,8 @@ export default async function FinanceSetupPage({
   params,
 }: PageProps<"/app/[orgSlug]/finance/setup">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "finance");
+  if (planLock) return planLock;
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "finance.manage")) {
     return <FinanceAccessGate orgId={org.id} orgSlug={orgSlug} role={role} />;

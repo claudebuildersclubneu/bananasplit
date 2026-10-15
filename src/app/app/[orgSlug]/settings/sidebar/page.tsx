@@ -1,6 +1,7 @@
 import { can } from "@/lib/auth/permissions";
 import { resolveSidebar } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug } from "@/server/db/context";
+import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../settings-no-access";
 import { SidebarEditor } from "./sidebar-editor";
@@ -13,6 +14,8 @@ export default async function SidebarSettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/sidebar">) {
   const { orgSlug } = await params;
+  const planLock = await planGate(orgSlug, "sidebar");
+  if (planLock) return planLock;
   const { organization, role, settings } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "settings.view")) {
     return <SettingsNoAccess title="Sidebar" who="owners and admins" />;

@@ -83,30 +83,33 @@ const intakeSchema = z.object({
   defaultDueInDays: z.number().int().min(1).max(60).nullable(),
 });
 
-const setIntakeTx = withOrgAction(async (ctx, input: unknown) => {
-  if (!can(ctx, "tasks.manageAll"))
-    return { error: "Only an owner or admin can set up an intake queue." };
-  const parsed = intakeSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const d = parsed.data;
-  if (d.triageUserId) {
-    const member = await ctx.db.membership.findFirst({
-      where: { organizationId: ctx.organizationId, userId: d.triageUserId },
-      select: { id: true },
+const setIntakeTx = withOrgAction(
+  async (ctx, input: unknown) => {
+    if (!can(ctx, "tasks.manageAll"))
+      return { error: "Only an owner or admin can set up an intake queue." };
+    const parsed = intakeSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const d = parsed.data;
+    if (d.triageUserId) {
+      const member = await ctx.db.membership.findFirst({
+        where: { organizationId: ctx.organizationId, userId: d.triageUserId },
+        select: { id: true },
+      });
+      if (!member) return { error: "The triage owner must be a member." };
+    }
+    const res = await ctx.db.project.updateMany({
+      where: { id: d.projectId, organizationId: ctx.organizationId },
+      data: {
+        isIntake: d.isIntake,
+        triageUserId: d.isIntake ? d.triageUserId : null,
+        defaultDueInDays: d.isIntake ? d.defaultDueInDays : null,
+      },
     });
-    if (!member) return { error: "The triage owner must be a member." };
-  }
-  const res = await ctx.db.project.updateMany({
-    where: { id: d.projectId, organizationId: ctx.organizationId },
-    data: {
-      isIntake: d.isIntake,
-      triageUserId: d.isIntake ? d.triageUserId : null,
-      defaultDueInDays: d.isIntake ? d.defaultDueInDays : null,
-    },
-  });
-  if (res.count === 0) return { error: "Project not found." };
-  return {};
-});
+    if (res.count === 0) return { error: "Project not found." };
+    return {};
+  },
+  { feature: "teamwork", onRefused: "return" },
+);
 
 /** OWNER/ADMIN: make a project an intake queue (or back into a plain project). */
 export async function setProjectIntake(

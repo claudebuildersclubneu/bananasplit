@@ -33,6 +33,8 @@ export interface OrgBranding {
     logoDisplay: string;
     light: unknown;
     dark: unknown;
+    /** Read for Look and feel only (`tokens.style`); the tokens are re-derived. */
+    tokens: unknown;
   } | null;
 }
 
@@ -52,6 +54,7 @@ async function loadOrgBranding(orgId: string): Promise<OrgBranding | null> {
         logoDisplay: true,
         light: true,
         dark: true,
+        tokens: true,
       },
     });
     return { organizationId: org.id, name: org.name, logo: org.logo, theme };

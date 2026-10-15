@@ -26,6 +26,9 @@ import {
   splitLocation,
 } from "@/lib/rsvp/format";
 import { dateLine, dateTile, timeLine } from "@/lib/rsvp/when";
+import { brandPageAccentStyle } from "@/lib/theme/accent";
+import { getPublicOrgTheme } from "@/lib/theme/loader";
+import { effectivePalettes } from "@/lib/theme/resolve";
 import { cn } from "@/lib/utils";
 import {
   loadRsvpPage,
@@ -48,21 +51,36 @@ export const dynamic = "force-dynamic";
  * ask for it with the same slug and ?via=, and cache() hands the second
  * caller the first one's result instead of reading it all again.
  */
+const targetFor = cache((slug: string) => rsvpPageTarget(slug));
+
 const load = cache(async (slug: string, via: string | null): Promise<RsvpPageData | null> => {
-  const target = await rsvpPageTarget(slug);
+  const target = await targetFor(slug);
   if (!target) return null;
   const viewerId = readRsvpManageKey((await cookies()).get(rsvpCookieName(target.eventId))?.value);
   return loadRsvpPage(slug, target, viewerId, { via });
 });
+
+/**
+ * The hosting club's accent as inline custom properties: the page keeps its
+ * cream-and-ink look, but its highlights (the date tile, chips, the "Tint"
+ * background, focus halos) take the club's theme accent instead of
+ * Bananasplit yellow. {} for a club on the default theme.
+ */
+async function clubAccentStyle(slug: string): Promise<React.CSSProperties> {
+  const target = await targetFor(slug);
+  const club = target ? await getPublicOrgTheme(target.organizationId) : null;
+  if (!club || club.theme.isDefault) return {};
+  return brandPageAccentStyle(effectivePalettes(club.theme).light.accent) as React.CSSProperties;
+}
 
 /** ?via= from a guest's invite link (one value, the code's own shape). */
 function viaParam(value: string | string[] | undefined): string | null {
   return typeof value === "string" && /^[a-z0-9]{6,12}$/.test(value) ? value : null;
 }
 
-/** Who the page says is hosting: the club, or the person on a free page. */
+/** Who the page says is hosting: the club. */
 function hostLabel(page: RsvpPageData): string {
-  return page.hostPerson?.name ?? page.org.name;
+  return page.org.name;
 }
 
 export async function generateMetadata({
@@ -99,6 +117,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
   const going = viewer?.status === "GOING";
 
   const tone = page.background.tone;
+  const accentStyle = await clubAccentStyle(slug);
   const tile = dateTile(page.startsAt, page.timeZone);
   const place = page.location ? splitLocation(page.location) : null;
 
@@ -117,6 +136,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
           "rsvp-page relative isolate flex min-h-svh flex-1 flex-col",
           `rsvp-bg-${page.background.id}`,
         )}
+        style={accentStyle}
       >
         {page.background.id === "cover" && page.cover && (
           <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden">
@@ -174,7 +194,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                 <InfoRow
                   tile={
                     <span className="flex w-12 flex-col overflow-hidden rounded-xl border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-center">
-                      <span className="bg-banana text-ink py-[2px] text-[10px] font-bold tracking-[0.08em]">
+                      <span className="bg-banana text-banana-ink py-[2px] text-[10px] font-bold tracking-[0.08em]">
                         {tile.month}
                       </span>
                       <span className="font-heading py-0.5 text-[20px] leading-7">{tile.day}</span>
@@ -366,7 +386,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
           </div>
         </main>
 
-        <HostYourOwn personal={page.personal} />
+        <HostYourOwn />
 
         <footer className="mx-auto w-full max-w-[1000px] px-5 pb-8 text-center text-[13px] text-(--rsvp-soft) sm:px-8">
           <Link
@@ -394,14 +414,13 @@ function Cover({ page }: { page: RsvpPageData }) {
       />
     );
   }
-  // No cover yet: the event's initial on a banana square.
+  // No cover yet: the event's initial on a flat accent square.
   return (
     <div
       aria-hidden="true"
-      className="bg-peel shadow-float relative grid aspect-square w-full place-items-center overflow-hidden rounded-[22px] max-md:max-w-[440px]"
+      className="bg-banana grid aspect-square w-full place-items-center overflow-hidden rounded-[22px] max-md:max-w-[440px]"
     >
-      <span className="bg-glow-cream absolute -top-16 -right-16 size-56 rounded-full" />
-      <span className="font-heading text-ink relative text-[120px] leading-none tracking-[-0.05em]">
+      <span className="font-heading text-banana-ink text-[120px] leading-none tracking-[-0.05em]">
         {page.title.trim()[0]?.toUpperCase() ?? "B"}
       </span>
     </div>
@@ -448,30 +467,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function HostedBy({ page }: { page: RsvpPageData }) {
-  if (page.hostPerson) {
-    const person = page.hostPerson;
-    return (
-      <Section title="Hosted by">
-        <div className="flex items-center gap-3">
-          {person.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a stored WebP variant or OAuth image
-            <img src={person.avatarUrl} alt="" className="size-9 rounded-full object-cover" />
-          ) : (
-            <span
-              className={cn(
-                "grid size-9 place-items-center rounded-full text-[13px] font-bold ring-1 ring-(--rsvp-tile-line)",
-                avatarTone(person.name),
-              )}
-            >
-              {initials(person.name)}
-            </span>
-          )}
-          <span className="min-w-0 flex-1 text-[15px] font-semibold">{person.name}</span>
-          {person.instagramUrl && <InstagramLink url={person.instagramUrl} name={person.name} />}
-        </div>
-      </Section>
-    );
-  }
   return (
     <Section title="Hosted by">
       <ul className="m-0 flex list-none flex-col gap-3 p-0">

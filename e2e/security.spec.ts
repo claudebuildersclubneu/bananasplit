@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import {
+  chooseClubRole,
   createOrgViaOnboarding,
   dayButtonName,
   makeUser,
@@ -139,7 +140,7 @@ test("public poll: guests keep separate answers, non-members answer as guests, o
   await expect(outsider.page.getByText("3 responded")).toBeVisible();
   await outsider.context.close();
 
-  await page.goto(`/app/${orgSlug}/calendar/polls/${pollId}`);
+  await page.goto(`/app/${orgSlug}/calendar/find-a-time/${pollId}`);
   await page.getByRole("tab", { name: /Everyone/ }).click();
   await expect(firstCell(page, "Everyone's availability")).toHaveAttribute(
     "aria-label",
@@ -209,6 +210,7 @@ test("member roles: an admin is never offered OWNER and cannot touch an owner", 
   const adminSession = await newGuest(browser, baseURL);
   await signUpVerified(adminSession.page, admin);
   await adminSession.page.getByRole("button", { name: "Join", exact: true }).click();
+  await chooseClubRole(adminSession.page, orgSlug);
   await expect(adminSession.page).toHaveURL(new RegExp(`/app/${orgSlug}$`));
 
   await adminSession.page.goto(`/app/${orgSlug}/settings/members`);

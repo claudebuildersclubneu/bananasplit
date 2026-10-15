@@ -31,8 +31,7 @@ export interface TicketData {
     location: string | null;
     timeZone: string;
     hostName: string;
-    personal: boolean;
-    /** Where hosts run the door: the club's suite, or /rsvp for a free page. */
+    /** Where hosts run the door: the club's suite. */
     doorHref: string;
   };
   /** Split the cost: what they owe now and what's recorded. */
@@ -73,15 +72,13 @@ export async function loadTicket(slug: string, code: string): Promise<TicketData
             location: true,
             rsvpCostMode: true,
             rsvpCostCents: true,
-            createdBy: { select: { name: true } },
-            organization: { select: { name: true, slug: true, timezone: true, kind: true } },
+            organization: { select: { name: true, slug: true, timezone: true } },
           },
         },
       },
     });
     if (!reg) return null;
     const e = reg.event;
-    const personal = e.organization.kind === "PERSONAL";
     const { going } = await registrationCounts(db, target.organizationId, target.eventId);
     const owes = shareCents(e.rsvpCostMode, e.rsvpCostCents, going);
     return {
@@ -96,11 +93,8 @@ export async function loadTicket(slug: string, code: string): Promise<TicketData
         allDay: e.allDay,
         location: e.location,
         timeZone: safeTimeZone(e.organization.timezone),
-        hostName: personal ? (e.createdBy.name ?? e.organization.name) : e.organization.name,
-        personal,
-        doorHref: personal
-          ? `/rsvp/${target.eventId}/door`
-          : `/app/${e.organization.slug}/calendar/${target.eventId}/rsvp/door`,
+        hostName: e.organization.name,
+        doorHref: `/app/${e.organization.slug}/calendar/${target.eventId}/rsvp/door`,
       },
       cost:
         owes === null

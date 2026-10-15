@@ -1,10 +1,11 @@
-import { CalendarSync, Ticket } from "lucide-react";
+import { CalendarClock, CalendarSync, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
@@ -33,6 +34,8 @@ export default async function CalendarPage({
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
+  // The Tasks layer is one of the task views; Google sync a data connection.
+  const tasksLayer = spaceIncludes(org, "taskViews");
 
   const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
@@ -51,7 +54,7 @@ export default async function CalendarPage({
       ),
       // A kind filter is about events; tasks stay out while one is on.
       tasks:
-        range.tasks && range.kinds.length === 0
+        tasksLayer && range.tasks && range.kinds.length === 0
           ? await getCalendarTasks(db, org.id, {
               dueFrom: fromDateKey(range.fromKey),
               dueTo: fromDateKey(addDaysToKey(range.toKey, -1)),
@@ -108,15 +111,24 @@ export default async function CalendarPage({
         title="Calendar"
         actions={
           <>
+            {/* Planning a meeting starts here as often as from the sidebar. */}
+            {spaceIncludes(org, "polls") && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/app/${orgSlug}/calendar/find-a-time/new`}>
+                  <CalendarClock aria-hidden="true" />
+                  Find a time
+                </Link>
+              </Button>
+            )}
             {can({ role }, "events.write") && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/app/${orgSlug}/calendar/rsvp`}>
                   <Ticket aria-hidden="true" />
-                  RSVP pages
+                  RSVPs
                 </Link>
               </Button>
             )}
-            {can({ role }, "integrations.view") && (
+            {can({ role }, "integrations.view") && spaceIncludes(org, "integrations") && (
               <Button variant="ghost" size="icon-sm" asChild>
                 <Link
                   href={`/app/${orgSlug}/calendar/sync`}
@@ -150,8 +162,9 @@ export default async function CalendarPage({
           view: range.view,
           kinds: range.kinds,
           visibility: range.visibility,
-          tasks: range.tasks,
+          tasks: tasksLayer && range.tasks,
         }}
+        tasksLayer={tasksLayer}
       />
     </div>
   );

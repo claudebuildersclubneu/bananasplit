@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { ArrowRight } from "@/components/brand/arrows";
 import { cn } from "@/lib/utils";
 
@@ -62,13 +60,6 @@ export function Hero() {
             Create your club <ArrowRight />
           </a>
         </div>
-        {/* The second way in: no club, just event pages. */}
-        <p className="text-ink-muted -mt-1 text-[15px]">
-          Just need an RSVP page?{" "}
-          <Link href="/rsvp" className="text-ink font-semibold underline-offset-4 hover:underline">
-            Make one free, no club needed
-          </Link>
-        </p>
 
         <div className="relative mt-4 w-full px-[clamp(0px,5vw,72px)] sm:mt-8">
           <div className="border-ink/12 bg-paper shadow-browser hidden overflow-hidden rounded-t-[18px] border border-b-0 sm:block">

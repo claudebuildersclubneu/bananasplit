@@ -5,6 +5,7 @@ import {
   sameContent,
   seedNoteState,
 } from "@/lib/collab/note-doc";
+import { spaceRefusal } from "@/lib/billing/space";
 import { canEditNote, isNoteVisibleTo, noteAccessSelect, toNoteAccess } from "@/lib/notes/access";
 import type { MemberContext } from "@/server/db/context";
 
@@ -61,6 +62,14 @@ export async function storeNoteState(
   noteId: string,
   incoming: Uint8Array,
 ): Promise<StoreResult> {
+  // A paused club (or a space without files) keeps its notes readable but
+  // saves nothing, like every other write (withOrgAction's space check).
+  const space = await ctx.db.organization.findUnique({
+    where: { id: ctx.organizationId },
+    select: { kind: true, plan: true, trialEndsAt: true },
+  });
+  if (space && spaceRefusal(space, { feature: "files" })) return { ok: false, reason: "forbidden" };
+
   for (let attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
     const row = await ctx.db.note.findFirst({
       where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },

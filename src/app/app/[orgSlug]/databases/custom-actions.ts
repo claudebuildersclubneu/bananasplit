@@ -29,6 +29,10 @@ import { AppError } from "@/server/db/errors";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 import type { Choice, FieldDef, StoredValue } from "@/lib/databases/fields";
 
+/** Every action here belongs to databases (withOrgAction's space check). */
+const databasesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { ...options, feature: "databases" });
+
 /**
  * Server Actions of club-made databases (src/server/databases/custom.ts).
  * Each runs as the member (withOrgAction: app_user, RLS) and returns
@@ -63,8 +67,14 @@ function failure(error: unknown): { error: string } {
   return { error: "Something went wrong saving that. Try again." };
 }
 
-function action<Args extends unknown[], T>(fn: (a: Actor, ...args: Args) => Promise<T>) {
-  const tx = withOrgAction(async (ctx: OrgContext, ...args: Args) => fn(actor(ctx), ...args));
+function action<Args extends unknown[], T>(
+  fn: (a: Actor, ...args: Args) => Promise<T>,
+  options: { whenPaused?: "refuse" | "allow" } = {},
+) {
+  const tx = databasesAction(
+    async (ctx: OrgContext, ...args: Args) => fn(actor(ctx), ...args),
+    options,
+  );
   return async (organizationId: string, ...args: Args): Promise<Result<T>> => {
     try {
       return { data: await tx(organizationId, ...args) };
@@ -166,6 +176,7 @@ export const loadRecordsAction = action(
     if (!parsed.success) throw new DatabaseInputError("Check the search.");
     return loadRecords(a, id.parse(databaseId), parsed.data);
   },
+  { whenPaused: "allow" },
 );
 
 export const createRecordAction = action(

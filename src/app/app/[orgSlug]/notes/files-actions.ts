@@ -6,13 +6,17 @@ import { withOrgAction } from "@/server/db/context";
 import { removeNoteFile, restoreNoteFile } from "@/server/notes/files";
 import { getBlob } from "@/server/storage";
 
+/** Every action here belongs to files (withOrgAction's space check). */
+const filesAction: typeof withOrgAction = (handler, options) =>
+  withOrgAction(handler, { ...options, feature: "files" });
+
 /**
  * Uploaded files in Files: the uploader, or an owner or admin (RLS decides which
  * rows the update may touch). Removing moves a file to "Recently deleted";
  * its bytes stay until the maintenance job clears files deleted more than
  * NOTE_TRASH_DAYS ago, so a restore brings it back whole.
  */
-export const removeNoteFileAction = withOrgAction(
+export const removeNoteFileAction = filesAction(
   async (ctx, fileId: string): Promise<{ error?: string }> => {
     const key = await removeNoteFile(ctx.db, ctx.organizationId, z.string().max(64).parse(fileId));
     if (!key)
@@ -21,7 +25,7 @@ export const removeNoteFileAction = withOrgAction(
   },
 );
 
-const deletedFileKey = withOrgAction(async (ctx, fileId: string): Promise<string | null> => {
+const deletedFileKey = filesAction(async (ctx, fileId: string): Promise<string | null> => {
   const row = await ctx.db.orgFile.findFirst({
     where: { id: fileId, organizationId: ctx.organizationId, deletedAt: { not: null } },
     select: { storageKey: true },
@@ -29,7 +33,7 @@ const deletedFileKey = withOrgAction(async (ctx, fileId: string): Promise<string
   return row?.storageKey ?? null;
 });
 
-const restoreRow = withOrgAction(async (ctx, fileId: string): Promise<{ error?: string }> => {
+const restoreRow = filesAction(async (ctx, fileId: string): Promise<{ error?: string }> => {
   const ok = await restoreNoteFile(ctx.db, ctx.organizationId, fileId);
   return ok ? {} : { error: "That file can't be restored any more." };
 });

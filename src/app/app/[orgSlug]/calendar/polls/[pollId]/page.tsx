@@ -7,26 +7,27 @@ import { safeTimeZone } from "@/lib/calendar/dates";
 import { buildQuestionPollView } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { loadQuestionPollSource } from "@/server/polls/question-polls";
+import { planGate } from "@/server/billing/plan-gate";
 
 /**
- * One question poll. An availability (find-a-time) poll's id goes to its
- * page under Find a time, so links from before that section existed (in
- * emails, pins, bookmarks) keep working; nothing else is a poll.
+ * One question poll. A find-a-time poll's id (every one of them lived here
+ * before Find a time was its own section, so shared links and pins still
+ * say /polls/) goes on to its page under Find a time.
  */
 export default async function PollDetailPage({
   params,
 }: PageProps<"/app/[orgSlug]/calendar/polls/[pollId]">) {
   const { orgSlug, pollId } = await params;
+  const planLock = await planGate(orgSlug, "polls");
+  if (planLock) return planLock;
   const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
   const loaded = await withOrgTx(org.id, async ({ db }) => {
+    const timePoll = await db.availabilityPoll.count({
+      where: { id: pollId, organizationId: org.id },
+    });
+    if (timePoll > 0) return { kind: "availability" as const };
     const question = await loadQuestionPollSource(db, org.id, pollId, user.id);
-    if (!question) {
-      const availability = await db.availabilityPoll.findFirst({
-        where: { id: pollId, organizationId: org.id },
-        select: { id: true },
-      });
-      return availability ? { kind: "availability" as const } : null;
-    }
+    if (!question) return null;
     const me = await db.user.findUnique({
       where: { id: user.id },
       select: { name: true, image: true, avatar: true },
@@ -34,9 +35,7 @@ export default async function PollDetailPage({
     return { kind: "question" as const, question, me };
   });
   if (!loaded) notFound();
-  if (loaded.kind === "availability") {
-    redirect(`/app/${orgSlug}/calendar/find-a-time/${encodeURIComponent(pollId)}`);
-  }
+  if (loaded.kind === "availability") redirect(`/app/${orgSlug}/calendar/find-a-time/${pollId}`);
 
   const view = buildQuestionPollView(
     loaded.question,
