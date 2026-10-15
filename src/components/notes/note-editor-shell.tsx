@@ -37,8 +37,8 @@ import {
   readNoteBackupRaw,
   writeNoteBackup,
 } from "@/components/notes/note-backup";
+import { ShareNoteDialog, type NoteSharingInfo } from "@/components/notes/share-note-dialog";
 import { useAutosave, type SaveStatus } from "@/components/notes/use-autosave";
-import { VisibilityToggle } from "@/components/notes/visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -49,12 +49,12 @@ import type { NoteCollabSession } from "@/server/collab/session";
 
 type Visibility = "PRIVATE" | "ORGANIZATION";
 
+/** Who sees the note is the Share dialog's, so a save never carries it. */
 interface NotePayload {
   title: string;
   /** JSON.stringify'd ProseMirror doc — see the comment on the server schema. */
   contentJson: string;
   contentText: string;
-  visibility: Visibility;
   eventId: string | null;
 }
 
@@ -72,6 +72,8 @@ export interface NoteEditorShellProps {
   };
   canEdit: boolean;
   events: EventOption[];
+  /** Who has access, and whether this viewer may change it (the Share button). */
+  sharing: NoteSharingInfo;
   /**
    * The page's live-collaboration session, or null while collaboration is
    * off (docs/features/collaboration.md). Without one, or when joining
@@ -88,11 +90,11 @@ export function NoteEditorShell({
   note,
   canEdit,
   events,
+  sharing,
   collab = null,
 }: NoteEditorShellProps) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
-  const [visibility, setVisibility] = useState<Visibility>(note.visibility);
   const [eventId, setEventId] = useState(note.eventId);
   const versionRef = useRef(note.version);
   const contentRef = useRef({ json: note.contentJson, text: note.contentText });
@@ -166,11 +168,10 @@ export function NoteEditorShell({
     (overrides: Partial<NotePayload>) => {
       if (!canType) return;
       if (live) {
-        const { title: t, visibility: v, eventId: e } = overrides;
+        const { title: t, eventId: e } = overrides;
         detailsRef.current = {
           ...detailsRef.current,
           ...(t !== undefined ? { title: t } : {}),
-          ...(v !== undefined ? { visibility: v } : {}),
           ...(e !== undefined ? { eventId: e } : {}),
         };
         scheduleDetails(detailsRef.current);
@@ -180,12 +181,11 @@ export function NoteEditorShell({
         title,
         contentJson: JSON.stringify(contentRef.current.json),
         contentText: contentRef.current.text,
-        visibility,
         eventId,
         ...overrides,
       });
     },
-    [canType, live, scheduleDetails, schedule, title, visibility, eventId],
+    [canType, live, scheduleDetails, schedule, title, eventId],
   );
 
   function restoreBackup() {
@@ -206,7 +206,6 @@ export function NoteEditorShell({
       title: backup.title,
       contentJson: backup.contentJson,
       contentText: backup.contentText,
-      visibility,
       eventId,
     });
   }
@@ -374,7 +373,7 @@ export function NoteEditorShell({
                       .slice(0, 20_000),
                   ),
               },
-              canEdit && {
+              sharing.canShare && {
                 label: "Delete note",
                 icon: Trash2,
                 destructive: true,
@@ -386,14 +385,14 @@ export function NoteEditorShell({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <VisibilityToggle
-          value={visibility}
-          disabled={!canType}
-          onChange={(v) => {
-            setVisibility(v);
-            queueSave({ visibility: v });
-          }}
+        <ShareNoteDialog
+          orgId={orgId}
+          orgSlug={orgSlug}
+          noteId={note.id}
+          title={title}
+          sharing={sharing}
         />
+        {!canEdit && <span className="text-muted-foreground text-xs">View only</span>}
         <EventLinkPicker
           events={events}
           value={eventId}

@@ -1,6 +1,7 @@
 import { describePath, type PinKind } from "@/lib/pins/pages";
 import { pollHref } from "@/lib/polls/paths";
 import type { TxClient } from "@/server/db/context";
+import { noteVisibleWhere } from "@/server/notes/visibility";
 
 /**
  * "Pin something": everything a member can pin, searchable. Each read runs
@@ -35,6 +36,7 @@ const PAGES = [
   "/calendar/find-a-time",
   "/calendar/rsvp",
   "/calendar/polls",
+  "/calendar/find-a-time",
   "/notes",
   "/notes?tab=files",
   "/people",
@@ -91,7 +93,7 @@ export async function searchPinnables(
     where: {
       organizationId: orgId,
       deletedAt: null,
-      OR: [{ visibility: "ORGANIZATION" }, { authorId: userId }],
+      ...noteVisibleWhere(userId),
       ...(contains ? { AND: [{ OR: [{ title: contains }, { contentText: contains }] }] } : {}),
     },
     orderBy: { updatedAt: "desc" },

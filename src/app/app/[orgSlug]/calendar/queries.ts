@@ -2,6 +2,7 @@ import type { EventKind, EventVisibility, Prisma, Role, RSVPStatus } from "@/gen
 import { can } from "@/lib/auth/permissions";
 import type { TxClient } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
+import { noteVisibleWhere } from "@/server/notes/visibility";
 
 /**
  * Calendar reads. Every function takes the caller's transaction client
@@ -12,7 +13,7 @@ import { userPublicSelect } from "@/server/members";
 /**
  * An event's relations as `viewerId` may see them. Linked notes follow the
  * notes rules (0A Fix 11): deleted notes never, and PRIVATE notes only for
- * their author, regardless of role.
+ * their author and the people they're shared with, regardless of role.
  */
 export function eventInclude(viewerId: string) {
   return {
@@ -23,7 +24,7 @@ export function eventInclude(viewerId: string) {
     notes: {
       where: {
         deletedAt: null,
-        OR: [{ visibility: "ORGANIZATION" as const }, { authorId: viewerId }],
+        ...noteVisibleWhere(viewerId),
       },
       select: { id: true, title: true },
       orderBy: { createdAt: "asc" as const },

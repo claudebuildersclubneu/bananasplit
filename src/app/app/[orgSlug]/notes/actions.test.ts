@@ -7,13 +7,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * notes.db.test.ts and the RLS suites.
  */
 
-const { state, db } = vi.hoisted(() => ({
+const { state, db, notifyUsers, listNoteShares } = vi.hoisted(() => ({
   state: { userId: "member_1", role: "MEMBER" as string, afterCommit: vi.fn() },
   db: {
     note: { findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
     event: { findFirst: vi.fn() },
+    membership: { findMany: vi.fn() },
+    noteShare: { findMany: vi.fn(), upsert: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
+    organization: { findUnique: vi.fn() },
   },
+  notifyUsers: vi.fn(),
+  listNoteShares: vi.fn(),
 }));
+
+vi.mock("@/server/notifications", () => ({ notifyUsers }));
+vi.mock("@/server/notes/sharing", () => ({ listNoteShares }));
 
 vi.mock("@/server/db/context", () => ({
   withOrgAction:
@@ -33,9 +41,19 @@ vi.mock("@/server/db/context", () => ({
       ),
 }));
 
-const { Role, NoteVisibility } = await import("@/generated/prisma/enums");
-const { createNote, updateNote, deleteNote, restoreNote, updateNoteDetails, issueNoteCollabToken } =
-  await import("./actions");
+const { Role, NoteVisibility, NoteShareRole } = await import("@/generated/prisma/enums");
+const {
+  createNote,
+  updateNote,
+  deleteNote,
+  restoreNote,
+  updateNoteDetails,
+  issueNoteCollabToken,
+  updateNoteAccess,
+  shareNote,
+  updateNoteShare,
+  removeNoteShare,
+} = await import("./actions");
 const { verifyCollabToken } = await import("@/lib/collab/token");
 const { noteStateToContent, seedNoteState } = await import("@/lib/collab/note-doc");
 
@@ -115,6 +133,8 @@ describe("updateNote — visibility enforcement (spec 3.3)", () => {
     await updateNote("org_1", "note_x", validInput, 1);
     expect(db.note.findFirst).toHaveBeenCalledWith({
       where: { id: "note_x", organizationId: "org_1", deletedAt: null },
+      // The caller's own share, for the sharing rules.
+      include: { shares: { where: { userId: MEMBER_ID }, select: { role: true }, take: 1 } },
     });
   });
 });
@@ -506,5 +526,203 @@ describe("deleteNote — live sessions", () => {
     db.note.updateMany.mockResolvedValue({ count: 1 });
     await deleteNote("org_1", "note_1");
     expect(state.afterCommit).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---- Sharing --------------------------------------------------------------
+
+/** A note by someone else, optionally shared with the caller. */
+function othersNote(
+  visibility: (typeof NoteVisibility)[keyof typeof NoteVisibility],
+  extra: {
+    memberCanEdit?: boolean;
+    share?: (typeof NoteShareRole)[keyof typeof NoteShareRole];
+  } = {},
+) {
+  return {
+    id: "note_1",
+    title: "Budget plan",
+    authorId: "someone_else",
+    visibility,
+    memberCanEdit: extra.memberCanEdit ?? false,
+    contentJson: { type: "doc", content: [] },
+    shares: extra.share ? [{ role: extra.share }] : [],
+  };
+}
+
+describe("note sharing — who sees and edits", () => {
+  it("lets an EDITOR share edit a private note, and a VIEWER only read it", async () => {
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.EDITOR }),
+    );
+    db.note.updateMany.mockResolvedValue({ count: 1 });
+    const { visibility: _v, ...save } = validInput;
+    expect((await updateNote("org_1", "note_1", save, 1)).error).toBeUndefined();
+
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.VIEWER }),
+    );
+    expect((await updateNote("org_1", "note_1", save, 1)).error).toMatch(/don't have permission/i);
+  });
+
+  it("hides a private note from someone it isn't shared with", async () => {
+    db.note.findFirst.mockResolvedValue(othersNote(NoteVisibility.PRIVATE));
+    expect((await updateNote("org_1", "note_1", validInput, 1)).error).toBe("Note not found.");
+  });
+
+  it("lets every member edit a club note that allows it", async () => {
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.ORGANIZATION, { memberCanEdit: true }),
+    );
+    db.note.updateMany.mockResolvedValue({ count: 1 });
+    expect((await updateNote("org_1", "note_1", validInput, 1)).error).toBeUndefined();
+  });
+
+  it("never lets an editor change who sees the note, or delete it", async () => {
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.ORGANIZATION, { memberCanEdit: true }),
+    );
+    const turned = await updateNote(
+      "org_1",
+      "note_1",
+      { ...validInput, visibility: NoteVisibility.PRIVATE },
+      1,
+    );
+    expect(turned.error).toMatch(/author/i);
+    expect((await updateNoteDetails("org_1", "note_1", { visibility: "PRIVATE" })).error).toMatch(
+      /author/i,
+    );
+    expect((await deleteNote("org_1", "note_1")).error).toMatch(/permission/i);
+    expect((await updateNoteAccess("org_1", "note_1", "CLUB_VIEW")).error).toMatch(/author/i);
+    expect(db.note.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("gives an EDITOR share a write token", async () => {
+    enableCollab();
+    const claimsOf = (result: Awaited<ReturnType<typeof issueNoteCollabToken>>) =>
+      result.error === undefined ? verifyCollabToken(result.session.token, COLLAB_SECRET) : null;
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.EDITOR }),
+    );
+    expect(claimsOf(await issueNoteCollabToken("org_1", "note_1"))?.perm).toBe("write");
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.VIEWER }),
+    );
+    expect(claimsOf(await issueNoteCollabToken("org_1", "note_1"))?.perm).toBe("read");
+  });
+});
+
+describe("updateNoteAccess — general access", () => {
+  it("lets the author open a note to the club as editors, and closes live sessions", async () => {
+    db.note.findFirst.mockResolvedValue({
+      ...othersNote(NoteVisibility.PRIVATE),
+      authorId: MEMBER_ID,
+    });
+    db.note.updateMany.mockResolvedValue({ count: 1 });
+    expect((await updateNoteAccess("org_1", "note_1", "CLUB_EDIT")).error).toBeUndefined();
+    expect(db.note.updateMany.mock.calls[0][0]).toMatchObject({
+      where: { id: "note_1", organizationId: "org_1" },
+      data: { visibility: "ORGANIZATION", memberCanEdit: true },
+    });
+    expect(state.afterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets an admin change a club note's access, but only the author makes it private", async () => {
+    actAs("admin_1", Role.ADMIN);
+    db.note.findFirst.mockResolvedValue(othersNote(NoteVisibility.ORGANIZATION));
+    db.note.updateMany.mockResolvedValue({ count: 1 });
+    expect((await updateNoteAccess("org_1", "note_1", "CLUB_EDIT")).error).toBeUndefined();
+    expect((await updateNoteAccess("org_1", "note_1", "RESTRICTED")).error).toMatch(/author/i);
+    expect(db.note.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an unknown access level", async () => {
+    expect((await updateNoteAccess("org_1", "note_1", "EVERYONE")).error).toBeTruthy();
+    expect(db.note.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("shareNote — adding people", () => {
+  beforeEach(() => {
+    db.note.findFirst.mockResolvedValue({
+      ...othersNote(NoteVisibility.PRIVATE),
+      authorId: MEMBER_ID,
+    });
+    db.organization.findUnique.mockResolvedValue({ slug: "cbc" });
+    listNoteShares.mockResolvedValue([]);
+  });
+
+  it("shares with club members and tells only the people newly added", async () => {
+    db.membership.findMany.mockResolvedValue([{ userId: "u_a" }, { userId: "u_b" }]);
+    db.noteShare.findMany.mockResolvedValue([{ userId: "u_b", role: NoteShareRole.VIEWER }]);
+    const result = await shareNote("org_1", "note_1", {
+      userIds: ["u_a", "u_b", MEMBER_ID],
+      role: NoteShareRole.EDITOR,
+    });
+    expect(result.error).toBeUndefined();
+    // The author is never a share of their own note.
+    expect(db.membership.findMany.mock.calls[0][0].where.userId.in).toEqual(["u_a", "u_b"]);
+    expect(db.noteShare.upsert).toHaveBeenCalledTimes(2);
+    expect(db.noteShare.upsert.mock.calls[0][0]).toMatchObject({
+      where: { noteId_userId: { noteId: "note_1", userId: "u_a" } },
+      create: { organizationId: "org_1", role: "EDITOR", createdById: MEMBER_ID },
+    });
+    expect(notifyUsers).toHaveBeenCalledWith(
+      db,
+      "org_1",
+      ["u_a"],
+      expect.objectContaining({ type: "NOTE_SHARED", linkUrl: "/app/cbc/notes/note_1" }),
+    );
+    // u_b went from viewer to editor: everyone reconnects with the new rights.
+    expect(state.afterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses anyone outside the club, and anyone but the author on a private note", async () => {
+    db.membership.findMany.mockResolvedValue([]);
+    expect(
+      (await shareNote("org_1", "note_1", { userIds: ["stranger"], role: "VIEWER" })).error,
+    ).toMatch(/members of the club/);
+
+    actAs("admin_1", Role.ADMIN);
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.EDITOR }),
+    );
+    expect(
+      (await shareNote("org_1", "note_1", { userIds: ["u_a"], role: "VIEWER" })).error,
+    ).toMatch(/author/);
+    expect(db.noteShare.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateNoteShare / removeNoteShare", () => {
+  it("changes and removes shares for the author only", async () => {
+    db.note.findFirst.mockResolvedValue({
+      ...othersNote(NoteVisibility.PRIVATE),
+      authorId: MEMBER_ID,
+    });
+    db.noteShare.updateMany.mockResolvedValue({ count: 1 });
+    listNoteShares.mockResolvedValue([]);
+    expect((await updateNoteShare("org_1", "note_1", "u_a", "VIEWER")).error).toBeUndefined();
+    expect((await removeNoteShare("org_1", "note_1", "u_a")).error).toBeUndefined();
+    expect(db.noteShare.deleteMany).toHaveBeenCalledWith({
+      where: { noteId: "note_1", userId: "u_a", organizationId: "org_1" },
+    });
+
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.EDITOR }),
+    );
+    expect((await updateNoteShare("org_1", "note_1", "u_a", "EDITOR")).error).toMatch(/author/);
+    expect((await removeNoteShare("org_1", "note_1", "u_a")).error).toMatch(/author/);
+  });
+
+  it("lets anyone take themselves off a note shared with them", async () => {
+    db.note.findFirst.mockResolvedValue(
+      othersNote(NoteVisibility.PRIVATE, { share: NoteShareRole.VIEWER }),
+    );
+    const result = await removeNoteShare("org_1", "note_1", MEMBER_ID);
+    expect(result).toEqual({ shares: [] });
+    expect(db.noteShare.deleteMany).toHaveBeenCalledWith({
+      where: { noteId: "note_1", userId: MEMBER_ID, organizationId: "org_1" },
+    });
   });
 });

@@ -105,6 +105,8 @@ model User {
   memberPrefs            MemberPrefs[]
   uploadedFiles          OrgFile[]            @relation("OrgFileUploadedBy")
   noteFolders            NoteFolder[]         @relation("NoteFolderCreatedBy")
+  noteShares             NoteShare[]          @relation("NoteShareUser")
+  noteSharesCreated      NoteShare[]          @relation("NoteShareCreatedBy")
 }
 
 /// When a user can't meet (profile setup A5, the profile page). Its own
@@ -427,6 +429,8 @@ enum NotificationType {
   // Due-date reminders on the day and the day after (src/server/tasks/reminders.ts)
   TASK_DUE_TODAY
   TASK_OVERDUE
+  // A note shared with someone (src/server/notes/sharing.ts)
+  NOTE_SHARED
 }
 
 model Notification {
@@ -770,6 +774,12 @@ enum NoteVisibility {
   ORGANIZATION
 }
 
+/// What a person a note is shared with may do (NoteShare).
+enum NoteShareRole {
+  VIEWER
+  EDITOR
+}
+
 model Note {
   id             String                   @id @default(cuid())
   organizationId String
@@ -777,6 +787,8 @@ model Note {
   contentJson    Json
   contentText    String
   visibility     NoteVisibility           @default(PRIVATE)
+  /// ORGANIZATION notes: every member may edit it, not only read it.
+  memberCanEdit  Boolean                  @default(false)
   authorId       String
   eventId        String?
   folderId       String?
@@ -799,10 +811,34 @@ model Note {
   updatedBy    User         @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
   event        Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   folder       NoteFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  shares       NoteShare[]
 
+  /// For NoteShare's composite foreign key (a share stays in its note's org).
+  @@unique([organizationId, id])
   // Phase 9: the notes list filters on deletedAt and orders by updatedAt.
   @@index([organizationId, deletedAt, updatedAt])
   @@index([searchVector], type: Gin)
+}
+
+/// A member a note is shared with, as a viewer or an editor, on top of its
+/// visibility: a PRIVATE note is seen by its author and the people it is
+/// shared with. Managed by the author (and owners/admins on a club note);
+/// RLS (app.note_share_role, app.can_share_note) enforces the same rules.
+model NoteShare {
+  organizationId String
+  noteId         String
+  userId         String
+  role           NoteShareRole @default(VIEWER)
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  note      Note  @relation(fields: [organizationId, noteId], references: [organizationId, id], onDelete: Cascade)
+  user      User  @relation("NoteShareUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("NoteShareCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@id([noteId, userId])
+  @@index([organizationId, userId])
 }
 
 // --- Calendar and scheduling ---

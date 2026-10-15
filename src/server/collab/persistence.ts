@@ -6,7 +6,7 @@ import {
   seedNoteState,
 } from "@/lib/collab/note-doc";
 import { spaceRefusal } from "@/lib/billing/space";
-import { canEditNote, isNoteVisibleTo } from "@/lib/notes/access";
+import { canEditNote, isNoteVisibleTo, noteAccessSelect, toNoteAccess } from "@/lib/notes/access";
 import type { MemberContext } from "@/server/db/context";
 
 /**
@@ -15,8 +15,9 @@ import type { MemberContext } from "@/server/db/context";
  *
  * Both run in the acting user's own RLS context (withOrgTxAs), so the
  * database applies the note policies (6.8) to a live save exactly as to an
- * autosave: a PRIVATE note is invisible to everyone but its author, and only
- * the author or an OWNER/ADMIN may write. The same two rules are checked
+ * autosave: a PRIVATE note is invisible to everyone but its author and the
+ * people it is shared with, and only its editors (src/lib/notes/access.ts)
+ * may write. The same two rules are checked
  * here first for a clear answer. The acting user of a store is the last
  * writer of the batch; their permission is checked again at every save, so
  * a demotion or removal stops their saves at once (their token also expires
@@ -33,10 +34,11 @@ export async function loadNoteState(
   ctx: MemberContext,
   noteId: string,
 ): Promise<Uint8Array | null> {
-  const note = await ctx.db.note.findFirst({
+  const row = await ctx.db.note.findFirst({
     where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
-    select: { authorId: true, visibility: true, contentJson: true, yjsState: true },
+    select: { ...noteAccessSelect(ctx.userId), contentJson: true, yjsState: true },
   });
+  const note = row && toNoteAccess(row);
   if (!note || !isNoteVisibleTo(ctx.userId, note)) return null;
   return note.yjsState ? new Uint8Array(note.yjsState) : seedNoteState(note.contentJson);
 }
@@ -69,16 +71,16 @@ export async function storeNoteState(
   if (space && spaceRefusal(space, { feature: "files" })) return { ok: false, reason: "forbidden" };
 
   for (let attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
-    const note = await ctx.db.note.findFirst({
+    const row = await ctx.db.note.findFirst({
       where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
       select: {
-        authorId: true,
-        visibility: true,
+        ...noteAccessSelect(ctx.userId),
         contentJson: true,
         yjsState: true,
         version: true,
       },
     });
+    const note = row && toNoteAccess(row);
     if (!note || !isNoteVisibleTo(ctx.userId, note)) return { ok: false, reason: "not_found" };
     if (!canEditNote(ctx, note)) return { ok: false, reason: "forbidden" };
 

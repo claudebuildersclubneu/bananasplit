@@ -8,6 +8,8 @@ import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
 import { listFolders } from "@/server/notes/folders";
+import { countNoteShares } from "@/server/notes/sharing";
+import { noteVisibleWhere } from "@/server/notes/visibility";
 import { listPins } from "@/server/pins";
 import { planGate } from "@/server/billing/plan-gate";
 
@@ -43,7 +45,7 @@ export default async function NotesPage({
   const isAdmin = can({ role }, "settings.view");
 
   const str = (v: unknown) => (typeof v === "string" && v !== "all" ? v : undefined);
-  const visibility = str(query.visibility) as "PRIVATE" | "ORGANIZATION" | undefined;
+  const visibility = str(query.visibility) as "PRIVATE" | "ORGANIZATION" | "SHARED" | undefined;
   const author = str(query.author);
   const inTrash = query.folder === "trash";
   const folderId = inTrash ? undefined : str(query.folder);
@@ -52,48 +54,56 @@ export default async function NotesPage({
     ? (query.sort as NoteSort)
     : "edited";
 
-  const data = await withOrgTx(org.id, async ({ db }) => ({
-    notes: await getNotesForList(db, org.id, user.id, {
+  const data = await withOrgTx(org.id, async ({ db }) => {
+    const notes = await getNotesForList(db, org.id, user.id, {
       visibility,
       authorId: author,
       folderId,
       q,
       sort,
-    }),
-    files: await listNoteFiles(db, org.id, { folderId, q }),
-    memberships: await getOrgMembersForFilter(db, org.id),
-    folders: await listFolders(db, org.id, user.id),
-    pins: await listPins(db, org.id, org.slug, user.id),
-    trash: inTrash
-      ? {
-          notes: await getDeletedNotes(db, org.id, user.id, isAdmin),
-          files: await listDeletedNoteFiles(db, org.id, user.id, isAdmin),
-        }
-      : null,
-    trashCount: await countDeleted(db, org.id, user.id, isAdmin),
-    totals: {
-      notes: await db.note.count({
-        where: {
-          organizationId: org.id,
-          deletedAt: null,
-          OR: [{ visibility: "ORGANIZATION" }, { authorId: user.id }],
-        },
-      }),
-      files: await db.orgFile.count({ where: { organizationId: org.id, deletedAt: null } }),
-      unfiled:
-        (await db.note.count({
+    });
+    return {
+      notes,
+      shareCounts: await countNoteShares(
+        db,
+        org.id,
+        notes.map((n) => n.id),
+      ),
+      files: await listNoteFiles(db, org.id, { folderId, q }),
+      memberships: await getOrgMembersForFilter(db, org.id),
+      folders: await listFolders(db, org.id, user.id),
+      pins: await listPins(db, org.id, org.slug, user.id),
+      trash: inTrash
+        ? {
+            notes: await getDeletedNotes(db, org.id, user.id, isAdmin),
+            files: await listDeletedNoteFiles(db, org.id, user.id, isAdmin),
+          }
+        : null,
+      trashCount: await countDeleted(db, org.id, user.id, isAdmin),
+      totals: {
+        notes: await db.note.count({
           where: {
             organizationId: org.id,
             deletedAt: null,
-            folderId: null,
-            OR: [{ visibility: "ORGANIZATION" }, { authorId: user.id }],
+            ...noteVisibleWhere(user.id),
           },
-        })) +
-        (await db.orgFile.count({
-          where: { organizationId: org.id, deletedAt: null, folderId: null },
-        })),
-    },
-  })).catch(handleAuthErrorInPage);
+        }),
+        files: await db.orgFile.count({ where: { organizationId: org.id, deletedAt: null } }),
+        unfiled:
+          (await db.note.count({
+            where: {
+              organizationId: org.id,
+              deletedAt: null,
+              folderId: null,
+              ...noteVisibleWhere(user.id),
+            },
+          })) +
+          (await db.orgFile.count({
+            where: { organizationId: org.id, deletedAt: null, folderId: null },
+          })),
+      },
+    };
+  }).catch(handleAuthErrorInPage);
 
   const members = data.memberships.map((m) => ({
     userId: m.userId,
@@ -141,6 +151,9 @@ export default async function NotesPage({
           eventTitle: n.event?.title ?? null,
           folderId: n.folderId,
           canMove: isAdmin || n.authorId === user.id,
+          shareCount: data.shareCounts.get(n.id) ?? 0,
+          sharedWithMe: n.authorId !== user.id && n.visibility === "PRIVATE",
+          memberCanEdit: n.memberCanEdit,
         }))}
         files={files.map((f) => ({
           id: f.id,

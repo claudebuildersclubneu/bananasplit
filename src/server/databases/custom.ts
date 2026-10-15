@@ -24,8 +24,6 @@ import { DATABASE_TEMPLATES, findTemplate } from "@/lib/databases/templates";
 import { writeOrgAuditLog } from "@/server/audit";
 import type { TxClient } from "@/server/db/context";
 
-import { parseCsv } from "./csv-import";
-
 /**
  * Club-made databases (DatabaseDefinition kind CUSTOM; docs/features/
  * databases.md "Your own databases"). Everything runs in the caller's
@@ -446,7 +444,7 @@ async function insertDefinition(
   });
 }
 
-/** A new database from a template (blank by default). Owners and admins. */
+/** A new database from a template (blank by default), with the template's empty rows. Owners and admins. */
 export async function createDatabase(
   actor: Actor,
   input: { name: string; description?: string | null; templateId?: string },
@@ -473,6 +471,18 @@ export async function createDatabase(
       },
     })),
   });
+  // A spreadsheet starts with rows to type into, like a new sheet does.
+  if (template.rows) {
+    await actor.db.databaseRecord.createMany({
+      data: Array.from({ length: template.rows }, () => ({
+        organizationId: actor.organizationId,
+        databaseId: def.id,
+        values: {},
+        createdById: actor.userId,
+        updatedById: actor.userId,
+      })),
+    });
+  }
   await writeOrgAuditLog(actor.db, {
     organizationId: actor.organizationId,
     action: "database.created",
@@ -491,17 +501,19 @@ export interface ImportSummary {
 }
 
 /**
- * A new database from a spreadsheet (CSV): one field per column, its type
- * inferred from the values (a column of yes/no becomes a checkbox, a few
- * repeated words a single select...), one row per line. A value that
- * doesn't fit its column's type is left empty and counted.
+ * A new database from a spreadsheet (one sheet of an Excel workbook, or a
+ * CSV or TSV file, already read into rows of cell text): one field per
+ * column, its type inferred from the values (a column of yes/no becomes a
+ * checkbox, a few repeated words a single select...), one row per line.
+ * The first row names the fields. A value that doesn't fit its column's
+ * type is left empty and counted.
  */
 export async function importDatabase(
   actor: Actor,
-  input: { name: string; csv: string },
+  input: { name: string; rows: readonly (readonly string[])[] },
 ): Promise<ImportSummary> {
   requireManage(actor);
-  const table = parseCsv(input.csv).filter((r) => r.some((c) => c.trim() !== ""));
+  const table = input.rows.filter((r) => r.some((c) => c.trim() !== ""));
   if (table.length < 2)
     throw new DatabaseInputError("The file needs a header row and at least one row of data.");
   const [header, ...lines] = table;

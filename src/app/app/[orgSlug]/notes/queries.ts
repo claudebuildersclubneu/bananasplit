@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { trashCutoff } from "@/lib/notes/trash";
 import type { TxClient } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
+import { noteVisibleWhere } from "@/server/notes/visibility";
 import { everyWord } from "@/server/search/where";
 
 /**
@@ -25,17 +26,16 @@ export type NoteWithRelations = Prisma.NoteGetPayload<{
   omit: typeof noteListOmit;
 }>;
 
-/** Private notes are invisible to everyone but their author, regardless of role. */
-function visibleToUser(userId: string): Prisma.NoteWhereInput {
-  return { OR: [{ visibility: "ORGANIZATION" }, { authorId: userId }] };
-}
+/** Private notes are invisible to everyone but their author and their shares, regardless of role. */
+const visibleToUser = noteVisibleWhere;
 
 export function getNotesForList(
   db: TxClient,
   organizationId: string,
   userId: string,
   filters: {
-    visibility?: "PRIVATE" | "ORGANIZATION";
+    /** SHARED: the notes shared with the viewer by name. */
+    visibility?: "PRIVATE" | "ORGANIZATION" | "SHARED";
     authorId?: string;
     /** A folder id, or "none" for notes in no folder. */
     folderId?: string;
@@ -49,7 +49,11 @@ export function getNotesForList(
       AND: [
         { organizationId, deletedAt: null },
         visibleToUser(userId),
-        filters.visibility ? { visibility: filters.visibility } : {},
+        filters.visibility === "SHARED"
+          ? { shares: { some: { userId } } }
+          : filters.visibility
+            ? { visibility: filters.visibility }
+            : {},
         filters.authorId ? { authorId: filters.authorId } : {},
         filters.folderId ? { folderId: filters.folderId === "none" ? null : filters.folderId } : {},
         // Every word, in the title or the body (as the ⌘K palette finds them).
@@ -134,10 +138,11 @@ export function getRecentNotes(
 
 export type RecentNote = Awaited<ReturnType<typeof getRecentNotes>>[number];
 
+/** One note the viewer may read, with their own share of it (if any) in `shares`. */
 export function getNoteById(db: TxClient, organizationId: string, userId: string, noteId: string) {
   return db.note.findFirst({
     where: { id: noteId, organizationId, deletedAt: null, ...visibleToUser(userId) },
-    include: noteListInclude,
+    include: { ...noteListInclude, shares: { where: { userId }, select: { role: true }, take: 1 } },
     omit: noteListOmit,
   });
 }

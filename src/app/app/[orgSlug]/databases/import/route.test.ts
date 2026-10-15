@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { strToU8, zipSync } from "fflate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => {
@@ -33,10 +34,16 @@ import { POST } from "./route";
 
 const params = { params: Promise.resolve({ orgSlug: "chess-club" }) };
 
-function post(file: Blob | null, headers: Record<string, string> = {}, name = "Roster") {
+function post(
+  file: Blob | null,
+  headers: Record<string, string> = {},
+  name = "Roster",
+  { filename = "roster.csv", sheet }: { filename?: string; sheet?: string } = {},
+) {
   const body = new FormData();
-  if (file) body.set("file", file, "roster.csv");
+  if (file) body.set("file", file, filename);
   body.set("name", name);
+  if (sheet) body.set("sheet", sheet);
   return POST(
     new Request("http://localhost/app/chess-club/databases/import", {
       method: "POST",
@@ -48,6 +55,41 @@ function post(file: Blob | null, headers: Record<string, string> = {}, name = "R
 }
 
 const csv = (text: string) => new Blob([text], { type: "text/csv" });
+
+/** A minimal .xlsx: one inline-string worksheet per entry, in tab order. */
+function xlsx(sheets: Record<string, string[][]>): Blob {
+  const names = Object.keys(sheets);
+  const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const pkg = "http://schemas.openxmlformats.org/package/2006/relationships";
+  const files: Record<string, Uint8Array> = {
+    "xl/workbook.xml": strToU8(
+      `<workbook xmlns="${ns}" xmlns:r="${rel}"><sheets>${names
+        .map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+        .join("")}</sheets></workbook>`,
+    ),
+    "xl/_rels/workbook.xml.rels": strToU8(
+      `<Relationships xmlns="${pkg}">${names
+        .map(
+          (_, i) =>
+            `<Relationship Id="rId${i + 1}" Type="${rel}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+        )
+        .join("")}</Relationships>`,
+    ),
+  };
+  names.forEach((n, i) => {
+    const rows = sheets[n]!.map(
+      (cells, r) =>
+        `<row r="${r + 1}">${cells
+          .map((c) => `<c t="inlineStr"><is><t>${c}</t></is></c>`)
+          .join("")}</row>`,
+    ).join("");
+    files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(
+      `<worksheet xmlns="${ns}"><sheetData>${rows}</sheetData></worksheet>`,
+    );
+  });
+  return new Blob([zipSync(files)]);
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,8 +108,51 @@ describe("POST /app/{orgSlug}/databases/import", () => {
     expect(await res.json()).toEqual({ key: "roster", rows: 2, fields: 2, skippedCells: 0 });
     expect(m.importDb).toHaveBeenCalledWith(
       { db: {}, organizationId: "org_1", userId: "u1", role: "OWNER" },
-      { name: "Roster", csv: big },
+      { name: "Roster", rows: expect.any(Array) },
     );
+    const { rows } = m.importDb.mock.calls[0]![1] as { rows: string[][] };
+    expect(rows[0]).toEqual(["Name", "Notes"]);
+    expect(rows[1]).toEqual(["Maya", "hello there"]);
+  });
+
+  it("reads Excel workbooks, importing the sheet the member picked", async () => {
+    const book = xlsx({
+      Roster: [
+        ["Name", "Year"],
+        ["Maya", "2027"],
+      ],
+      Merch: [
+        ["Item", "Qty"],
+        ["Hoodie", "3"],
+        ["Sticker", "40"],
+      ],
+    });
+    expect((await post(book, {}, "Merch", { filename: "club.xlsx", sheet: "Merch" })).status).toBe(
+      200,
+    );
+    expect(m.importDb.mock.calls[0]![1]).toEqual({
+      name: "Merch",
+      rows: [
+        ["Item", "Qty"],
+        ["Hoodie", "3"],
+        ["Sticker", "40"],
+      ],
+    });
+
+    // Without a sheet, the first one.
+    await post(book, {}, "Roster", { filename: "club.xlsx" });
+    expect((m.importDb.mock.calls[1]![1] as { rows: string[][] }).rows[0]).toEqual([
+      "Name",
+      "Year",
+    ]);
+  });
+
+  it("reads tab-separated files", async () => {
+    await post(csv("Name\tRole\nMaya\tPresident\n"), {}, "Board", { filename: "board.tsv" });
+    expect((m.importDb.mock.calls[0]![1] as { rows: string[][] }).rows).toEqual([
+      ["Name", "Role"],
+      ["Maya", "President"],
+    ]);
   });
 
   it("refuses cross-site posts, strangers, unknown clubs and too many imports", async () => {
@@ -84,16 +169,22 @@ describe("POST /app/{orgSlug}/databases/import", () => {
     expect(m.importDb).not.toHaveBeenCalled();
   });
 
-  it("turns away files over 4 MB, missing files and files that aren't CSV", async () => {
+  it("turns away files over 4 MB, missing files and files that aren't spreadsheets", async () => {
     const tooBig = await post(csv("x".repeat(4 * 1024 * 1024 + 1)));
     expect(tooBig.status).toBe(413);
     expect((await tooBig.json()).error).toMatch(/over 4 MB/);
 
     expect((await post(null)).status).toBe(400);
 
-    const binary = await post(new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00])]));
-    expect(binary.status).toBe(400);
-    expect((await binary.json()).error).toMatch(/CSV/);
+    const damaged = await post(new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00])]));
+    expect(damaged.status).toBe(400);
+    expect((await damaged.json()).error).toMatch(/couldn't be opened/);
+
+    const old = await post(new Blob([new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0x00])]), {}, "Old", {
+      filename: "roster.xls",
+    });
+    expect(old.status).toBe(400);
+    expect((await old.json()).error).toMatch(/\.xlsx or CSV/);
     expect(m.importDb).not.toHaveBeenCalled();
   });
 

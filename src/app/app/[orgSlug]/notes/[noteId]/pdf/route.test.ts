@@ -97,7 +97,11 @@ describe("GET /app/[orgSlug]/notes/[noteId]/pdf", () => {
           id: "note_1",
           organizationId: "org_1",
           deletedAt: null,
-          OR: [{ visibility: "ORGANIZATION" }, { authorId: member.id }],
+          OR: [
+            { visibility: "ORGANIZATION" },
+            { authorId: member.id },
+            { shares: { some: { userId: member.id } } },
+          ],
         }),
       }),
     );

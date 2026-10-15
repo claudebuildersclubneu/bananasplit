@@ -7,11 +7,15 @@ const { parseCalendarRange } = await import("@/lib/calendar/range");
 const { canEditEvent, eventInclude, rangeWhere } = await import("./queries");
 
 describe("eventInclude — linked notes follow the notes rules (0A Fix 11)", () => {
-  it("never includes deleted notes, and PRIVATE notes only for their author", () => {
+  it("never includes deleted notes, and PRIVATE notes only for their author and shares", () => {
     const include = eventInclude("viewer_1");
     expect(include.notes.where).toEqual({
       deletedAt: null,
-      OR: [{ visibility: "ORGANIZATION" }, { authorId: "viewer_1" }],
+      OR: [
+        { visibility: "ORGANIZATION" },
+        { authorId: "viewer_1" },
+        { shares: { some: { userId: "viewer_1" } } },
+      ],
     });
     expect(include.notes.select).toEqual({ id: true, title: true });
   });

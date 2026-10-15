@@ -79,9 +79,10 @@ same, then Join a club / Start a club. Home (`/app`) opens the last space
 used, else Personal.
 
 Personal's sidebar: Home, Tasks, Calendar, Find a time, RSVPs. A club's
-default sidebar puts Find a time and RSVPs right under Calendar; a club
-that saved its own sidebar before they existed gets them there too, hidden
-if it had hidden Polls (Find a time) or Calendar (RSVPs).
+default sidebar puts RSVPs right under Calendar and Find a time under Club,
+right after Polls; a club that saved its own sidebar before they existed
+gets them next to those sections too (wherever it moved them), hidden if it
+had hidden Polls (Find a time) or Calendar (RSVPs).
 
 ## Migration of existing data
 

@@ -95,8 +95,12 @@ test("full workspace workflow", async ({ page }) => {
   await page.getByPlaceholder("Untitled note").fill(noteTitle);
   await page.locator(".tiptap, [contenteditable='true']").first().click();
   await page.keyboard.type("Meeting notes body text.");
-  await page.getByRole("button", { name: "Everyone in the club", exact: true }).click();
   await expect(page.getByText(/Saved|Saving/)).toBeVisible();
+  await page.getByRole("button", { name: /^Share/ }).click();
+  const share = page.getByRole("dialog");
+  await share.getByLabel("Everyone else in the club").selectOption("CLUB_VIEW");
+  await share.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("button", { name: /Club can view/ })).toBeVisible();
 
   // --- create an availability poll, respond, and finalize into an event ---
   await page.goto(`/app/${orgSlug}/calendar/find-a-time/new`);

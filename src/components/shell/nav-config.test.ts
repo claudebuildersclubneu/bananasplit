@@ -17,11 +17,11 @@ describe("sidebar navigation", () => {
       "Overview",
       "Tasks",
       "Calendar",
-      "Find a time",
       "RSVPs",
       "Files",
       "People",
       "Polls",
+      "Find a time",
       "Databases",
       "Finance",
     ]);
@@ -74,7 +74,7 @@ describe("sidebar navigation", () => {
     expect(active("Calendar", "/app/cbc/calendar/e1/rsvp")).toBe(true);
   });
 
-  it("puts sections added since a club saved its sidebar after Calendar, hidden with what they came from", () => {
+  it("puts sections added since a club saved its sidebar after the one before them, hidden with what they came from", () => {
     // A sidebar saved before Find a time and RSVPs: Calendar moved under Club, Polls hidden.
     const saved = {
       groups: [
@@ -96,10 +96,10 @@ describe("sidebar navigation", () => {
     const club = resolveSidebar(saved).find((g) => g.id === "club")!;
     expect(club.items.map((i) => i.label)).toEqual([
       "Events",
-      "Find a time",
       "RSVPs",
       "People",
       "Polls",
+      "Find a time",
     ]);
     expect(club.items.find((i) => i.id === "find-a-time")!.hidden).toBe(true);
     expect(club.items.find((i) => i.id === "rsvps")!.hidden).toBe(false);

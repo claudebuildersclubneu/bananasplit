@@ -48,6 +48,9 @@ const GRANTS = {
   Note: ["SIUD", "SIUD", ""],
   // Notes page folders: members create; the creator or an admin edits.
   NoteFolder: ["SIUD", "S", ""],
+  // Note sharing: the author (or an admin, on a club note) shares; anyone
+  // takes themselves off (app.can_share_note).
+  NoteShare: ["SIUD", "SIUD", ""],
   Notification: ["SIu", "SIUD", ""],
   OrgAuditLog: ["S", "S", ""],
   // DELETE only on DRAFT positions (b3_org_chart_draft_delete; P-CAT5, P3-05).
@@ -158,6 +161,7 @@ const NEW_TENANT_TABLES = [
   "OrgJoinCode",
   "OrgFile",
   "NoteFolder",
+  "NoteShare",
   "Poll",
   "PollOption",
   "PollVote",
@@ -375,6 +379,8 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
           "EVENT_CANCELLED",
           "TASK_DUE_TODAY",
           "TASK_OVERDUE",
+          // A note shared with someone (20261014120000_note_shared_notification).
+          "NOTE_SHARED",
         ],
         task_status: ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "COMPLETED"],
         indexes: [

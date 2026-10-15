@@ -9,6 +9,7 @@ import {
   Lock,
   Package,
   Plus,
+  Sheet,
   ShieldCheck,
   Shirt,
   Table2,
@@ -49,6 +50,7 @@ const ICONS: Record<string, LucideIcon> = {
   Vote,
   Users,
   Table2,
+  Sheet,
   Package,
   Shirt,
   Handshake,
@@ -255,10 +257,30 @@ export default async function DatabasesPage({
             </li>
             <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
               <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="font-medium">Start a spreadsheet</p>
+                <p className="text-muted-foreground text-sm">
+                  A blank grid of rows and columns to type straight into. Rename the columns, or
+                  turn one into numbers, dates or choices, whenever you like.
+                </p>
+              </div>
+              <NewDatabaseDialog
+                orgId={organization.id}
+                orgSlug={orgSlug}
+                defaultTemplateId="spreadsheet"
+                trigger={
+                  <Button size="sm" variant="outline">
+                    <Sheet aria-hidden="true" />
+                    New spreadsheet
+                  </Button>
+                }
+              />
+            </li>
+            <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+              <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="font-medium">Import a spreadsheet</p>
                 <p className="text-muted-foreground text-sm">
-                  Bring a Google Sheet or Excel file in as a CSV; it becomes a database with a field
-                  per column.{" "}
+                  Bring in an Excel workbook (.xlsx), a CSV or a TSV, from Excel, Google Sheets or
+                  Numbers; it becomes a database with a field per column.{" "}
                   {importable.length > 0 && (
                     <>
                       Sign-in sheets and interest forms can go straight into{" "}
@@ -285,7 +307,7 @@ export default async function DatabasesPage({
                 trigger={
                   <Button size="sm" variant="outline">
                     <Upload aria-hidden="true" />
-                    Import CSV
+                    Import a spreadsheet
                   </Button>
                 }
               />

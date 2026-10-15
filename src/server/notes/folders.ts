@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { TxClient } from "@/server/db/context";
 
+import { noteVisibleWhere } from "./visibility";
+
 /**
  * Notes page folders (NoteFolder): shared by the org, created by any member,
  * changed by their creator or an owner/admin (RLS). Moving a note is an
@@ -37,7 +39,7 @@ export async function listFolders(db: TxClient, orgId: string, userId: string): 
       createdById: true,
       _count: {
         select: {
-          notes: { where: { deletedAt: null, OR: [{ visibility: "ORGANIZATION" }, { authorId: userId }] } },
+          notes: { where: { deletedAt: null, ...noteVisibleWhere(userId) } },
           files: { where: { deletedAt: null } },
         },
       },

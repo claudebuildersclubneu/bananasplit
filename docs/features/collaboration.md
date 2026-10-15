@@ -14,11 +14,12 @@ one decision left before turning this on.
 
 ## For an org
 
-- **Who edits, who watches.** The same rules as always: a note's author and
-  OWNER/ADMIN can edit; other members can read ORGANIZATION notes, and now
-  watch them change live (read-only, with everyone's carets). A **PRIVATE**
-  note stays its author's alone, live or not (the author can still have it
-  open in two tabs).
+- **Who edits, who watches.** The note's sharing rules
+  (`docs/features/notes-sharing.md`): its author, its editors, owners and
+  admins on a club note, and every member on a club note that lets everyone
+  edit; everyone else who can see it watches it change live (read-only,
+  with everyone's carets). A **PRIVATE** note is seen only by its author and
+  the people it's shared with, live or not.
 - **What is live.** The body. The title, visibility and linked event save as
   soon as you change them, but other people see a new title on their next
   visit.
@@ -27,9 +28,10 @@ one decision left before turning this on.
   reconnecting…" if the connection drops. Keep typing when offline: the
   changes are kept in the tab and merged when it reconnects (closing the tab
   first asks for confirmation).
-- **Making a note private or deleting it** closes its live sessions at once:
-  anyone who may no longer see it loses the note on their screen ("This note
-  is no longer available to you").
+- **Changing who has access, or deleting it,** closes its live sessions at
+  once: everyone reconnects with what they may do now, and anyone who may no
+  longer see it loses the note on their screen ("This note is no longer
+  available to you").
 - **Search, the notes list and exports** see live edits a few seconds after
   typing stops, like autosaved ones.
 

@@ -31,6 +31,7 @@ import {
 } from "@/lib/search/types";
 import { dueDateKey, formatDueKey } from "@/lib/tasks/dates";
 import type { TxClient } from "@/server/db/context";
+import { noteVisibleSql } from "@/server/notes/visibility";
 import { listRecent } from "@/server/pins";
 
 import { everyWord } from "./where";
@@ -139,7 +140,7 @@ interface NoteRow {
  * Notes: the body through the full-text index with every word as a prefix
  * ("quart" finds "quarterly"), or every word anywhere in the title or body
  * (inside a word, or a stop word the index drops). PRIVATE notes only for
- * their author, as RLS already guarantees. Raw SQL for the tsvector; every
+ * their author and the people they're shared with, as RLS already guarantees. Raw SQL for the tsvector; every
  * value is a bound parameter.
  */
 async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
@@ -154,7 +155,7 @@ async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
       LEFT JOIN "NoteFolder" f ON f.id = n."folderId"
       WHERE n."organizationId" = ${viewer.orgId}
         AND n."deletedAt" IS NULL
-        AND (n.visibility = 'ORGANIZATION' OR n."authorId" = ${viewer.userId})
+        AND ${noteVisibleSql("n", viewer.userId)}
       ORDER BY n."updatedAt" DESC
       LIMIT ${ctx.limit}
     `;
@@ -176,7 +177,7 @@ async function searchNotes(ctx: Ctx): Promise<SearchGroup> {
         FROM "Note"
         WHERE "organizationId" = ${viewer.orgId}
           AND "deletedAt" IS NULL
-          AND (visibility = 'ORGANIZATION' OR "authorId" = ${viewer.userId})
+          AND ${noteVisibleSql("Note", viewer.userId)}
           AND (
             "searchVector" @@ to_tsquery('english', ${tsq})
             OR NOT EXISTS (
