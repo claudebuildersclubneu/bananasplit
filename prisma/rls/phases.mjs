@@ -379,6 +379,8 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
           "EVENT_CANCELLED",
           "TASK_DUE_TODAY",
           "TASK_OVERDUE",
+          // A note shared with someone (20261014120000_note_shared_notification).
+          "NOTE_SHARED",
         ],
         task_status: ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "COMPLETED"],
         indexes: [
