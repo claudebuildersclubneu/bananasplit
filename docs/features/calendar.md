@@ -73,7 +73,7 @@ events that are still syncing to Google or whose sync failed.
 
 ### 1b. Availability polls
 
-**Find a time** (its own sidebar section, under Calendar) finds a meeting
+**Find a time** (its own sidebar section, under Club after Polls) finds a meeting
 time (when2meet-style): `/app/{slug}/calendar/find-a-time` lists the space's
 availability polls, **New poll** there (or **Find a time** in the
 Calendar's header) starts one, and each lives at
