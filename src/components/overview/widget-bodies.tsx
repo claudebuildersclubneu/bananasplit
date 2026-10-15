@@ -113,7 +113,7 @@ export function TaskStats({
               <Icon className={cn("size-3.5 shrink-0", c.value > 0 && c.tone)} aria-hidden="true" />
               {c.label}
             </span>
-            <span className={cn("numeral mt-1.5 block text-5xl", c.value > 0 && c.tone)}>
+            <span className={cn("mt-1.5 block text-2xl font-semibold tabular-nums", c.value > 0 && c.tone)}>
               {c.value}
             </span>
           </Link>
