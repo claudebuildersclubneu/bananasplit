@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/toaster";
 import type { Role } from "@/generated/prisma/enums";
 import { can } from "@/lib/auth/permissions";
 import { highlightRanges, parseQuery } from "@/lib/search/text";
+import { OPEN_SHORTCUTS_EVENT } from "@/lib/shortcuts";
 import {
   GROUP_SCOPE,
   GROUP_SECTION,
@@ -82,7 +83,7 @@ export function CommandPalette({
   role: Role | null;
   /** Every sidebar section, hidden ones flagged (members don't search those). */
   sections: readonly PaletteSection[];
-  orgs?: readonly { slug: string; name: string; pendingDeletion?: boolean }[];
+  orgs?: readonly { slug: string; name: string; kind?: string; pendingDeletion?: boolean }[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Tests swap the server search. */
@@ -187,6 +188,7 @@ export function CommandPalette({
     onOpenChange(false);
     if (command.type === "pin") pins?.openPicker();
     else if (command.type === "theme") setTheme(command.theme);
+    else if (command.type === "shortcuts") window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT));
     else void newNote();
   }
 

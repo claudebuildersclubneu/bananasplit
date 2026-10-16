@@ -216,7 +216,7 @@ export const NOTIFICATION_TYPE_META: Record<
     group: "tasks",
     audience: "Leads",
   },
-  WEEKLY_UPDATE_REMINDER: { label: "Reminder to post my Sunday update", group: "tasks" },
+  WEEKLY_UPDATE_REMINDER: { label: "Reminder to post my weekly update", group: "tasks" },
   EVENT_INVITE: { label: "I'm invited to an event", group: "events" },
   EVENT_UPDATED: { label: "An event I'm going to changes", group: "events" },
   EVENT_CANCELLED: { label: "An event I'm going to is cancelled", group: "events" },

@@ -32,6 +32,7 @@ const ACTION_COPY: Record<string, string> = {
   "org.renamed": "renamed the organization",
   "org.slug_changed": "changed the URL",
   "org.timezone_changed": "changed the timezone",
+  "settings.weekly_update_day_changed": "changed the weekly update day",
   "org.logo_changed": "uploaded a new logo",
   "org.logo_removed": "removed the logo",
   "org.deletion_scheduled": "scheduled the organization for deletion",

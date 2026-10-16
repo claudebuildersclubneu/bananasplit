@@ -19,7 +19,7 @@ import type { TxClient } from "@/server/db/context";
  *     tasks the reader owns or is on, which are in the audience by
  *     construction.
  *
- * The Sunday update is a third case and a different one: there the reader is
+ * The weekly update is a third case and a different one: there the reader is
  * allowed to see the task, but the POST publishes its title to the whole
  * org, so private items are dropped at that boundary instead
  * (src/server/tasks/weekly.ts).

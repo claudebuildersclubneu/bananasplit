@@ -340,26 +340,6 @@ export function getCalendarTasks(
   });
 }
 
-/** An intake queue: its open requests and those done since `completedSince`. */
-export function getIntakeTasks(
-  db: TxClient,
-  organizationId: string,
-  projectId: string,
-  completedSince: Date,
-) {
-  return db.task.findMany({
-    where: {
-      ...live(organizationId),
-      projectId,
-      parentTaskId: null,
-      OR: [{ status: { not: TaskStatus.COMPLETED } }, { completedAt: { gte: completedSince } }],
-    },
-    select: taskListSelect,
-    orderBy: [{ createdAt: "asc" }],
-    take: 500,
-  });
-}
-
 export function getTaskDetail(db: TxClient, organizationId: string, taskId: string) {
   return db.task.findFirst({
     where: { id: taskId, ...live(organizationId) },

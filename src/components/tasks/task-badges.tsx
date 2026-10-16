@@ -72,7 +72,7 @@ export function FlagBadge({
         "bg-warning/15 text-warning inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
         className,
       )}
-      title="Assigned above the assigner's level in the org chart"
+      title="Given this task by someone below them on the org chart"
     >
       <TriangleAlert className="size-3" aria-hidden="true" />
       {label}

@@ -441,7 +441,7 @@ export async function applyCbcTemplate(
       ).id;
   }
 
-  // Design Requests intake project, triaged by the VP Growth.
+  // The Design Requests project (an intake queue until Requests was retired).
   const triageUserId = members[CBC_INTAKE_PROJECT.triagePerson] ?? null;
   const existingProject = await db.project.findFirst({
     where: { organizationId, name: CBC_INTAKE_PROJECT.name },
@@ -449,7 +449,8 @@ export async function applyCbcTemplate(
   });
   const projectData = {
     description: CBC_INTAKE_PROJECT.description,
-    isIntake: true,
+    // A plain project: Requests (the intake queue) is retired.
+    isIntake: false,
     triageUserId,
     triagePositionKey: CBC_INTAKE_PROJECT.triagePositionKey,
     defaultDueInDays: CBC_INTAKE_PROJECT.defaultDueInDays,

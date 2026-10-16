@@ -11,18 +11,18 @@ import {
   fromDateKey,
   isDateKey,
   localDateKey,
-  mondayOfKey,
-  weekStartKey,
+  updateWeekStartKey,
+  updateWeekStartOfKey,
 } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
+import { getTaskDashboard } from "@/server/tasks/dashboard";
 import {
   TABLE_PAGE_SIZE,
   countOlderCompleted,
   getAgendaTasks,
   getBoardTasks,
-  getIntakeTasks,
   getOrgLabels,
   getOrgProjects,
   getTableTasks,
@@ -36,10 +36,11 @@ import {
   storedLines,
 } from "@/server/tasks/weekly";
 
-import { IntakeView } from "./intake/intake-view";
+import { DashboardView } from "./dashboard/dashboard-view";
 import { KanbanBoard } from "./kanban/kanban-board";
 import { TaskTable } from "./table/task-table";
 import { UpdatesView, type PostedUpdate } from "./updates/updates-view";
+import { WeeklyUpdateStrip, type WeeklyStatus } from "./updates/weekly-update-strip";
 import { WeekView } from "./week/week-view";
 import { WorkspaceHeader } from "./workspace-header";
 import { ListView } from "./list/list-view";
@@ -66,9 +67,9 @@ function dateParam(value: string | undefined): Date | undefined {
 /**
  * The task workspace (C4).
  *
- * One page, one toolbar, three layouts of the same filtered question, plus
- * two destinations (Requests and the Sunday update) that are pieces of work
- * rather than ways of drawing tasks. See ./views.ts for the URL grammar and
+ * One page, one toolbar, four layouts of the same filtered question (the
+ * dashboard counts it), plus the weekly update, a piece of work rather than
+ * a way of drawing tasks. See ./views.ts for the URL grammar and
  * the reasoning; every link other sections publish still resolves here.
  */
 export default async function TasksPage({
@@ -88,20 +89,23 @@ export default async function TasksPage({
   // The Free plan has the List only: any other ?view= (or a remembered
   // layout) opens the List too, so a typed URL doesn't reach the others.
   const simple = !spaceIncludes(org, "taskViews");
-  // Requests and the Sunday update are work between people: a Personal
-  // space has every layout but neither destination.
+  // The weekly update is work between people: a Personal space has every
+  // layout but not the update.
   const teamwork = spaceIncludes(org, "teamwork");
+  const isAdmin = can({ role }, "tasks.manageAll");
+  const now = new Date();
+  // The club's update day (Sunday unless it picked another): weeks end on it.
+  const updateDay = settings?.weeklyUpdateDay ?? 0;
+
+  const members = await getOrgMembersForPicker(org.id);
+  const positions = await getChartForPage(org.id);
+  const chart = buildViewerChart(positions, user.id);
+
   const ws: WorkspaceQuery = simple
     ? { ...parsed, view: TASK_LIST_VIEW, scope: parseScope(query.scope) ?? "all" }
     : !teamwork && isDestination(parsed.view)
       ? { ...parsed, view: DEFAULT_TASK_LAYOUT }
       : parsed;
-  const isAdmin = can({ role }, "tasks.manageAll");
-  const now = new Date();
-
-  const members = await getOrgMembersForPicker(org.id);
-  const positions = await getChartForPage(org.id);
-  const chart = buildViewerChart(positions, user.id);
 
   const base = await withOrgTx(org.id, async ({ db }) => {
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
@@ -111,35 +115,24 @@ export default async function TasksPage({
   });
   const todayKey = localDateKey(now, base.tz);
   const today = fromDateKey(todayKey);
-  const intakeProjects = base.projects.filter((p) => p.isIntake);
 
-  // Header badges: what is waiting in the queue, and whether this person
-  // still owes the club a Sunday update.
-  const currentWeek = weekStartKey(now, org.timezone);
-  const header = await withOrgTx(org.id, async ({ db }) => ({
-    intakeCount:
-      intakeProjects.length > 0
-        ? await db.task.count({
+  // This week's update (a club's layouts only): whether this person has
+  // posted it, for the Week's reminder strip and the dashboard.
+  const weekly: WeeklyStatus | null =
+    teamwork && !simple
+      ? await withOrgTx(org.id, async ({ db }) => {
+          const weekStart = updateWeekStartKey(now, org.timezone, updateDay);
+          const posted = await db.weeklyUpdate.count({
             where: {
               organizationId: org.id,
-              deletedAt: null,
-              parentTaskId: null,
-              projectId: { in: intakeProjects.map((p) => p.id) },
-              ownerId: null,
-              status: { not: "COMPLETED" },
+              userId: user.id,
+              weekStart: fromDateKey(weekStart),
+              postedAt: { not: null },
             },
-          })
-        : 0,
-    posted:
-      (await db.weeklyUpdate.count({
-        where: {
-          organizationId: org.id,
-          userId: user.id,
-          weekStart: fromDateKey(currentWeek),
-          postedAt: { not: null },
-        },
-      })) > 0,
-  }));
+          });
+          return { weekStart, dueDay: updateDay, posted: posted > 0, todayKey };
+        })
+      : null;
 
   // The scope chip resolves to a set of people; everything else is literal.
   const peopleIds =
@@ -172,7 +165,8 @@ export default async function TasksPage({
     query,
     members,
     positions,
-    intakeProjects,
+    updateDay,
+    weekly,
   });
 
   return (
@@ -191,12 +185,8 @@ export default async function TasksPage({
       projects={base.projects}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
-        <WorkspaceHeader
-          intakeCount={header.intakeCount}
-          showIntake={intakeProjects.length > 0 || isAdmin}
-          posted={header.posted}
-          teamwork={teamwork}
-        />
+        <WorkspaceHeader teamwork={teamwork && !simple} />
+        {ws.view === "week" && weekly && <WeeklyUpdateStrip status={weekly} />}
         {content}
       </WorkspaceProvider>
     </TasksProvider>
@@ -218,7 +208,10 @@ async function renderView(input: {
   query: Query;
   members: Awaited<ReturnType<typeof getOrgMembersForPicker>>;
   positions: Awaited<ReturnType<typeof getChartForPage>>;
-  intakeProjects: Awaited<ReturnType<typeof getOrgProjects>>;
+  /** The club's weekly update day, 0 Sunday … 6 Saturday. */
+  updateDay: number;
+  /** This week's update, in a club (null in Personal and on the Free plan). */
+  weekly: WeeklyStatus | null;
 }): Promise<React.ReactNode> {
   const { ws, filters, org, userId, now, today, todayKey, query, members } = input;
 
@@ -276,12 +269,12 @@ async function renderView(input: {
     }
 
     case "updates": {
-      // Weeks are org-time (Monday to Sunday), the same for everyone.
-      const currentWeek = weekStartKey(now, org.timezone);
+      // Weeks are org-time and end on the club's update day, the same for everyone.
+      const currentWeek = updateWeekStartKey(now, org.timezone, input.updateDay);
       const requestedWeek = param(query.week);
       const weekStart =
         requestedWeek && isDateKey(requestedWeek) && requestedWeek <= currentWeek
-          ? mondayOfKey(requestedWeek)
+          ? updateWeekStartOfKey(requestedWeek, input.updateDay)
           : currentWeek;
       const requestedPerson = param(query.person);
       const person =
@@ -315,19 +308,44 @@ async function renderView(input: {
           expected={data.expected}
           weekUpdates={data.updates.map(toPosted)}
           canSeeWhoPosted={data.seeAll}
+          dueDay={input.updateDay}
         />
       );
     }
 
-    case "intake": {
-      const project =
-        input.intakeProjects.find((p) => p.id === ws.projectId) ?? input.intakeProjects[0] ?? null;
-      const tasks = project
-        ? await withOrgTx(org.id, ({ db }) =>
-            getIntakeTasks(db, org.id, project.id, new Date(now.getTime() - 14 * DAY_MS)),
-          )
-        : [];
-      return <IntakeView project={project} intakeProjects={input.intakeProjects} tasks={tasks} />;
+    case "dashboard": {
+      // The same question as the other layouts, counted. Its people rows are
+      // whoever the scope or the person filter names, else the whole club.
+      const rowsFor =
+        filters.peopleIds ??
+        ((ws.ownerId ?? ws.assigneeId) ? [ws.ownerId ?? ws.assigneeId!] : undefined);
+      const data = await withOrgTx(org.id, async ({ db }) => {
+        const dashboard = await getTaskDashboard(db, org.id, {
+          filters,
+          people: rowsFor,
+          todayKey,
+          now,
+        });
+        if (!input.weekly) return { dashboard, updates: [], expected: [] };
+        const updates = await getWeekUpdates(db, org.id, input.weekly.weekStart);
+        const seeAll = await canSeeWhoPosted(db, org.id, userId, input.role);
+        const expected = seeAll ? await expectedPosters(db, org.id) : [];
+        return { dashboard, updates, expected };
+      });
+      return (
+        <DashboardView
+          data={data.dashboard}
+          everyone={!rowsFor}
+          weekly={
+            input.weekly && {
+              ...input.weekly,
+              postedBy: data.updates.filter((u) => u.postedAt).map((u) => u.userId),
+              // Only for who may see who hasn't posted (canSeeWhoPosted).
+              expected: data.expected.map((e) => e.userId),
+            }
+          }
+        />
+      );
     }
 
     default: {

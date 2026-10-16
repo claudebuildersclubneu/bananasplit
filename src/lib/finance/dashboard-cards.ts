@@ -11,7 +11,11 @@ export const FINANCE_CARDS = [
     title: "Budget vs. actual",
     detail: "Spent against each category's allocation",
   },
-  { id: "runway", title: "Runway", detail: "When the money runs out, at the current pace" },
+  {
+    id: "runway",
+    title: "When money runs out",
+    detail: "When the money runs out, at the current pace",
+  },
   { id: "sponsorships", title: "Sponsorships", detail: "Committed vs. received" },
   { id: "burn", title: "Spend by month", detail: "Money out per month this period" },
 ] as const;

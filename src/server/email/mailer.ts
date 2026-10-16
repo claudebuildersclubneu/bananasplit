@@ -4,7 +4,7 @@ import { IntegrationProvider, IntegrationStatus } from "@/generated/prisma/clien
 import { withSystemOrgTx } from "@/server/db/context";
 import { getSecret } from "@/server/secrets";
 
-import { addressOf, platformFrom } from "./config";
+import { domainOf, platformFrom } from "./config";
 import { displayName } from "./escape";
 import type { RenderedEmail } from "./templates";
 import { transportFor, type SendOptions, type SendResult } from "./transport";
@@ -20,10 +20,12 @@ import { transportFor, type SendOptions, type SendResult } from "./transport";
  *   1. the org's own Resend sender, when its EMAIL_RESEND integration is
  *      CONNECTED on a verified domain (fromAddress + domainVerifiedAt in
  *      OrgIntegration.config, the API key an OrgSecret);
- *   2. otherwise the platform sender "on behalf of" the org, while
- *      OrgSettings.platformMailFallback is true (backfilled true for orgs
- *      that existed at the Phase 1 migration, i.e. CBC);
- *   3. otherwise null: in-app notifications only (Settings shows a banner).
+ *   2. otherwise the platform sender, the one sign-in and verification mail
+ *      already uses, "on behalf of" the org and from its no-reply address.
+ *      Nothing to set up: task assignments, @mentions and reminders reach
+ *      inboxes from day one. (OrgSettings.platformMailFallback no longer
+ *      decides this; an org that wants its own From address connects a
+ *      verified domain.)
  *
  * EMAIL_DELIVERY and previews apply to both (sink/off never reach Resend).
  * Mailers are used OUTSIDE transactions: send() is network I/O.
@@ -89,10 +91,9 @@ export function getPlatformMailer(): Mailer {
 }
 
 export interface OrgMailRouting {
+  /** "none" only for an org that doesn't exist. */
   mode: "org" | "platform-fallback" | "none";
   orgName: string;
-  /** OrgSettings.platformMailFallback. */
-  platformMailFallback: boolean;
   /** For mode "org": the integration whose secret holds the key. */
   integrationId?: string;
   sender?: ResendSenderConfig;
@@ -105,15 +106,13 @@ export async function resolveOrgMailRouting(orgId: string): Promise<OrgMailRouti
       where: { id: orgId },
       select: {
         name: true,
-        settings: { select: { platformMailFallback: true } },
         integrations: {
           where: { provider: IntegrationProvider.EMAIL_RESEND },
           select: { id: true, status: true, config: true },
         },
       },
     });
-    if (!org) return { mode: "none", orgName: "", platformMailFallback: false };
-    const platformMailFallback = org.settings?.platformMailFallback ?? false;
+    if (!org) return { mode: "none", orgName: "" };
     const integration = org.integrations[0];
     if (integration && integration.status === IntegrationStatus.CONNECTED) {
       const parsed = resendSenderConfig.safeParse(integration.config);
@@ -121,24 +120,24 @@ export async function resolveOrgMailRouting(orgId: string): Promise<OrgMailRouti
         return {
           mode: "org",
           orgName: org.name,
-          platformMailFallback,
           integrationId: integration.id,
           sender: parsed.data,
         };
       }
     }
-    return {
-      mode: platformMailFallback ? "platform-fallback" : "none",
-      orgName: org.name,
-      platformMailFallback,
-    };
+    return { mode: "platform-fallback", orgName: org.name };
   });
 }
 
-/** The platform sender, labelled "<Org> via Bananasplit". */
+/** The no-reply address on the platform sender's (verified) domain. */
+export function platformNoReplyAddress(): string {
+  return `no-reply@${domainOf(platformFrom())}`;
+}
+
+/** The platform sender, labelled "<Org> via Bananasplit", from no-reply@ its domain. */
 export function platformFallbackMailer(orgName: string): Mailer {
   const name = displayName(`${orgName} via ${PLATFORM_NAME}`);
-  const from = `"${name}" <${addressOf(platformFrom())}>`;
+  const from = `"${name}" <${platformNoReplyAddress()}>`;
   return makeMailer(
     "platform-fallback",
     from,
@@ -148,8 +147,9 @@ export function platformFallbackMailer(orgName: string): Mailer {
 }
 
 /**
- * The org's sender, or null when the org gets in-app notifications only.
- * Reads the org's Resend key through the secrets accessor (service path).
+ * The org's sender: its own verified one, else the platform's no-reply
+ * sender (null only for an org that doesn't exist). Reads the org's Resend
+ * key through the secrets accessor (service path).
  */
 export async function getOrgMailer(orgId: string): Promise<Mailer | null> {
   const routing = await resolveOrgMailRouting(orgId);
@@ -171,7 +171,6 @@ export async function getOrgMailer(orgId: string): Promise<Mailer | null> {
       );
     }
   }
-  // No usable org sender (or its key is gone): the platform fallback, if the
-  // org has it, else in-app only.
-  return routing.platformMailFallback ? platformFallbackMailer(routing.orgName) : null;
+  // No usable org sender (or its key is gone): the platform's no-reply sender.
+  return routing.mode === "none" ? null : platformFallbackMailer(routing.orgName);
 }

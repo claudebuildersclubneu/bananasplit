@@ -91,7 +91,7 @@ describe("mail routing", () => {
     ...over,
   });
 
-  it("uses the platform sender on behalf of the org while the fallback is on", async () => {
+  it("uses the platform's no-reply sender on behalf of the org, with nothing set up", async () => {
     orgRow.current = cbc();
     const mailer = await getOrgMailer("org1");
     expect(mailer?.kind).toBe("platform-fallback");
@@ -99,8 +99,25 @@ describe("mail routing", () => {
     expect(getSecret).not.toHaveBeenCalled();
   });
 
-  it("is in-app only with neither a sender nor the fallback", async () => {
+  it("still sends from no-reply when the old fallback switch is off", async () => {
     orgRow.current = cbc({ settings: { platformMailFallback: false } });
+    expect((await getOrgMailer("org1"))?.from).toBe(
+      '"Claude Builders Club via Bananasplit" <no-reply@example.com>',
+    );
+    expect((await resolveOrgMailRouting("org1")).mode).toBe("platform-fallback");
+  });
+
+  it("sends from no-reply on the platform's domain whatever EMAIL_FROM's mailbox is", async () => {
+    process.env.EMAIL_FROM = "Bananasplit <hello@bananasplit.com>";
+    orgRow.current = cbc();
+    expect((await getOrgMailer("org1"))?.from).toBe(
+      '"Claude Builders Club via Bananasplit" <no-reply@bananasplit.com>',
+    );
+    delete process.env.EMAIL_FROM;
+  });
+
+  it("has no sender for an org that doesn't exist", async () => {
+    orgRow.current = null;
     expect(await getOrgMailer("org1")).toBeNull();
     expect((await resolveOrgMailRouting("org1")).mode).toBe("none");
   });
@@ -132,13 +149,12 @@ describe("mail routing", () => {
 
   it("does not use an unverified or disconnected org sender", async () => {
     orgRow.current = cbc({
-      settings: { platformMailFallback: false },
       integrations: [{ id: "i", status: "CONNECTED", config: { fromAddress: "board@claudeneu.com" } }],
     });
-    expect(await getOrgMailer("org1")).toBeNull();
+    expect((await getOrgMailer("org1"))?.kind).toBe("platform-fallback");
   });
 
-  it("falls back when the org sender's key is gone, only if the org opted in", async () => {
+  it("falls back to no-reply when the org sender's key is gone", async () => {
     orgRow.current = cbc({
       integrations: [
         {

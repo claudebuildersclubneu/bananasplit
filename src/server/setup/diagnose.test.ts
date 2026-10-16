@@ -29,21 +29,6 @@ describe("diagnose", () => {
     ["data", "The website database did not answer.", /paused/],
     ["data", "The website export is version 9; this suite understands version 1.", /latest/],
     ["calendar", "Google access was revoked or expired. Connect again.", /Testing mode/],
-    [
-      "email",
-      "mail.club.org is not a domain in this Resend account. Add and verify it in Resend first.",
-      /from address/,
-    ],
-    [
-      "email",
-      "mail.club.org is pending in Resend. Finish the DNS records, then test again.",
-      /DNS/,
-    ],
-    [
-      "email",
-      "Resend rejected this API key (it needs full access to read domains).",
-      /Full access/,
-    ],
     ["claude", "Claude rejected this API key.", /console\.anthropic\.com/],
     [
       "claude",
@@ -64,9 +49,6 @@ describe("diagnose", () => {
     expect(
       diagnose("data", "The website database refused the password for the reader role.").field,
     ).toBe("password");
-    expect(diagnose("email", "Resend rejected this API key (it needs full access).").field).toBe(
-      "apiKey",
-    );
     expect(
       diagnose("data", "The pooler host was not found. Check the region and prefix.").field,
     ).toBe("poolerRegion");

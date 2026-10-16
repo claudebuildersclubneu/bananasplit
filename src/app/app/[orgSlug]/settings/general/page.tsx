@@ -1,20 +1,22 @@
 import { appOrigin } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
+import { spaceIncludes } from "@/lib/billing/space";
 import { orgLogoUrl } from "@/lib/org-logo";
 import { getOrgContextBySlug } from "@/server/db/context";
 
 import { SettingsNoAccess } from "../settings-no-access";
-import { LogoForm, NameForm, SlugForm, TimezoneForm } from "./general-forms";
+import { LogoForm, NameForm, SlugForm, TimezoneForm, WeeklyUpdateDayForm } from "./general-forms";
 
 /**
  * Settings > General: name and timezone (OWNER/ADMIN), the club picture (OWNER/ADMIN),
- * and the URL (OWNER only; old URLs redirect and stay reserved).
+ * the URL (OWNER only; old URLs redirect and stay reserved), and the weekly
+ * update day (OWNER/ADMIN, in a club).
  */
 export default async function GeneralSettingsPage({
   params,
 }: PageProps<"/app/[orgSlug]/settings/general">) {
   const { orgSlug } = await params;
-  const { organization, role } = await getOrgContextBySlug(orgSlug);
+  const { organization, role, settings } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "settings.view")) {
     return <SettingsNoAccess title="General" who="owners and admins" />;
   }
@@ -37,6 +39,13 @@ export default async function GeneralSettingsPage({
         appOrigin={appOrigin()}
       />
       <TimezoneForm orgId={organization.id} timezone={organization.timezone} canEdit={canWrite} />
+      {spaceIncludes(organization, "teamwork") && (
+        <WeeklyUpdateDayForm
+          orgId={organization.id}
+          day={settings?.weeklyUpdateDay ?? 0}
+          canEdit={canWrite}
+        />
+      )}
     </div>
   );
 }

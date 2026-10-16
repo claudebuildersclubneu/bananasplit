@@ -31,13 +31,14 @@ export function overviewWidgetsFor(isAdmin: boolean): OverviewWidgetMeta[] {
   return OVERVIEW_WIDGETS.filter((w) => isAdmin || !w.admin);
 }
 
+// What's on your plate first; Pinned and Recent, empty on day one, after.
 const DEFAULT_LAYOUT: readonly BoardWidget[] = [
   { id: "getting-started", type: "getting-started", w: 4, h: null },
-  { id: "pinned", type: "pinned", w: 4, h: null },
   { id: "my-tasks", type: "my-tasks", w: 2, h: null },
   { id: "meetings", type: "meetings", w: 2, h: null },
   { id: "events", type: "events", w: 2, h: null },
   { id: "recent", type: "recent", w: 2, h: null },
+  { id: "pinned", type: "pinned", w: 4, h: null },
 ];
 
 /** The member's saved Overview, or the default one. */

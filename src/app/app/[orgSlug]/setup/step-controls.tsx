@@ -9,7 +9,6 @@ import type { SetupStepId } from "@/server/setup/catalog";
 import {
   finishSetupAction,
   resumeSetupStepAction,
-  sendSetupTestEmailAction,
   skipSetupStepAction,
   testSetupStepAction,
   type SetupResult,
@@ -145,37 +144,6 @@ export function TestButton({
           {!result.ok && result.fix ? (
             <span className="text-foreground/80 mt-1 block">{result.fix}</span>
           ) : null}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** One message from the org's own sender to the acting user, nobody else. */
-export function SendTestEmailButton({ orgId }: { orgId: string }) {
-  const [result, setResult] = useState<SetupResult | null>(null);
-  const [isPending, start] = useTransition();
-  return (
-    <div className="space-y-1.5">
-      <Button
-        type="button"
-        variant="outline"
-        disabled={isPending}
-        onClick={() =>
-          start(async () => {
-            setResult(null);
-            setResult(await sendSetupTestEmailAction(orgId));
-          })
-        }
-      >
-        {isPending ? "Sending…" : "Send me a test email"}
-      </Button>
-      {result ? (
-        <p
-          role="status"
-          className={result.ok ? "text-success text-sm" : "text-destructive text-sm"}
-        >
-          {result.ok ? (result.message ?? "Sent.") : result.error}
         </p>
       ) : null}
     </div>

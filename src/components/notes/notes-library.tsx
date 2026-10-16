@@ -376,7 +376,7 @@ export function NotesLibrary({
   );
   const pinClass = (href: string) =>
     cn(
-      "border-transparent bg-transparent shadow-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+      "border-transparent bg-transparent shadow-none opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 focus-visible:opacity-100",
       pinned.has(href) && "opacity-100",
     );
 
@@ -609,13 +609,41 @@ export function NotesLibrary({
   }
 
   /** What an empty list says; how folders and dragging work is told here, not under every list. */
-  function emptyCopy(): { title: string; description: string } {
-    if (params.get("q"))
-      return { title: "Nothing matches that search", description: "Try fewer or different words." };
+  function emptyCopy(): { title: string; description: string; action?: React.ReactNode } {
+    if (params.get("q")) {
+      return {
+        title: "Nothing matches that search",
+        description: "Try fewer or different words.",
+        action: (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setQ("");
+              go({ q: null });
+            }}
+          >
+            Clear search
+          </Button>
+        ),
+      };
+    }
     if (params.get("visibility") || params.get("author")) {
       return {
         title: "Nothing matches these filters",
-        description: "Clear them from Filter to see everything.",
+        description: "Clear them to see everything.",
+        // The same reset as Filter › Clear filters.
+        action: (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => go({ tab: null, visibility: null, author: null })}
+          >
+            Clear filters
+          </Button>
+        ),
       };
     }
     if (kind === "files") {
@@ -638,13 +666,12 @@ export function NotesLibrary({
       return {
         title: "This folder is empty",
         description:
-          "Drag notes and files onto it in the list on the left, or use New while it's open: what you make lands here.",
+          "Drag notes and files onto it, or use New while it's open: what you make lands here.",
       };
     }
     return {
       title: "Nothing here yet",
-      description:
-        "Write a note, start from a template, bring in a Word document or Google Doc, or upload PDFs, slides and images, all from New. Drag anything onto a folder to file it, or onto Recently deleted to delete it. Folders are shared with the club; private notes stay private inside them.",
+      description: "Use New to write a note or upload a file.",
     };
   }
 
@@ -718,7 +745,7 @@ export function NotesLibrary({
                   <PinToggle
                     href={`${base}?folder=${f.id}`}
                     label={`folder ${f.name}`}
-                    className="rounded-lg border-transparent bg-transparent opacity-0 shadow-none group-hover:opacity-100 focus-visible:opacity-100"
+                    className="rounded-lg border-transparent bg-transparent opacity-0 shadow-none group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                   />
                   {f.canEdit ? (
                     // Not an ItemMenu: the colour swatches sit inside the menu.
@@ -729,7 +756,7 @@ export function NotesLibrary({
                           variant="ghost"
                           size="icon-sm"
                           aria-label={`${f.name} options`}
-                          className="text-muted-foreground me-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                          className="text-muted-foreground me-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
                         >
                           <MoreHorizontal className="size-4" aria-hidden="true" />
                         </Button>

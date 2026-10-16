@@ -71,12 +71,12 @@ const connectedSupabase: Row = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("loadSetupState", () => {
-  it("an org that has done nothing has four steps to do and is prompted", async () => {
+  it("an org that has done nothing has three steps to do and is prompted", async () => {
     const { db } = makeDb([], null);
     const state = await loadSetupState(db, "org_A");
-    expect(state.steps.map((s) => s.status)).toEqual(["todo", "todo", "todo", "todo"]);
+    expect(state.steps.map((s) => s.status)).toEqual(["todo", "todo", "todo"]);
     expect(state.connectedCount).toBe(0);
-    expect(state.totalCount).toBe(4);
+    expect(state.totalCount).toBe(3);
     expect(state.nextStep).toBe("data");
     expect(state.allDecided).toBe(false);
     expect(state.promptVisible).toBe(true);
@@ -126,9 +126,9 @@ describe("loadSetupState", () => {
   });
 
   it("a skipped step is decided: out of the queue, never counted as connected", async () => {
-    const { db } = makeDb([], { setupSkipped: ["calendar", "email", "claude"] });
+    const { db } = makeDb([], { setupSkipped: ["calendar", "claude"] });
     const state = await loadSetupState(db, "org_A");
-    expect(state.skipped).toEqual(["calendar", "email", "claude"]);
+    expect(state.skipped).toEqual(["calendar", "claude"]);
     expect(state.todo).toEqual(["data"]);
     expect(state.connectedCount).toBe(0);
   });
@@ -179,8 +179,8 @@ describe("loadSetupState", () => {
     });
     const after = await loadSetupState(done.db, "org_A");
     expect(after.promptVisible).toBe(false);
-    // Hidden, not finished: three steps are still worth doing.
-    expect(after.todo).toEqual(["calendar", "email", "claude"]);
+    // Hidden, not finished: two steps are still worth doing.
+    expect(after.todo).toEqual(["calendar", "claude"]);
   });
 
   it("a broken connection brings the prompt back even after Done for now", async () => {
@@ -193,7 +193,7 @@ describe("loadSetupState", () => {
           lastError: "nope",
         },
       ],
-      { setupSkipped: ["calendar", "email", "claude"], setupCompletedAt: new Date() },
+      { setupSkipped: ["calendar", "claude"], setupCompletedAt: new Date() },
     );
     const state = await loadSetupState(db, "org_A");
     // promptVisible stays false, but the attention list is what the prompt
@@ -204,21 +204,22 @@ describe("loadSetupState", () => {
 
 describe("the stored choices", () => {
   it("skipping adds the step once and writes an audit row", async () => {
-    const { db, update } = makeDb([], { setupSkipped: ["email"] });
-    await skipStep(db, "org_A", "u1", "email");
+    const { db, update } = makeDb([], { setupSkipped: ["claude"] });
+    await skipStep(db, "org_A", "u1", "claude");
     expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ setupSkipped: ["email"] }) }),
+      expect.objectContaining({ data: expect.objectContaining({ setupSkipped: ["claude"] }) }),
     );
     expect(writeOrgAuditLog).toHaveBeenCalledWith(
       db,
-      expect.objectContaining({ action: "setup.step_skipped", diff: { step: "email" } }),
+      expect.objectContaining({ action: "setup.step_skipped", diff: { step: "claude" } }),
     );
   });
 
   it("skipping drops anything that is not a step id", async () => {
-    const { db, update } = makeDb([], { setupSkipped: ["email", "not-a-step"] });
+    // "email" was a step once; a club that skipped it keeps a stale entry.
+    const { db, update } = makeDb([], { setupSkipped: ["calendar", "email", "not-a-step"] });
     await skipStep(db, "org_A", "u1", "claude");
-    expect(update.mock.calls[0][0].data.setupSkipped).toEqual(["email", "claude"]);
+    expect(update.mock.calls[0][0].data.setupSkipped).toEqual(["calendar", "claude"]);
   });
 
   it("un-skipping and connecting both clear the flag, and neither writes when there is nothing to clear", async () => {

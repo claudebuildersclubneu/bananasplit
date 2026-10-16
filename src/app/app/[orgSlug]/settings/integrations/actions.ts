@@ -15,7 +15,6 @@ import {
   saveNetlifyHook,
   saveSupabase,
   sendTestEmail,
-  setPlatformMailFallback,
   testProvider,
   type IntegrationResult,
   type OrgActor,
@@ -94,10 +93,6 @@ export async function saveEmailSenderAction(orgId: string, input: z.input<typeof
 
 export async function sendTestEmailAction(orgId: string) {
   return run(orgId, (actor) => sendTestEmail(orgId, actor));
-}
-
-export async function setMailFallbackAction(orgId: string, enabled: boolean) {
-  return run(orgId, () => setPlatformMailFallback(orgId, z.boolean().parse(enabled)));
 }
 
 export async function saveSupabaseAction(orgId: string, input: z.input<typeof supabaseInput>) {

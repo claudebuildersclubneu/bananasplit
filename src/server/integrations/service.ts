@@ -248,13 +248,9 @@ export async function checkEmailDomain(orgId: string, actor: OrgActor): Promise<
     test: testResendDomain,
   });
   if (!result.ok) return fail(result.reason);
-  const cleared = await clearPlatformFallbackOnVerify(orgId, actor);
-  return {
-    ok: true,
-    message: cleared
-      ? "The domain is verified. Org email now goes out from your sender (the platform fallback is off)."
-      : "The domain is verified. Org email now goes out from your sender.",
-  };
+  // The old fallback flag no longer routes anything; clearing it keeps the audit trail as it was.
+  await clearPlatformFallbackOnVerify(orgId, actor);
+  return { ok: true, message: "The domain is verified. Org email now goes out from your sender." };
 }
 
 export async function saveEmailSender(
@@ -364,31 +360,6 @@ export async function sendTestEmail(orgId: string, actor: OrgActor): Promise<Int
         ? "Written to the local mail sink (.data/mail/): this environment never sends real mail."
         : "Email delivery is switched off here (EMAIL_DELIVERY=off).";
   return { ok: true, message: `Test email: ${where}` };
-}
-
-/** OWNER-only: keep org mail on the platform sender (or stop) while no verified sender exists. */
-export async function setPlatformMailFallback(
-  orgId: string,
-  enabled: boolean,
-): Promise<IntegrationResult> {
-  return withOrgTx(orgId, async (ctx) => {
-    requirePermission(ctx, "mail.fallback.write");
-    await ctx.db.orgSettings.update({
-      where: { organizationId: orgId },
-      data: { platformMailFallback: enabled, updatedById: ctx.userId },
-    });
-    await writeOrgAuditLog(ctx.db, {
-      organizationId: orgId,
-      action: "integration.mail_fallback_changed",
-      targetType: "OrgSettings",
-      targetId: orgId,
-      diff: { to: enabled },
-    });
-    return {
-      ok: true as const,
-      message: enabled ? "Platform fallback on." : "Platform fallback off.",
-    };
-  });
 }
 
 // ---------------------------------------------------------------- Supabase data source

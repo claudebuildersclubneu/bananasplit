@@ -1,7 +1,7 @@
 import { formatDueKey } from "./dates";
 
 /**
- * The Sunday update as text: the lines stored in WeeklyUpdate and the
+ * The weekly update as text: the lines stored in WeeklyUpdate and the
  * 'Copy as text' output. Pure and client-safe.
  */
 
@@ -45,7 +45,7 @@ function itemLine(item: WeeklyItem, todayKey: string, kind: keyof WeeklyLines): 
 /**
  * The lines that get published. Private tasks are left out: a posted update
  * is readable by the whole organization, and a title that was deliberately
- * kept off the open board must not arrive there through the Sunday post.
+ * kept off the open board must not arrive there through the weekly post.
  */
 export function summaryLines(summary: WeeklySummary, todayKey: string): WeeklyLines {
   const shared = (items: WeeklyItem[]) => items.filter((i) => !i.isPrivate);
@@ -71,7 +71,7 @@ export function formatWeeklyText(input: {
   const section = (title: string, lines: string[]) =>
     `${title}\n${lines.length > 0 ? lines.map((l) => `- ${l}`).join("\n") : "- Nothing"}`;
   const parts = [
-    `Sunday update: ${input.personName}, week of ${formatDueKey(input.weekStart)}`,
+    `Weekly update: ${input.personName}, week of ${formatDueKey(input.weekStart)}`,
     section("Done", input.lines.done),
     section("Next", input.lines.next),
     section("Blocked", input.lines.blocked),

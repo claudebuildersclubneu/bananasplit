@@ -7,6 +7,7 @@ import {
   formatDueKey,
   isDateKey,
   localDateKey,
+  WEEKDAY_NAMES,
 } from "@/lib/tasks/dates";
 import { canSeeTask } from "@/lib/tasks/visibility";
 import { withSystemOrgTx } from "@/server/db/context";
@@ -32,7 +33,7 @@ import { getWeeklySummary } from "./weekly";
 /**
  * Renders the email copy of a task notification for the notify-email job
  * (src/server/email/jobs.ts), so assignment, mention, comment, reminder,
- * digest and Sunday-update mail all ride the one outbox path: the job checks
+ * digest and weekly-update mail all ride the one outbox path: the job checks
  * the recipient's preference, routes through getOrgMailer (the org's sender,
  * or the platform fallback) and marks Notification.emailSentAt with a
  * compare-and-set, so each message goes out at most once.
@@ -98,7 +99,12 @@ export async function renderTaskNotificationEmail(
   return withSystemOrgTx(organizationId, async ({ db }) => {
     const org = await db.organization.findUnique({
       where: { id: organizationId },
-      select: { name: true, slug: true, timezone: true },
+      select: {
+        name: true,
+        slug: true,
+        timezone: true,
+        settings: { select: { weeklyUpdateDay: true } },
+      },
     });
     const recipient = await db.user.findUnique({
       where: { id: n.userId },
@@ -139,6 +145,7 @@ export async function renderTaskNotificationEmail(
       return weeklyUpdateReminderEmail({
         orgName: org.name,
         weekLabel: formatDueKey(weekStart, todayKey),
+        dueDayName: WEEKDAY_NAMES[org.settings?.weeklyUpdateDay ?? 0],
         counts: {
           done: summary.done.length,
           next: summary.next.length,

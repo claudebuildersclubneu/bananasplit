@@ -104,7 +104,34 @@ export function mondayOfKey(key: string): string {
   return addDaysToKey(key, -((weekdayOfKey(key) + 6) % 7));
 }
 
-/** [start, end) instants of the local week starting on the Monday `weekStart`. */
+/** Weekday names, 0 Sunday … 6 Saturday (as weekdayOfKey counts). */
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+/**
+ * The first day of the weekly-update week holding `key`. The week ends on
+ * the club's update day (0 Sunday … 6 Saturday) and starts the day after,
+ * so a Sunday club's weeks run Monday to Sunday (mondayOfKey) and a Friday
+ * club's Saturday to Friday.
+ */
+export function updateWeekStartOfKey(key: string, updateDay: number): string {
+  const startDay = (updateDay + 1) % 7;
+  return addDaysToKey(key, -((weekdayOfKey(key) - startDay + 7) % 7));
+}
+
+/** The first day of the weekly-update week holding `instant` in `tz`. */
+export function updateWeekStartKey(instant: Date, tz: string, updateDay: number): string {
+  return updateWeekStartOfKey(localDateKey(instant, tz), updateDay);
+}
+
+/** [start, end) instants of the local week starting on `weekStart` (seven days). */
 export function weekBounds(weekStart: string, tz: string): { start: Date; end: Date } {
   return {
     start: zonedInstant(weekStart, 0, tz),

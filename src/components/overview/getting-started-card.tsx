@@ -10,13 +10,16 @@ export interface GettingStartedState {
   task: boolean;
   budget: boolean;
   note: boolean;
+  /** The club chose its sidebar sections (Admin panel › Sidebar). */
+  sections: boolean;
 }
 
 const STEPS: { key: keyof GettingStartedState; label: string; hint: string; href: (slug: string) => string }[] = [
   { key: "members", label: "Invite your members", hint: "Share the invite code or send email invites.", href: (s) => `/app/${s}/settings/members` },
   { key: "picture", label: "Add a club picture", hint: "It shows in the sidebar and on the join page.", href: (s) => `/app/${s}/settings/general` },
   { key: "event", label: "Put your first meeting on the calendar", hint: "Members see it on their Overview.", href: (s) => `/app/${s}/calendar` },
-  { key: "task", label: "Create a task", hint: "Give someone something to own.", href: (s) => `/app/${s}/tasks` },
+  { key: "sections", label: "Pick your club's sections", hint: "Hide what you won't use, so the sidebar stays short.", href: (s) => `/app/${s}/settings/sidebar` },
+  { key: "task", label: "Create a task", hint: "Give someone something to own.", href: (s) => `/app/${s}/tasks?new=1` },
   { key: "budget", label: "Set up the budget", hint: "A period and its categories, for the treasurer.", href: (s) => `/app/${s}/finance/budget` },
   { key: "note", label: "Write or import a note", hint: "Minutes, plans, or a Word doc you already have.", href: (s) => `/app/${s}/notes` },
 ];

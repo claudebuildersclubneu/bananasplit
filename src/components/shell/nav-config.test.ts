@@ -17,11 +17,11 @@ describe("sidebar navigation", () => {
       "Overview",
       "Tasks",
       "Calendar",
-      "RSVPs",
-      "Files",
       "People",
       "Polls",
       "Find a time",
+      "RSVPs",
+      "Files",
       "Databases",
       "Finance",
     ]);
@@ -96,10 +96,10 @@ describe("sidebar navigation", () => {
     const club = resolveSidebar(saved).find((g) => g.id === "club")!;
     expect(club.items.map((i) => i.label)).toEqual([
       "Events",
-      "RSVPs",
       "People",
       "Polls",
       "Find a time",
+      "RSVPs",
     ]);
     expect(club.items.find((i) => i.id === "find-a-time")!.hidden).toBe(true);
     expect(club.items.find((i) => i.id === "rsvps")!.hidden).toBe(false);

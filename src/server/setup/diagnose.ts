@@ -80,33 +80,6 @@ const RULES: Record<SetupStepId, Rule[]> = {
       fix: "The calendar list is stale. Press Test and refresh calendars, then pick again.",
     },
   ],
-  email: [
-    {
-      match: /is not a domain in this Resend account/i,
-      fix: "The from address does not match any domain in the Resend account this key belongs to. Either fix the from address, or add that domain in Resend and verify it.",
-      field: "fromAddress",
-    },
-    {
-      match:
-        /is (pending|not started|temporary failure|failed).* in Resend|Finish the DNS records/i,
-      fix: "The DNS records are not all in place yet. Open the domain in Resend: it marks which record is missing or wrong. DNS changes can take a few hours to spread — this is normal, come back later.",
-    },
-    {
-      match: /rejected this API key|needs full access/i,
-      fix: "Create a new key in Resend with Full access. A sending-only key cannot read the domain list, which is how the check confirms your domain is verified.",
-      field: "apiKey",
-    },
-    {
-      match: /doesn't look like a Resend API key/i,
-      fix: "Resend keys start with re_. Copy it again from API Keys in Resend — it is only shown at creation, so make a new one if you lost it.",
-      field: "apiKey",
-    },
-    {
-      match: /Set a from address first/i,
-      fix: "Fill in the from address before testing. It has to be on the domain you verified.",
-      field: "fromAddress",
-    },
-  ],
   claude: [
     {
       // Named, not bare "rejected this API key": Resend's message says the

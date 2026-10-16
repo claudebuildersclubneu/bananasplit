@@ -63,7 +63,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
       </div>
       <Button asChild size="sm">
         <Link href={href}>
-          {state.connectedCount === 0 ? "Start setup" : "Continue setup"}
+          {state.connectedCount === 0 ? "Connect tools" : "Keep connecting"}
           <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       </Button>

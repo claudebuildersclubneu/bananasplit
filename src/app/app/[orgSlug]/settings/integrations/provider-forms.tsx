@@ -25,7 +25,6 @@ import {
   saveNetlifyHookAction,
   saveSupabaseAction,
   sendTestEmailAction,
-  setMailFallbackAction,
 } from "./actions";
 import { FeedbackLine, SecretInput, feedbackOf, type Feedback } from "./integration-ui";
 
@@ -327,39 +326,6 @@ export function EmailSenderForm({
           <FeedbackLine feedback={test.feedback} />
         </div>
       )}
-    </div>
-  );
-}
-
-export function MailFallbackToggle({
-  orgId,
-  enabled,
-  canEdit,
-}: {
-  orgId: string;
-  enabled: boolean;
-  canEdit: boolean;
-}) {
-  const { feedback, isPending, submit } = useSubmit();
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4">
-      <div className="max-w-md">
-        <Label htmlFor="mail-fallback">Use the platform sender until yours is verified</Label>
-        <p className="text-muted-foreground text-xs">
-          While on and your own sender is not verified, notification email goes out from the
-          platform address &ldquo;on behalf of&rdquo; your organization. Off means in-app
-          notifications only until your sender is verified. Connecting a verified sender turns this
-          off.
-          {canEdit ? "" : " Only an owner can change this."}
-        </p>
-        <FeedbackLine feedback={feedback} />
-      </div>
-      <Switch
-        id="mail-fallback"
-        checked={enabled}
-        disabled={!canEdit || isPending}
-        onCheckedChange={(v) => submit(() => setMailFallbackAction(orgId, v))}
-      />
     </div>
   );
 }

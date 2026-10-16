@@ -52,7 +52,7 @@ export function KanbanColumn({
         <button
           type="button"
           onClick={onAddTask}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring ms-auto rounded p-1 opacity-0 transition-opacity duration-150 group-focus-within/col:opacity-100 group-hover/col:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring ms-auto rounded p-1 opacity-0 transition-opacity duration-150 group-focus-within/col:opacity-100 group-hover/col:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none pointer-coarse:opacity-100"
           aria-label={`Add a task to ${title}`}
         >
           <Plus className="size-4" aria-hidden="true" />

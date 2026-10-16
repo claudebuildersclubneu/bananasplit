@@ -15,9 +15,10 @@ import { deletePoll } from "../../polls/actions";
 /**
  * An availability poll's header: while it's open, one click to invite
  * guests (it copies the guest link, which is all a guest needs: they type a
- * name on it, no account and no onboarding); then the pin, and the "…" menu
- * for the rest. Delete is for the poll's creator or an owner/admin
- * (deletePoll checks again).
+ * name on it, no account and no onboarding); then the pin, Delete, and the
+ * "…" menu for the rest. Delete is for the poll's creator or an owner/admin
+ * (deletePoll checks again). Left alone, a poll deletes itself 10 days after
+ * the last day it offers (src/lib/polls/expiry.ts).
  */
 export function AvailabilityPollActions({
   orgId,
@@ -62,24 +63,30 @@ export function AvailabilityPollActions({
       {isOpen && (
         <Button type="button" variant="outline" size="sm" onClick={() => copyGuestPollLink(pollId)}>
           <UserPlus aria-hidden className="size-4" />
-          Invite guests
+          Copy guest link
         </Button>
       )}
       <PinToggle href={href} label={title} />
+      {canDelete && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => void remove()}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 aria-hidden className="size-4" />
+          <span className="max-sm:sr-only">Delete</span>
+        </Button>
+      )}
       <ItemMenu
         label="Poll actions"
         items={[
-          { label: "Copy link", icon: Link2, onSelect: () => copyPollLink(href) },
+          { label: "Copy member link", icon: Link2, onSelect: () => copyPollLink(href) },
           isOpen && {
             label: "Open guest view",
             icon: ExternalLink,
             onSelect: () => window.open(`/poll/${pollId}`, "_blank", "noopener,noreferrer"),
-          },
-          canDelete && {
-            label: "Delete",
-            icon: Trash2,
-            destructive: true,
-            onSelect: () => void remove(),
           },
         ]}
       />

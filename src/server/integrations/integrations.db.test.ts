@@ -228,10 +228,10 @@ describe.skipIf(!dbReady)("integrations against the local database", () => {
     });
     expect(saved).toMatchObject({
       ok: true,
-      message: expect.stringMatching(/platform fallback is off/),
+      message: expect.stringMatching(/goes out from your sender/),
     });
     const routing = await resolveOrgMailRouting(orgId);
-    expect(routing).toMatchObject({ mode: "org", platformMailFallback: false });
+    expect(routing).toMatchObject({ mode: "org" });
     expect(JSON.stringify(routing)).not.toContain(RESEND_KEY);
 
     const sent = await sendTestEmail(orgId, actor);

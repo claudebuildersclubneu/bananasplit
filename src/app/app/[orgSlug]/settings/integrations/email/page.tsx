@@ -1,26 +1,18 @@
-import { can } from "@/lib/auth/permissions";
-import { getOrgContextBySlug } from "@/server/db/context";
-import { resolveOrgMailRouting } from "@/server/email/mailer";
-import { WARNING_BOX } from "@/lib/status-tones";
+import { platformNoReplyAddress, resolveOrgMailRouting } from "@/server/email/mailer";
 import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../../settings-no-access";
 import { IntegrationHeader } from "../integration-header";
 import { StatusPanel, TestAndRemove } from "../integration-ui";
 import { loadIntegrationPage } from "../load";
-import { EmailSenderForm, MailFallbackToggle } from "../provider-forms";
-
-const ROUTING_COPY = {
-  org: "Notification email goes out from your own sender.",
-  "platform-fallback":
-    "Notification email goes out from the platform sender on your behalf until your sender is verified.",
-  none: "Notification email is off: members get in-app notifications only.",
-} as const;
+import { EmailSenderForm } from "../provider-forms";
 
 /**
- * Settings > Integrations > Email sender (Resend): from name, from address,
- * reply-to and the API key; the domain check; Send test email; and the
- * OWNER's platform-fallback switch.
+ * Settings > Integrations > Email sender (Resend), which is optional: email
+ * already works with nothing set up, from the platform's no-reply address
+ * (the sender sign-in mail uses). This is for a club that wants mail to come
+ * from its own domain: from name, from address, reply-to and the API key;
+ * the domain check; Send test email.
  */
 export default async function EmailIntegrationPage({
   params,
@@ -30,8 +22,7 @@ export default async function EmailIntegrationPage({
   if (planLock) return planLock;
   const page = await loadIntegrationPage(orgSlug, "EMAIL_RESEND");
   if (!page) return <SettingsNoAccess title="Email sender" who="owners and admins" />;
-  const { organization, dto, canWrite, canRemove, role } = page;
-  const { settings } = await getOrgContextBySlug(orgSlug);
+  const { organization, dto, canWrite, canRemove } = page;
   const routing = await resolveOrgMailRouting(organization.id);
   const domainStatus = typeof dto.config.domainStatus === "string" ? dto.config.domainStatus : null;
 
@@ -40,17 +31,12 @@ export default async function EmailIntegrationPage({
       <IntegrationHeader
         orgSlug={orgSlug}
         title="Email sender"
-        description="Send task assignments, reminders, digests and other notifications from your own address through Resend. Invitations use it too once it is verified."
+        description="Optional. Task assignments, @mentions, reminders and digests already go out by email with nothing to set up. Connect your own domain here only if you want them to come from your address instead."
       />
-      <p
-        role="status"
-        className={
-          routing.mode === "none"
-            ? `rounded-md p-3 text-sm ${WARNING_BOX}`
-            : "bg-muted rounded-md p-3 text-sm"
-        }
-      >
-        {ROUTING_COPY[routing.mode]}
+      <p role="status" className="bg-muted rounded-md p-3 text-sm">
+        {routing.mode === "org"
+          ? "Notification email goes out from your own sender."
+          : `Notification email goes out from ${platformNoReplyAddress()} as “${organization.name} via Bananasplit”, the same sender as sign-in email. Nothing to set up.`}
         {domainStatus && domainStatus !== "verified"
           ? ` Your domain is ${domainStatus.replace(/_/g, " ")} in Resend.`
           : ""}
@@ -69,14 +55,9 @@ export default async function EmailIntegrationPage({
           canTest={canWrite}
           canRemove={canRemove}
           testLabel="Check domain"
-          removeCopy="The key is deleted and org email falls back to the platform sender (if the fallback is on) or in-app only."
+          removeCopy="The key is deleted and email goes back to the platform's no-reply sender."
         />
       )}
-      <MailFallbackToggle
-        orgId={organization.id}
-        enabled={settings?.platformMailFallback ?? false}
-        canEdit={can({ role }, "mail.fallback.write")}
-      />
       <details className="text-muted-foreground text-sm">
         <summary className="cursor-pointer">How to set up a sending domain</summary>
         <ol className="mt-2 list-decimal space-y-1 pl-5">

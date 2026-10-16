@@ -196,8 +196,8 @@ export const taskDigestJob: JobHandler<{ userId: string; localDate: string }> = 
 };
 
 /**
- * weekly-update-reminder:{userId}:{weekStart} (once=true). Sunday evening,
- * to a lead who hasn't posted this week's update.
+ * weekly-update-reminder:{userId}:{weekStart} (once=true). The evening of
+ * the club's update day, to a lead who hasn't posted this week's update.
  */
 export const weeklyUpdateReminderJob: JobHandler<{ userId: string; weekStart: string }> = async (
   run,
@@ -223,7 +223,7 @@ export const weeklyUpdateReminderJob: JobHandler<{ userId: string; weekStart: st
     });
     await notifyUsers(db, orgId, [userId], {
       type: NotificationType.WEEKLY_UPDATE_REMINDER,
-      title: "Post your Sunday update",
+      title: "Post your weekly update",
       body: "Done, next and blocked are drafted for you; review them and post.",
       linkUrl: `/app/${org.slug}/tasks?view=updates`,
       dedupeKey: `weekly:${weekStart}`,

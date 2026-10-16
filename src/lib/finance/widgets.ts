@@ -21,7 +21,7 @@ export const FINANCE_WIDGETS: readonly FinanceWidgetMeta[] = [
   { type: "by-category", title: "Spending by category", description: "Where the money went, as a donut chart.", group: "Charts", icon: "ChartPie", w: 2, h: null, card: "categories" },
   { type: "by-kind", title: "By transaction type", description: "Expenses, sponsorships, income and adjustments.", group: "Charts", icon: "ChartBar", w: 2, h: null },
   { type: "budget", title: "Budget vs. actual", description: "Spent against each category's allocation.", group: "Budget", icon: "Target", w: 2, h: null, card: "categories" },
-  { type: "runway", title: "Runway", description: "When the money runs out at the current pace.", group: "Budget", icon: "Timer", w: 4, h: null, card: "runway" },
+  { type: "runway", title: "When money runs out", description: "When the money runs out at the current pace.", group: "Budget", icon: "Timer", w: 4, h: null, card: "runway" },
   { type: "sponsorships", title: "Sponsorships", description: "Committed vs. received.", group: "Budget", icon: "Handshake", w: 1, h: null, card: "sponsorships" },
   { type: "recent", title: "Recent transactions", description: "The latest money in and out.", group: "Lists", icon: "ReceiptText", w: 2, h: null },
   { type: "top-expenses", title: "Biggest expenses", description: "This period's largest spending.", group: "Lists", icon: "TrendingDown", w: 2, h: null },

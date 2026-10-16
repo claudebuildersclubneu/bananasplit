@@ -379,18 +379,7 @@ export function TaskTable({
                     size="sm"
                     variant="outline"
                     className="mt-3"
-                    onClick={() =>
-                      ws.filterCount > 0
-                        ? ws.setFilters({
-                            status: undefined,
-                            labelId: undefined,
-                            q: undefined,
-                            flagged: false,
-                            blockers: false,
-                            visibility: undefined,
-                          })
-                        : newTask()
-                    }
+                    onClick={() => (ws.filterCount > 0 ? ws.clearFilters() : newTask())}
                   >
                     {ws.filterCount > 0 ? "Clear filters" : "New task"}
                   </Button>

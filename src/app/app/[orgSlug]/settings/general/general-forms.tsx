@@ -25,10 +25,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { slugify } from "@/lib/slug";
+import { WEEKDAY_NAMES } from "@/lib/tasks/dates";
 import { timeZoneOptions } from "@/lib/timezones";
 import { SUCCESS_TEXT } from "@/lib/status-tones";
 
-import { renameOrgSlug, updateOrgName, updateOrgTimezone } from "./actions";
+import { renameOrgSlug, updateOrgName, updateOrgTimezone, updateWeeklyUpdateDay } from "./actions";
 
 type Status = { tone: "ok" | "error"; text: string } | null;
 
@@ -93,6 +94,71 @@ export function NameForm({
           </Button>
         )}
       </div>
+      <StatusLine status={status} />
+    </form>
+  );
+}
+
+/**
+ * The day the weekly update is due. A week is the seven days ending that
+ * day, and leads who haven't posted get a reminder that evening.
+ */
+export function WeeklyUpdateDayForm({
+  orgId,
+  day,
+  canEdit,
+}: {
+  orgId: string;
+  day: number;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(day);
+  const [status, setStatus] = useState<Status>(null);
+  const [isPending, startTransition] = useTransition();
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        setStatus(null);
+        startTransition(async () => {
+          const result = await updateWeeklyUpdateDay(orgId, value);
+          setStatus(
+            result.error
+              ? { tone: "error", text: result.error }
+              : { tone: "ok", text: "Weekly update day saved." },
+          );
+          if (!result.error) router.refresh();
+        });
+      }}
+    >
+      <Label htmlFor="org-weekly-day">Weekly update day</Label>
+      <div className="flex flex-wrap gap-2">
+        <select
+          id="org-weekly-day"
+          value={value}
+          disabled={!canEdit}
+          onChange={(e) => setValue(Number(e.target.value))}
+          className="border-input bg-background h-8 w-full max-w-sm rounded-lg border px-2.5 text-sm"
+        >
+          {WEEKDAY_NAMES.map((name, i) => (
+            <option key={name} value={i}>
+              {name}
+            </option>
+          ))}
+        </select>
+        {canEdit && (
+          <Button type="submit" variant="outline" disabled={isPending || value === day}>
+            {isPending ? "Saving…" : "Save"}
+          </Button>
+        )}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        When everyone&apos;s done / next / blocked update is due. Each week runs{" "}
+        {WEEKDAY_NAMES[(value + 1) % 7]} to {WEEKDAY_NAMES[value]}, and leads who haven&apos;t
+        posted get a reminder {WEEKDAY_NAMES[value]} evening.
+      </p>
       <StatusLine status={status} />
     </form>
   );

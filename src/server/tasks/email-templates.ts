@@ -279,17 +279,19 @@ export function taskDigestEmail(input: {
 export function weeklyUpdateReminderEmail(input: {
   orgName: string;
   weekLabel: string;
+  /** The club's update day, e.g. "Friday". */
+  dueDayName: string;
   counts: { done: number; next: number; blocked: number };
   url: string;
 }): RenderedEmail {
-  const lead = `Your Sunday update for the week of ${input.weekLabel} isn't posted yet. The helper has it drafted: ${input.counts.done} done, ${input.counts.next} next, ${input.counts.blocked} blocked.`;
+  const lead = `Your weekly update for the week of ${input.weekLabel} isn't posted yet. The helper has it drafted: ${input.counts.done} done, ${input.counts.next} next, ${input.counts.blocked} blocked.`;
+  const ask = `Review it, add a note, and post it before ${input.dueDayName} night.`;
   return layout({
-    subject: `Post your Sunday update (${input.orgName})`,
+    subject: `Post your weekly update (${input.orgName})`,
     eyebrow: input.orgName,
-    bodyHtml:
-      paragraph(lead) + paragraph("Review it, add a note, and post it before Sunday night."),
-    bodyText: `${lead}\n\nReview it, add a note, and post it before Sunday night.`,
-    cta: { label: "Open the Sunday update", url: input.url },
+    bodyHtml: paragraph(lead) + paragraph(ask),
+    bodyText: `${lead}\n\n${ask}`,
+    cta: { label: "Open the weekly update", url: input.url },
     footer: FOOTER,
   });
 }

@@ -52,7 +52,11 @@ export function ListView({
             : "Write down what needs doing and who is on it."
         }
         action={
-          ws.filterCount > 0 ? undefined : (
+          ws.filterCount > 0 ? (
+            <Button variant="outline" size="sm" onClick={ws.clearFilters}>
+              Clear filters
+            </Button>
+          ) : (
             <Button size="sm" onClick={() => newTask()}>
               New task
             </Button>

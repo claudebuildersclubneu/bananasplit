@@ -40,8 +40,8 @@ export function BootstrapCard({
         <p className="text-muted-foreground text-sm">
           Sets up the Claude Builders Club structure: the task defaults (one owner and a due date
           per task), the &ldquo;Needs President&rdquo; and &ldquo;Design&rdquo; labels, the Design
-          Requests intake queue, the published org chart (9 positions), member titles and the CBC
-          theme. It adds no members. Running it again publishes a fresh chart version.
+          Requests project, the published org chart (9 positions), member titles and the CBC theme.
+          It adds no members. Running it again publishes a fresh chart version.
         </p>
         {bootstrappedAt && (
           <p className="mt-1 text-sm">

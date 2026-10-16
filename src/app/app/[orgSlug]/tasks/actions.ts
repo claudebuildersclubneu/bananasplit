@@ -72,7 +72,7 @@ const bulkDeleteTx = withEnv(svc.bulkDelete);
 const addCommentTx = withEnv(svc.addComment);
 const editCommentTx = withEnv(svc.editComment);
 const deleteCommentTx = withEnv(svc.deleteComment);
-// Sunday updates are work between people: clubs only (Personal has no team).
+// Weekly updates are work between people: clubs only (Personal has no team).
 const postWeeklyTx = withEnv(postWeekly, { feature: "teamwork" });
 
 export async function createTask(orgId: string, input: unknown) {

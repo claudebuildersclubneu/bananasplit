@@ -13,8 +13,8 @@ import { sqlStateOf } from "@/server/db/errors";
 import { orgNameSchema, orgSlugSchema } from "@/server/settings/org-creation";
 
 /**
- * Settings > General, on app_user through withOrgAction. Name and timezone
- * are ADMIN+; the URL (slug) is OWNER-only, in the app and in the database
+ * Settings > General, on app_user through withOrgAction. Name, timezone and
+ * the weekly update day are ADMIN+; the URL (slug) is OWNER-only, in the app and in the database
  * (app.organization_guard). The organization_slug_guard trigger refuses a
  * reserved or retired slug and records the old slug in OrgSlugHistory, so
  * it keeps redirecting (307) to the org and can never be taken by another.
@@ -67,6 +67,32 @@ export const updateOrgTimezone = withOrgAction(
       diff: { from: before.timezone, to: tz },
     });
     invalidate([tags.reports(ctx.organizationId), tags.publicEvents(ctx.organizationId)]);
+    return {};
+  },
+);
+
+/** The day the weekly update is due, 0 Sunday … 6 Saturday (OrgSettings.weeklyUpdateDay). */
+export const updateWeeklyUpdateDay = withOrgAction(
+  async (ctx, day: number): Promise<GeneralResult> => {
+    requirePermission(ctx, "settings.general.write");
+    const parsed = z.number().int().min(0).max(6).safeParse(day);
+    if (!parsed.success) return { error: "Pick a day of the week." };
+    const before = await ctx.db.orgSettings.findUnique({
+      where: { organizationId: ctx.organizationId },
+      select: { weeklyUpdateDay: true },
+    });
+    if (before?.weeklyUpdateDay === parsed.data) return {};
+    await ctx.db.orgSettings.update({
+      where: { organizationId: ctx.organizationId },
+      data: { weeklyUpdateDay: parsed.data, updatedById: ctx.userId },
+    });
+    await writeOrgAuditLog(ctx.db, {
+      organizationId: ctx.organizationId,
+      action: "settings.weekly_update_day_changed",
+      targetType: "OrgSettings",
+      targetId: ctx.organizationId,
+      diff: { from: before?.weeklyUpdateDay ?? 0, to: parsed.data },
+    });
     return {};
   },
 );

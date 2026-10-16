@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ClipboardPaste, Inbox, NotebookPen, Plus } from "lucide-react";
+import { ArrowLeft, ChevronDown, ClipboardPaste, Plus } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import { WorkspaceToolbar } from "@/components/tasks/workspace-toolbar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,18 +14,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  hasModifier,
+  isTypingTarget,
+  NEW_TASK_PARAM,
+  overlayOpen,
+  SCOPE_KEYS,
+  TASK_KEYS,
+} from "@/lib/shortcuts";
 
 import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
 
 /**
- * The workspace header.
+ * The workspace header: the title and New task. Nothing else competes for
+ * the corner: the dashboard is a layout in the toolbar, Requests is gone,
+ * and the weekly update shows where it's relevant (the Week's strip, the
+ * dashboard), not as a button sitting here all week.
  *
- * Requests and the Sunday update used to be two of seven equal tabs. They
- * are not layouts — you do not "look at the board as a Sunday update" — so
- * they sit here as destinations instead, next to New task. Pulling them out
- * is what lets the tab row become five genuine views of one question.
- *
- * Inside a destination the header collapses to a back link: the filter
+ * Inside the weekly update the header collapses to a back link: the filter
  * toolbar has nothing to filter there, and leaving it on screen would
  * suggest otherwise.
  *
@@ -33,47 +39,61 @@ import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
  * rather than beside it.
  */
 export function WorkspaceHeader({
-  intakeCount,
-  showIntake,
-  posted,
   teamwork = true,
 }: {
-  /** Open requests waiting in the intake queue. */
-  intakeCount: number;
-  showIntake: boolean;
-  /** Whether the viewer already posted this week's Sunday update. */
-  posted: boolean;
-  /** Requests and the Sunday update (not in a Personal space). */
+  /** The weekly update exists (a club's layouts; not Personal or the Free plan). */
   teamwork?: boolean;
 }) {
   const { newTask, org } = useTasks();
   const ws = useWorkspace();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [importing, setImporting] = useState(false);
   const inDestination = isDestination(ws.query.view);
+  const projectId = ws.query.projectId ?? null;
 
-  // 1-3 switch layout, c starts a task. Typing in a field never triggers them.
+  // The single keys (src/lib/shortcuts.ts, listed on the ⌘/ sheet): 1-4
+  // switch layout (4 is the dashboard), c starts a task, m / t / e pick
+  // whose work, x clears the filters, u opens the weekly update. Typing in a
+  // field never triggers them, nor does a key an open menu uses.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      if (target?.isContentEditable) return;
-      if (document.querySelector("[role=dialog][data-state=open]")) return;
-
+      if (event.defaultPrevented || hasModifier(event) || isTypingTarget(event)) return;
+      if (overlayOpen()) return;
+      const run = (action: () => void) => {
+        event.preventDefault();
+        action();
+      };
+      const key = event.key.toLowerCase();
       const index = Number.parseInt(event.key, 10);
       if (!ws.simple && index >= 1 && index <= TASK_LAYOUTS.length) {
-        event.preventDefault();
-        ws.setView(TASK_LAYOUTS[index - 1]!.value as TaskLayout);
-        return;
+        return run(() => ws.setView(TASK_LAYOUTS[index - 1]!.value as TaskLayout));
       }
-      if (event.key === "c") {
-        event.preventDefault();
-        newTask({ projectId: ws.query.projectId ?? null });
+      if (key === TASK_KEYS.newTask) return run(() => newTask({ projectId }));
+      if (teamwork && key === TASK_KEYS.updates) return run(() => ws.setView("updates"));
+      // The rest narrow a layout; a destination has nothing to narrow.
+      if (inDestination) return;
+      const scope = ws.scopes.find((s) => SCOPE_KEYS[s.value] === key);
+      if (scope) return run(() => ws.setScope(scope.value));
+      if (key === TASK_KEYS.clearFilters) {
+        return run(() => router.push(`/app/${org.slug}/tasks?view=${ws.query.view}`));
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ws, newTask]);
+  }, [ws, newTask, projectId, teamwork, inDestination, router, org.slug]);
+
+  // `c` pressed elsewhere in the app lands here with ?new=1: start the task,
+  // then drop the param so a reload or Back doesn't start another.
+  const startNew = searchParams.get(NEW_TASK_PARAM) === "1";
+  useEffect(() => {
+    if (!startNew) return;
+    newTask({ projectId });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(NEW_TASK_PARAM);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [startNew, newTask, projectId, searchParams, router, pathname]);
 
   return (
     <div className="mb-5 space-y-4">
@@ -86,30 +106,7 @@ export function WorkspaceHeader({
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back to tasks
             </Button>
-          ) : ws.simple || !teamwork ? null : (
-            <>
-              {showIntake && (
-                <DestinationButton
-                  icon={Inbox}
-                  label="Requests"
-                  hint={
-                    intakeCount > 0
-                      ? `${intakeCount} request${intakeCount === 1 ? "" : "s"} waiting on triage`
-                      : "The intake queue"
-                  }
-                  count={intakeCount}
-                  onClick={() => ws.setView("intake")}
-                />
-              )}
-              <DestinationButton
-                icon={NotebookPen}
-                label="Sunday update"
-                hint={posted ? "You have posted this week" : "Draft and post this week's update"}
-                dot={!posted}
-                onClick={() => ws.setView("updates")}
-              />
-            </>
-          )}
+          ) : null}
 
           {/* New task, with "Paste a list" in its menu (just New task on the Free plan). */}
           {ws.simple ? (
@@ -175,39 +172,5 @@ export function WorkspaceHeader({
         />
       )}
     </div>
-  );
-}
-
-function DestinationButton({
-  icon: Icon,
-  label,
-  hint,
-  count,
-  dot,
-  onClick,
-}: {
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  label: string;
-  hint?: string;
-  count?: number;
-  /** A quiet "there is something to do here" marker. */
-  dot?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      title={hint}
-      aria-label={hint ? `${label}: ${hint}` : label}
-    >
-      <Icon className="size-4" aria-hidden />
-      <span className="hidden sm:inline">{label}</span>
-      {count !== undefined && count > 0 && (
-        <Badge className="h-4 min-w-4 px-1 text-[10px]">{count}</Badge>
-      )}
-      {dot && <span className="bg-warning size-1.5 rounded-full" aria-hidden />}
-    </Button>
   );
 }

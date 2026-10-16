@@ -201,7 +201,7 @@ export const JOB_KINDS = {
     sendsEmail: true,
     handler: () => import("@/server/tasks/jobs").then((m) => m.weeklyUpdateReminderJob),
     description:
-      "Sunday 18:00 local reminder to a lead who hasn't posted the week's update (once=true), enqueued by /api/cron/task-digest.",
+      "18:00 local reminder, on the club's weekly update day, to a lead who hasn't posted the week's update (once=true), enqueued by /api/cron/task-digest.",
   }),
 
   // ---- Calendar (Phase 7; handlers owned by B7) ----

@@ -10,6 +10,8 @@ import {
   isDateKey,
   localDateKey,
   localHour,
+  updateWeekStartKey,
+  updateWeekStartOfKey,
   weekBounds,
   weekStartKey,
   zonedInstant,
@@ -82,5 +84,23 @@ describe("My Tasks buckets", () => {
     ["2026-09-28", "later"],
   ] as const)("%s is %s", (due, bucket) => {
     expect(dueBucket(due, today)).toBe(bucket);
+  });
+});
+
+describe("weekly-update weeks end on the club's day", () => {
+  // Fri 2026-10-16. 0 Sunday … 6 Saturday.
+  it.each([
+    [0, "2026-10-12"], // Sunday club: Monday to Sunday
+    [5, "2026-10-10"], // Friday club: Saturday to Friday, and today is its last day
+    [1, "2026-10-13"], // Monday club: Tuesday to Monday
+    [4, "2026-10-16"], // Thursday club: a new week started today
+  ] as const)("update day %i: the week holding Fri Oct 16 starts %s", (day, start) => {
+    expect(updateWeekStartOfKey("2026-10-16", day)).toBe(start);
+    expect(addDaysToKey(start, 6) >= "2026-10-16").toBe(true);
+  });
+
+  it("matches the Monday weeks for a Sunday club", () => {
+    const sundayNight = new Date("2026-11-09T04:30:00Z"); // Sun Nov 8, 11:30pm in New York
+    expect(updateWeekStartKey(sundayNight, NY, 0)).toBe(weekStartKey(sundayNight, NY));
   });
 });

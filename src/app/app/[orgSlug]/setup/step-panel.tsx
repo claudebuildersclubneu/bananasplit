@@ -5,7 +5,7 @@ import { ClickPath, Consequences, PanelSection, Prerequisite } from "@/component
 import { setupStep, type SetupStepId } from "@/server/setup/catalog";
 
 import { ResumeButton, SkipButton, TestButton } from "./step-controls";
-import { CalendarForm, ClaudeForm, DataSourceForm, EmailForm } from "./step-forms";
+import { CalendarForm, ClaudeForm, DataSourceForm } from "./step-forms";
 import type { SetupStepView } from "./view";
 
 /**
@@ -19,7 +19,6 @@ import type { SetupStepView } from "./view";
 export function StepPanel({
   orgId,
   orgSlug,
-  orgName,
   view,
   nextStep,
   googleConfigured,
@@ -27,7 +26,6 @@ export function StepPanel({
 }: {
   orgId: string;
   orgSlug: string;
-  orgName: string;
   view: SetupStepView;
   nextStep: SetupStepId | null;
   googleConfigured: boolean;
@@ -118,7 +116,6 @@ export function StepPanel({
         {view.id === "calendar" ? (
           <CalendarForm orgId={orgId} view={view} configured={googleConfigured} />
         ) : null}
-        {view.id === "email" ? <EmailForm orgId={orgId} view={view} orgName={orgName} /> : null}
         {view.id === "claude" ? <ClaudeForm orgId={orgId} view={view} /> : null}
       </PanelSection>
 

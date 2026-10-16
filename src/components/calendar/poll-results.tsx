@@ -180,7 +180,7 @@ export function SlotDetails({
         <p className="text-muted-foreground">
           {total === 0
             ? "Nobody has answered yet."
-            : "Point at a time, or tab to it, to see who can make it."}
+            : "Tap or point at a time to see who can make it."}
         </p>
       </section>
     );

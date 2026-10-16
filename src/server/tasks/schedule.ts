@@ -7,7 +7,7 @@ import {
   fromDateKey,
   localDateKey,
   localHour,
-  weekStartKey,
+  updateWeekStartKey,
   weekdayOfKey,
   zonedInstant,
 } from "@/lib/tasks/dates";
@@ -18,7 +18,7 @@ import { enqueueReminder, REMINDER_HOUR_LOCAL, type ReminderStage } from "./remi
 import { expectedPosters } from "./weekly";
 
 /**
- * Scheduling for the daily digest, the Sunday-update reminder and the
+ * Scheduling for the daily digest, the weekly-update reminder and the
  * due-today and overdue reminders, called per org by /api/cron/task-digest.
  * It only enqueues (once=true keys); the jobs do the work.
  *
@@ -26,7 +26,7 @@ import { expectedPosters } from "./weekly";
  *
  * - hourly (Vercel Pro cron, or the GitHub Actions pinger on Hobby): enqueue
  *   a digest for each opted-in member whose local hour equals their
- *   digest.hourLocal, due now; on Sunday at 18:00 local, a reminder to each
+ *   digest.hourLocal, due now; on the club's update day at 18:00 local, a reminder to each
  *   lead who hasn't posted; and at 09:00 local, the due-today and overdue
  *   reminders for that member's open tasks.
  * - daily (the Hobby daily-cron fallback): enqueue the NEXT occurrence of
@@ -97,7 +97,7 @@ export async function scheduleOrgTaskJobs(
   return withSystemOrgTx(organizationId, async ({ db }) => {
     const org = await db.organization.findUnique({
       where: { id: organizationId },
-      select: { timezone: true, deletedAt: true },
+      select: { timezone: true, deletedAt: true, settings: { select: { weeklyUpdateDay: true } } },
     });
     if (!org || org.deletedAt) return { digests: 0, weeklyReminders: 0, dueReminders: 0 };
 
@@ -126,6 +126,8 @@ export async function scheduleOrgTaskJobs(
     }
 
     let weeklyReminders = 0;
+    // On the club's update day (Sunday unless it picked another), 6pm local.
+    const updateDay = org.settings?.weeklyUpdateDay ?? 0;
     const leads = await expectedPosters(db, organizationId);
     const tzOf = new Map(members.map((m) => [m.userId, effectiveTimezone(m.user, org)]));
     for (const lead of leads) {
@@ -135,10 +137,10 @@ export async function scheduleOrgTaskJobs(
         tz,
         WEEKLY_REMINDER_HOUR_LOCAL,
         mode,
-        (d) => weekdayOfKey(d) === 0,
+        (d) => weekdayOfKey(d) === updateDay,
       );
       if (!at) continue;
-      const weekStart = weekStartKey(new Date(at.runAt.getTime()), tz);
+      const weekStart = updateWeekStartKey(new Date(at.runAt.getTime()), tz, updateDay);
       const posted = await db.weeklyUpdate.findFirst({
         where: {
           organizationId,

@@ -162,7 +162,7 @@ export default async function DatabasesPage({
           href={href}
           label={d.name}
           className={cn(
-            "absolute right-3 bottom-3 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+            "absolute right-3 bottom-3 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",
             pinned.has(href) && "opacity-100",
           )}
         />
@@ -357,7 +357,6 @@ export default async function DatabasesPage({
               <StepPanel
                 orgId={organization.id}
                 orgSlug={orgSlug}
-                orgName={organization.name}
                 view={dataStep}
                 nextStep={null}
                 googleConfigured={false}
@@ -485,7 +484,6 @@ export default async function DatabasesPage({
           <StepPanel
             orgId={organization.id}
             orgSlug={orgSlug}
-            orgName={organization.name}
             view={dataStep}
             nextStep={null}
             googleConfigured={false}
