@@ -217,7 +217,7 @@ export async function checkJoinCode(
     return {
       ok: false,
       reason: "invalid_format",
-      message: "Club codes are 8 letters and numbers, like RPKA-YWSF.",
+      message: "Invite codes are 8 letters and numbers, like RPKA-YWSF.",
     };
 
   const identity = await getUserIdentity(user.id);

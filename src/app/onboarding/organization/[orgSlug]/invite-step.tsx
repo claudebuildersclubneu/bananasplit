@@ -138,7 +138,7 @@ export function InviteStep({
       }
     >
       <StepIntro index={index} total={total} title="Bring in your officers.">
-        Invite each officer by email, or share your club code. Members can join with the code any
+        Invite each officer by email, or share your invite code. Members can join with the code any
         time.
       </StepIntro>
 
@@ -146,10 +146,10 @@ export function InviteStep({
         {code && (
           <div className="bg-oat flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-4 py-3.5">
             <span className="flex flex-col gap-1">
-              <span className="text-ink-soft text-[13px] font-semibold">Your club code</span>
+              <span className="text-ink-soft text-[13px] font-semibold">Your invite code</span>
               <span
                 className="font-heading text-[30px] leading-none tracking-[0.12em]"
-                aria-label={`Club code ${code.split("").join(" ")}`}
+                aria-label={`Invite code ${code.split("").join(" ")}`}
               >
                 {code}
               </span>
