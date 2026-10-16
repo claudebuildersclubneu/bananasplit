@@ -10,6 +10,7 @@ import { ChartView } from "@/components/org-chart/chart-view";
 import { StartDraftButton } from "@/components/org-chart/start-draft-button";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import type { ChartNodeDTO } from "@/lib/org-chart/types";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getPublishedOrgChart } from "@/server/org-chart/queries";
@@ -35,7 +36,7 @@ export default async function OrgChartPage({
   const planLock = await planGate(orgSlug, "people");
   if (planLock) return planLock;
   const query = await searchParams;
-  const { organization, role } = await getOrgContextBySlug(orgSlug);
+  const { organization, role, settings } = await getOrgContextBySlug(orgSlug);
   const canEdit = can({ role }, "orgchart.write");
   const chart = await getPublishedOrgChart(organization.id);
   const mode = query.view === "list" ? "list" : "chart";
@@ -92,7 +93,7 @@ export default async function OrgChartPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="People"
+        title={sectionLabel(settings?.sidebar, "people")}
         description={published ?? "Roles and who reports to whom."}
         actions={
           <ChartHeaderActions

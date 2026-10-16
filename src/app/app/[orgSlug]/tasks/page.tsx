@@ -6,6 +6,7 @@ import { TasksProvider } from "@/components/tasks/tasks-context";
 import { WorkspaceProvider } from "@/components/tasks/workspace-context";
 import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import {
   effectiveTimezone,
   fromDateKey,
@@ -185,7 +186,10 @@ export default async function TasksPage({
       projects={base.projects}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
-        <WorkspaceHeader teamwork={teamwork && !simple} />
+        <WorkspaceHeader
+          title={sectionLabel(settings?.sidebar, "tasks")}
+          teamwork={teamwork && !simple}
+        />
         {ws.view === "week" && weekly && <WeeklyUpdateStrip status={weekly} />}
         {content}
       </WorkspaceProvider>
