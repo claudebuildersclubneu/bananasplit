@@ -22,14 +22,12 @@ export function TaskSentence({
   onTitle,
   ownerId,
   onOwner,
-  ownerLocked,
   dueDate,
   onDue,
   projectId,
   onProject,
   priority,
   onPriority,
-  priorityLocked,
   status,
   onStatus,
   visibility,
@@ -42,14 +40,12 @@ export function TaskSentence({
   onTitle: (v: string) => void;
   ownerId: string | null;
   onOwner: (v: string | null) => void;
-  ownerLocked?: boolean;
   dueDate: string;
   onDue: (v: string) => void;
   projectId: string | null;
   onProject: (v: string | null) => void;
   priority: TaskPriority;
   onPriority: (v: TaskPriority) => void;
-  priorityLocked?: boolean;
   status: TaskStatus;
   onStatus: (v: TaskStatus) => void;
   visibility: TaskVisibility;
@@ -92,7 +88,7 @@ export function TaskSentence({
       </div>
 
       <p className="text-foreground/80 m-0 text-[21px] leading-[1.85]">
-        <Slot label="Owner" text={ownerText} empty={!owner} disabled={ownerLocked}>
+        <Slot label="Owner" text={ownerText} empty={!owner}>
           {(close) => (
             <div className="flex max-h-72 flex-col gap-px overflow-y-auto">
               {members.map((m) => (
@@ -155,11 +151,7 @@ export function TaskSentence({
           )}
         </Slot>
         . It&apos;s{" "}
-        <Slot
-          label="Priority"
-          text={PRIORITY_LABEL[priority].toLowerCase()}
-          disabled={priorityLocked}
-        >
+        <Slot label="Priority" text={PRIORITY_LABEL[priority].toLowerCase()}>
           {(close) => (
             <div className="flex flex-col gap-px">
               {(Object.values(TaskPriority) as TaskPriority[]).map((p) => (
