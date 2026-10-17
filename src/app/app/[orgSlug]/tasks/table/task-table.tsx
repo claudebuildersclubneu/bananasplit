@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/table";
 import { UserAvatar } from "@/components/user-avatar";
 import { TaskStatus } from "@/generated/prisma/enums";
-import { canEditTask, canTriage } from "@/lib/tasks/access";
+import { canEditTask } from "@/lib/tasks/access";
 import { relationFor } from "@/lib/tasks/assignment";
 import { cn } from "@/lib/utils";
 
@@ -387,8 +387,7 @@ export function TaskTable({
               </TableRow>
             )}
             {sorted.map((task) => {
-              const access = accessSubjectOf(task);
-              const editable = canEditTask(actor, access);
+              const editable = canEditTask(actor, accessSubjectOf(task));
               const isExpanded = expanded.has(task.id);
               const doneSubtasks = task.subtasks.filter(
                 (s) => s.status === TaskStatus.COMPLETED,
@@ -474,10 +473,7 @@ export function TaskTable({
                     )}
                     {visible.priority && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <QuickPriority
-                          task={task}
-                          disabled={!editable || !canTriage(actor, access)}
-                        />
+                        <QuickPriority task={task} disabled={!editable} />
                       </TableCell>
                     )}
                     {visible.dueDate && (

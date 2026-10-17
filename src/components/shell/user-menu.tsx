@@ -70,7 +70,7 @@ export function UserMenu({ user }: { user: UserMenuUser }) {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-          {locked ? "Theme (set by your organization)" : "Theme"}
+          {locked ? "Theme (set by your club)" : "Theme"}
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup value={forcedTheme ?? theme ?? "system"} onValueChange={setTheme}>
           <DropdownMenuRadioItem value="light" disabled={locked}>

@@ -11,7 +11,7 @@ export function cleanCode(text: string): string {
 }
 
 /**
- * One box per character of a club code (design: App screens, 03). Accepts
+ * One box per character of an invite code (design: App screens, 03). Accepts
  * A-Z and 0-9 only and upper-cases them; typing moves on to the next box;
  * Backspace in an empty box clears the one before and moves back; the arrow
  * keys move between boxes; focusing a box selects it; a paste anywhere fills
@@ -25,7 +25,7 @@ export function CodeBoxes({
   onChange,
   invalid = false,
   autoFocus = false,
-  label = "Club code",
+  label = "Invite code",
 }: {
   value: string[];
   onChange: (next: string[]) => void;

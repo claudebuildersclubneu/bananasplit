@@ -1,11 +1,14 @@
-import { ChevronRight, Ticket } from "lucide-react";
+import { ChevronRight, Plus, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
+import { newRsvpEventHref } from "@/lib/calendar/range";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { rsvpCover } from "@/lib/rsvp/cover";
 import { whenLine } from "@/lib/rsvp/when";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -92,6 +95,15 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
   const ticketFor = new Map(tickets.map((r) => [r.eventId, r]));
   const upcoming = events.filter((e) => e.endsAt > now);
   const past = events.filter((e) => e.endsAt <= now).reverse();
+  // Whoever can make events: the Calendar's New event, with the RSVP page on.
+  const newEvent = canManage ? (
+    <Button size="sm" asChild>
+      <Link href={newRsvpEventHref(orgSlug)}>
+        <Plus aria-hidden="true" />
+        New event with RSVPs
+      </Link>
+    </Button>
+  ) : null;
 
   const pageList = (items: PageRow[]) => (
     <ul className="divide-y overflow-hidden rounded-xl border">
@@ -150,14 +162,15 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <PageHeader
-        title="RSVPs"
+        title={sectionLabel(ctx.settings?.sidebar, "rsvps")}
         description={
           personal
             ? "Event pages anyone can RSVP to, no account needed, and every event you've signed up for."
             : canManage
-              ? "Public sign-up pages for the club's events, and your own tickets. Make one from New event on the calendar, or from any event's page."
+              ? "Public sign-up pages for the club's events, and your own tickets. Start one here, or from any event's page."
               : "The club's events taking sign-ups, and your tickets."
         }
+        actions={newEvent}
       />
 
       {tickets.length > 0 && (
@@ -175,11 +188,12 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
             title="No RSVP pages yet"
             description={
               <>
-                Open an event and choose{" "}
+                Make a new event with a sign-up page, or open one you already have and choose{" "}
                 <Ticket className="inline size-3.5 align-[-2px]" aria-hidden="true" /> Set up an
-                RSVP page, or turn on Take RSVPs when you make a new one.
+                RSVP page.
               </>
             }
+            action={newEvent}
           />
         ) : (
           <EmptyState

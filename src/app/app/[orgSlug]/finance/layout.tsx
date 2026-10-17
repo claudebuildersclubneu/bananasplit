@@ -4,6 +4,7 @@ import { PageTabs } from "@/components/ui/page-tabs";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 
 import { getCategoriesForPeriods, getOrgPeriods } from "./queries";
@@ -20,7 +21,7 @@ export default async function FinanceLayout({
 }: LayoutProps<"/app/[orgSlug]/finance">) {
   const { orgSlug } = await params;
   // Unknown slug or not a member: notFound() (getOrgContextBySlug).
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   // Not on the plan: the page shows the upgrade screen, without the header.
   if (!spaceIncludes(org, "finance")) return children;
   const isFinance = can({ role }, "finance.manage");
@@ -34,7 +35,7 @@ export default async function FinanceLayout({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Finance"
+        title={sectionLabel(settings?.sidebar, "finance")}
         actions={
           <FinanceActions
             orgId={org.id}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { settingsNavItems, isSettingsItemActive } from "@/app/app/[orgSlug]/settings/settings-nav";
 
-import { resolveSidebar, toConfig, visibleSidebar } from "@/lib/nav/sidebar";
+import { resolveSidebar, sectionLabel, toConfig, visibleSidebar } from "@/lib/nav/sidebar";
 
 import { isLinkActive, navSections } from "./nav-config";
 
@@ -104,6 +104,18 @@ describe("sidebar navigation", () => {
     expect(club.items.find((i) => i.id === "find-a-time")!.hidden).toBe(true);
     expect(club.items.find((i) => i.id === "rsvps")!.hidden).toBe(false);
     expect(links(saved).map((i) => i.label)).not.toContain("Find a time");
+  });
+
+  it("names a section's page the way the club's sidebar does", () => {
+    expect(sectionLabel(null, "notes")).toBe("Files");
+    const groups = resolveSidebar(null);
+    groups.find((g) => g.id === "data")!.items.find((i) => i.id === "notes")!.label = "Docs";
+    groups.find((g) => g.id === "club")!.items.find((i) => i.id === "rsvps")!.hidden = true;
+    const config = toConfig(groups);
+    expect(sectionLabel(config, "notes")).toBe("Docs");
+    // A hidden section keeps its name: admins can still open it.
+    expect(sectionLabel(config, "rsvps")).toBe("RSVPs");
+    expect(sectionLabel({ junk: true }, "people")).toBe("People");
   });
 
   it("follows the org's sidebar: hidden, renamed, moved and reordered sections", () => {

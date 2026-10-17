@@ -46,8 +46,8 @@ export default async function IntegrationsSettingsPage({
       <div>
         <h1 className="page-title">Integrations</h1>
         <p className="text-muted-foreground text-sm">
-          Each integration uses this organization&apos;s own keys, stored encrypted and never shown
-          again after saving. Owners and admins can connect and test; only owners can remove.
+          Each integration uses this club&apos;s own keys, stored encrypted and never shown again
+          after saving. Owners and admins can connect and test; only owners can remove.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border p-4">
