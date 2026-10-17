@@ -81,7 +81,7 @@ export default async function BallotDefinitionsPage({
         <BackLink href={`/app/${orgSlug}/databases/${dbKey}`} label={data.database.name} />
         <PageHeader
           title="Poll definitions"
-          description="Labels, question types and voting windows for each poll. Ballots cast outside the window, test polls, load and smoke tests, and ballots naming options a poll no longer has are kept but not counted."
+          description="What each poll asks, its answer options, and when voting is open. If a poll's totals look off, check here: votes cast outside that window, votes from the website's own tests, and votes for options a poll no longer has are kept but not counted."
         />
       </div>
 

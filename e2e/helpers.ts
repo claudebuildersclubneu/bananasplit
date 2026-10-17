@@ -148,27 +148,27 @@ export async function chooseClubRole(page: Page, orgSlug: string, role?: string)
 }
 
 /**
- * Org setup (onboarding Flow B) with the defaults: name the club, skip the
- * connections, keep the suggested labels, finance and starter teams, invite
- * no one, and land on the new club's home as its OWNER. Returns the slug.
+ * Org setup (onboarding Flow B) with the defaults: name the club, keep the
+ * suggested labels, finance and starter teams, invite no one, skip the
+ * connections, and land on the new club's home as its OWNER. Returns the slug.
  */
 export async function createOrgViaOnboarding(page: Page, orgName: string): Promise<string> {
   if (!/\/onboarding\/organization$/.test(new URL(page.url()).pathname))
     await page.goto("/onboarding/organization");
   await page.getByLabel("Club name").fill(orgName);
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL(/\/onboarding\/organization\/[^/]+\/data$/);
+  await page.waitForURL(/\/onboarding\/organization\/[^/]+\/labels$/);
   const slug = new URL(page.url()).pathname.split("/")[3]!;
-  // Connecting data is optional: the club's data is stored in Bananasplit either way.
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL(/\/labels$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/finance$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/teams$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/invite$/);
-  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  // Connecting tools is optional: the club's data is stored in Bananasplit either way.
+  await page.waitForURL(/\/data$/);
+  await page.getByRole("button", { name: "Continue" }).click();
   // A new club starts its 30-day trial with everything (Society), so the
   // flows under test have the whole club; its home is the Overview.
   await page.waitForURL(new RegExp(`/app/${slug}(\\?welcome=1)?$`));

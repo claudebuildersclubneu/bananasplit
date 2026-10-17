@@ -6,7 +6,7 @@ import { sanitize } from "@/server/jobs/sanitize";
 import { scheduleOrgTaskJobs, type TriggerMode } from "@/server/tasks/schedule";
 
 /**
- * Enqueues the daily task digests, the Sunday-update reminders and the
+ * Enqueues the daily task digests, the weekly-update reminders and the
  * due-today and overdue reminders (src/server/tasks/schedule.ts). It never
  * sends anything itself: the job drain (/api/cron/jobs) runs the
  * task-digest, weekly-update-reminder and task-reminder jobs.

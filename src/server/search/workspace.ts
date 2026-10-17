@@ -401,7 +401,7 @@ async function searchProjects(ctx: Ctx): Promise<SearchGroup> {
       ...everyWord<Prisma.ProjectWhereInput>(q.terms, (c) => [{ name: c }, { description: c }]),
     },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, description: true, isIntake: true },
+    select: { id: true, name: true, description: true },
     take: ctx.pool,
   });
   const labels = await db.label.findMany({
@@ -419,7 +419,7 @@ async function searchProjects(ctx: Ctx): Promise<SearchGroup> {
         title: p.name,
         href: `${ctx.base}/tasks?view=board&scope=all&project=${p.id}`,
         detail: excerptAround(p.description, q.folded) ?? openingLine(p.description, 100) ?? null,
-        meta: p.isIntake ? "Requests" : "Project",
+        meta: "Project",
         score: scoreFields(
           [
             { text: p.name, weight: 3 },

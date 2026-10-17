@@ -98,7 +98,7 @@ export default async function SetupStatusPage({
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href={`/app/${orgSlug}/setup`}>Guided setup</Link>
+          <Link href={`/app/${orgSlug}/setup`}>Connect tools</Link>
         </Button>
       </header>
 

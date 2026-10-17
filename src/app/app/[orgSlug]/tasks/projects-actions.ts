@@ -8,16 +8,15 @@ import { withOrgAction } from "@/server/db/context";
 
 /**
  * Projects on the task board. Creating, archiving and unarchiving a project
- * all need `tasks.manageAll` (OWNER/ADMIN), as does turning a project into an
- * intake queue (Design Requests) with a triage owner and a default due
- * window.
+ * all need `tasks.manageAll` (OWNER/ADMIN). (Turning a project into an
+ * intake queue went with Requests.)
  *
  * Projects are org-wide structure: every member sees the same list in the
- * project filter, the CBC set is created by the OWNER-only 'Bootstrap CBC
- * workspace' action, and one of them is the intake queue. Until now
+ * project filter, and the CBC set is created by the OWNER-only 'Bootstrap
+ * CBC workspace' action. Until now
  * createProjectTx and setArchivedTx made no permission check at all, so any
- * MEMBER could add a project, or archive the admin-configured intake project
- * out from under the queue (reproduced). Row-level security only scopes these
+ * MEMBER could add a project, or archive an admin-configured one out from
+ * under the board (reproduced). Row-level security only scopes these
  * writes to the caller's org; it carries no role predicate, so the check has
  * to be here. Gating create as well as archive keeps the pair symmetric — a
  * member who could create but not archive would leave clutter only an admin
@@ -72,56 +71,6 @@ export async function archiveProject(orgId: string, projectId: string) {
 
 export async function unarchiveProject(orgId: string, projectId: string) {
   const result = await setArchivedTx(orgId, projectId, false);
-  if (!result.error) refresh();
-  return result;
-}
-
-const intakeSchema = z.object({
-  projectId: id,
-  isIntake: z.boolean(),
-  triageUserId: id.nullable(),
-  defaultDueInDays: z.number().int().min(1).max(60).nullable(),
-});
-
-const setIntakeTx = withOrgAction(
-  async (ctx, input: unknown) => {
-    if (!can(ctx, "tasks.manageAll"))
-      return { error: "Only an owner or admin can set up an intake queue." };
-    const parsed = intakeSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-    const d = parsed.data;
-    if (d.triageUserId) {
-      const member = await ctx.db.membership.findFirst({
-        where: { organizationId: ctx.organizationId, userId: d.triageUserId },
-        select: { id: true },
-      });
-      if (!member) return { error: "The triage owner must be a member." };
-    }
-    const res = await ctx.db.project.updateMany({
-      where: { id: d.projectId, organizationId: ctx.organizationId },
-      data: {
-        isIntake: d.isIntake,
-        triageUserId: d.isIntake ? d.triageUserId : null,
-        defaultDueInDays: d.isIntake ? d.defaultDueInDays : null,
-      },
-    });
-    if (res.count === 0) return { error: "Project not found." };
-    return {};
-  },
-  { feature: "teamwork", onRefused: "return" },
-);
-
-/** OWNER/ADMIN: make a project an intake queue (or back into a plain project). */
-export async function setProjectIntake(
-  orgId: string,
-  input: {
-    projectId: string;
-    isIntake: boolean;
-    triageUserId: string | null;
-    defaultDueInDays: number | null;
-  },
-) {
-  const result = await setIntakeTx(orgId, input);
   if (!result.error) refresh();
   return result;
 }

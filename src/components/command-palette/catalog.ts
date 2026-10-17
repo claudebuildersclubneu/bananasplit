@@ -19,6 +19,7 @@ export type PaletteCommand =
   | { type: "href"; href: string }
   | { type: "pin" }
   | { type: "new-note" }
+  | { type: "shortcuts" }
   | { type: "theme"; theme: "light" | "dark" | "system" };
 
 export interface CatalogEntry {
@@ -50,7 +51,7 @@ export interface CatalogInput {
   orgSlug: string;
   role: Role | null;
   sections: readonly PaletteSection[];
-  orgs?: readonly { slug: string; name: string; pendingDeletion?: boolean }[];
+  orgs?: readonly { slug: string; name: string; kind?: string; pendingDeletion?: boolean }[];
   /** The org fixes light or dark (Settings › Theme): no theme switching. */
   themeLocked?: boolean;
   /** "Pin something" is available. */
@@ -99,18 +100,28 @@ const PAGES: readonly PageDef[] = [
     keywords: ["task calendar", "due dates", "month", "deadlines"],
   },
   {
-    path: "/tasks?view=updates",
-    title: "Sunday update",
+    path: "/tasks?view=dashboard",
+    title: "Task dashboard",
+    detail: "Where tasks and projects stand",
     section: "tasks",
-    icon: "Newspaper",
-    keywords: ["weekly update", "status report", "summary"],
+    icon: "Gauge",
+    keywords: [
+      "status",
+      "progress",
+      "overdue",
+      "blocked",
+      "projects",
+      "leads",
+      "report",
+      "overview",
+    ],
   },
   {
-    path: "/tasks?view=intake",
-    title: "Requests",
+    path: "/tasks?view=updates",
+    title: "Weekly update",
     section: "tasks",
-    icon: "Inbox",
-    keywords: ["intake", "design requests", "queue", "triage"],
+    icon: "Newspaper",
+    keywords: ["weekly update", "sunday update", "status report", "summary"],
   },
   // Calendar
   {
@@ -240,17 +251,17 @@ const PAGES: readonly PageDef[] = [
   // Setup
   {
     path: "/setup",
-    title: "Club setup",
+    title: "Connect tools",
     permission: "integrations.write",
     icon: "Rocket",
-    keywords: ["getting started", "onboarding", "checklist"],
+    keywords: ["setup", "integrations", "google calendar", "claude", "website data"],
   },
   {
     path: "/setup/status",
-    title: "Setup status",
+    title: "Connection status",
     permission: "integrations.write",
     icon: "ListChecks",
-    keywords: ["getting started", "progress", "checklist"],
+    keywords: ["setup", "integrations", "connected", "broken"],
   },
   // The Admin panel (the sections come from settings-nav, below)
   {
@@ -261,11 +272,11 @@ const PAGES: readonly PageDef[] = [
     keywords: ["settings", "preferences", "configuration", "admin", "options", "club settings"],
   },
   {
-    path: "/settings/invitations",
-    title: "Invitations",
+    path: "/settings/members",
+    title: "Invite people",
     permission: "members.invite",
     icon: "MailPlus",
-    keywords: ["invite", "join code", "link", "add members"],
+    keywords: ["invite", "invitations", "join code", "link", "add members"],
     detail: "Admin panel",
   },
   {
@@ -389,6 +400,17 @@ export function buildCatalog(input: CatalogInput): CatalogEntry[] {
   };
   action(
     {
+      key: "action:new-task",
+      title: "New task",
+      detail: "Give someone something to own",
+      keywords: ["create", "add", "todo", "ticket", "assign"],
+      icon: "CheckSquare",
+      command: { type: "href", href: `${base}/tasks?new=1` },
+    },
+    "tasks",
+  );
+  action(
+    {
       key: "action:new-note",
       title: "New note",
       detail: "Start a private note",
@@ -438,6 +460,14 @@ export function buildCatalog(input: CatalogInput): CatalogEntry[] {
     },
     "finance",
   );
+  action({
+    key: "action:shortcuts",
+    title: "Keyboard shortcuts",
+    detail: "⌘/ or Ctrl /",
+    keywords: ["keys", "hotkeys", "keybindings", "help", "commands"],
+    icon: "Keyboard",
+    command: { type: "shortcuts" },
+  });
   if (input.canPin) {
     action({
       key: "action:pin",
@@ -477,7 +507,7 @@ export function buildCatalog(input: CatalogInput): CatalogEntry[] {
     action({
       key: `action:org:${org.slug}`,
       title: `Switch to ${org.name}`,
-      detail: "Organization",
+      detail: org.kind === "PERSONAL" ? "Personal" : "Club",
       keywords: ["switch", "organization", "club", "org"],
       icon: "ArrowRightLeft",
       command: { type: "href", href: `/app/${org.slug}` },

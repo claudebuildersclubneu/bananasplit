@@ -174,6 +174,8 @@ export interface TaskEnv {
     name: string;
     taskRequireOwner: boolean;
     taskRequireDueDate: boolean;
+    /** The weekly update's day, 0 Sunday … 6 Saturday. */
+    weeklyUpdateDay: number;
   };
   memberIds: ReadonlySet<string>;
   /** OWNER/ADMIN: the standing audience of every private task (C4). */
@@ -190,7 +192,12 @@ export async function loadTaskEnv(ctx: OrgContext, now: Date = new Date()): Prom
       name: true,
       timezone: true,
       settings: {
-        select: { taskRequireOwner: true, taskRequireDueDate: true, reminderLeadDaysDefault: true },
+        select: {
+          taskRequireOwner: true,
+          taskRequireDueDate: true,
+          reminderLeadDaysDefault: true,
+          weeklyUpdateDay: true,
+        },
       },
     },
   });
@@ -212,6 +219,7 @@ export async function loadTaskEnv(ctx: OrgContext, now: Date = new Date()): Prom
       taskRequireOwner: org.settings?.taskRequireOwner ?? false,
       taskRequireDueDate: org.settings?.taskRequireDueDate ?? false,
       reminderLeadDaysDefault: org.settings?.reminderLeadDaysDefault ?? 1,
+      weeklyUpdateDay: org.settings?.weeklyUpdateDay ?? 0,
     },
     memberIds: new Set(members.map((m) => m.userId)),
     adminIds,

@@ -15,6 +15,7 @@ import {
   NotebookText,
   Pin,
   Plus,
+  ShieldCheck,
   Ticket,
   Users,
   Wallet,
@@ -85,7 +86,7 @@ function NavItemLink({
       href={link.href}
       onClick={onNavigate}
       aria-current={pathname === link.href ? "page" : isActive ? "true" : undefined}
-      title={link.locked ? "Not on your club's plan" : "Drag onto Pinned to pin it"}
+      title={link.locked ? "Not on your club's plan" : undefined}
       className={cn(itemClass(isActive), link.locked && !isActive && "text-sidebar-foreground/55")}
     >
       <Icon className="size-4 shrink-0" aria-hidden="true" />
@@ -214,6 +215,7 @@ export function SidebarNav({
   orgId,
   pins = [],
   spaces,
+  admin,
   onNavigate,
 }: {
   sections: NavSection[];
@@ -221,6 +223,8 @@ export function SidebarNav({
   pins?: SidebarPin[];
   /** Personal and the clubs (SpaceList), at the foot, always in view. */
   spaces?: React.ReactNode;
+  /** The Admin panel (owners and admins), so it's one click away, not only in the club menu. */
+  admin?: { href: string; label: string };
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -243,6 +247,17 @@ export function SidebarNav({
             ))}
           </div>
         ))}
+        {admin && (
+          <Link
+            href={admin.href}
+            onClick={onNavigate}
+            aria-current={pathname.startsWith(admin.href) ? "true" : undefined}
+            className={cn(itemClass(pathname.startsWith(admin.href)), "mt-2")}
+          >
+            <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+            {admin.label}
+          </Link>
+        )}
         <PinnedList pins={pins} orgId={orgId} pathname={pathname} onNavigate={onNavigate} />
       </div>
       {spaces && <div className="border-sidebar-border mt-3 border-t pt-3">{spaces}</div>}

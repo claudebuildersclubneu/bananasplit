@@ -15,7 +15,10 @@ import type { IntegrationProvider } from "@/generated/prisma/enums";
  * whose result screen has something to show.
  */
 
-export const SETUP_STEP_IDS = ["data", "calendar", "email", "claude"] as const;
+// No email step: notification email works with nothing set up (the platform's
+// no-reply sender). A club that wants its own From address connects one under
+// Settings > Integrations > Email sender.
+export const SETUP_STEP_IDS = ["data", "calendar", "claude"] as const;
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
 
 export function isSetupStepId(value: string): value is SetupStepId {
@@ -128,48 +131,6 @@ export const SETUP_STEPS: readonly SetupStepDefinition[] = [
     ],
     ifSkipped:
       "Sessions live only in this portal. The calendar page still works, and the public events feed still works; nothing appears on Google.",
-  },
-  {
-    id: "email",
-    provider: "EMAIL_RESEND",
-    settingsSegment: "email",
-    title: "Email sender",
-    summary: "Send reminders, digests and invitations from your club's own address.",
-    unlocks: [
-      "Task reminders and the weekly digest reach people's inboxes",
-      "Invitations come from your club, not from a platform address",
-      "Replies go to an address your officers actually read",
-    ],
-    minutes: 10,
-    prerequisite:
-      "This is the one step you cannot finish in a sitting. Verifying a domain means adding DNS records, and DNS can take anywhere from ten minutes to a few hours to spread.",
-    where: [
-      {
-        text: "At resend.com, open Domains and press Add Domain. Use a subdomain you use for nothing else, so a bounce problem never touches your main domain.",
-        code: "mail.yourclub.org",
-      },
-      {
-        text: "Resend shows a table of DNS records: SPF, DKIM and a return path. Add every one of them at whoever hosts your DNS. On Netlify that is Domains, your domain, DNS records. Add a DMARC record too while you are there.",
-      },
-      {
-        text: "Wait until Resend shows the domain as Verified. Refreshing does not speed it up. Come back to this step when it is green.",
-      },
-      {
-        text: "In Resend open API Keys, Create API Key, and give it Full access — the domain check has to read your domain list, which a sending-only key cannot do.",
-      },
-      {
-        text: "Copy the key. Resend shows it exactly once. Paste it below with the from name and address.",
-        code: "re_xxxxxxxxxxxxxxxxxxxxxxxx",
-      },
-    ],
-    consequences: [
-      "Test connection will fail until the domain shows Verified in Resend. That failure is the DNS not being ready yet, not a broken key — the error will tell you which.",
-      "Resend bills your club, not the platform. Their free tier covers a club's volume comfortably.",
-      "Until a verified sender exists, org mail either goes out from the platform address on your behalf or not at all. The step says which applies to you.",
-      "Once your sender verifies, mail switches to it and the platform fallback turns itself off.",
-    ],
-    ifSkipped:
-      "Members get in-app notifications only, or mail from the platform address. Invitations still go out either way.",
   },
   {
     id: "claude",

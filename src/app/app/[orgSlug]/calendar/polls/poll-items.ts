@@ -1,5 +1,6 @@
 import type { PollListItem } from "@/components/polls/poll-list";
 import { safeTimeZone } from "@/lib/calendar/dates";
+import { availabilityExpiresAt } from "@/lib/polls/expiry";
 import { pollHref } from "@/lib/polls/paths";
 import { isPollOpen } from "@/lib/polls/question-poll";
 import type { QuestionPollSummary } from "@/server/polls/question-polls";
@@ -89,6 +90,10 @@ export function availabilityItem(
       dateSpan(poll),
       `${poll.durationMinutes}-minute meeting`,
       people(poll.respondentCount, "responded"),
+      // It deletes itself 10 days after the last day it offers (src/lib/polls/expiry.ts).
+      poll.lastSlotEndsAt
+        ? `Deletes ${shortDate(availabilityExpiresAt(poll.lastSlotEndsAt), zone)}`
+        : null,
     ]
       .filter(Boolean)
       .join(" · "),

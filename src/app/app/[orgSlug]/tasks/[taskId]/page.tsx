@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { BackLink } from "@/components/back-link";
 import { TaskPageEditor } from "@/components/tasks/task-page-editor";
 import { TasksProvider } from "@/components/tasks/tasks-context";
 import { can } from "@/lib/auth/permissions";
@@ -54,7 +55,8 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
       labels={data.labels}
       projects={data.projects}
     >
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <BackLink href={`/app/${orgSlug}/tasks`} label="Tasks" />
         <TaskPageEditor task={task} initialComments={data.comments} />
       </div>
     </TasksProvider>

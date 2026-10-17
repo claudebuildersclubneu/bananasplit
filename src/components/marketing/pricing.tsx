@@ -145,7 +145,7 @@ const SECTIONS: Record<Audience, readonly Section[]> = {
       rows: [
         { feature: "Members, invitations and roles", marks: [false, true, true] },
         { feature: "A home page for every member", marks: [false, true, true] },
-        { feature: "Requests and Sunday updates", marks: [false, true, true] },
+        { feature: "Weekly updates", marks: [false, true, true] },
         { feature: "Club polls", marks: [false, true, true] },
         { feature: "Member directory and org chart", marks: [false, true, true] },
         { feature: "Live notes and club storage", marks: [false, "25 GB", "100 GB"] },

@@ -4,22 +4,24 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
  * The task workspace's URL grammar (C4).
  *
  * There used to be seven tabs — My Tasks, Board, Table, Calendar, Team,
- * Sunday update, Requests — sitting next to each other as if they were the
+ * the weekly update, Requests — sitting next to each other as if they were the
  * same kind of thing. They were not. Five of them draw the SAME set of tasks
  * in different shapes; the other two are pieces of work you do (compose the
  * week's update, run the request queue).
  *
- * So the workspace is now one filtered question asked three ways:
+ * So the workspace is now one filtered question asked four ways:
  *
- *   LAYOUT  board · week · table                     (how it is drawn)
+ *   LAYOUT  board · week · table · dashboard         (how it is drawn)
  *   SCOPE   mine · team · all                        (whose work)
  *   FILTERS project, status, label, search, due range, flagged, blockers,
  *           visibility                               (which tasks)
  *
  * One toolbar drives all of it and every layout reads the same filters, so
  * switching from the board to the table never silently changes what you are
- * looking at. Requests and the Sunday update moved out of the row of tabs
- * and became their own destinations in the header.
+ * looking at. The dashboard is the same question again, counted: where the
+ * work in view stands, by project and by person. The weekly update is a
+ * destination of its own (reached from the Week and the dashboard), and the
+ * request queue is gone.
  *
  * The board is the default. The calendar layout became the main calendar's
  * Tasks layer (due dates beside the events, one calendar for everything),
@@ -32,7 +34,8 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
  *   ?view=table&owner={id}&status=open   that person's open tasks
  *   ?view=table&assignee={id}            tasks involving that person
  *   ?view=mine                           now the Week layout, scope mine
- *   ?view=board | updates | intake
+ *   ?view=board | week | table | dashboard | updates
+ *   ?view=intake                         the board (Requests is retired)
  *   ?view=calendar                       the Calendar, tasks shown
  *   ?view=team                           the board
  */
@@ -41,12 +44,13 @@ export const TASK_LAYOUTS = [
   { value: "board", label: "Board", hint: "Move work along" },
   { value: "week", label: "Week", hint: "What is due, by when" },
   { value: "table", label: "Table", hint: "Filter and bulk-edit" },
+  { value: "dashboard", label: "Dashboard", hint: "Where things stand" },
 ] as const;
 
 export type TaskLayout = (typeof TASK_LAYOUTS)[number]["value"];
 
-/** Not layouts: the two things you go and DO. */
-export const TASK_DESTINATIONS = ["updates", "intake"] as const;
+/** Not a layout: the weekly update is a piece of work you go and do. */
+export const TASK_DESTINATIONS = ["updates"] as const;
 export type TaskDestination = (typeof TASK_DESTINATIONS)[number];
 
 /**
@@ -81,12 +85,13 @@ export function isDestination(value: unknown): value is TaskDestination {
 
 /**
  * `view=mine` is the old name for "the week, just my work"; the retired
- * team layout (and a remembered calendar one) open the board. A requested
- * ?view=calendar is sent to the Calendar by the page before this runs.
+ * team layout, the retired request queue (?view=intake) and a remembered
+ * calendar one open the board. A requested ?view=calendar is sent to the
+ * Calendar by the page before this runs.
  */
 export function parseTaskView(value: unknown): TaskView | null {
   if (value === "mine") return "week";
-  if (value === "team" || value === "calendar") return "board";
+  if (value === "team" || value === "calendar" || value === "intake") return "board";
   if (isLayout(value) || isDestination(value)) return value;
   return null;
 }

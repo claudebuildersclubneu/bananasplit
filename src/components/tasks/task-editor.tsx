@@ -378,7 +378,7 @@ export function TaskEditor({
                 ? "Create subtask"
                 : "Create task"
               : "Save"}
-          <span aria-hidden="true" className="inline-flex gap-0.5">
+          <span aria-hidden="true" className="hidden gap-0.5 sm:inline-flex">
             <kbd className="bg-primary-foreground/15 inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] px-1 font-mono text-[11px] font-semibold">
               {mod}
             </kbd>
@@ -616,8 +616,8 @@ export function TaskEditor({
             <div key={`${f.role}-${f.userId}`} className="flex flex-wrap items-center gap-2">
               <FlagBadge />
               <span className="min-w-0 flex-1">
-                {memberById.get(f.userId)?.name ?? "Someone"} was assigned as {f.role} from below
-                their level in the org chart.
+                {memberById.get(f.userId)?.name ?? "Someone"} was given this task by someone below
+                them on the org chart.
               </span>
               {canAcknowledgeFlag(actor, f.userId) && (
                 <Button

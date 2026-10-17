@@ -59,7 +59,7 @@ export default async function OrgSetupStepPage({
       steps={ORG_STEP_NAMES}
       current={index}
       exit={
-        <Link href={`/app/${organization.slug}`} className={exitClass}>
+        <Link href={`/app/${organization.slug}?welcome=1`} className={exitClass}>
           Save and exit
         </Link>
       }

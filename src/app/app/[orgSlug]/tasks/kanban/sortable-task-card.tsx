@@ -51,7 +51,7 @@ export function SortableTaskCard({
         task={{ id: task.id, title: task.title, subtaskCount: task.subtasks.length }}
         editable={canEditTask(actor, accessSubjectOf(task))}
         onOpen={() => onOpen(task.id)}
-        className="bg-card absolute top-1.5 right-1.5 border opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+        className="bg-card absolute top-1.5 right-1.5 border opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
       />
     </div>
   );

@@ -397,7 +397,7 @@ export function WidgetBody({
           hideHeading
         />
       ) : (
-        <ChartEmpty text="No runway to project yet" />
+        <ChartEmpty text="Not enough history to project yet" />
       );
     case "sponsorships":
       return (

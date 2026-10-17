@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
 import Form from "next/form";
 import Link from "next/link";
 
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { UserAvatar } from "@/components/user-avatar";
 import { PinToggle } from "@/components/pins/pins-context";
+import { can } from "@/lib/auth/permissions";
 import { peopleHref, personHref } from "@/lib/profile/href";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { listOrgPeople, parsePageParam, parseSearchParam } from "@/server/profiles/queries";
@@ -30,7 +31,7 @@ export default async function PeoplePage({
   const planLock = await planGate(orgSlug, "people");
   if (planLock) return planLock;
   const query = await searchParams;
-  const { organization, user } = await getOrgContextBySlug(orgSlug);
+  const { organization, user, role } = await getOrgContextBySlug(orgSlug);
 
   const q = parseSearchParam(query.q);
   const { people, total, page, pageCount } = await listOrgPeople(organization.id, {
@@ -48,19 +49,29 @@ export default async function PeoplePage({
             : `${total} ${total === 1 ? "member" : "members"} of ${organization.name}`
         }
         actions={
-          <Form action={peopleHref(orgSlug)} className="w-full sm:w-auto" role="search">
-            <label htmlFor="people-search" className="sr-only">
-              Search people
-            </label>
-            <SearchField
-              id="people-search"
-              name="q"
-              defaultValue={q}
-              placeholder="Search name, title or major"
-              className="sm:w-64"
-              maxLength={80}
-            />
-          </Form>
+          <>
+            <Form action={peopleHref(orgSlug)} className="w-full sm:w-auto" role="search">
+              <label htmlFor="people-search" className="sr-only">
+                Search people
+              </label>
+              <SearchField
+                id="people-search"
+                name="q"
+                defaultValue={q}
+                placeholder="Search name, title or major"
+                className="sm:w-64"
+                maxLength={80}
+              />
+            </Form>
+            {can({ role }, "members.invite") && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/app/${orgSlug}/settings/members`}>
+                  <UserPlus className="size-4" aria-hidden="true" />
+                  Invite people
+                </Link>
+              </Button>
+            )}
+          </>
         }
         tabs={<PeopleTabs orgSlug={orgSlug} />}
       />
@@ -87,7 +98,7 @@ export default async function PeoplePage({
                 <PinToggle
                   href={personHref(orgSlug, person.id)}
                   label={person.name ?? "member"}
-                  className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                  className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                 />
                 <Link
                   href={personHref(orgSlug, person.id)}

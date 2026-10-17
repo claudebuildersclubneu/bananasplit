@@ -579,7 +579,7 @@ function EventForm({
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="event-stamp">Stamp slot</Label>
+                    <Label htmlFor="event-stamp">Stamp card spot</Label>
                     <Input
                       id="event-stamp"
                       type="number"
@@ -588,7 +588,11 @@ function EventForm({
                       value={stampSlot}
                       onChange={(e) => setStampSlot(e.target.value)}
                       placeholder="1-12"
+                      aria-describedby="event-stamp-hint"
                     />
+                    <p id="event-stamp-hint" className="text-muted-foreground text-xs">
+                      Which square of the website&apos;s stamp card this event fills.
+                    </p>
                   </div>
                 </div>
               </fieldset>
@@ -596,7 +600,7 @@ function EventForm({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label>Conferencing</Label>
+                <Label>Video call</Label>
                 <ConferenceProviderSelect value={provider} onChange={setProvider} />
               </div>
               <div className="grid gap-1.5">
@@ -674,7 +678,7 @@ function EventForm({
             Cancel
           </Button>
           <Button type="submit" disabled={isPending || !title.trim()}>
-            {isPending ? "Saving…" : event ? "Save" : "Create"}
+            {isPending ? "Saving…" : event ? "Save" : "Create event"}
           </Button>
         </div>
       </DialogFooter>

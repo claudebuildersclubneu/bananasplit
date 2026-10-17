@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { setActiveOrgCookie } from "@/lib/active-org-cookie";
 import { requireUser } from "@/lib/auth/session";
 import { ACCEPT_ERROR_MESSAGES } from "@/lib/invitations";
-import { clubRoleHref, orgStepHref } from "@/lib/onboarding/steps";
+import { clubRoleHref, ORG_STEPS, orgStepHref } from "@/lib/onboarding/steps";
 import { acceptInvitation, findPendingInvitationsForMe } from "@/server/settings/invitations";
 import { createOrganization, isSlugAvailable } from "@/server/settings/org-creation";
 
@@ -40,8 +40,8 @@ export async function createOrganizationAction(
   if (!result.ok) return { error: result.error };
 
   await setActiveOrgCookie(result.orgId);
-  // From onboarding, org setup continues with B2 (connect data).
-  if (field(formData, "flow") === "onboarding") redirect(orgStepHref(result.slug, "data"));
+  // From onboarding, org setup continues with the first of ORG_STEPS.
+  if (field(formData, "flow") === "onboarding") redirect(orgStepHref(result.slug, ORG_STEPS[0]));
   redirect(`/app/${result.slug}`);
 }
 

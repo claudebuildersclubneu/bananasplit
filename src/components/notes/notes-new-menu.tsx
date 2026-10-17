@@ -375,6 +375,11 @@ export function NotesNewMenu({
 
   return (
     <>
+      {/* The commonest thing after a new note, one click away (also under New). */}
+      <Button type="button" variant="outline" size="sm" onClick={() => show("upload")}>
+        <Upload className="size-4" aria-hidden="true" />
+        Upload
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" size="sm" disabled={pending}>

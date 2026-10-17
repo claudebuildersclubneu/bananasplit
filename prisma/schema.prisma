@@ -1669,6 +1669,9 @@ model OrgSettings {
   // Phase 6 (tasks)
   taskRequireOwner              Boolean          @default(false)
   taskRequireDueDate            Boolean          @default(false)
+  /// The day the weekly update is due, 0 Sunday … 6 Saturday. An update
+  /// covers the seven days ending that day (Sunday: Monday to Sunday).
+  weeklyUpdateDay               Int              @default(0)
   reminderLeadDaysDefault       Int              @default(1)
   bootstrapTemplate             String?
   bootstrappedAt                DateTime?

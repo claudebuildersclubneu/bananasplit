@@ -132,24 +132,11 @@ export function WeekView({
             ? "Loosen a filter, or clear them all to see the whole week."
             : mine
               ? "Nothing open is assigned to you. Switch to Everyone to see what the club is carrying, or start something."
-              : "No open tasks in this scope yet."
+              : "Nobody has an open task here yet."
         }
         action={
           ws.filterCount > 0 ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                ws.setFilters({
-                  status: undefined,
-                  labelId: undefined,
-                  q: undefined,
-                  flagged: false,
-                  blockers: false,
-                  visibility: undefined,
-                })
-              }
-            >
+            <Button variant="outline" size="sm" onClick={ws.clearFilters}>
               Clear filters
             </Button>
           ) : (

@@ -10,7 +10,7 @@ import type { OrgPlan } from "@/generated/prisma/enums";
  *   FREE     Personal, every account's own space: RSVP pages, tasks (every
  *            view, for one person), the calendar and availability polls,
  *            and its own settings. Never a club's plan.
- *   CLUB     the club workspace: the overview, Requests and Sunday updates,
+ *   CLUB     the club workspace: the overview, weekly updates,
  *            labels, files, people and the org chart, finance, databases
  *            and reports, and data connections.
  *   SOCIETY  everything, plus themes, AI, sponsorships, website sync and
@@ -38,7 +38,7 @@ export const PLAN_FEATURES = {
 
   /** The Overview board of widgets (Personal has its own home). */
   overview: "CLUB",
-  /** Requests (the intake queue) and Sunday updates: work between people. */
+  /** Weekly updates: work between people. */
   teamwork: "CLUB",
   /** Shared task labels (Admin panel > Labels). */
   labels: "CLUB",
@@ -127,7 +127,7 @@ export const FEATURE_LABELS: Record<PlanFeature, string> = {
   polls: "Polls",
   admin: "Settings",
   overview: "The Overview",
-  teamwork: "Requests and Sunday updates",
+  teamwork: "Weekly updates",
   labels: "Task labels",
   files: "Files",
   people: "People and the org chart",
@@ -152,7 +152,7 @@ export const FEATURE_PITCH: Record<PlanFeature, string> = {
   polls: "Find a time that works for everyone, or ask anything.",
   admin: "Your name, time zone and the rest of your settings.",
   overview: "Each member's home page: their tasks, meetings, pins and recent pages.",
-  teamwork: "Take requests in one queue, and post a weekly update to your team.",
+  teamwork: "Post a weekly update to your team, on the day your club picks.",
   labels: "A shared label palette for sorting tasks.",
   files: "Live notes, documents and uploads in one place.",
   people: "A member directory with profiles, and an org chart for your officers.",

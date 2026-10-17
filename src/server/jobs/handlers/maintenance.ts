@@ -1,6 +1,7 @@
 import { authDb, serviceDb } from "@/server/db/clients";
 import { withSystemOrgTx } from "@/server/db/context";
 import { NOTE_TRASH_DAYS } from "@/lib/notes/trash";
+import { expiredAvailabilityPoll } from "@/server/polls/expiry";
 import { deleteBlobs } from "@/server/storage";
 
 import type { JobHandler } from "../types";
@@ -57,6 +58,27 @@ async function purgeDeletedNoteFiles(now: Date = new Date()): Promise<number> {
   return purged;
 }
 
+/**
+ * Find a time polls are deleted FIND_A_TIME_KEEP_DAYS after the last day
+ * they offer (src/lib/polls/expiry.ts). Slots and answers cascade; an event
+ * a poll scheduled stays on the calendar (the link is the poll's column).
+ */
+async function purgeExpiredFindATimes(now: Date = new Date()): Promise<number> {
+  const orgIds = await serviceDb.$queryRaw<
+    { id: string }[]
+  >`SELECT id FROM app.active_org_ids() AS id`;
+  let purged = 0;
+  for (const { id } of orgIds) {
+    const { count } = await withSystemOrgTx(id, ({ db }) =>
+      db.availabilityPoll.deleteMany({
+        where: { organizationId: id, ...expiredAvailabilityPoll(now) },
+      }),
+    );
+    purged += count;
+  }
+  return purged;
+}
+
 /** Spent or replaced links are deleted at once; expired ones are kept a week, so a late click still reads "expired". */
 export const AUTH_TOKEN_GRACE_DAYS = 7;
 
@@ -70,7 +92,7 @@ async function pruneExpiredAuthTokens(now: Date = new Date()): Promise<number> {
   return resets.count + verifies.count;
 }
 
-/** Prunes expired rate-limit buckets, old finished jobs, stale sign-in links and long-deleted Notes files. */
+/** Prunes expired rate-limit buckets, old finished jobs, stale sign-in links, long-deleted Notes files and past Find a time polls. */
 export const maintenanceJob: JobHandler<unknown> = async () => {
   const buckets = await serviceDb.$queryRaw<{ n: number }[]>`
     SELECT app.prune_rate_limit_buckets(${BUCKET_RETENTION_SECONDS}::int) AS n`;
@@ -84,7 +106,11 @@ export const maintenanceJob: JobHandler<unknown> = async () => {
     console.error("[jobs] pruning expired sign-in links failed", error);
     return 0;
   });
+  const polls = await purgeExpiredFindATimes().catch((error) => {
+    console.error("[jobs] deleting past Find a time polls failed", error);
+    return 0;
+  });
   console.info(
-    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s), ${tokens} expired link(s) and ${files} deleted file(s)`,
+    `[jobs] maintenance pruned ${Number(buckets[0]?.n ?? 0)} bucket(s), ${Number(jobs[0]?.n ?? 0)} job(s), ${tokens} expired link(s), ${files} deleted file(s) and ${polls} past Find a time poll(s)`,
   );
 };

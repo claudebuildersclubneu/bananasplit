@@ -121,7 +121,7 @@ export function RsvpManager(props: RsvpManagerProps) {
             <Button variant="outline" size="sm" asChild>
               <Link href={links.door}>
                 <ScanLine aria-hidden="true" />
-                Door mode
+                Check in guests
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>

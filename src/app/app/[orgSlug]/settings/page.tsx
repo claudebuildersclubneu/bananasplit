@@ -56,10 +56,10 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
       {can({ role }, "integrations.write") && spaceIncludes(organization, "integrations") && (
         <div className="bg-card flex flex-wrap items-center gap-4 rounded-xl border p-4">
           <div className="min-w-0 flex-1">
-            <p className="font-medium">Guided setup</p>
+            <p className="font-medium">Connect tools</p>
             <p className="text-muted-foreground text-sm">
-              Connect the club website, Google Calendar, an email sender and a Claude key, one at a
-              time, with a test for each.
+              Connect the club website, Google Calendar and a Claude key, one at a time, with a test
+              for each. All optional.
             </p>
           </div>
           <Button asChild size="sm" variant="outline">

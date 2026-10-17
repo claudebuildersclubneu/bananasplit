@@ -150,6 +150,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
         canInvite={
           ctx.organization.kind !== "PERSONAL" && can({ role: ctx.role }, "members.invite")
         }
+        taskViews={spaceIncludes(ctx.organization, "taskViews")}
+        teamwork={spaceIncludes(ctx.organization, "teamwork")}
         banner={
           <SpaceBanner
             space={ctx.organization}

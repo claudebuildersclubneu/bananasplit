@@ -20,13 +20,15 @@ import { TaskError } from "./service";
 export type { WeeklyItem, WeeklySummary };
 
 /**
- * The Sunday update helper (view=updates). Weeks run Monday 00:00 to Sunday
- * 23:59 in the org's timezone ('How we work': every lead posts done / next /
- * blocked by Sunday night).
+ * The weekly update helper (view=updates). Each club picks the day its
+ * update is due (OrgSettings.weeklyUpdateDay, Sunday by default), and a week
+ * is the seven days ending that day in the org's timezone: Monday to Sunday
+ * for a Sunday club, Saturday to Friday for a Friday one. Every lead posts
+ * done / next / blocked by that evening.
  *
  * - Done: completed during the week (owned or involved).
  * - Next: open tasks due within 7 days of the week's reference day (today
- *   for the current week, else its Sunday), overdue ones included, or in
+ *   for the current week, else its last day), overdue ones included, or in
  *   progress.
  * - Blocked: BLOCKED, with the reason.
  *
@@ -86,9 +88,9 @@ export async function getWeeklySummary(
     deletedAt: null,
     OR: [{ ownerId: userId }, { assignees: { some: { userId } } }],
   };
-  const sunday = addDaysToKey(weekStart, 6);
+  const lastDay = addDaysToKey(weekStart, 6);
   const today = localDateKey(now, tz);
-  const reference = today < sunday ? today : sunday;
+  const reference = today < lastDay ? today : lastDay;
   const horizon = fromDateKey(addDaysToKey(reference, 7));
 
   const done = await db.task.findMany({
@@ -211,7 +213,7 @@ export function getWeekUpdates(db: TxClient, organizationId: string, weekStart: 
 export type WeekUpdateRow = Awaited<ReturnType<typeof getWeekUpdates>>[number];
 
 export const postWeeklyUpdateSchema = z.object({
-  weekStart: z.string().refine((v) => isDateKey(v) && weekdayOfKey(v) === 1, "Pick a week."),
+  weekStart: z.string().refine(isDateKey, "Pick a week."),
   note: z.string().trim().max(2000).nullable().optional(),
 });
 
@@ -220,6 +222,10 @@ export async function postWeeklyUpdate(env: TaskEnv, input: unknown): Promise<{ 
   const parsed = postWeeklyUpdateSchema.safeParse(input);
   if (!parsed.success) throw new TaskError(parsed.error.issues[0]?.message ?? "Invalid input");
   const { weekStart, note } = parsed.data;
+  // A week starts the day after the club's update day.
+  if (weekdayOfKey(weekStart) !== (env.org.weeklyUpdateDay + 1) % 7) {
+    throw new TaskError("Pick a week.");
+  }
   const { db, organizationId } = env.ctx;
   const tz = env.org.timezone;
   const today = localDateKey(env.now, tz);

@@ -9,8 +9,10 @@ import { deleteQuestionPoll } from "@/app/app/[orgSlug]/calendar/polls/question-
 import { ItemMenu } from "@/components/item-menu";
 import { PinToggle } from "@/components/pins/pins-context";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
+import { cn } from "@/lib/utils";
 
 import { copyGuestPollLink, copyPollLink } from "./copy-link";
 import { PollStatusBadge, type PollStatusTone } from "./poll-status-badge";
@@ -39,6 +41,10 @@ export interface PollListItem {
   /** Said when asking before a delete. */
   deleteNote?: string;
 }
+
+/** Shown on hover or focus (always on a phone), so the row stays quiet. */
+const HOVER_ONLY =
+  "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100";
 
 const KINDS: Record<PollKind, { label: string; icon: typeof Vote }> = {
   question: { label: "Question", icon: Vote },
@@ -165,11 +171,20 @@ function PollRow({
         </div>
       </div>
       <div className="relative z-10 flex shrink-0 items-center gap-1">
-        <PinToggle
-          href={poll.href}
-          label={poll.title}
-          className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100"
-        />
+        <PinToggle href={poll.href} label={poll.title} className={HOVER_ONLY} />
+        {poll.canDelete && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            title="Delete poll"
+            aria-label={`Delete ${poll.title}`}
+            onClick={onDelete}
+            className={cn(HOVER_ONLY, "text-muted-foreground hover:text-destructive")}
+          >
+            <Trash2 aria-hidden className="size-4" />
+          </Button>
+        )}
         <ItemMenu
           label={`Actions for ${poll.title}`}
           items={[
@@ -178,7 +193,7 @@ function PollRow({
               icon: UserPlus,
               onSelect: () => copyGuestPollLink(poll.id),
             },
-            { label: "Copy link", icon: Link2, onSelect: () => copyPollLink(poll.href) },
+            { label: "Copy member link", icon: Link2, onSelect: () => copyPollLink(poll.href) },
             poll.canDelete && {
               label: "Delete",
               icon: Trash2,

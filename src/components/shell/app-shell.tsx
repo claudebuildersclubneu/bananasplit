@@ -1,11 +1,12 @@
 "use client";
 
 import { Menu, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { PaletteSection } from "@/components/command-palette/catalog";
 import { CommandPalette } from "@/components/command-palette/command-palette";
 import { useModKey } from "@/components/command-palette/use-mod-key";
+import { KeyboardShortcuts } from "@/components/shell/keyboard-shortcuts";
 import { NotificationBell } from "@/components/shell/notification-bell";
 import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { PinsProvider } from "@/components/pins/pins-context";
@@ -33,6 +34,8 @@ export function AppShell({
   role = null,
   isAdmin = false,
   canInvite = false,
+  taskViews = true,
+  teamwork = true,
   banner,
   children,
 }: {
@@ -56,6 +59,10 @@ export function AppShell({
   isAdmin?: boolean;
   /** May invite members (the club menu's "Invite people"). */
   canInvite?: boolean;
+  /** The plan has Board, Week and Table (the shortcut sheet lists their keys). */
+  taskViews?: boolean;
+  /** The weekly update exists (not in Personal). */
+  teamwork?: boolean;
   /** Above every page: the club's trial or paused notice (SpaceBanner). */
   banner?: React.ReactNode;
   children: React.ReactNode;
@@ -66,6 +73,17 @@ export function AppShell({
   const setCommandOpen = (open: boolean) =>
     setCommand((c) => (open === c.open ? c : { open, session: open ? c.session + 1 : c.session }));
   const mod = useModKey();
+  // A Personal space's settings are just settings; a club's are its Admin panel.
+  const admin = isAdmin
+    ? {
+        href: `/app/${orgSlug}/settings`,
+        label: sections[0]?.id === "personal" ? "Settings" : "Admin panel",
+      }
+    : undefined;
+  const shortcutLinks = useMemo(
+    () => sections.flatMap((s) => s.items).filter((i) => !i.locked),
+    [sections],
+  );
   const clubMenu = (
     <OrgSwitcher
       orgs={orgs}
@@ -105,6 +123,7 @@ export function AppShell({
             orgId={orgId}
             pins={pins}
             spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} />}
+            admin={admin}
           />
         </aside>
 
@@ -134,6 +153,7 @@ export function AppShell({
                     sections={sections}
                     orgId={orgId}
                     pins={pins}
+                    admin={admin}
                     spaces={
                       <SpaceList
                         orgs={orgs}
@@ -181,6 +201,13 @@ export function AppShell({
         </div>
 
         <VisitTracker orgId={orgId} />
+        <KeyboardShortcuts
+          orgSlug={orgSlug}
+          links={shortcutLinks}
+          isAdmin={isAdmin}
+          taskViews={taskViews}
+          teamwork={teamwork}
+        />
         <CommandPalette
           key={command.session}
           orgId={orgId}

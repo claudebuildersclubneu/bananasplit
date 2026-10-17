@@ -7,8 +7,7 @@ vi.mock("@/server/db/context", async () =>
 
 const { fake, resetFake } = await import("@/test/fake-context");
 const { Role } = await import("@/generated/prisma/enums");
-const { archiveProject, createProject, setProjectIntake, unarchiveProject } =
-  await import("./projects-actions");
+const { archiveProject, createProject, unarchiveProject } = await import("./projects-actions");
 
 function makeDb() {
   return {
@@ -84,18 +83,5 @@ describe("project actions require tasks.manageAll", () => {
     expect(await archiveProject("org_1", "../other-org")).toEqual({ error: "Project not found." });
     expect(fake.db.project.create).not.toHaveBeenCalled();
     expect(fake.db.project.updateMany).not.toHaveBeenCalled();
-  });
-
-  it("keeps the existing gate on intake configuration", async () => {
-    fake.role = Role.MEMBER;
-    const input = {
-      projectId: "proj_intake",
-      isIntake: true,
-      triageUserId: null,
-      defaultDueInDays: 5,
-    };
-    expect((await setProjectIntake("org_1", input)).error).toMatch(/owner or admin/i);
-    fake.role = Role.ADMIN;
-    expect(await setProjectIntake("org_1", input)).toEqual({});
   });
 });

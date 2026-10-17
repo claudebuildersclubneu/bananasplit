@@ -3,6 +3,7 @@ import { can } from "@/lib/auth/permissions";
 import type { TxClient } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
 import { noteVisibleWhere } from "@/server/notes/visibility";
+import { keptAvailabilityPoll } from "@/server/polls/expiry";
 
 /**
  * Calendar reads. Every function takes the caller's transaction client
@@ -182,9 +183,10 @@ export function canEditEvent(
  * length and how many people (not answers: one person answers many slots)
  * have responded.
  */
-export async function getOrgPolls(db: TxClient, organizationId: string) {
+export async function getOrgPolls(db: TxClient, organizationId: string, now = new Date()) {
   const polls = await db.availabilityPoll.findMany({
-    where: { organizationId },
+    // One past its date (src/lib/polls/expiry.ts) is gone, even before the cleanup runs.
+    where: { organizationId, ...keptAvailabilityPoll(now) },
     select: {
       id: true,
       title: true,
@@ -230,9 +232,14 @@ export async function getOrgPolls(db: TxClient, organizationId: string) {
  * the org and creator for the caller's own checks. Never hand this to a
  * client component: it holds user ids and guest key hashes. Build the DTO.
  */
-export function getPollSource(db: TxClient, organizationId: string, pollId: string) {
+export function getPollSource(
+  db: TxClient,
+  organizationId: string,
+  pollId: string,
+  now = new Date(),
+) {
   return db.availabilityPoll.findFirst({
-    where: { id: pollId, organizationId },
+    where: { id: pollId, organizationId, ...keptAvailabilityPoll(now) },
     select: {
       id: true,
       organizationId: true,

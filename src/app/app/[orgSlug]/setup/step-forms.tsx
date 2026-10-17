@@ -19,7 +19,6 @@ import {
 import {
   connectClaudeAction,
   connectDataSourceAction,
-  connectEmailAction,
   saveSetupCalendarsAction,
   type SetupResult,
 } from "./actions";
@@ -335,86 +334,6 @@ export function CalendarForm({
         </form>
       ) : null}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------- Email sender
-
-export function EmailForm({ orgId, view, onConnected, orgName }: FormProps & { orgName: string }) {
-  const [fromName, setFromName] = useState(str(view.config.fromName) || orgName);
-  const [fromAddress, setFromAddress] = useState(str(view.config.fromAddress));
-  const [replyTo, setReplyTo] = useState(str(view.config.replyTo));
-  const [apiKey, setApiKey] = useState("");
-  const { failure, isPending, submit } = useConnect(onConnected);
-
-  return (
-    <form
-      className="space-y-4"
-      onSubmit={(e: FormEvent) => {
-        e.preventDefault();
-        submit(
-          () =>
-            connectEmailAction(orgId, {
-              fromName,
-              fromAddress,
-              replyTo: replyTo || undefined,
-              apiKey: apiKey || undefined,
-            }),
-          () => setApiKey(""),
-        );
-      }}
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="setup-from-name">From name</Label>
-          <Input
-            id="setup-from-name"
-            value={fromName}
-            maxLength={80}
-            onChange={(e) => setFromName(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="setup-from-address">From address</Label>
-          <Input
-            id="setup-from-address"
-            type="email"
-            value={fromAddress}
-            placeholder="team@mail.yourclub.org"
-            aria-invalid={fieldInvalid(failure, "fromAddress") || undefined}
-            onChange={(e) => setFromAddress(e.target.value)}
-          />
-          <p className="text-muted-foreground text-xs">On the domain you verified in Resend.</p>
-        </div>
-        <div className="grid gap-1.5 sm:col-span-2">
-          <Label htmlFor="setup-reply-to">Reply-to (optional)</Label>
-          <Input
-            id="setup-reply-to"
-            type="email"
-            value={replyTo}
-            placeholder="president@yourclub.org"
-            onChange={(e) => setReplyTo(e.target.value)}
-          />
-          <p className="text-muted-foreground text-xs">
-            Where replies land. An officer inbox beats a no-reply address.
-          </p>
-        </div>
-      </div>
-      <SecretField
-        id="setup-resend-key"
-        label="Resend API key"
-        placeholder="re_…"
-        help="Full access, not sending-only."
-        value={apiKey}
-        onChange={setApiKey}
-        view={view}
-        invalid={fieldInvalid(failure, "apiKey")}
-      />
-      {failure ? <FailureNote reason={failure.error} fix={failure.fix} /> : null}
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Checking your domain…" : "Connect and check domain"}
-      </Button>
-    </form>
   );
 }
 

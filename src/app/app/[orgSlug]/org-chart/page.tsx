@@ -129,7 +129,7 @@ export default async function OrgChartPage({
           }
           action={
             canEdit ? (
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button asChild size="sm">
                   <Link href={`${base}/import`}>
                     <FileUp className="size-4" aria-hidden="true" />

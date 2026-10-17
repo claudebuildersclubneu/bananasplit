@@ -10,9 +10,10 @@ import {
   Lock,
   Plus,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/user-avatar";
@@ -225,25 +226,99 @@ function MemberHint({ member }: { member: MemberOption }) {
   );
 }
 
-/** Narrows a long member list as you type (only shown when the list is long). */
-function useMemberFilter(members: MemberOption[]) {
+/**
+ * The people menus' search box. It narrows the list as you type and runs it
+ * from the keyboard: ↑/↓ move through the matches, Enter picks the
+ * highlighted one (the first, until you move). After a pick the box clears
+ * and keeps focus, so in the multi-pick menu you type the next name straight
+ * away; Backspace in an empty box hands back to `onRemoveLast`. The box shows
+ * when the list is long, or always with `always`.
+ */
+export function useMemberSearch(
+  members: MemberOption[],
+  {
+    onPick,
+    onRemoveLast,
+    always = false,
+  }: {
+    onPick: (member: MemberOption) => void;
+    onRemoveLast?: () => void;
+    always?: boolean;
+  },
+) {
   const [q, setQ] = useState("");
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listId = useId();
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return members;
     return members.filter((m) => `${m.name ?? ""} ${m.title ?? ""}`.toLowerCase().includes(needle));
   }, [members, q]);
+  const current = filtered.length === 0 ? -1 : Math.min(active, filtered.length - 1);
+  const optionId = (m: MemberOption) => `${listId}-${m.id}`;
+
+  const reset = () => {
+    setQ("");
+    setActive(0);
+  };
+  const pick = (m: MemberOption) => {
+    onPick(m);
+    reset();
+    inputRef.current?.focus();
+  };
+
   const input =
-    members.length > 8 ? (
+    always || members.length > 8 ? (
       <input
+        ref={inputRef}
         value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Find someone"
+        onChange={(e) => {
+          setQ(e.target.value);
+          setActive(0);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            if (filtered.length === 0) return;
+            const step = e.key === "ArrowDown" ? 1 : -1;
+            const next = (current + step + filtered.length) % filtered.length;
+            setActive(next);
+            document
+              .getElementById(optionId(filtered[next]!))
+              ?.scrollIntoView({ block: "nearest" });
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const m = filtered[current];
+            if (m) pick(m);
+          } else if (e.key === "Backspace" && q === "" && onRemoveLast) {
+            e.preventDefault();
+            onRemoveLast();
+          }
+        }}
+        placeholder="Type a name"
         aria-label="Find someone"
-        className="bg-background border-input placeholder:text-muted-foreground mb-1 h-8 rounded-md border px-2.5 text-[13px] outline-none"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded="true"
+        aria-controls={listId}
+        aria-activedescendant={filtered[current] ? optionId(filtered[current]) : undefined}
+        className="bg-background border-input placeholder:text-muted-foreground focus-visible:border-primary/70 mb-1 h-8 rounded-md border px-2.5 text-[13px] outline-none"
       />
     ) : null;
-  return { filtered, input, reset: () => setQ("") };
+
+  return {
+    filtered,
+    input,
+    listId,
+    optionId,
+    /** The highlighted row, when the search box is there to drive it. */
+    isActive: (i: number) => input !== null && i === current,
+    hover: (i: number) => setActive(i),
+    pick,
+    reset,
+    focus: () => inputRef.current?.focus(),
+  };
 }
 
 export function OwnerField({
@@ -261,10 +336,15 @@ export function OwnerField({
 }) {
   const { members, memberById } = useTasks();
   const [open, setOpen] = useState(false);
-  const { filtered, input, reset } = useMemberFilter(members);
+  const search = useMemberSearch(members, {
+    onPick: (m) => {
+      onChange(m.id);
+      setOpen(false);
+    },
+  });
   const owner = value ? memberById.get(value) : undefined;
   return (
-    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
+    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || search.reset())}>
       <PopoverTrigger asChild>
         <button
           id={id}
@@ -285,23 +365,23 @@ export function OwnerField({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={MENU}>
-        {input}
+        {search.input}
         <div
+          id={search.listId}
           role="listbox"
           aria-label="Owner"
           className="flex max-h-72 flex-col gap-px overflow-y-auto"
         >
-          {filtered.map((m) => (
+          {search.filtered.map((m, i) => (
             <button
               key={m.id}
+              id={search.optionId(m)}
               type="button"
               role="option"
               aria-selected={m.id === value}
-              className={menuItemClass(m.id === value)}
-              onClick={() => {
-                onChange(m.id);
-                setOpen(false);
-              }}
+              className={cn(menuItemClass(m.id === value), search.isActive(i) && "bg-muted")}
+              onPointerMove={() => search.hover(i)}
+              onClick={() => search.pick(m)}
             >
               <UserAvatar user={m} size="xs" />
               <span className="truncate">{m.name ?? "Member"}</span>
@@ -345,13 +425,23 @@ export function PeopleField({
   const { members, memberById } = useTasks();
   const [open, setOpen] = useState(false);
   const choices = members.filter((m) => m.id !== exclude);
-  const { filtered, input, reset } = useMemberFilter(choices);
   const picked = value
     .filter((v) => v !== exclude)
     .map((v) => memberById.get(v))
     .filter(Boolean) as MemberOption[];
+  const toggle = (userId: string) =>
+    onChange(value.includes(userId) ? value.filter((v) => v !== userId) : [...value, userId]);
+  // Type a name, Enter, type the next: the box clears and keeps focus after each.
+  const search = useMemberSearch(choices, {
+    always: true,
+    onPick: (m) => toggle(m.id),
+    onRemoveLast: () => {
+      const last = picked.at(-1);
+      if (last) toggle(last.id);
+    },
+  });
   return (
-    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || reset())}>
+    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || search.reset())}>
       <PopoverTrigger asChild>
         <button
           id={id}
@@ -373,25 +463,63 @@ export function PeopleField({
           <UpDown />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className={MENU}>
+      <PopoverContent
+        align="end"
+        className={MENU}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          search.focus();
+        }}
+      >
         <MenuHeading>Add people</MenuHeading>
-        {input}
+        {picked.length > 0 && (
+          <div className="flex flex-wrap gap-1 px-1 pb-1.5">
+            {picked.map((m) => (
+              <span
+                key={m.id}
+                className="bg-muted inline-flex h-6 items-center gap-1 rounded-md ps-0.5 pe-0.5 text-xs font-medium"
+              >
+                <UserAvatar user={m} size="xs" />
+                {firstName(m)}
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={`Remove ${m.name ?? "member"}`}
+                  onClick={() => {
+                    toggle(m.id);
+                    search.focus();
+                  }}
+                  className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-0.5"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {search.input}
         <div
+          id={search.listId}
           role="listbox"
           aria-multiselectable="true"
           aria-label="Involved people"
           className="flex max-h-72 flex-col gap-px overflow-y-auto"
         >
-          {filtered.map((m) => {
+          {search.filtered.length === 0 && (
+            <p className="text-muted-foreground px-2 py-2 text-[13px]">Nobody by that name.</p>
+          )}
+          {search.filtered.map((m, i) => {
             const on = value.includes(m.id);
             return (
               <button
                 key={m.id}
+                id={search.optionId(m)}
                 type="button"
                 role="option"
                 aria-selected={on}
-                className={menuItemClass(on)}
-                onClick={() => onChange(on ? value.filter((v) => v !== m.id) : [...value, m.id])}
+                className={cn(menuItemClass(on), search.isActive(i) && "bg-muted")}
+                onPointerMove={() => search.hover(i)}
+                onClick={() => search.pick(m)}
               >
                 <UserAvatar user={m} size="xs" />
                 <span className="truncate">{m.name ?? "Member"}</span>
@@ -404,6 +532,9 @@ export function PeopleField({
             );
           })}
         </div>
+        <p className="text-muted-foreground mt-1 border-t px-2 pt-1.5 text-[11px]">
+          Enter adds · Backspace removes · Esc closes
+        </p>
       </PopoverContent>
     </Popover>
   );
@@ -713,11 +844,6 @@ export function ProjectField({
                 style={{ background: projectColor(p.id) }}
               />
               <span className="truncate">{p.name}</span>
-              {p.isIntake && (
-                <small className="text-muted-foreground ms-auto text-xs font-normal">
-                  Requests
-                </small>
-              )}
             </button>
           ))}
         </div>

@@ -28,13 +28,15 @@ interface WorkspaceValue {
   query: WorkspaceQuery;
   /** The layouts to offer: none on the Free plan, which has the List only. */
   layouts: readonly (typeof TASK_LAYOUTS)[number][];
-  /** The Free plan's workspace: the List, no layouts, Requests or Sunday update. */
+  /** The Free plan's workspace: the List, no layouts or weekly update. */
   simple: boolean;
   scopes: readonly { value: TaskScope; label: string }[];
   filterCount: number;
   setView: (view: TaskView) => void;
   setScope: (scope: TaskScope) => void;
   setFilters: (next: Partial<WorkspaceQuery>) => void;
+  /** Clears every filter `filterCount` counts (a person and due dates too); keeps the scope and project. */
+  clearFilters: () => void;
   /** A href for the same workspace with these changes, for real links. */
   hrefWith: (next: Partial<WorkspaceQuery>) => string;
 }
@@ -113,6 +115,21 @@ export function WorkspaceProvider({
         router.push(write({ scope, ownerId: undefined, assigneeId: undefined }));
       },
       setFilters: (next) => router.push(write(next)),
+      clearFilters: () =>
+        router.push(
+          write({
+            status: undefined,
+            ownerId: undefined,
+            assigneeId: undefined,
+            labelId: undefined,
+            q: undefined,
+            dueFrom: undefined,
+            dueTo: undefined,
+            flagged: false,
+            blockers: false,
+            visibility: undefined,
+          }),
+        ),
     };
   }, [query, hasReports, simple, router, write]);
 

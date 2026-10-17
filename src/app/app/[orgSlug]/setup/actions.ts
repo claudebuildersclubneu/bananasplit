@@ -11,10 +11,8 @@ import {
   removeProvider,
   resolveActor,
   saveClaude,
-  saveEmailSender,
   saveGoogleCalendars,
   saveSupabase,
-  sendTestEmail,
   testProvider,
   type IntegrationResult,
   type OrgActor,
@@ -55,12 +53,6 @@ const claudeInput = z.object({
   apiKey: optionalSecret,
   model: z.string().max(100).optional(),
   fallbacks: z.boolean().optional(),
-});
-const emailInput = z.object({
-  fromName: z.string().max(200),
-  fromAddress: z.string().max(300),
-  replyTo: z.string().max(300).optional(),
-  apiKey: optionalSecret,
 });
 const supabaseInput = z.object({
   projectRef: z.string().max(100),
@@ -131,21 +123,6 @@ export async function connectClaudeAction(
     if (result.ok) await onProviderConnected(orgId, actor.userId, IntegrationProvider.CLAUDE);
     return withFix("claude", result);
   });
-}
-
-export async function connectEmailAction(
-  orgId: string,
-  input: z.input<typeof emailInput>,
-): Promise<SetupResult> {
-  return run(orgId, async (actor) => {
-    const result = await saveEmailSender(orgId, actor, emailInput.parse(input));
-    if (result.ok) await onProviderConnected(orgId, actor.userId, IntegrationProvider.EMAIL_RESEND);
-    return withFix("email", result);
-  });
-}
-
-export async function sendSetupTestEmailAction(orgId: string): Promise<SetupResult> {
-  return run(orgId, async (actor) => withFix("email", await sendTestEmail(orgId, actor)));
 }
 
 export async function saveSetupCalendarsAction(

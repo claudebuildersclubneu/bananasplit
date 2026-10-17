@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { PollList } from "@/components/polls/poll-list";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { FIND_A_TIME_KEEP_DAYS } from "@/lib/polls/expiry";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { planGate } from "@/server/billing/plan-gate";
 
@@ -44,16 +45,16 @@ export default async function FindATimePage({
     <div className="space-y-6">
       <PageHeader
         title="Find a time"
-        description={
+        description={`${
           personal
             ? "Offer some days and hours and share the link: anyone marks when they're free, no account needed, and you pick the time."
             : "Offer some days and hours: members and guests mark when they're free, and an owner or admin schedules the best time."
-        }
+        } Each poll deletes itself ${FIND_A_TIME_KEEP_DAYS} days after its last date.`}
         actions={
           <Button size="sm" asChild>
             <Link href={`${base}/calendar/find-a-time/new`}>
               <Plus aria-hidden className="size-4" />
-              New poll
+              Offer times
             </Link>
           </Button>
         }
@@ -62,7 +63,7 @@ export default async function FindATimePage({
       {items.length === 0 ? (
         <EmptyState
           title="No meeting times to pick yet"
-          description="Start one with New poll: choose the days, the hours and how long the meeting is, then send the link. You'll see the best times as answers come in."
+          description="Press Offer times: choose the days, the hours and how long the meeting is, then send the link. You'll see the best times as answers come in."
         />
       ) : (
         <PollList

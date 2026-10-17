@@ -54,6 +54,7 @@ export function DataStep({
   orgSlug,
   index,
   total,
+  backHref,
   connections,
   connectedCount,
 }: {
@@ -61,6 +62,7 @@ export function DataStep({
   orgSlug: string;
   index: number;
   total: number;
+  backHref: string;
   connections: DataConnection[];
   connectedCount: number;
 }) {
@@ -156,7 +158,7 @@ export function DataStep({
       </StepBody>
 
       <StepError message={error} />
-      <StepFooter>
+      <StepFooter back={{ href: backHref }}>
         <ContinuePill
           pending={pending}
           pendingLabel="One moment…"

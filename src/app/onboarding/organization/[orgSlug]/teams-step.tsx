@@ -74,7 +74,9 @@ export function TeamsStep({
   const [teams, setTeams] = useState<TeamInput[]>(() =>
     STARTER.map((t, i) => (i === 0 ? { ...t, leadUserId: currentUserId } : t)),
   );
-  const [addMeetings, setAddMeetings] = useState(true);
+  // Off until asked for: the starter teams are examples, and a new club
+  // shouldn't find a semester of made-up meetings on its calendar.
+  const [addMeetings, setAddMeetings] = useState(false);
   const [showBusy, setShowBusy] = useState(state.showMemberAvailability);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -206,7 +208,10 @@ export function TeamsStep({
       </StepBody>
 
       <StepError message={error} />
-      <StepFooter back={{ href: backHref }}>
+      <StepFooter
+        back={{ href: backHref }}
+        skip={{ onClick: () => start(() => goToNextOrgStep(orgSlug, "teams")), disabled: pending }}
+      >
         <ContinuePill
           pending={pending}
           onClick={submit}

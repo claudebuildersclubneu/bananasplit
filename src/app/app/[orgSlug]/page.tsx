@@ -152,6 +152,7 @@ export default async function OrgOverviewPage({
             task: (await db.task.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
             budget: (await db.budgetPeriod.count({ where: { organizationId: org.id } })) > 0,
             note: (await db.note.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+            sections: settings?.sidebar != null,
           }
         : null,
     };

@@ -75,15 +75,15 @@ const SUBPAGES: Record<string, string> = {
   "finance/transactions": "Transactions",
   "org-chart/import": "Import org chart",
   "org-chart/versions": "Org chart history",
-  "setup/status": "Setup status",
+  "setup/status": "Connection status",
 };
 
 export const TASK_VIEWS: Record<string, string> = {
   week: "Week",
   board: "Board",
   table: "Table",
-  updates: "Sunday update",
-  intake: "Requests",
+  dashboard: "Dashboard",
+  updates: "Weekly update",
 };
 
 const TASK_SCOPES: Record<string, string> = { mine: "Mine", team: "My team", all: "Everyone" };

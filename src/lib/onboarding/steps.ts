@@ -85,7 +85,9 @@ export function unfinishedProfileSteps(profile: {
 }
 
 // B1 is /onboarding/organization; the rest live under the new org's slug.
-export const ORG_STEPS = ["data", "labels", "finance", "teams", "invite", "bring"] as const;
+// Connecting tools comes after inviting officers: it's optional, and a new
+// club's first minutes are better spent on its own setup and its people.
+export const ORG_STEPS = ["labels", "finance", "teams", "invite", "data", "bring"] as const;
 export type OrgStep = (typeof ORG_STEPS)[number];
 /** Seven steps in the stepper: B1 plus these six. */
 export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
@@ -93,12 +95,12 @@ export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
 /** The stepper's names for B1-B7, in order. */
 export const ORG_STEP_NAMES = [
   "Club basics",
-  // Optional: a club's data is stored in Bananasplit whether or not it connects anything.
-  "Connect tools",
   "Labels",
   "Finance",
   "Teams",
   "Invite officers",
+  // Optional: a club's data is stored in Bananasplit whether or not it connects anything.
+  "Connect tools",
   // "Bring anything in?": events, polls and tasks from the creator's Personal space.
   "Bring things in",
 ] as const;

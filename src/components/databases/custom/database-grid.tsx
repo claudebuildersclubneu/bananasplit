@@ -463,10 +463,7 @@ export function DatabaseGrid({
     setTrashCount((n) => n + done);
     setSelected(new Set());
     toast({
-      title:
-        ids.length === 1
-          ? "Row moved to the trash"
-          : `${formatCount(ids.length)} rows moved to the trash`,
+      title: ids.length === 1 ? "Row deleted" : `${formatCount(ids.length)} rows deleted`,
       action: {
         label: "Undo",
         run: async () => {
@@ -498,7 +495,7 @@ export function DatabaseGrid({
   async function purge(ids: string[] | "all") {
     let purged = 0;
     const ok = await confirm({
-      title: ids === "all" ? "Empty the trash?" : "Delete for good?",
+      title: ids === "all" ? "Delete all for good?" : "Delete for good?",
       description: "These rows are deleted forever. This can't be undone.",
       confirmLabel: "Delete forever",
       run: async () => {
@@ -629,10 +626,10 @@ export function DatabaseGrid({
         label={trash ? database.name : "Databases"}
       />
       <PageHeader
-        title={trash ? `${database.name}: trash` : database.name}
+        title={trash ? "Recently deleted" : database.name}
         description={
           trash
-            ? "Rows deleted in the last while. Restore them, or delete them for good."
+            ? "Deleted rows. Restore them, or delete them for good."
             : (database.description ?? undefined)
         }
         actions={
@@ -647,7 +644,7 @@ export function DatabaseGrid({
             {trash && database.canManage && records.length > 0 && (
               <Button size="sm" variant="outline" onClick={() => void purge("all")}>
                 <Trash2 aria-hidden="true" />
-                Empty trash
+                Delete all for good
               </Button>
             )}
             {!trash && (
@@ -660,7 +657,7 @@ export function DatabaseGrid({
                     onSelect: () => void exportCsv(),
                   },
                   {
-                    label: `Trash${trashCount ? ` (${formatCount(trashCount)})` : ""}`,
+                    label: `Recently deleted${trashCount ? ` (${formatCount(trashCount)})` : ""}`,
                     icon: Trash2,
                     href: `${base}?trash=1`,
                   },
@@ -707,7 +704,7 @@ export function DatabaseGrid({
             <span className="text-sm">{formatCount(selected.size)} selected</span>
             <Button size="sm" variant="outline" onClick={() => void trashRows([...selected])}>
               <Trash2 aria-hidden="true" />
-              Move to trash
+              Delete
             </Button>
           </span>
         )}
@@ -821,10 +818,10 @@ export function DatabaseGrid({
             <p className="text-muted-foreground p-6 text-sm">No rows match “{searchedFor}”.</p>
           ) : (
             <div className="space-y-2 p-6">
-              <p className="heading text-sm">{trash ? "The trash is empty" : "No rows yet"}</p>
+              <p className="heading text-sm">{trash ? "Nothing here" : "No rows yet"}</p>
               <p className="text-muted-foreground text-sm">
                 {trash
-                  ? "Rows moved to the trash show up here."
+                  ? "Rows you delete show up here."
                   : canEdit
                     ? "Add the first row. Everything you type is saved automatically."
                     : "Nothing has been added yet."}
@@ -1051,7 +1048,7 @@ const GridRow = memo(function GridRow({
             items={[
               { label: "Expand row", icon: Maximize2, onSelect: () => actions.expand(r.id) },
               canEdit && {
-                label: "Move to trash",
+                label: "Delete row",
                 icon: Trash2,
                 destructive: true,
                 separated: true,

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user-avatar";
-import { addDaysToKey, formatDueKey } from "@/lib/tasks/dates";
+import { addDaysToKey, formatDueKey, WEEKDAY_NAMES } from "@/lib/tasks/dates";
 import {
   formatWeeklyText,
   privateItemCount,
@@ -31,9 +31,9 @@ import { cn } from "@/lib/utils";
 import { postWeeklyUpdate } from "../actions";
 
 /**
- * The Sunday update helper: for one person and one week (Monday to Sunday,
- * org time), what they finished, what's next and what's blocked, drafted
- * from their tasks. 'Copy as text' for Slack; 'Post update' saves it (with a
+ * The weekly update helper: for one person and one week (the seven days
+ * ending on the club's update day, org time), what they finished, what's
+ * next and what's blocked, drafted from their tasks. 'Copy as text' for Slack; 'Post update' saves it (with a
  * note) as their WeeklyUpdate. OWNER/ADMIN also see who hasn't posted.
  */
 
@@ -56,6 +56,7 @@ export function UpdatesView({
   expected,
   weekUpdates,
   canSeeWhoPosted,
+  dueDay,
 }: {
   personId: string;
   personName: string;
@@ -66,6 +67,8 @@ export function UpdatesView({
   expected: { userId: string; name: string | null; title: string | null }[];
   weekUpdates: PostedUpdate[];
   canSeeWhoPosted: boolean;
+  /** The club's update day, 0 Sunday … 6 Saturday: the week's last day. */
+  dueDay: number;
 }) {
   const { org, viewer, members, memberById, announce } = useTasks();
   const router = useRouter();
@@ -112,10 +115,18 @@ export function UpdatesView({
   const postedBy = new Map(weekUpdates.filter((u) => u.postedAt).map((u) => [u.userId, u]));
   const notPosted = expected.filter((e) => !postedBy.has(e.userId));
   const isFuture = weekStart > currentWeekStart;
+  const lastDay = addDaysToKey(weekStart, 6);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
       <div className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold">Weekly update</h2>
+          <p className="text-muted-foreground text-sm">
+            Due {formatDueKey(lastDay, org.todayKey)}. What you finished, what&apos;s next and
+            what&apos;s stuck, drafted from your tasks: check it, add a note, post.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={personId}
@@ -143,7 +154,7 @@ export function UpdatesView({
               <ChevronLeft className="size-4" />
             </Button>
             <span className="min-w-44 text-center text-sm font-medium">
-              Week of {formatDueKey(weekStart, org.todayKey)}
+              {formatDueKey(weekStart, org.todayKey)} – {formatDueKey(lastDay, org.todayKey)}
             </span>
             <Button
               variant="outline"
@@ -283,8 +294,9 @@ export function UpdatesView({
           </section>
         )}
         <p className="text-muted-foreground text-xs">
-          Weeks run Monday to Sunday in {org.timezone}. Leads who haven&apos;t posted get a reminder
-          Sunday at 6pm.
+          Weeks run {WEEKDAY_NAMES[(dueDay + 1) % 7]} to {WEEKDAY_NAMES[dueDay]} in {org.timezone}.
+          Leads who haven&apos;t posted get a reminder {WEEKDAY_NAMES[dueDay]} at 6pm. An owner or
+          admin picks the day in Admin panel › General.
         </p>
       </aside>
     </div>

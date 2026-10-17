@@ -19,7 +19,7 @@ import type { AttendanceReport } from "@/server/reports/types";
 import { setupStep, type SetupStepId } from "@/server/setup/catalog";
 import { countsSentence, totalRows, type DataSummary } from "@/server/setup/summary";
 
-import { SendTestEmailButton, TestButton } from "./step-controls";
+import { TestButton } from "./step-controls";
 import { SyncWatcher } from "./sync-watcher";
 import type { SetupStepView } from "./view";
 
@@ -335,7 +335,7 @@ function CalendarResult({
         </ul>
       </PanelSection>
       <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-        <NextStepLink orgSlug={orgSlug} nextStep="email" />
+        <NextStepLink orgSlug={orgSlug} nextStep="claude" />
         <TestButton
           orgId={orgId}
           step="calendar"
@@ -348,60 +348,6 @@ function CalendarResult({
 }
 
 // ---------------------------------------------------------------- Email
-
-function EmailResult({
-  orgId,
-  orgSlug,
-  view,
-}: {
-  orgId: string;
-  orgSlug: string;
-  view: SetupStepView;
-}) {
-  const domain = typeof view.config.domain === "string" ? view.config.domain : null;
-  const from = typeof view.config.fromAddress === "string" ? view.config.fromAddress : null;
-
-  return (
-    <div className="space-y-6">
-      <Done>
-        {domain ? `${domain} is verified.` : "Your sender is connected."}
-        {from ? ` Org email now goes out from ${from}.` : ""}
-      </Done>
-      <p className="text-muted-foreground text-sm">
-        Task reminders, the weekly digest and invitations now come from your club. The platform
-        fallback has turned itself off.
-      </p>
-      <PanelSection title="Prove it">
-        <p className="text-muted-foreground text-sm">
-          Sends one message from this sender to your own address, and to nobody else.
-        </p>
-        <SendTestEmailButton orgId={orgId} />
-      </PanelSection>
-      <PanelSection title="Now worth opening">
-        <ul className="grid gap-2 sm:grid-cols-2">
-          <Destination
-            href={`/app/${orgSlug}/settings/notifications`}
-            icon={ArrowRight}
-            label="Notification settings"
-            detail="Which notifications also send email"
-          />
-          <Destination
-            href={`/app/${orgSlug}/settings/members`}
-            icon={Users}
-            label="Invite the rest of the board"
-            detail="Invitations now come from your own address"
-          />
-        </ul>
-      </PanelSection>
-      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-        <NextStepLink orgSlug={orgSlug} nextStep="claude" />
-        <TestButton orgId={orgId} step="email" label="Re-check the domain" variant="ghost" />
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- Claude
 
 function ClaudeResult({
   orgId,
@@ -481,7 +427,6 @@ export function ResultPanel({
       {view.id === "calendar" ? (
         <CalendarResult orgId={orgId} orgSlug={orgSlug} view={view} />
       ) : null}
-      {view.id === "email" ? <EmailResult orgId={orgId} orgSlug={orgSlug} view={view} /> : null}
       {view.id === "claude" ? <ClaudeResult orgId={orgId} orgSlug={orgSlug} view={view} /> : null}
     </div>
   );

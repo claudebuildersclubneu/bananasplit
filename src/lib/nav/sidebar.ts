@@ -50,15 +50,17 @@ export interface SectionDef {
   description: string;
 }
 
+// Main is the everyday three; Club is the people things (RSVPs among them);
+// Data opens with Files, the club's documents.
 export const SECTIONS: readonly SectionDef[] = [
   { id: "overview", label: "Overview", icon: "LayoutDashboard", path: "", exact: true, group: "main", locked: true, description: "Each member's home page." },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", group: "main", description: "Who's doing what, and by when." },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", group: "main", description: "Meetings and events." },
-  { id: "rsvps", label: "RSVPs", icon: "Ticket", path: "/calendar/rsvp", group: "main", description: "Sign-up pages for events, and your tickets." },
-  { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", group: "main", description: "Notes, documents and uploads." },
   { id: "people", label: "People", icon: "Users", path: "/people", also: ["/org-chart"], group: "club", description: "The member directory and the org chart." },
   { id: "polls", label: "Polls", icon: "CalendarCheck", path: "/calendar/polls", group: "club", description: "Ask the club a question and let people vote." },
   { id: "find-a-time", label: "Find a time", icon: "CalendarClock", path: "/calendar/find-a-time", group: "club", description: "Offer some times and see when everyone's free." },
+  { id: "rsvps", label: "RSVPs", icon: "Ticket", path: "/calendar/rsvp", group: "club", description: "Sign-up pages for events, and your tickets." },
+  { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", group: "data", description: "Notes, documents and uploads." },
   { id: "databases", label: "Databases", icon: "Database", path: "/databases", group: "data", description: "Attendance, sign-ups, votes and reports." },
   { id: "finance", label: "Finance", icon: "Wallet", path: "/finance", group: "data", description: "Budget, transactions and reimbursements." },
 ];
@@ -148,9 +150,9 @@ export function resolveSidebar(raw: unknown): ResolvedGroup[] {
   for (const [i, def] of SECTIONS.entries()) {
     const s = saved.get(def.id);
     // Saved order first. A section added since the club saved its sidebar
-    // goes right after the one before it, under its heading (RSVPs after
-    // Calendar, Find a time after Polls), and starts hidden if the section it
-    // came out of is.
+    // goes right after the one before it, under its heading (Find a time
+    // after Polls, RSVPs after Find a time), and starts hidden if the section
+    // it came out of is (Polls, the Calendar).
     const before =
       config && !s && SECTIONS[i - 1]?.group === def.group ? items[items.length - 1] : undefined;
     const from = config && !s ? ADDED_FROM[def.id] : undefined;

@@ -4,10 +4,12 @@ import {
   Check,
   ChevronDown,
   Columns3,
+  Gauge,
   ListChecks,
   Lock,
   SlidersHorizontal,
   Table2,
+  UserRound,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -15,6 +17,9 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +31,11 @@ import {
 import { SearchField } from "@/components/ui/search-field";
 import { chipClass, Segmented } from "@/components/ui/segmented";
 import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
+import { hasModifier, isTypingTarget, overlayOpen, SCOPE_KEYS, TASK_KEYS } from "@/lib/shortcuts";
+import { cn } from "@/lib/utils";
 
 import { STATUS_LABELS } from "./status-select";
+import { menuItemClass, useMemberSearch } from "./task-fields";
 import { useTasks, useWorkspace } from "./tasks-context";
 
 /**
@@ -47,6 +55,7 @@ const LAYOUT_ICONS = {
   board: Columns3,
   week: ListChecks,
   table: Table2,
+  dashboard: Gauge,
 } as const;
 
 function Chip({
@@ -83,9 +92,7 @@ export function WorkspaceToolbar() {
   // `/` focuses search from anywhere that is not already a field.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      if (target?.isContentEditable) return;
+      if (event.defaultPrevented || isTypingTarget(event)) return;
       if (event.key === "/" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         searchRef.current?.focus();
@@ -133,10 +140,12 @@ export function WorkspaceToolbar() {
               key={scope.value}
               active={ws.query.scope === scope.value && !pinnedMember}
               onClick={() => ws.setScope(scope.value)}
+              title={SCOPE_KEYS[scope.value] && `${scope.label} (${SCOPE_KEYS[scope.value]})`}
             >
               {scope.label}
             </Chip>
           ))}
+          {members.length > 1 && <PersonFilter />}
         </div>
 
         <div className="ms-auto flex flex-1 items-center justify-end gap-2 sm:flex-none">
@@ -261,7 +270,11 @@ export function WorkspaceToolbar() {
           )}
           {ws.query.visibility && (
             <FilterPill
-              icon={<Lock className="size-3" aria-hidden="true" />}
+              icon={
+                ws.query.visibility === TaskVisibility.PRIVATE ? (
+                  <Lock className="size-3" aria-hidden="true" />
+                ) : undefined
+              }
               label={
                 ws.query.visibility === TaskVisibility.PRIVATE ? "Private only" : "Open to the club"
               }
@@ -314,6 +327,137 @@ export function WorkspaceToolbar() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Filter by person: every layout narrowed to one member's tasks, the ones
+ * they own or are involved in (or, ticked, only the ones they own). It
+ * writes ?assignee= or ?owner=, the links the People pages already publish,
+ * so a filtered board is a link you can share. `p` opens it; type a name and
+ * press Enter.
+ */
+function PersonFilter() {
+  const { members, memberById } = useTasks();
+  const ws = useWorkspace();
+  const [open, setOpen] = useState(false);
+  const personId = ws.query.ownerId ?? ws.query.assigneeId;
+  const person = personId ? memberById.get(personId) : undefined;
+  const [ownedOnly, setOwnedOnly] = useState(Boolean(ws.query.ownerId));
+
+  const choose = (userId: string | undefined, owned = ownedOnly) =>
+    ws.setFilters(
+      owned
+        ? { ownerId: userId, assigneeId: undefined }
+        : { assigneeId: userId, ownerId: undefined },
+    );
+  const search = useMemberSearch(members, {
+    always: true,
+    onPick: (m) => {
+      choose(m.id);
+      setOpen(false);
+    },
+  });
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.defaultPrevented || isTypingTarget(event) || hasModifier(event)) return;
+      if (event.key.toLowerCase() !== TASK_KEYS.person || overlayOpen()) return;
+      event.preventDefault();
+      setOpen(true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <Popover open={open} onOpenChange={(o) => (setOpen(o), o || search.reset())}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={`Filter by person (${TASK_KEYS.person})`}
+          aria-label={person ? `Filtered to ${person.name ?? "a member"}` : "Filter by person"}
+          className={cn(chipClass(Boolean(person)), person && "ps-1")}
+        >
+          {person ? (
+            <>
+              <UserAvatar user={person} size="xs" />
+              <span className="max-w-32 truncate">{person.name ?? "Member"}</span>
+            </>
+          ) : (
+            <>
+              <UserRound className="size-3.5" aria-hidden="true" />
+              Person
+            </>
+          )}
+          <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-72 gap-px p-1.5"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          search.focus();
+        }}
+      >
+        {search.input}
+        <div
+          id={search.listId}
+          role="listbox"
+          aria-label="Person"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
+          {person && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={false}
+              className={cn(menuItemClass(), "text-muted-foreground")}
+              onClick={() => {
+                choose(undefined);
+                setOpen(false);
+              }}
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              Anyone
+            </button>
+          )}
+          {search.filtered.length === 0 && (
+            <p className="text-muted-foreground px-2 py-2 text-[13px]">Nobody by that name.</p>
+          )}
+          {search.filtered.map((m, i) => (
+            <button
+              key={m.id}
+              id={search.optionId(m)}
+              type="button"
+              role="option"
+              aria-selected={m.id === personId}
+              className={cn(menuItemClass(m.id === personId), search.isActive(i) && "bg-muted")}
+              onPointerMove={() => search.hover(i)}
+              onClick={() => search.pick(m)}
+            >
+              <UserAvatar user={m} size="xs" />
+              <span className="truncate">{m.name ?? "Member"}</span>
+              {m.id === personId && (
+                <Check className="text-primary ms-auto size-3.5 shrink-0" aria-hidden="true" />
+              )}
+            </button>
+          ))}
+        </div>
+        <label className="text-muted-foreground mt-1 flex items-center gap-2 border-t px-2 pt-2 pb-1 text-xs">
+          <Checkbox
+            checked={ownedOnly}
+            onCheckedChange={(checked) => {
+              const next = checked === true;
+              setOwnedOnly(next);
+              if (person) choose(person.id, next);
+            }}
+          />
+          Only tasks they own
+        </label>
+      </PopoverContent>
+    </Popover>
   );
 }
 

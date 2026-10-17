@@ -16,8 +16,8 @@ import { StatusBadge } from "./integration-ui";
 const MAIL_ROUTING_COPY = {
   org: "Org email goes out from your own verified sender.",
   "platform-fallback":
-    "Org email goes out from the platform sender on your behalf until your own sender is connected.",
-  none: "Org email is off: members get in-app notifications only. Connect an email sender to turn it on.",
+    "Org email goes out from the platform's no-reply address, the same sender as sign-in email. Nothing to set up; an email sender is optional.",
+  none: "Org email is off: members get in-app notifications only.",
 } as const;
 
 /**
@@ -60,7 +60,7 @@ export default async function IntegrationsSettingsPage({
         </div>
         <Button asChild>
           <Link href={`/app/${orgSlug}/setup`}>
-            Guided setup
+            Connect tools
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </Button>

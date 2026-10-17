@@ -144,20 +144,6 @@ describe("connecting the other three", () => {
     });
   });
 
-  it("an unverified sending domain is explained as DNS, not as a broken key", async () => {
-    vi.mocked(service.saveEmailSender).mockResolvedValue({
-      ok: false,
-      error: "mail.club.org is pending in Resend. Finish the DNS records, then test again.",
-    });
-    expect(
-      await actions.connectEmailAction("org_A", {
-        fromName: "CBC",
-        fromAddress: "team@mail.club.org",
-        apiKey: "re_secret",
-      }),
-    ).toMatchObject({ ok: false, fix: expect.stringMatching(/DNS/) });
-  });
-
   it("saving the Google calendars counts as connecting that step", async () => {
     vi.mocked(service.saveGoogleCalendars).mockResolvedValue({ ok: true, message: "Saved." });
     await actions.saveSetupCalendarsAction("org_A", { publicCalendarId: "cal_1" });
@@ -179,7 +165,7 @@ describe("re-testing a step", () => {
 
   it("testing anything else queues nothing", async () => {
     vi.mocked(service.testProvider).mockResolvedValue({ ok: true });
-    await actions.testSetupStepAction("org_A", "email");
+    await actions.testSetupStepAction("org_A", "claude");
     expect(setupService.startFirstSync).not.toHaveBeenCalled();
   });
 
@@ -217,16 +203,16 @@ describe("disconnecting", () => {
 
 describe("progress, and who may change it", () => {
   it("an admin may skip, resume and finish", async () => {
-    expect(await actions.skipSetupStepAction("org_A", "email")).toMatchObject({ ok: true });
-    expect(progress.skipStep).toHaveBeenCalledWith(fake.db, "org_A", "actor", "email");
-    expect(await actions.resumeSetupStepAction("org_A", "email")).toMatchObject({ ok: true });
+    expect(await actions.skipSetupStepAction("org_A", "claude")).toMatchObject({ ok: true });
+    expect(progress.skipStep).toHaveBeenCalledWith(fake.db, "org_A", "actor", "claude");
+    expect(await actions.resumeSetupStepAction("org_A", "claude")).toMatchObject({ ok: true });
     expect(await actions.finishSetupAction("org_A", true)).toMatchObject({ ok: true });
     expect(progress.setSetupCompleted).toHaveBeenCalledWith(fake.db, "org_A", "actor", true);
   });
 
   it("a member may not, and is told so rather than shown a crash", async () => {
     resetFake({ role: "MEMBER" });
-    expect(await actions.skipSetupStepAction("org_A", "email")).toMatchObject({ ok: false });
+    expect(await actions.skipSetupStepAction("org_A", "claude")).toMatchObject({ ok: false });
     expect(await actions.finishSetupAction("org_A", true)).toMatchObject({ ok: false });
     expect(progress.skipStep).not.toHaveBeenCalled();
     expect(progress.setSetupCompleted).not.toHaveBeenCalled();
