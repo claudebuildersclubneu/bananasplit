@@ -2231,6 +2231,14 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "NoteShare:UPDATE",
         "Notification:INSERT",
         "Notification:UPDATE",
+        // Every member edits the org chart (org_chart_member_edits): versions
+        // pin createdById, positions are deleted only from a DRAFT, and there
+        // is no version DELETE.
+        "OrgChartPosition:DELETE",
+        "OrgChartPosition:INSERT",
+        "OrgChartPosition:UPDATE",
+        "OrgChartVersion:INSERT",
+        "OrgChartVersion:UPDATE",
         "OrgFile:INSERT",
         "Pin:DELETE",
         "Pin:INSERT",
