@@ -54,7 +54,7 @@ export interface PositionPanelProps {
   side: "right" | "bottom";
   onClose: () => void;
   onNavigate: (node: ChartNodeDTO) => void;
-  /** Admin: opens this position in a draft (absent for members). */
+  /** Editors: opens this position in a draft (absent without orgchart.write). */
   onEdit?: () => void;
 }
 

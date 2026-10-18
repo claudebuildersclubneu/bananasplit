@@ -11,13 +11,8 @@ import { can } from "@/lib/auth/permissions";
 import { claudeModelLabel, estimateParseCostUsd, formatUsd } from "@/lib/org-chart/models";
 import { STARTER_ROLE_COUNT } from "@/lib/org-chart/starter";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
-import { readClaudeSettings } from "@/server/org-chart/claude";
-import {
-  ACTIVE_PARSE_STATUSES,
-  hasClaudeKey,
-  listVersions,
-  UPLOADS_PER_DAY,
-} from "@/server/org-chart/service";
+import { getClaudeKeyStatus } from "@/server/org-chart/claude";
+import { ACTIVE_PARSE_STATUSES, listVersions, UPLOADS_PER_DAY } from "@/server/org-chart/service";
 import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Import org chart" };
@@ -38,7 +33,7 @@ const READER_LABEL: Record<string, string> = {
 };
 
 /**
- * Import a document (OWNER/ADMIN): the drop zone, the starter structure for
+ * Import a document (any member): the drop zone, the starter structure for
  * an org with nothing to upload, recent imports and what reads best.
  *
  * No Claude API key is needed. The portal's own parser reads the document
@@ -52,22 +47,11 @@ export default async function ImportPage({ params }: PageProps<"/app/[orgSlug]/o
   const { organization, role } = await getOrgContextBySlug(orgSlug);
   if (!can({ role }, "orgchart.write")) notFound();
 
-  const { keySaved, versions, canSeeIntegrations, model } = await withOrgTx(
-    organization.id,
-    async (ctx) => {
-      const integration = await ctx.db.orgIntegration.findUnique({
-        where: { organizationId_provider: { organizationId: organization.id, provider: "CLAUDE" } },
-        select: { config: true },
-      });
-      return {
-        keySaved: await hasClaudeKey(ctx.db, organization.id),
-        versions: (await listVersions(ctx)).filter((v) => v.source === "UPLOAD").slice(0, 10),
-        canSeeIntegrations: can(ctx, "integrations.view"),
-        model: readClaudeSettings((integration?.config as Record<string, unknown> | null) ?? {})
-          .model,
-      };
-    },
+  const versions = await withOrgTx(organization.id, async (ctx) =>
+    (await listVersions(ctx)).filter((v) => v.source === "UPLOAD").slice(0, 10),
   );
+  const { saved: keySaved, model } = await getClaudeKeyStatus(organization.id);
+  const canSeeIntegrations = can({ role }, "integrations.view");
   const base = `/app/${orgSlug}/org-chart`;
   const active = versions.some(
     (v) =>

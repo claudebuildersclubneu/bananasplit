@@ -54,6 +54,7 @@ const GRANTS = {
   Notification: ["SIu", "SIUD", ""],
   OrgAuditLog: ["S", "S", ""],
   // DELETE only on DRAFT positions (b3_org_chart_draft_delete; P-CAT5, P3-05).
+  // Every member writes both (org_chart_member_edits; P3-02).
   OrgChartPosition: ["SIUD", "SIUD", ""],
   OrgChartVersion: ["SIU", "SIUD", ""],
   OrgCreationCode: ["", "", ""],
@@ -309,7 +310,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
 
   await tcase(
     "P-CAT5",
-    "history tables: no app_user DELETE on org-chart versions, position DELETE only in DRAFT versions, no UPDATE/DELETE on TaskActivity",
+    "history tables: no app_user DELETE on org-chart versions, position DELETE only in DRAFT versions of the caller's org, no UPDATE/DELETE on TaskActivity",
     "owner",
     null,
     async (q) =>
@@ -318,7 +319,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
                WHERE schemaname = 'public' AND 'app_user' = ANY (roles)
                  AND ((tablename = 'OrgChartVersion' AND cmd = 'DELETE')
                    OR (tablename = 'OrgChartPosition' AND cmd = 'DELETE'
-                       AND (qual IS NULL OR qual NOT LIKE '%''DRAFT''%' OR qual NOT LIKE '%is_org_admin%'))
+                       AND (qual IS NULL OR qual NOT LIKE '%''DRAFT''%' OR qual NOT LIKE '%member_org_id%'))
                    OR (tablename = 'TaskActivity' AND cmd IN ('UPDATE','DELETE')))`)
       ).rows.map((r) => r.p),
     { value: [] },
@@ -1067,69 +1068,80 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
 
   // ======================= Phase 3: org chart =======================
+  // Every member edits the chart (20261018120000_org_chart_member_edits):
+  // drafts and history are visible to every member, and any member writes
+  // versions and positions in their own org. History stays append-only.
   await tcase(
     "P3-01",
-    "members see only the published chart; OWNER/ADMIN see drafts",
+    "every member sees the org's drafts and history, and nothing of another org's",
     "app_user",
     A("u_memberA"),
-    async (q) => {
-      const member = {
-        versions: await count(q, `SELECT count(*) n FROM "OrgChartVersion"`),
-        positions: await count(q, `SELECT count(*) n FROM "OrgChartPosition"`),
-      };
-      await q(`SELECT app.set_context('u_adminA','org_A')`);
-      const admin = {
-        versions: await count(q, `SELECT count(*) n FROM "OrgChartVersion"`),
-        positions: await count(q, `SELECT count(*) n FROM "OrgChartPosition"`),
-      };
-      return { member, admin };
-    },
-    { value: { member: { versions: 1, positions: 2 }, admin: { versions: 2, positions: 3 } } },
+    async (q) => ({
+      versions: await count(q, `SELECT count(*) n FROM "OrgChartVersion"`),
+      positions: await count(q, `SELECT count(*) n FROM "OrgChartPosition"`),
+      foreign: await count(
+        q,
+        `SELECT count(*) n FROM "OrgChartVersion" WHERE "organizationId" <> 'org_A'`,
+      ),
+    }),
+    { value: { versions: 2, positions: 3, foreign: 0 } },
   );
   await tcase(
     "P3-02",
-    "a MEMBER cannot create or change a version or position; nobody deletes history",
+    "a MEMBER creates and edits versions and positions as themselves, in their own org; nobody deletes history",
     "app_user",
     A("u_memberA"),
     async (q) => {
       const s = {};
-      s.member_update_published = await rc(
-        q,
-        `UPDATE "OrgChartVersion" SET "status" = 'ARCHIVED' WHERE "id" = 'ocv_A1'`,
-      );
       s.member_insert = await tryq(
         q,
         `INSERT INTO "OrgChartVersion" ("id","organizationId","number","source","createdById","updatedAt") VALUES ('v_m','org_A',3,'MANUAL','u_memberA',now())`,
       );
+      s.member_insert_as_other = await tryq(
+        q,
+        `INSERT INTO "OrgChartVersion" ("id","organizationId","number","source","createdById","updatedAt") VALUES ('v_o','org_A',4,'MANUAL','u_adminA',now())`,
+      );
+      s.member_insert_foreign = await tryq(
+        q,
+        `INSERT INTO "OrgChartVersion" ("id","organizationId","number","source","createdById","updatedAt") VALUES ('v_f','org_B',9,'MANUAL','u_memberA',now())`,
+      );
+      s.member_update_draft = await rc(
+        q,
+        `UPDATE "OrgChartVersion" SET "editVersion" = "editVersion" + 1 WHERE "id" = 'ocv_A2'`,
+      );
+      s.member_update_foreign = await rc(
+        q,
+        `UPDATE "OrgChartVersion" SET "status" = 'ARCHIVED' WHERE "id" = 'ocv_B1'`,
+      );
       s.member_position_update = await rc(
         q,
-        `UPDATE "OrgChartPosition" SET "title" = 'x' WHERE "id" = 'pos_A1_pres'`,
+        `UPDATE "OrgChartPosition" SET "title" = 'x' WHERE "id" = 'pos_A2_pres'`,
+      );
+      s.member_position_foreign = await rc(
+        q,
+        `UPDATE "OrgChartPosition" SET "title" = 'x' WHERE "id" = 'pos_B1_pres'`,
+      );
+      s.member_delete = await tryq(q, `DELETE FROM "OrgChartVersion" WHERE "id" = 'ocv_A2'`);
+      s.creator_immutable = await tryq(
+        q,
+        `UPDATE "OrgChartVersion" SET "createdById" = 'u_memberA' WHERE "id" = 'ocv_A2'`,
       );
       await q(`SELECT app.set_context('u_ownerA','org_A')`);
       s.owner_delete = await tryq(q, `DELETE FROM "OrgChartVersion" WHERE "id" = 'ocv_A2'`);
-      s.owner_insert_as_other = await tryq(
-        q,
-        `INSERT INTO "OrgChartVersion" ("id","organizationId","number","source","createdById","updatedAt") VALUES ('v_o','org_A',3,'MANUAL','u_adminA',now())`,
-      );
-      s.owner_insert = await tryq(
-        q,
-        `INSERT INTO "OrgChartVersion" ("id","organizationId","number","source","createdById","updatedAt") VALUES ('v_o2','org_A',3,'MANUAL','u_ownerA',now())`,
-      );
-      s.creator_immutable = await tryq(
-        q,
-        `UPDATE "OrgChartVersion" SET "createdById" = 'u_ownerA' WHERE "id" = 'ocv_A2'`,
-      );
       return s;
     },
     {
       value: {
-        member_update_published: 0,
-        member_insert: "42501",
-        member_position_update: 0,
-        owner_delete: "42501",
-        owner_insert_as_other: "42501",
-        owner_insert: 1,
+        member_insert: 1,
+        member_insert_as_other: "42501",
+        member_insert_foreign: "42501",
+        member_update_draft: 1,
+        member_update_foreign: 0,
+        member_position_update: 1,
+        member_position_foreign: 0,
+        member_delete: "42501",
         creator_immutable: "42501",
+        owner_delete: "42501",
       },
     },
   );
@@ -1156,18 +1168,19 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P3-05",
-    "OWNER/ADMIN delete positions only from a DRAFT; members delete nothing",
+    "any member deletes positions only from a DRAFT of their own org",
     "app_user",
     A("u_memberA"),
     async (q) => {
       const s = {};
+      s.member_published = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_A1_vp'`);
+      s.member_foreign = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_B1_pres'`);
       s.member_draft = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_A2_pres'`);
-      await q(`SELECT app.set_context('u_adminA','org_A')`);
-      s.admin_published = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_A1_vp'`);
-      s.admin_foreign = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_B1_pres'`);
-      s.admin_draft = await rc(q, `DELETE FROM "OrgChartPosition" WHERE "id" = 'pos_A2_pres'`);
+      await q(
+        `INSERT INTO "OrgChartPosition" ("id","organizationId","versionId","key","title","rank") VALUES ('pos_A2_x','org_A','ocv_A2','x','X','a1')`,
+      );
       await q(`UPDATE "OrgChartVersion" SET "status" = 'DISCARDED' WHERE "id" = 'ocv_A2'`);
-      s.admin_discarded = await rc(
+      s.member_discarded = await rc(
         q,
         `DELETE FROM "OrgChartPosition" WHERE "versionId" = 'ocv_A2'`,
       );
@@ -1175,22 +1188,49 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
     },
     {
       value: {
-        member_draft: 0,
-        admin_published: 0,
-        admin_foreign: 0,
-        admin_draft: 1,
-        admin_discarded: 0,
+        member_published: 0,
+        member_foreign: 0,
+        member_draft: 1,
+        member_discarded: 0,
       },
     },
   );
   await tcase(
     "P3-04",
-    "a MEMBER cannot publish by pointing the org at a version (Organization updates are admin-only)",
+    "a MEMBER publishes only through app.set_active_org_chart, and only to a PUBLISHED version of their own org",
     "app_user",
     A("u_memberA"),
-    (q) =>
-      rc(q, `UPDATE "Organization" SET "activeOrgChartVersionId" = 'ocv_A2' WHERE "id" = 'org_A'`),
-    { value: 0 },
+    async (q) => {
+      const s = {};
+      // Organization itself stays OWNER/ADMIN.
+      s.direct = await rc(
+        q,
+        `UPDATE "Organization" SET "activeOrgChartVersionId" = 'ocv_A2' WHERE "id" = 'org_A'`,
+      );
+      s.draft = await tryq(q, `SELECT app.set_active_org_chart('ocv_A2')`);
+      s.foreign = await tryq(q, `SELECT app.set_active_org_chart('ocv_B1')`);
+      s.missing = await tryq(q, `SELECT app.set_active_org_chart('nope')`);
+      await q(`UPDATE "OrgChartVersion" SET "status" = 'PUBLISHED' WHERE "id" = 'ocv_A2'`);
+      s.published = await tryq(q, `SELECT app.set_active_org_chart('ocv_A2')`);
+      s.pointer = await tryv(
+        q,
+        `SELECT "activeOrgChartVersionId" FROM "Organization" WHERE "id" = 'org_A'`,
+      );
+      await q(`SELECT app.set_context('u_memberB','org_A')`);
+      s.non_member = await tryq(q, `SELECT app.set_active_org_chart('ocv_A1')`);
+      return s;
+    },
+    {
+      value: {
+        direct: 0,
+        draft: "23503",
+        foreign: "23503",
+        missing: "23503",
+        published: 1,
+        pointer: "ocv_A2",
+        non_member: "42501",
+      },
+    },
   );
 
   // ======================= Phase 4a: sessions and databases =======================

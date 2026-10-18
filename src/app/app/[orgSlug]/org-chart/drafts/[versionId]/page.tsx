@@ -17,7 +17,7 @@ import { planGate } from "@/server/billing/plan-gate";
 
 export const metadata: Metadata = { title: "Edit org chart draft" };
 
-/** The draft editor (OWNER/ADMIN). Members get a 404: drafts are invisible to them under RLS too. */
+/** The draft editor (any member: orgchart.write). */
 export default async function DraftPage({
   params,
 }: PageProps<"/app/[orgSlug]/org-chart/drafts/[versionId]">) {
@@ -140,6 +140,7 @@ export default async function DraftPage({
             openItems: version.openItems,
           }}
           positions={positions}
+          canSetTitles={can({ role }, "members.setTitle")}
           members={members.map((m) => ({
             id: m.id,
             name: m.name,

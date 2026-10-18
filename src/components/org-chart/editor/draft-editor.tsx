@@ -50,7 +50,7 @@ const ChartCanvas = dynamic(() => import("../chart-canvas"), {
 });
 
 /**
- * The draft editor (ADMIN+). Parsing is never trusted blindly: every
+ * The draft editor (any member). Parsing is never trusted blindly: every
  * position can be renamed, re-linked, moved (drag and drop in the outline,
  * or the Reports to picker and move buttons), toggled advisor or open hire,
  * and its bullets edited, with a live checklist and a read-only preview of
@@ -72,9 +72,18 @@ export interface DraftEditorProps {
   };
   positions: DraftPosition[];
   members: EditorMember[];
+  /** Offer "set each linked member's title" on publish (members.setTitle, OWNER/ADMIN). */
+  canSetTitles: boolean;
 }
 
-export function DraftEditor({ orgId, orgSlug, version, positions: initial, members }: DraftEditorProps) {
+export function DraftEditor({
+  orgId,
+  orgSlug,
+  version,
+  positions: initial,
+  members,
+  canSetTitles,
+}: DraftEditorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [positions, setPositions] = useState<DraftPosition[]>(initial);
@@ -181,7 +190,10 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
     startTransition(async () => {
       const current = dirty ? await save() : editVersion;
       if (current === null) return;
-      const result = await publishDraftAction(orgId, version.id, { setTitles, expectedEditVersion: current });
+      const result = await publishDraftAction(orgId, version.id, {
+        setTitles: canSetTitles && setTitles,
+        expectedEditVersion: current,
+      });
       if (!result.ok) {
         const detail = "issues" in result && result.issues?.length ? ` ${result.issues.map((i) => i.message).join(" ")}` : "";
         setStatus({ tone: "error", text: `${result.error}${detail}` });
@@ -411,12 +423,14 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
                   ))}
                 </ul>
               )}
-              <div className="flex items-start gap-2">
-                <Checkbox id="set-titles" checked={setTitles} onCheckedChange={(v) => setSetTitles(v === true)} />
-                <Label htmlFor="set-titles" className="leading-snug font-normal">
-                  Also set each linked member&apos;s title in this workspace from their position
-                </Label>
-              </div>
+              {canSetTitles && (
+                <div className="flex items-start gap-2">
+                  <Checkbox id="set-titles" checked={setTitles} onCheckedChange={(v) => setSetTitles(v === true)} />
+                  <Label htmlFor="set-titles" className="leading-snug font-normal">
+                    Also set each linked member&apos;s title in this workspace from their position
+                  </Label>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

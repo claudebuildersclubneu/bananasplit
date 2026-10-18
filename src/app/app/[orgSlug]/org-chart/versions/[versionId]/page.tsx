@@ -75,7 +75,7 @@ function describe(change: DiffChange): string {
   }
 }
 
-/** A read-only version (OWNER/ADMIN) with a diff against another version (?compare=). */
+/** A read-only version (any member) with a diff against another version (?compare=). */
 export default async function VersionPage({
   params,
   searchParams,

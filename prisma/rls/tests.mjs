@@ -2124,6 +2124,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "secret_delete",
         "secret_read",
         "secret_write",
+        // Publishing the org chart: moves Organization.activeOrgChartVersionId
+        // (and nothing else) to a PUBLISHED version of the caller's member org.
+        "set_active_org_chart",
         "set_ics_token_hash",
         "slug_available",
         "user_has_role",
@@ -2359,6 +2362,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       log_org_deletion: "s",
       // Phase 3
       assert_org_active_chart: "",
+      // Any member publishes the org chart (member path only).
+      set_active_org_chart: "u",
       // Phase 4a
       term_of: "us",
       event_defaults: "",
