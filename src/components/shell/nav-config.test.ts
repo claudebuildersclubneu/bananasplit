@@ -4,7 +4,14 @@ import { settingsNavItems, isSettingsItemActive } from "@/app/app/[orgSlug]/sett
 
 import { resolveSidebar, toConfig, visibleSidebar } from "@/lib/nav/sidebar";
 
-import { isLinkActive, navSections } from "./nav-config";
+import {
+  createActions,
+  isExactPage,
+  isLinkActive,
+  navSections,
+  tabBarLinks,
+  type NavSection,
+} from "./nav-config";
 
 const links = (raw: unknown = null) =>
   navSections("cbc", visibleSidebar(raw)).flatMap((s) => s.items);
@@ -152,12 +159,14 @@ describe("the sidebar in each space", () => {
   const nav = (space: Space, showLocked = false) =>
     navSections("me", visibleSidebar(null), { space, showLocked }).flatMap((s) => s.items);
 
-  it("gives Personal its own five: Home, Tasks, Calendar, Find a time and RSVPs", () => {
+  it("gives Personal its own seven: Home, Tasks, Calendar, Notes, Files, Find a time and RSVPs", () => {
     const items = nav(PERSONAL, true);
     expect(items.map((i) => i.label)).toEqual([
       "Home",
       "Tasks",
       "Calendar",
+      "Notes",
+      "Files",
       "Find a time",
       "RSVPs",
     ]);
@@ -165,21 +174,35 @@ describe("the sidebar in each space", () => {
       "/app/me",
       "/app/me/tasks",
       "/app/me/calendar",
+      "/app/me/notes?tab=notes",
+      "/app/me/notes?tab=files",
       "/app/me/calendar/find-a-time",
       "/app/me/calendar/rsvp",
     ]);
     expect(items.some((i) => i.locked)).toBe(false);
     const all = items;
-    const is = (label: string, path: string) =>
-      isLinkActive(
-        all.find((i) => i.label === label)!,
-        path,
-        all,
-      );
+    const is = (label: string, path: string, search = "") =>
+      isLinkActive(all.find((i) => i.label === label)!, path, all, search);
     expect(is("RSVPs", "/app/me/calendar/rsvp/e1")).toBe(true);
     expect(is("Calendar", "/app/me/calendar/rsvp/e1")).toBe(false);
     expect(is("Find a time", "/app/me/calendar/find-a-time/p1")).toBe(true);
     expect(is("Home", "/app/me/tasks")).toBe(false);
+  });
+
+  it("tells Personal's Notes and Files apart on the one library they share", () => {
+    const all = nav(PERSONAL);
+    const active = (path: string, search = "") =>
+      all.filter((i) => isLinkActive(i, path, all, search)).map((i) => i.label);
+    expect(active("/app/me/notes", "tab=notes")).toEqual(["Notes"]);
+    expect(active("/app/me/notes", "tab=files&folder=f1")).toEqual(["Files"]);
+    // A bare /notes, or a note's own page: Notes (the first of the two).
+    expect(active("/app/me/notes")).toEqual(["Notes"]);
+    expect(active("/app/me/notes/n1")).toEqual(["Notes"]);
+    // A file's own page.
+    expect(active("/app/me/notes/files/f1")).toEqual(["Files"]);
+    expect(isExactPage("/app/me/notes?tab=files", "/app/me/notes", "tab=files&q=x")).toBe(true);
+    expect(isExactPage("/app/me/notes?tab=files", "/app/me/notes", "tab=notes")).toBe(false);
+    expect(isExactPage("/app/me", "/app/me")).toBe(true);
   });
 
   it("gives a club on its trial (running or paused) every section", () => {
@@ -196,6 +219,78 @@ describe("the sidebar in each space", () => {
       expect(nav(club(p), true).some((i) => i.locked)).toBe(false);
       expect(nav(club(p)).map((i) => i.label)).toEqual(links().map((i) => i.label));
     }
+  });
+});
+
+describe("the phone tab bar and the create menu", () => {
+  const sections = (space: Space, raw: unknown = null, showLocked = false) =>
+    navSections("me", visibleSidebar(raw), { space, showLocked });
+  const hrefs = (tabs: ReturnType<typeof tabBarLinks>) => ({
+    home: tabs.home?.href,
+    tasks: tabs.tasks?.href,
+    calendar: tabs.calendar?.href,
+  });
+
+  it("puts a club's Overview, Tasks and Calendar on the tab bar", () => {
+    expect(hrefs(tabBarLinks(sections(club("SOCIETY"))))).toEqual({
+      home: "/app/me",
+      tasks: "/app/me/tasks",
+      calendar: "/app/me/calendar",
+    });
+    expect(tabBarLinks(sections(club("SOCIETY"))).home?.label).toBe("Overview");
+  });
+
+  it("puts Personal's Home first", () => {
+    const tabs = tabBarLinks(sections(PERSONAL));
+    expect(tabs.home?.label).toBe("Home");
+    expect(hrefs(tabs)).toEqual({
+      home: "/app/me",
+      tasks: "/app/me/tasks",
+      calendar: "/app/me/calendar",
+    });
+  });
+
+  it("leaves off a section the club hid or the plan locks, and keeps the club's names", () => {
+    const groups = resolveSidebar(null);
+    groups[0].items.find((i) => i.id === "calendar")!.hidden = true;
+    groups[0].items.find((i) => i.id === "tasks")!.label = "To-dos";
+    const tabs = tabBarLinks(sections(club("SOCIETY"), toConfig(groups)));
+    expect(tabs.calendar).toBeUndefined();
+    expect(tabs.tasks?.label).toBe("To-dos");
+    const locked: NavSection[] = [
+      { id: "main", label: null, items: [{ ...item("Tasks"), locked: true }] },
+    ];
+    expect(tabBarLinks(locked).tasks).toBeUndefined();
+  });
+
+  it("offers what the space has: task, event, note, poll and Find a time", () => {
+    const all = createActions(sections(club("SOCIETY")), { canCreateEvents: true });
+    expect(all.map((a) => [a.id, a.href])).toEqual([
+      ["task", "/app/me/tasks?new=1"],
+      ["event", "/app/me/calendar?new=1"],
+      ["note", undefined],
+      ["poll", "/app/me/calendar/polls/ask"],
+      ["find-a-time", "/app/me/calendar/find-a-time/new"],
+    ]);
+    // Members who can't create events don't get New event.
+    expect(
+      createActions(sections(club("SOCIETY")), { canCreateEvents: false }).map((a) => a.id),
+    ).not.toContain("event");
+  });
+
+  it("leaves out polls in Personal, and what a club hid", () => {
+    expect(createActions(sections(PERSONAL), { canCreateEvents: true }).map((a) => a.id)).toEqual(
+      ["task", "event", "note", "find-a-time"],
+    );
+    const groups = resolveSidebar(null);
+    for (const g of groups) {
+      for (const i of g.items) if (i.id === "notes" || i.id === "polls") i.hidden = true;
+    }
+    expect(
+      createActions(sections(club("SOCIETY"), toConfig(groups)), { canCreateEvents: true }).map(
+        (a) => a.id,
+      ),
+    ).toEqual(["task", "event", "find-a-time"]);
   });
 });
 

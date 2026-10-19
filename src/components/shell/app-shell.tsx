@@ -1,27 +1,45 @@
 "use client";
 
-import { Menu, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { PaletteSection } from "@/components/command-palette/catalog";
 import { CommandPalette } from "@/components/command-palette/command-palette";
-import { useModKey } from "@/components/command-palette/use-mod-key";
-import { KeyboardShortcuts } from "@/components/shell/keyboard-shortcuts";
-import { NotificationBell } from "@/components/shell/notification-bell";
-import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { PinsProvider } from "@/components/pins/pins-context";
-import { PinButton, VisitTracker } from "@/components/shell/pin-button";
-import type { NavSection } from "@/components/shell/nav-config";
+import { GlassRefraction } from "@/components/shell/glass-refraction";
+import { KeyboardShortcuts } from "@/components/shell/keyboard-shortcuts";
+import { createActions, type NavSection } from "@/components/shell/nav-config";
+import { OrgSwitcher } from "@/components/shell/org-switcher";
+import { VisitTracker } from "@/components/shell/pin-button";
 import { SectionGate } from "@/components/shell/section-gate";
+import { SidebarModeProvider, type SidebarState } from "@/components/shell/sidebar-mode-context";
 import { SidebarNav, type SidebarPin } from "@/components/shell/sidebar-nav";
+import { SidebarBody, SidebarPanel } from "@/components/shell/sidebar-panel";
 import { SpaceList } from "@/components/shell/space-list";
-import { UserMenu } from "@/components/shell/user-menu";
-import { Button } from "@/components/ui/button";
-import { Toaster } from "@/components/ui/toaster";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { TabBar } from "@/components/shell/tab-bar";
+import { ToolCapsule } from "@/components/shell/tool-capsule";
 import type { OrgSummary, ShellUser } from "@/components/shell/types";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Toaster } from "@/components/ui/toaster";
 import type { Role } from "@/generated/prisma/enums";
+import { serializeSidebarCookie, type SidebarMode } from "@/lib/sidebar-mode";
+import { cn } from "@/lib/utils";
 
+/**
+ * The app's frame on every page of a space (the Moonstone shell):
+ *
+ * - the sidebar (sidebar-panel.tsx): docked, rail or peek, its mode kept
+ *   per member in a cookie the org layout reads (`sidebarMode`), so the
+ *   server renders the right one;
+ * - the tool capsule (tool-capsule.tsx) at the top right, in place of the
+ *   old top bar;
+ * - below md, the tab bar (tab-bar.tsx), whose More opens the sidebar in a
+ *   sheet;
+ * - the corona (globals.css) drifting behind the top of the page, and the
+ *   glass's refraction filter, mounted once.
+ *
+ * `--shell-top` and `--shell-bottom` are the room the floating chrome takes
+ * at the top and bottom, for pages with sticky bars of their own.
+ */
 export function AppShell({
   orgSlug,
   orgId,
@@ -34,8 +52,11 @@ export function AppShell({
   role = null,
   isAdmin = false,
   canInvite = false,
+  canCreateEvents = false,
   taskViews = true,
   teamwork = true,
+  sidebarMode = "docked",
+  sidebarCookie,
   banner,
   children,
 }: {
@@ -59,20 +80,26 @@ export function AppShell({
   isAdmin?: boolean;
   /** May invite members (the club menu's "Invite people"). */
   canInvite?: boolean;
+  /** May create events (the create menu's "New event"). */
+  canCreateEvents?: boolean;
   /** The plan has Board, Week and Table (the shortcut sheet lists their keys). */
   taskViews?: boolean;
   /** The weekly update exists (not in Personal). */
   teamwork?: boolean;
+  /** The member's stored sidebar mode (src/lib/sidebar-mode-cookie.ts). */
+  sidebarMode?: SidebarMode;
+  /** The member's sidebar cookie name (sidebarCookieName); without it, the mode isn't kept. */
+  sidebarCookie?: string;
   /** Above every page: the club's trial or paused notice (SpaceBanner). */
   banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mode, setMode] = useState<SidebarState>(sidebarMode);
   // Each opening is a new session (a fresh palette: empty box, no stale results).
   const [command, setCommand] = useState({ open: false, session: 0 });
   const setCommandOpen = (open: boolean) =>
     setCommand((c) => (open === c.open ? c : { open, session: open ? c.session + 1 : c.session }));
-  const mod = useModKey();
   // A Personal space's settings are just settings; a club's are its Admin panel.
   const admin = isAdmin
     ? {
@@ -84,6 +111,30 @@ export function AppShell({
     () => sections.flatMap((s) => s.items).filter((i) => !i.locked),
     [sections],
   );
+  const creatable = useMemo(
+    () => createActions(sections, { canCreateEvents }),
+    [sections, canCreateEvents],
+  );
+
+  /** Docks or collapses the sidebar, and remembers it. */
+  const keepMode = useCallback(
+    (next: SidebarMode) => {
+      setMode(next);
+      if (sidebarCookie) {
+        document.cookie = serializeSidebarCookie(
+          sidebarCookie,
+          next,
+          window.location.protocol === "https:",
+        );
+      }
+    },
+    [sidebarCookie],
+  );
+  const toggleSidebar = useCallback(
+    () => keepMode(mode === "docked" ? "rail" : "docked"),
+    [keepMode, mode],
+  );
+
   const clubMenu = (
     <OrgSwitcher
       orgs={orgs}
@@ -92,6 +143,18 @@ export function AppShell({
       brand={brand}
       isAdmin={isAdmin}
       canInvite={canInvite}
+    />
+  );
+  const nav = (onNavigate?: () => void) => (
+    <SidebarNav
+      sections={sections}
+      orgId={orgId}
+      pins={pins}
+      admin={admin}
+      onNavigate={onNavigate}
+      spaces={
+        <SpaceList orgs={orgs} activeSlug={orgSlug} user={user} onNavigate={onNavigate} />
+      }
     />
   );
 
@@ -108,97 +171,76 @@ export function AppShell({
 
   return (
     <PinsProvider orgId={orgId} orgSlug={orgSlug} pinnedHrefs={pins.map((p) => p.href)}>
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[16rem_1fr]">
+      <div
+        className={cn(
+          "corona isolate grid min-h-svh grid-cols-1",
+          "[--shell-bottom:calc(env(safe-area-inset-bottom)+5.5rem)] [--shell-top:4.25rem] md:[--shell-bottom:0px] md:[--shell-top:4.5rem]",
+          "md:transition-[grid-template-columns] md:duration-500 md:ease-(--ease-ink) motion-reduce:transition-none",
+          mode === "docked"
+            ? "md:grid-cols-[248px_minmax(0,1fr)]"
+            : "md:grid-cols-[96px_minmax(0,1fr)]",
+        )}
+      >
         <a
           href="#main-content"
-          className="bg-background text-foreground focus:ring-ring sr-only rounded-md px-3 py-2 focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:ring-2"
+          className="bg-background text-foreground focus-glow sr-only rounded-full px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
         >
           Skip to content
         </a>
+        <GlassRefraction />
 
-        <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden flex-col gap-3 border-r p-3 md:sticky md:top-0 md:flex md:h-screen">
-          {clubMenu}
-          <SidebarNav
-            sections={sections}
-            orgId={orgId}
-            pins={pins}
-            spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} />}
-            admin={admin}
-          />
-        </aside>
+        <SidebarPanel mode={mode} setMode={setMode} onToggle={toggleSidebar} clubMenu={clubMenu}>
+          {nav()}
+        </SidebarPanel>
 
         <div className="flex min-w-0 flex-col">
-          <header className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 flex h-14 items-center gap-3 border-b px-4 backdrop-blur md:px-6">
-            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden"
-                  aria-label="Open navigation menu"
-                >
-                  <Menu className="size-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="left"
-                className="bg-sidebar text-sidebar-foreground flex w-72 flex-col p-3"
-              >
-                <SheetHeader className="gap-3 p-0 pr-8">
-                  <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  {clubMenu}
-                </SheetHeader>
-                <div className="mt-3 flex min-h-0 flex-1 flex-col">
-                  <SidebarNav
-                    sections={sections}
-                    orgId={orgId}
-                    pins={pins}
-                    admin={admin}
-                    spaces={
-                      <SpaceList
-                        orgs={orgs}
-                        activeSlug={orgSlug}
-                        user={user}
-                        onNavigate={() => setMobileNavOpen(false)}
-                      />
-                    }
-                    onNavigate={() => setMobileNavOpen(false)}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            {/* Looks like the search boxes on every page, and opens search everywhere. */}
-            <button
-              type="button"
-              onClick={() => setCommandOpen(true)}
-              aria-label="Search everything"
-              className="border-input text-muted-foreground hover:text-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 flex h-8 w-full max-w-sm min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:ring-3"
-            >
-              <Search className="size-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">Search everything</span>
-              <kbd className="ms-auto hidden rounded-md border px-1 font-sans text-[10px] leading-4 sm:block">
-                {mod === "⌘" ? "⌘K" : "Ctrl K"}
-              </kbd>
-            </button>
-
-            <div className="flex flex-1 items-center justify-end gap-1">
-              <PinButton />
-              <NotificationBell />
-              <UserMenu user={user} />
-            </div>
-          </header>
-
+          <ToolCapsule
+            orgId={orgId}
+            orgSlug={orgSlug}
+            user={user}
+            createActions={creatable}
+            onSearch={() => setCommandOpen(true)}
+          />
           <main
             id="main-content"
-            className="reveal-page relative isolate min-w-0 flex-1 p-4 md:p-6"
+            className="reveal-page relative isolate min-w-0 flex-1 py-4 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:p-6"
           >
             {banner}
             <SectionGate orgSlug={orgSlug} sectionPaths={sectionPaths} isAdmin={isAdmin}>
               {children}
             </SectionGate>
           </main>
+          {/* Room under the last of the page for the phone's tab bar. */}
+          <div aria-hidden="true" className="h-(--shell-bottom) shrink-0 md:hidden" />
         </div>
+
+        <TabBar
+          orgId={orgId}
+          orgSlug={orgSlug}
+          sections={sections}
+          createActions={creatable}
+          moreOpen={moreOpen}
+          onMore={() => setMoreOpen(true)}
+        />
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent
+            side="left"
+            className="bg-sidebar text-sidebar-foreground flex w-[300px] flex-col gap-0 p-3.5 pt-4 md:hidden"
+          >
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">
+              Every section, your pins, and your clubs.
+            </SheetDescription>
+            <SidebarModeProvider value={{ mode: "docked" }}>
+              <SidebarBody
+                clubMenu={<div className="pr-9">{clubMenu}</div>}
+                onNavigate={() => setMoreOpen(false)}
+              >
+                {nav(() => setMoreOpen(false))}
+              </SidebarBody>
+            </SidebarModeProvider>
+          </SheetContent>
+        </Sheet>
 
         <VisitTracker orgId={orgId} />
         <KeyboardShortcuts
@@ -207,6 +249,7 @@ export function AppShell({
           isAdmin={isAdmin}
           taskViews={taskViews}
           teamwork={teamwork}
+          onToggleSidebar={toggleSidebar}
         />
         <CommandPalette
           key={command.session}

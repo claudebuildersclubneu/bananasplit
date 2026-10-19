@@ -11,8 +11,8 @@ import {
   Plus,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { moveEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
   windowDays,
 } from "@/lib/calendar/grid";
 import { calendarSearch, type CalendarView } from "@/lib/calendar/range";
+import { NEW_EVENT_PARAM } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
 import { AgendaList } from "./agenda-list";
@@ -141,6 +142,27 @@ export function EventCalendar({
   const [moveError, setMoveError] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [shotOpen, setShotOpen] = useState(false);
+
+  // The create menu's "New event" lands here with ?new=1: open the form
+  // once (state adjusted while rendering, not in an effect), then drop the
+  // param so a reload or Back doesn't open another.
+  const searchParams = useSearchParams();
+  const askedNew = canManage && searchParams.get(NEW_EVENT_PARAM) === "1";
+  const [openedNew, setOpenedNew] = useState(false);
+  if (askedNew !== openedNew) {
+    setOpenedNew(askedNew);
+    if (askedNew) {
+      setPeek(null);
+      setDialog({ mode: "create", start: null, allDay: false });
+    }
+  }
+  useEffect(() => {
+    if (!askedNew) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(NEW_EVENT_PARAM);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [askedNew, pathname, router, searchParams]);
 
   // Today is read in the org timezone on the server so the first paint
   // matches, then swapped for the viewer's own day on hydration.

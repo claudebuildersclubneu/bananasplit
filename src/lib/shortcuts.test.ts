@@ -4,6 +4,7 @@ import {
   goToKey,
   hasModifier,
   isShortcutSheetKey,
+  isSidebarToggleKey,
   isTypingTarget,
   shortcutGroups,
   type ShortcutGroup,
@@ -81,5 +82,17 @@ describe("keyboard shortcuts", () => {
     );
     const noTasks = shortcutGroups({ mod: "⌘", sections: [], isAdmin: false });
     expect(noTasks.map((g) => g.title)).toEqual(["Anywhere", "Go to"]);
+  });
+
+  it("collapses the sidebar with ⌘\\ or Ctrl \\, and lists it under Anywhere", () => {
+    expect(isSidebarToggleKey(key({ key: "\\", metaKey: true }))).toBe(true);
+    expect(isSidebarToggleKey(key({ key: "\\", ctrlKey: true }))).toBe(true);
+    // A layout where \ sits elsewhere still reports the physical key.
+    expect(isSidebarToggleKey(key({ key: "#", code: "Backslash", ctrlKey: true }))).toBe(true);
+    expect(isSidebarToggleKey(key({ key: "\\" }))).toBe(false);
+    expect(isSidebarToggleKey(key({ key: "\\", metaKey: true, altKey: true }))).toBe(false);
+    const sheet = shortcutGroups({ mod: "Ctrl", sections: [], isAdmin: false });
+    const row = sheet[0]!.rows.find((r) => r.label === "Collapse or expand the sidebar");
+    expect(row?.keys).toEqual([["Ctrl", "\\"]]);
   });
 });

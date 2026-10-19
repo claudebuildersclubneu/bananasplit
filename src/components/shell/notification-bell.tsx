@@ -9,7 +9,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/app/app/notifications-actions";
-import { Badge } from "@/components/ui/badge";
+import { capsuleButtonClass } from "@/components/shell/capsule";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -88,21 +88,23 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
+        <button
+          type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          className="relative"
+          title="Notifications"
+          className={capsuleButtonClass}
         >
-          <Bell className="size-4" aria-hidden="true" />
+          <Bell className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          {/* Unread: a small dot in the glow colour, not a count. */}
           {unreadCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-4 min-w-4 justify-center px-1 text-[10px]">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
+            <span
+              aria-hidden="true"
+              className="bg-glow ring-card absolute top-[9px] right-[10px] size-2 rounded-full ring-2"
+            />
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" sideOffset={8} className="w-80 p-0">
         <div className="flex items-center justify-between border-b p-3">
           <p className="text-sm font-medium">Notifications</p>
           {unreadCount > 0 && (

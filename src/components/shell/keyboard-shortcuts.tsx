@@ -17,6 +17,7 @@ import {
   goToKey,
   hasModifier,
   isShortcutSheetKey,
+  isSidebarToggleKey,
   isTypingTarget,
   NEW_TASK_PARAM,
   OPEN_SHORTCUTS_EVENT,
@@ -32,6 +33,7 @@ import {
  *
  * - ⌘/ or Ctrl / (Ctrl works on a Mac too), or ? outside a field, opens the
  *   sheet of every shortcut; the ⌘K palette's "Keyboard shortcuts" too.
+ * - ⌘\ or Ctrl \ collapses the sidebar to its rail, or docks it again.
  * - `g` then a letter opens a sidebar section (g t Tasks, g c Calendar...),
  *   and g s Settings for owners and admins.
  * - `c` starts a task from anywhere: the task workspace handles its own c,
@@ -47,6 +49,7 @@ export function KeyboardShortcuts({
   isAdmin,
   taskViews,
   teamwork,
+  onToggleSidebar,
 }: {
   orgSlug: string;
   /** The sidebar's links (the plan's locked ones already left out). */
@@ -56,6 +59,8 @@ export function KeyboardShortcuts({
   taskViews: boolean;
   /** The weekly update exists (not Personal). */
   teamwork: boolean;
+  /** ⌘\: dock or collapse the sidebar. */
+  onToggleSidebar?: () => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,6 +75,11 @@ export function KeyboardShortcuts({
       if (isShortcutSheetKey(event)) {
         event.preventDefault();
         setOpen((o) => !o);
+        return;
+      }
+      if (onToggleSidebar && isSidebarToggleKey(event)) {
+        event.preventDefault();
+        onToggleSidebar();
         return;
       }
       const sequence =
@@ -112,7 +122,7 @@ export function KeyboardShortcuts({
       document.removeEventListener("keydown", onKeyDown);
       window.removeEventListener(OPEN_SHORTCUTS_EVENT, openSheet);
     };
-  }, [base, isAdmin, links, pathname, router, tasksHref]);
+  }, [base, isAdmin, links, onToggleSidebar, pathname, router, tasksHref]);
 
   const groups = useMemo(
     () =>

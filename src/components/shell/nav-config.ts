@@ -1,16 +1,19 @@
 import { spaceIncludes, type SpaceInfo } from "@/lib/billing/space";
 import { SECTION_FEATURES, type ResolvedGroup } from "@/lib/nav/sidebar";
+import { NEW_EVENT_PARAM, NEW_TASK_PARAM } from "@/lib/shortcuts";
 
 /**
  * The sidebar's links for one space: a club's sections (in the club's
  * order, under its headings, with its names; Admin panel > Sidebar) as
  * plain data the client sidebar can take, or a Personal space's fixed few.
- * The Admin panel lives in the club menu instead.
+ * The phone's tab bar and the create menu are worked out from the same
+ * links, so they only offer what the space has.
  */
 
 export interface NavLink {
   id: string;
   label: string;
+  /** The page, sometimes with a query (Personal's Notes and Files share /notes). */
   href: string;
   /** lucide icon name. */
   icon: string;
@@ -33,22 +36,34 @@ export interface NavSection {
 
 /**
  * A Personal space's sidebar: Home (the Personal dashboard), Tasks,
- * Calendar, Find a time (availability polls anyone answers from a link) and
- * RSVPs (its event pages and your tickets). No question polls: only members
- * vote on those, and Personal has one. Not arrangeable: there is no team to
- * arrange it for.
+ * Calendar, Notes and Files (the one library at /notes, one kind each),
+ * Find a time (availability polls anyone answers from a link) and RSVPs (its
+ * event pages and your tickets). No question polls: only members vote on
+ * those, and Personal has one. Not arrangeable: there is no team to arrange
+ * it for.
  */
 export const PERSONAL_NAV: readonly {
   id: string;
   label: string;
   icon: string;
-  /** Path under /app/{slug}. */
+  /** Path (and query) under /app/{slug}. */
   path: string;
+  also?: readonly string[];
   exact: boolean;
 }[] = [
   { id: "home", label: "Home", icon: "House", path: "", exact: true },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", exact: false },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", exact: false },
+  { id: "notes", label: "Notes", icon: "NotebookText", path: "/notes?tab=notes", exact: false },
+  {
+    id: "files",
+    label: "Files",
+    icon: "FolderOpen",
+    path: "/notes?tab=files",
+    // A file's own page.
+    also: ["/notes/files"],
+    exact: false,
+  },
   {
     id: "find-a-time",
     label: "Find a time",
@@ -81,7 +96,7 @@ export function navSections(
           label: i.label,
           href: `/app/${orgSlug}${i.path}`,
           icon: i.icon,
-          also: [],
+          also: (i.also ?? []).map((p) => `/app/${orgSlug}${p}`),
           exact: i.exact,
         })),
       },
@@ -110,26 +125,151 @@ export function navSections(
     .filter((g) => g.items.length > 0);
 }
 
-function matchesHref(href: string, exact: boolean, pathname: string): boolean {
-  if (pathname === href) return true;
-  if (exact) return false;
-  return pathname.startsWith(`${href}/`);
+function splitHref(href: string): { path: string; query: URLSearchParams | null } {
+  const at = href.indexOf("?");
+  if (at === -1) return { path: href, query: null };
+  return { path: href.slice(0, at), query: new URLSearchParams(href.slice(at + 1)) };
 }
 
-/** The length of the most specific href of `link` that `pathname` is on, or 0. */
-function matchLength(link: NavLink, pathname: string): number {
-  const hrefs = [link.href, ...(link.also ?? [])].filter((h) =>
-    matchesHref(h, link.exact, pathname),
-  );
-  return Math.max(0, ...hrefs.map((h) => h.length));
+function matchesPath(path: string, exact: boolean, pathname: string): boolean {
+  if (pathname === path) return true;
+  if (exact) return false;
+  return pathname.startsWith(`${path}/`);
 }
 
 /**
- * Whether `link` is the active one on `pathname`. When links nest (Polls
- * lives under Calendar), only the most specific match is active.
+ * How closely `link` matches the page: the length of its most specific
+ * matching href, or 0. A link with a query (?tab=files) matches when the
+ * page's URL agrees with it or doesn't say, and scores a little higher when
+ * the URL says the same, so ?tab=files picks Files over Notes.
  */
-export function isLinkActive(link: NavLink, pathname: string, all: readonly NavLink[]): boolean {
-  const mine = matchLength(link, pathname);
+function matchScore(link: NavLink, pathname: string, search: URLSearchParams): number {
+  let best = 0;
+  const { path, query } = splitHref(link.href);
+  if (matchesPath(path, link.exact, pathname)) {
+    let agrees = true;
+    let said = false;
+    for (const [key, value] of query ?? []) {
+      const here = search.get(key);
+      if (here === null) continue;
+      if (here !== value) agrees = false;
+      else said = true;
+    }
+    if (agrees) best = path.length + (said ? 0.5 : 0);
+  }
+  for (const href of link.also ?? []) {
+    if (matchesPath(href, link.exact, pathname)) best = Math.max(best, href.length);
+  }
+  return best;
+}
+
+/**
+ * Whether `link` is the active one on `pathname` (and `search`, the page's
+ * query string). When links nest (Polls lives under Calendar), only the
+ * most specific match is active; when two match equally (Personal's Notes
+ * and Files on a bare /notes), the first one is.
+ */
+export function isLinkActive(
+  link: NavLink,
+  pathname: string,
+  all: readonly NavLink[],
+  search: string | URLSearchParams = "",
+): boolean {
+  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+  const mine = matchScore(link, pathname, params);
   if (mine === 0) return false;
-  return !all.some((other) => matchLength(other, pathname) > mine);
+  const scores = all.map((other) => matchScore(other, pathname, params));
+  const top = Math.max(0, ...scores);
+  if (mine !== top) return mine > top;
+  const first = all[scores.indexOf(top)];
+  return first.id === link.id && first.href === link.href;
+}
+
+/** Whether the page is exactly `href` (path and query), for aria-current="page". */
+export function isExactPage(href: string, pathname: string, search: string = ""): boolean {
+  const { path, query } = splitHref(href);
+  if (path !== pathname) return false;
+  const params = new URLSearchParams(search);
+  for (const [key, value] of query ?? []) if (params.get(key) !== value) return false;
+  return true;
+}
+
+/**
+ * The phone tab bar's links: the space's home (Overview in a club, Home in
+ * Personal), Tasks and Calendar, each only when the space shows it and its
+ * plan has it. Everything else is under More.
+ */
+export function tabBarLinks(sections: readonly NavSection[]): {
+  home?: NavLink;
+  tasks?: NavLink;
+  calendar?: NavLink;
+} {
+  const links = sections.flatMap((s) => s.items).filter((l) => !l.locked);
+  const find = (...ids: string[]) => links.find((l) => ids.includes(l.id));
+  return { home: find("overview", "home"), tasks: find("tasks"), calendar: find("calendar") };
+}
+
+export type CreateActionId = "task" | "event" | "note" | "poll" | "find-a-time";
+
+export interface CreateAction {
+  id: CreateActionId;
+  label: string;
+  /** lucide icon name. */
+  icon: string;
+  /** Where it starts; none for a note, which the menu creates and then opens. */
+  href?: string;
+}
+
+/**
+ * The + menu (the tool capsule's, and the phone tab bar's create button):
+ * what the viewer can start in this space, from the sections it shows.
+ *
+ * - New task: Tasks with ?new=1, which starts one there (as `c` does).
+ * - New event: the Calendar with ?new=1, which opens the event form; only
+ *   for those who may create events.
+ * - New note: a blank private note, made by the menu, then opened.
+ * - New poll: Polls' "Ask a question" (clubs only; Personal has no polls).
+ * - Find a time: a new availability poll.
+ */
+export function createActions(
+  sections: readonly NavSection[],
+  { canCreateEvents }: { canCreateEvents: boolean },
+): CreateAction[] {
+  const links = new Map(
+    sections
+      .flatMap((s) => s.items)
+      .filter((l) => !l.locked)
+      .map((l) => [l.id, l] as const),
+  );
+  const path = (id: string) => splitHref(links.get(id)!.href).path;
+  const actions: CreateAction[] = [];
+  if (links.has("tasks")) {
+    actions.push({
+      id: "task",
+      label: "New task",
+      icon: "CheckSquare",
+      href: `${path("tasks")}?${NEW_TASK_PARAM}=1`,
+    });
+  }
+  if (links.has("calendar") && canCreateEvents) {
+    actions.push({
+      id: "event",
+      label: "New event",
+      icon: "CalendarPlus",
+      href: `${path("calendar")}?${NEW_EVENT_PARAM}=1`,
+    });
+  }
+  if (links.has("notes")) actions.push({ id: "note", label: "New note", icon: "NotebookPen" });
+  if (links.has("polls")) {
+    actions.push({ id: "poll", label: "New poll", icon: "Vote", href: `${path("polls")}/ask` });
+  }
+  if (links.has("find-a-time")) {
+    actions.push({
+      id: "find-a-time",
+      label: "Find a time",
+      icon: "CalendarClock",
+      href: `${path("find-a-time")}/new`,
+    });
+  }
+  return actions;
 }
