@@ -171,6 +171,8 @@ beforeAll(async () => {
       data: {
         id: ids.task,
         organizationId: spaceId,
+        // It has a subtask, so it is a story (app.task_hierarchy_guard).
+        type: "STORY",
         title: "Book the room",
         rank: "a0",
         createdById: maya.id,

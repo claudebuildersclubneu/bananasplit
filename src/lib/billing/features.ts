@@ -19,8 +19,12 @@ import type { OrgPlan } from "@/generated/prisma/enums";
  * Plans are ordered, so a feature names the cheapest plan that has it.
  */
 
-/** The plans a price is shown for (TRIAL is a club's first 30 days of Society). */
-export type PricedPlan = Exclude<OrgPlan, "TRIAL">;
+/**
+ * The plans a price is shown for (TRIAL is a club's first 30 days of
+ * Society). PERSONAL_PLUS isn't priced yet: a Personal space has FREE's
+ * features on either Personal plan (src/lib/billing/space.ts).
+ */
+export type PricedPlan = Exclude<OrgPlan, "TRIAL" | "PERSONAL_PLUS">;
 
 export const PLAN_ORDER = ["FREE", "CLUB", "SOCIETY"] as const satisfies readonly PricedPlan[];
 
@@ -82,6 +86,7 @@ export const PLAN_LIMITS: Record<PricedPlan, { storageGb: number; dataConnection
 
 export const PLAN_NAMES: Record<OrgPlan, string> = {
   FREE: "Personal",
+  PERSONAL_PLUS: "Personal Plus",
   TRIAL: "Trial",
   CLUB: "Club",
   SOCIETY: "Society",

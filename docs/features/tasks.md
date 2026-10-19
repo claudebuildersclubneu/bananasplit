@@ -27,14 +27,15 @@ that task.
 
 | Setting                   | What it does                                                                                                          |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `taskRequireOwner`        | A new top-level task must name an owner (requests in an intake queue are exempt: triage assigns them).                |
+| `taskRequireOwner`        | A new top-level task must name an owner.                                                                              |
 | `taskRequireDueDate`      | A new top-level task must have a due date.                                                                            |
 | `reminderLeadDaysDefault` | How many days before the due date the reminder goes out (1 by default). Each person can override it in their profile. |
 
 The Claude Builders Club turns both rules on ("one task board, every task
 has one owner and a due date") through **Settings > Bootstrap CBC
-workspace**, which also creates the Design Requests intake queue and the
-"Needs President" and "Design" labels. Running it twice changes nothing.
+workspace**, which also creates the Design Requests project (led by the VP
+Growth) and the "Needs President" and "Design" labels. Running it twice
+changes nothing.
 
 ### 3. Publish an org chart (for hand-down rules and the Team view)
 
@@ -117,9 +118,6 @@ it, and their notification is already out of reach.
 otherwise adding one person to a private task would hand them the power to
 publish it. Collaborators can still edit everything else.
 
-Requests filed into an **intake queue are always open** — a queue nobody can
-see is not a queue.
-
 ### Email, notifications and the Sunday update
 
 - Assignment, mention and comment mail only ever goes to people on the task,
@@ -170,7 +168,6 @@ became **destinations** in the header.
 
 | Destination       | What it is                                                                  |
 | ----------------- | --------------------------------------------------------------------------- |
-| **Requests**      | The intake queue (below). Hidden until an org has one.                      |
 | **Sunday update** | The weekly composer (below). Carries a dot until you have posted this week. |
 
 The toolbar above the layouts is the same in all five:
@@ -207,8 +204,7 @@ Deep links other sections use, all unchanged:
 Editing a task — title, description, status, due date, labels, project,
 owner, collaborators, subtasks — is open to its **creator**, its **owner**,
 anyone **involved**, a **chart manager of the owner** (anyone above them in
-the published chart), the triage owner of its queue, and **owners and
-admins**. Visibility is narrower: see _Who can change the flag_ above.
+the published chart), and **owners and admins**. Visibility is narrower: see _Who can change the flag_ above.
 
 Everyone else gets the **self-assign carve-out**: any member may add or
 remove **themselves** as a collaborator on any task they can see, and take
@@ -218,11 +214,16 @@ due-date edits, and never removing somebody else's ownership.
 ### Who can change the project list
 
 **Owners and admins only.** Projects are org-wide structure: everyone sees
-the same list in the project filter, one of them can be the intake queue,
-and the Claude Builders Club set comes from **Bootstrap CBC workspace**. So
-creating, archiving and unarchiving a project, and turning one into an
-intake queue, all need the same permission. Every member still files tasks
-into any project and filters by it. Ask an owner or admin for a new project.
+the same list in the project filter, and the Claude Builders Club set comes
+from **Bootstrap CBC workspace**. So creating, archiving and unarchiving a
+project all need the same permission. Every member still files tasks into
+any project and filters by it. Ask an owner or admin for a new project.
+
+A project also has a colour, a lead (a member; cleared when they leave), a
+status (active, on hold, done) and start and target dates. The database
+already lets every member create projects, and tags (recording who made
+each), while the club's `memberCanCreateProjects` / `memberCanCreateTags`
+settings are on (the default); the app still asks for an owner or admin.
 
 ### Handing work down
 
@@ -254,21 +255,11 @@ a description or comment opens a member picker; the server keeps only real
 members (and, on a private task, only the audience) and notifies the newly
 mentioned, never you. Mentions in code blocks are left as text.
 
-### The Design Requests intake queue
-
-An intake queue lets **anyone** file a request while **one triage owner**
-runs it. Owners and admins set one up in **Requests > Queue settings**:
-pick a project, name the triage owner, and set the default due window (5
-days for CBC's Design Requests).
-
-- Anyone creates requests; each gets the default due date.
-- Only the triage owner (or an owner or admin) sets a request's priority and
-  owner, from the queue list or the panel.
-- The triage owner is notified and emailed whenever a request is filed.
-- Requests are always visible to the whole org.
-
-The **Requests** button in the header shows how many are still waiting for
-an owner.
+Every task is an **epic**, a **story** or a **task**, and the database keeps
+the nesting to that order: an epic is always top-level, a story sits at the
+top or under an epic, a task at the top, under an epic or under a story.
+Breaking a task into subtasks makes it a story (the subtasks are tasks).
+The app still nests one level; epics come with the work on them.
 
 ### Sunday updates
 

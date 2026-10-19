@@ -1,7 +1,14 @@
 import { faker } from "@faker-js/faker";
-import { generateNKeysBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "../src/lib/auth/password";
+import {
+  addDaysToKey,
+  fromDateKey,
+  localDateKey,
+  updateWeekStartOfKey,
+  zonedInstant,
+} from "../src/lib/tasks/dates";
 import {
   applyCbcTemplate,
   CBC_ORG,
@@ -11,19 +18,25 @@ import {
 } from "../src/server/bootstrap/cbc-template";
 import {
   ConferenceProvider,
+  NoteLayout,
   OrgChartSource,
   NoteVisibility,
+  PaperSize,
   PollAvailability,
   PrismaClient,
+  ProjectStatus,
+  PulseAudience,
   Role,
   RSVPStatus,
   SponsorshipStatus,
   SponsorshipType,
   TaskPriority,
   TaskStatus,
+  TaskType,
   TransactionDirection,
   TransactionKind,
   TransactionStatus,
+  type Prisma,
 } from "../src/generated/prisma/client";
 
 /**
@@ -246,6 +259,8 @@ async function main() {
 
     for (let i = 0; i < subtaskCount; i++) {
       const parent = faker.helpers.arrayElement(created);
+      // A task with subtasks is a story (app.task_hierarchy_guard).
+      await prisma.task.update({ where: { id: parent.id }, data: { type: TaskType.STORY } });
       await prisma.task.create({
         data: {
           organizationId,
@@ -787,14 +802,539 @@ async function main() {
     intakeProjectId: template.intakeProjectId,
     labelIds: template.labelIds,
   });
+  const moonstone = await seedMoonstoneShowcase(cbc.id, cbcUsers);
 
   console.log("Seed complete:", {
     users: userSeeds.length + CBC_PEOPLE.length,
     organizations: ORG_SLUGS,
     orgATasks: 17,
     orgBTasks: 8,
-    claudeBuildersClub: demo,
+    claudeBuildersClub: { ...demo, ...moonstone },
   });
+}
+
+/**
+ * PulseIssue.data, version 1: one week of a club, compiled by the pulse job
+ * (service path) and shown as the weekly pulse. Ids point at rows of the
+ * same org; dates are org-local date keys (YYYY-MM-DD), instants ISO 8601.
+ */
+export interface PulseIssueData {
+  v: 1;
+  /** The seven org-local days covered, inclusive; `from` is PulseIssue.weekStart. */
+  range: { from: string; to: string };
+  /** Tasks completed in the range. */
+  doneCount: number;
+  /** Per project (projectId null: tasks in no project), live tasks only. */
+  byProject: {
+    projectId: string | null;
+    name: string;
+    /** Project.color (#rrggbb) or null. */
+    color: string | null;
+    /** Completed in the range. */
+    done: number;
+    /** Still open at the end of the range. */
+    open: number;
+  }[];
+  /** Events held in the range, in order. */
+  events: { eventId: string; title: string; startsAt: string; checkIns: number }[];
+  /** People who joined in the range: club members (userId) or sign-ups (contactId). */
+  newMembers: {
+    userId: string | null;
+    contactId: string | null;
+    name: string;
+    joinedAt: string;
+  }[];
+  /** Polls and website ballots that drew votes in the range, with their results so far. */
+  pollResults: {
+    kind: "poll" | "ballot";
+    /** Poll.id or BallotDefinition.id. */
+    pollId: string;
+    question: string;
+    totalVotes: number;
+    /** Most votes first. */
+    options: { label: string; votes: number }[];
+  }[];
+  /** The next seven days: tasks due and events, by date. */
+  nextWeek: {
+    kind: "task" | "event";
+    id: string;
+    title: string;
+    date: string;
+    /** A task's owner; null for events and unowned tasks. */
+    ownerId: string | null;
+  }[];
+}
+
+/**
+ * The Moonstone product update in the Claude Builders Club, for the design
+ * audit: projects with colours, leads, statuses and dates; epics, stories
+ * and tasks under the Fall Showcase; tags made inline (createdById); a note
+ * with two subpages, a comment thread with a reply and two versions (one
+ * named); last week's pulse; and the pulse settings. The seed recreates the
+ * org on every run, so this runs once per seed.
+ */
+async function seedMoonstoneShowcase(
+  organizationId: string,
+  members: Record<CbcPersonKey, string>,
+): Promise<{ projects: number; epics: number; pulseIssues: number }> {
+  const tz = CBC_ORG.timezone;
+  const now = new Date();
+  const today = localDateKey(now, tz);
+  const day = (offset: number) => fromDateKey(addDaysToKey(today, offset));
+
+  // --- The weekly pulse, and what members may create ---
+  await prisma.orgSettings.update({
+    where: { organizationId },
+    data: {
+      pulseEnabled: true,
+      pulseDay: 5,
+      pulseHourLocal: 17,
+      pulseAudience: PulseAudience.EVERYONE,
+      pulseEmail: true,
+      pulseInApp: true,
+      memberCanCreateProjects: true,
+      memberCanCreateTags: true,
+    },
+  });
+
+  // --- Projects ---
+  const project = (data: Omit<Prisma.ProjectUncheckedCreateInput, "organizationId">) =>
+    prisma.project.create({ data: { organizationId, ...data } });
+  const showcase = await project({
+    name: "Fall Showcase",
+    description: "The end-of-semester demo night: projects, sponsors and a crowd.",
+    color: "#d97757",
+    leadId: members.oliver,
+    status: ProjectStatus.ACTIVE,
+    startDate: day(-21),
+    targetDate: day(32),
+  });
+  await project({
+    name: "Recruitment",
+    description: "Fall recruitment: tabling, the info session and first workshops.",
+    color: "#3b82f6",
+    leadId: members.kristine,
+    status: ProjectStatus.DONE,
+    startDate: day(-56),
+    targetDate: day(-14),
+  });
+  await project({
+    name: "Club operations",
+    description: "Budget, rooms, the board calendar and everything that keeps the club running.",
+    color: "#64748b",
+    leadId: members.jackson,
+    status: ProjectStatus.ACTIVE,
+    startDate: day(-70),
+  });
+  const sponsors = await project({
+    name: "Sponsors",
+    description: "Sponsor outreach for the year. Paused until the showcase deck is ready.",
+    color: "#16a34a",
+    leadId: members.lucas,
+    status: ProjectStatus.ON_HOLD,
+    startDate: day(-30),
+    targetDate: day(60),
+  });
+
+  // --- Tags made inline by members ---
+  const tag = (name: string, color: string, by: CbcPersonKey) =>
+    prisma.label.create({ data: { organizationId, name, color, createdById: members[by] } });
+  const venueTag = await tag("Venue", "#0ea5e9", "oliver");
+  const showcaseTag = await tag("Showcase", "#f59e0b", "kristine");
+  const sponsorTag = await tag("Sponsor", "#16a34a", "lucas");
+
+  // --- Epics, stories and tasks under the Fall Showcase ---
+  // Epics sit on the board with the other top-level tasks: their ranks go
+  // after the last one in their column.
+  const lastRank = async (status: TaskStatus) =>
+    (
+      await prisma.task.findFirst({
+        where: { organizationId, status, parentTaskId: null },
+        orderBy: { rank: "desc" },
+        select: { rank: true },
+      })
+    )?.rank ?? null;
+
+  interface Node {
+    type: TaskType;
+    title: string;
+    owner: CbcPersonKey;
+    status: TaskStatus;
+    due: number;
+    priority?: TaskPriority;
+    project?: string;
+    labels?: string[];
+    children?: Node[];
+  }
+  async function plant(node: Node, parentId: string | null, rank: string): Promise<void> {
+    const completed = node.status === TaskStatus.COMPLETED;
+    const task = await prisma.task.create({
+      data: {
+        organizationId,
+        projectId: node.project ?? showcase.id,
+        type: node.type,
+        title: node.title,
+        status: node.status,
+        priority: node.priority ?? TaskPriority.MEDIUM,
+        dueDate: day(node.due),
+        rank,
+        parentTaskId: parentId,
+        createdById: members.oliver,
+        ownerId: members[node.owner],
+        ownerRelation: node.owner === "oliver" ? "SELF" : "OUTSIDE_CHART",
+        ownerAssignedById: members.oliver,
+        completedAt: completed ? new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) : null,
+        labels: node.labels?.length
+          ? { create: node.labels.map((labelId) => ({ labelId })) }
+          : undefined,
+        activity: {
+          create: [{ actorId: members.oliver, type: "CREATED", diffJson: { title: node.title } }],
+        },
+      },
+      select: { id: true },
+    });
+    const kids = node.children ?? [];
+    const ranks = generateNKeysBetween(null, null, kids.length);
+    for (const [i, child] of kids.entries()) await plant(child, task.id, ranks[i]);
+  }
+
+  const epics: Node[] = [
+    {
+      type: TaskType.EPIC,
+      title: "Venue and logistics",
+      owner: "oliver",
+      status: TaskStatus.IN_PROGRESS,
+      due: 28,
+      priority: TaskPriority.HIGH,
+      labels: [venueTag.id],
+      children: [
+        {
+          type: TaskType.STORY,
+          title: "Confirm the venue for the Fall Showcase",
+          owner: "oliver",
+          status: TaskStatus.IN_PROGRESS,
+          due: 7,
+          priority: TaskPriority.HIGH,
+          labels: [venueTag.id],
+          children: [
+            {
+              type: TaskType.TASK,
+              title: "Tour the Curry Student Center ballroom",
+              owner: "oliver",
+              status: TaskStatus.COMPLETED,
+              due: -3,
+            },
+            {
+              type: TaskType.TASK,
+              title: "Send the room request to the SAO",
+              owner: "alex",
+              status: TaskStatus.NOT_STARTED,
+              due: 2,
+              priority: TaskPriority.HIGH,
+            },
+          ],
+        },
+        {
+          type: TaskType.STORY,
+          title: "Book a photographer for the showcase",
+          owner: "kristine",
+          status: TaskStatus.NOT_STARTED,
+          due: 14,
+          labels: [showcaseTag.id],
+          children: [
+            {
+              type: TaskType.TASK,
+              title: "Ask three photographers for quotes",
+              owner: "kristine",
+              status: TaskStatus.IN_PROGRESS,
+              due: 4,
+            },
+            {
+              type: TaskType.TASK,
+              title: "Share the shot list with the photographer",
+              owner: "kristine",
+              status: TaskStatus.NOT_STARTED,
+              due: 12,
+              priority: TaskPriority.LOW,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: TaskType.EPIC,
+      title: "Sponsors",
+      owner: "lucas",
+      status: TaskStatus.NOT_STARTED,
+      due: 21,
+      labels: [sponsorTag.id],
+      children: [
+        {
+          type: TaskType.STORY,
+          title: "Line up two showcase sponsors",
+          owner: "lucas",
+          status: TaskStatus.NOT_STARTED,
+          due: 14,
+          project: sponsors.id,
+          labels: [sponsorTag.id],
+          children: [
+            {
+              type: TaskType.TASK,
+              title: "Draft the showcase sponsor deck",
+              owner: "lucas",
+              status: TaskStatus.IN_PROGRESS,
+              due: 5,
+              project: sponsors.id,
+            },
+            {
+              type: TaskType.TASK,
+              title: "Email last year's sponsors",
+              owner: "anthony",
+              status: TaskStatus.NOT_STARTED,
+              due: 9,
+              project: sponsors.id,
+            },
+          ],
+        },
+        // A task can sit straight under an epic, without a story.
+        {
+          type: TaskType.TASK,
+          title: "Print sponsor logos for the banner",
+          owner: "kristine",
+          status: TaskStatus.NOT_STARTED,
+          due: 24,
+          priority: TaskPriority.LOW,
+        },
+      ],
+    },
+  ];
+  for (const epic of epics) {
+    await plant(epic, null, generateKeyBetween(await lastRank(epic.status), null));
+  }
+
+  // --- A note with two subpages, a comment thread and two versions ---
+  const doc = (paragraphs: string[]) => ({
+    contentJson: {
+      type: "doc",
+      content: paragraphs.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+    },
+    contentText: paragraphs.join("\n\n"),
+  });
+  const planBody = [
+    "Fall Showcase: Thursday of finals week in the Curry Student Center ballroom. Doors open at 6:30, demos from 7 to 9.",
+    "Every project team gets a table, a power strip and three minutes on stage. Sponsors get the front row of tables.",
+    "Open questions: catering headcount, whether we stream the stage, and who runs check-in.",
+  ];
+  const plan = await prisma.note.create({
+    data: {
+      organizationId,
+      title: "Fall Showcase plan",
+      icon: "🎪",
+      layout: NoteLayout.DOCUMENT,
+      paperSize: PaperSize.LETTER,
+      visibility: NoteVisibility.ORGANIZATION,
+      memberCanEdit: true,
+      authorId: members.oliver,
+      updatedById: members.oliver,
+      ...doc(planBody),
+    },
+  });
+  const subpage = (title: string, icon: string, author: CbcPersonKey, paragraphs: string[]) =>
+    prisma.note.create({
+      data: {
+        organizationId,
+        parentId: plan.id,
+        title,
+        icon,
+        visibility: NoteVisibility.ORGANIZATION,
+        memberCanEdit: true,
+        authorId: members[author],
+        updatedById: members[author],
+        ...doc(paragraphs),
+      },
+    });
+  await subpage("Run of show", "🕖", "alex", [
+    "6:00 setup. 6:30 doors. 7:00 welcome from Jackson. 7:10 demos, three minutes each. 8:45 awards. 9:00 out.",
+  ]);
+  await subpage("Volunteer roles", "🙋", "kristine", [
+    "Check-in (two people), stage manager, photographer liaison, sponsor host, cleanup crew.",
+  ]);
+
+  const root = await prisma.noteComment.create({
+    data: {
+      organizationId,
+      noteId: plan.id,
+      authorId: members.jackson,
+      body: "Can we open doors at 6:15? The last two events had a line before 6:30.",
+      anchorText: "Doors open at 6:30",
+    },
+  });
+  await prisma.noteComment.create({
+    data: {
+      organizationId,
+      noteId: plan.id,
+      threadId: root.id,
+      authorId: members.oliver,
+      body: "The ballroom is booked from 6, so 6:15 works. I'll update the run of show.",
+    },
+  });
+
+  // sizeBytes is counted by the database (app.note_version_size).
+  await prisma.noteVersion.create({
+    data: {
+      organizationId,
+      noteId: plan.id,
+      createdById: members.oliver,
+      contentJson: doc(planBody.slice(0, 2)).contentJson,
+      createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+    },
+  });
+  await prisma.noteVersion.create({
+    data: {
+      organizationId,
+      noteId: plan.id,
+      name: "Draft sent to the board",
+      createdById: members.oliver,
+      contentJson: doc(planBody).contentJson,
+      createdAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    },
+  });
+
+  // --- Last week's pulse ---
+  const pulseDay = 5;
+  const from = addDaysToKey(updateWeekStartOfKey(today, pulseDay), -7);
+  const to = addDaysToKey(from, 6);
+  const start = zonedInstant(from, 0, tz);
+  const end = zonedInstant(addDaysToKey(to, 1), 0, tz);
+  const nextEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const projects = await prisma.project.findMany({
+    where: { organizationId, archivedAt: null },
+    select: { id: true, name: true, color: true },
+    orderBy: { name: "asc" },
+  });
+  const live = { organizationId, deletedAt: null };
+  const doneIn = { ...live, completedAt: { gte: start, lt: end } };
+  const byProject = [];
+  for (const p of [...projects, { id: null, name: "No project", color: null }]) {
+    const done = await prisma.task.count({ where: { ...doneIn, projectId: p.id } });
+    const open = await prisma.task.count({
+      where: { ...live, projectId: p.id, status: { not: TaskStatus.COMPLETED } },
+    });
+    if (done || open) byProject.push({ projectId: p.id, name: p.name, color: p.color, done, open });
+  }
+
+  const events = await prisma.event.findMany({
+    where: { organizationId, deletedAt: null, startsAt: { gte: start, lt: end } },
+    select: { id: true, title: true, startsAt: true, _count: { select: { attendance: true } } },
+    orderBy: { startsAt: "asc" },
+  });
+  const signups = await prisma.signup.findMany({
+    where: { organizationId, signedUpAt: { gte: start, lt: end } },
+    select: { contactId: true, signedUpAt: true, contact: { select: { displayName: true } } },
+    orderBy: { signedUpAt: "asc" },
+    take: 8,
+  });
+
+  const pollResults: PulseIssueData["pollResults"] = [];
+  const ballots = await prisma.ballotDefinition.findMany({
+    where: { organizationId },
+    select: { id: true, title: true, definition: true },
+  });
+  type BallotQuestion = {
+    key: string;
+    label?: string;
+    options?: { key: string; label?: string }[];
+  };
+  for (const b of ballots) {
+    const question = (b.definition as { questions?: BallotQuestion[] }).questions?.[0];
+    if (!question) continue;
+    const where = { organizationId, ballotDefinitionId: b.id };
+    // Ballots that drew votes this week, with their results so far.
+    if (!(await prisma.ballot.count({ where: { ...where, castAt: { gte: start, lt: end } } })))
+      continue;
+    const choices = await prisma.ballotChoice.groupBy({
+      by: ["choiceKey"],
+      where: { ...where, questionKey: question.key },
+      _count: { _all: true },
+    });
+    const labelOf = (key: string) => question.options?.find((o) => o.key === key)?.label ?? key;
+    pollResults.push({
+      kind: "ballot",
+      pollId: b.id,
+      question: question.label ?? b.title,
+      totalVotes: await prisma.ballot.count({ where }),
+      options: choices
+        .filter((c) => c.choiceKey)
+        .map((c) => ({ label: labelOf(c.choiceKey!), votes: c._count._all }))
+        .sort((x, y) => y.votes - x.votes)
+        .slice(0, 4),
+    });
+  }
+
+  const dueNext = await prisma.task.findMany({
+    where: {
+      ...live,
+      status: { not: TaskStatus.COMPLETED },
+      dueDate: { gte: fromDateKey(today), lt: fromDateKey(addDaysToKey(today, 7)) },
+    },
+    select: { id: true, title: true, dueDate: true, ownerId: true },
+    orderBy: { dueDate: "asc" },
+    take: 8,
+  });
+  const eventsNext = await prisma.event.findMany({
+    where: { organizationId, deletedAt: null, startsAt: { gte: now, lt: nextEnd } },
+    select: { id: true, title: true, startsAt: true },
+    orderBy: { startsAt: "asc" },
+    take: 5,
+  });
+
+  const data: PulseIssueData = {
+    v: 1,
+    range: { from, to },
+    doneCount: await prisma.task.count({ where: doneIn }),
+    byProject,
+    events: events.map((e) => ({
+      eventId: e.id,
+      title: e.title,
+      startsAt: e.startsAt.toISOString(),
+      checkIns: e._count.attendance,
+    })),
+    newMembers: signups.map((s) => ({
+      userId: null,
+      contactId: s.contactId,
+      name: s.contact.displayName ?? "New member",
+      joinedAt: s.signedUpAt.toISOString(),
+    })),
+    pollResults,
+    nextWeek: [
+      ...dueNext.map((t) => ({
+        kind: "task" as const,
+        id: t.id,
+        title: t.title,
+        date: localDateKey(t.dueDate!, "UTC"),
+        ownerId: t.ownerId,
+      })),
+      ...eventsNext.map((e) => ({
+        kind: "event" as const,
+        id: e.id,
+        title: e.title,
+        date: localDateKey(e.startsAt, tz),
+        ownerId: null,
+      })),
+    ].sort((x, y) => x.date.localeCompare(y.date)),
+  };
+  await prisma.pulseIssue.create({
+    data: {
+      organizationId,
+      weekStart: fromDateKey(from),
+      data: data as unknown as Prisma.InputJsonValue,
+      note: "Venue tour done: the ballroom it is. Photographer quotes are due Friday.",
+      sentAt: zonedInstant(to, 17, tz),
+    },
+  });
+
+  return { projects: 4, epics: epics.length, pulseIssues: 1 };
 }
 
 main()
