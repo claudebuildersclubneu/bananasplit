@@ -152,9 +152,7 @@ export function AppShell({
       pins={pins}
       admin={admin}
       onNavigate={onNavigate}
-      spaces={
-        <SpaceList orgs={orgs} activeSlug={orgSlug} user={user} onNavigate={onNavigate} />
-      }
+      spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} onNavigate={onNavigate} />}
     />
   );
 
@@ -175,7 +173,7 @@ export function AppShell({
         className={cn(
           "corona isolate grid min-h-svh grid-cols-1",
           "[--shell-bottom:calc(env(safe-area-inset-bottom)+5.5rem)] [--shell-top:4.25rem] md:[--shell-bottom:0px] md:[--shell-top:4.5rem]",
-          "md:transition-[grid-template-columns] md:duration-500 md:ease-(--ease-ink) motion-reduce:transition-none",
+          "motion-reduce:transition-none md:transition-[grid-template-columns] md:duration-500 md:ease-(--ease-ink)",
           mode === "docked"
             ? "md:grid-cols-[248px_minmax(0,1fr)]"
             : "md:grid-cols-[96px_minmax(0,1fr)]",

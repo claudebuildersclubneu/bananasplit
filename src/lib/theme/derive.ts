@@ -75,6 +75,8 @@ export const TOKEN_NAMES = [
   "thumb",
   "chrome",
   "chrome-foreground",
+  "chrome-accent",
+  "chrome-accent-foreground",
   "block-quiet",
   "block-quiet-foreground",
   "block-quiet-meta",
@@ -270,6 +272,10 @@ export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): To
     ? mixOklab(surface, text, 0.075)
     : oklchToHex({ L: 0.235, C: Math.min(hueSource.C, 0.035), h: hueSource.h });
   const chromeForeground = onFill(chrome, [text, background, surface, WHITE]);
+  // The accent as it sits on the chrome (the active item on the rail, the
+  // tab bar's create button): the accent itself, unless it is about as dark
+  // as the chrome (an ink accent in light mode); then the chrome's own label.
+  const chromeAccent = contrastRatio(accent, chrome) >= 1.6 ? accent : chromeForeground;
 
   // The four block cards. Quiet comes from the chrome; it moves towards
   // mid-grey when it would read as the accent block (an ink or pearl accent).
@@ -336,6 +342,8 @@ export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): To
     thumb,
     chrome,
     "chrome-foreground": chromeForeground,
+    "chrome-accent": chromeAccent,
+    "chrome-accent-foreground": onFill(chromeAccent, [chrome, text, background, surface]),
     "block-quiet": quiet,
     "block-quiet-foreground": quietForeground,
     "block-quiet-meta": blockMeta(quietForeground, quiet),

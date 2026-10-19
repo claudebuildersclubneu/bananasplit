@@ -12,5 +12,7 @@ export const capsuleButtonClass = cn(
 );
 
 export function CapsuleSeparator({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={cn("bg-border mx-1 h-[22px] w-px shrink-0", className)} />;
+  return (
+    <span aria-hidden="true" className={cn("bg-border mx-1 h-[22px] w-px shrink-0", className)} />
+  );
 }

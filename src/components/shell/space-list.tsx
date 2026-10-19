@@ -65,7 +65,12 @@ export function SpaceList({
                 }}
                 className={cn(
                   row,
-                  current ? cn("font-semibold", chrome ? "text-chrome-foreground" : "text-sidebar-foreground") : cn(tone.text, tone.hover),
+                  current
+                    ? cn(
+                        "font-semibold",
+                        chrome ? "text-chrome-foreground" : "text-sidebar-foreground",
+                      )
+                    : cn(tone.text, tone.hover),
                 )}
               >
                 {org.kind === "PERSONAL" ? (

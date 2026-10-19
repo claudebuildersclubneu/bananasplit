@@ -11,9 +11,8 @@ import { useEffect } from "react";
  */
 export function GlassRefraction() {
   useEffect(() => {
-    const brands = (
-      navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } }
-    ).userAgentData?.brands;
+    const brands = (navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } })
+      .userAgentData?.brands;
     if (!brands?.some((b) => /Chromium/.test(b.brand))) return;
     const root = document.documentElement;
     root.classList.add("has-refract");

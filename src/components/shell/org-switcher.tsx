@@ -13,11 +13,7 @@ import {
 import Link from "next/link";
 import { useTransition, type ReactNode } from "react";
 
-import {
-  fadeLabel,
-  surfaceTone,
-  useSidebarMode,
-} from "@/components/shell/sidebar-mode-context";
+import { fadeLabel, surfaceTone, useSidebarMode } from "@/components/shell/sidebar-mode-context";
 import type { OrgSummary, ShellUser } from "@/components/shell/types";
 import {
   DropdownMenu,
@@ -138,7 +134,10 @@ export function OrgSwitcher({
             "focus-glow relative flex h-12 w-full min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden text-left outline-none",
             "[transition:border-radius_500ms_var(--ease-ink),padding_500ms_var(--ease-ink),background-color_200ms] motion-reduce:[transition:none]",
             rail ? "rounded-full p-0" : "rounded-field px-1.5",
-            !rail && (chrome ? "aria-expanded:bg-chrome-foreground/10" : "aria-expanded:bg-sidebar-accent"),
+            !rail &&
+              (chrome
+                ? "aria-expanded:bg-chrome-foreground/10"
+                : "aria-expanded:bg-sidebar-accent"),
             !rail && tone.hover,
           )}
           aria-label={`${nameOf(active)} menu`}

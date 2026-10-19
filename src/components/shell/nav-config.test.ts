@@ -194,7 +194,12 @@ describe("the sidebar in each space", () => {
     expect(items.some((i) => i.locked)).toBe(false);
     const all = items;
     const is = (label: string, path: string, search = "") =>
-      isLinkActive(all.find((i) => i.label === label)!, path, all, search);
+      isLinkActive(
+        all.find((i) => i.label === label)!,
+        path,
+        all,
+        search,
+      );
     expect(is("RSVPs", "/app/me/calendar/rsvp/e1")).toBe(true);
     expect(is("Calendar", "/app/me/calendar/rsvp/e1")).toBe(false);
     expect(is("Find a time", "/app/me/calendar/find-a-time/p1")).toBe(true);
@@ -291,9 +296,12 @@ describe("the phone tab bar and the create menu", () => {
   });
 
   it("leaves out polls in Personal, and what a club hid", () => {
-    expect(createActions(sections(PERSONAL), { canCreateEvents: true }).map((a) => a.id)).toEqual(
-      ["task", "event", "note", "find-a-time"],
-    );
+    expect(createActions(sections(PERSONAL), { canCreateEvents: true }).map((a) => a.id)).toEqual([
+      "task",
+      "event",
+      "note",
+      "find-a-time",
+    ]);
     const groups = resolveSidebar(null);
     for (const g of groups) {
       for (const i of g.items) if (i.id === "notes" || i.id === "polls") i.hidden = true;

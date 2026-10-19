@@ -36,11 +36,7 @@ import {
 import { usePinDrop } from "@/components/pins/pin-dnd";
 import { usePins } from "@/components/pins/pins-context";
 import { PIN_ICONS } from "@/components/shell/pin-icons";
-import {
-  fadeLabel,
-  surfaceTone,
-  useSidebarMode,
-} from "@/components/shell/sidebar-mode-context";
+import { fadeLabel, surfaceTone, useSidebarMode } from "@/components/shell/sidebar-mode-context";
 import { canonicalHref } from "@/lib/pins/pages";
 import type { PinKind } from "@/lib/pins/pages";
 import { cn } from "@/lib/utils";
@@ -91,7 +87,9 @@ export function sidebarItemClass({
     "[transition:width_500ms_var(--ease-ink),background-color_200ms,color_200ms,box-shadow_200ms] motion-reduce:[transition:none]",
     rail ? "w-10" : "w-full",
     active
-      ? "bg-brand-accent text-brand-accent-foreground glow-halo font-semibold"
+      ? chrome
+        ? "bg-chrome-accent text-chrome-accent-foreground glow-halo font-semibold"
+        : "bg-brand-accent text-brand-accent-foreground glow-halo font-semibold"
       : cn(tone.text, tone.hover),
   );
 }
@@ -389,7 +387,11 @@ export function SidebarNav({
               aria-current={adminActive ? "true" : undefined}
               className={sidebarItemClass({ active: adminActive, rail, chrome })}
             >
-              <ShieldCheck className="size-5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
+              <ShieldCheck
+                className="size-5 shrink-0"
+                strokeWidth={ICON_STROKE}
+                aria-hidden="true"
+              />
               <span className={cn("truncate", fadeLabel(rail))}>{admin.label}</span>
             </Link>
           </div>

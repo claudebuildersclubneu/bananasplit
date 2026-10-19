@@ -98,7 +98,7 @@ export function TabBar({
               size="icon"
               aria-label="Create"
               aria-busy={pending || undefined}
-              className="mx-1 size-12 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:size-6"
+              className="bg-chrome-accent text-chrome-accent-foreground hover:bg-chrome-accent mx-1 size-12 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:size-6"
             >
               {icon}
             </Button>
@@ -111,7 +111,10 @@ export function TabBar({
         onClick={onMore}
         aria-haspopup="dialog"
         aria-expanded={moreOpen}
-        className={cn(tabClass, "aria-expanded:bg-chrome-foreground/12 aria-expanded:text-chrome-foreground")}
+        className={cn(
+          tabClass,
+          "aria-expanded:bg-chrome-foreground/12 aria-expanded:text-chrome-foreground",
+        )}
       >
         <Ellipsis className="size-[21px] shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
         More

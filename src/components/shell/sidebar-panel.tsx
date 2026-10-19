@@ -191,7 +191,11 @@ export function SidebarPanel({
               // Keyboard focus opens the peek (not a click, which would only
               // flash it open on the way to a page); the toggle stays itself.
               const target = event.target as HTMLElement;
-              if (mode === "rail" && target !== toggleRef.current && target.matches(":focus-visible")) {
+              if (
+                mode === "rail" &&
+                target !== toggleRef.current &&
+                target.matches(":focus-visible")
+              ) {
                 peek();
               }
             }}
@@ -204,7 +208,8 @@ export function SidebarPanel({
               "relative flex flex-col overflow-hidden",
               "[transition:width_500ms_var(--ease-ink),height_500ms_var(--ease-ink),margin_500ms_var(--ease-ink),padding_500ms_var(--ease-ink),border-radius_500ms_var(--ease-ink),background-color_350ms,box-shadow_350ms,color_350ms]",
               "motion-reduce:[transition:none]",
-              mode === "docked" && "text-sidebar-foreground m-0 h-svh w-[248px] rounded-none px-3.5 py-4",
+              mode === "docked" &&
+                "text-sidebar-foreground m-0 h-svh w-[248px] rounded-none px-3.5 py-4",
               mode === "rail" && "glass m-3.5 h-[calc(100svh-28px)] w-[68px] rounded-[36px] p-3.5",
               mode === "peek" &&
                 "glass m-3.5 h-[calc(100svh-28px)] w-64 rounded-[28px] p-3.5 [--glass-strength:93%]",
