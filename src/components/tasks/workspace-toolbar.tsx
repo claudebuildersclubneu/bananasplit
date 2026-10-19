@@ -4,11 +4,13 @@ import {
   Check,
   ChevronDown,
   Columns3,
+  FolderKanban,
   Gauge,
   ListChecks,
   Lock,
   SlidersHorizontal,
   Table2,
+  Tag,
   UserRound,
   X,
 } from "lucide-react";
@@ -35,6 +37,7 @@ import { hasModifier, isTypingTarget, overlayOpen, SCOPE_KEYS, TASK_KEYS } from 
 import { cn } from "@/lib/utils";
 
 import { STATUS_LABELS } from "./status-select";
+import { ProjectDot, ProjectMenu } from "./project-menu";
 import { menuItemClass, useMemberSearch } from "./task-fields";
 import { useTasks, useWorkspace } from "./tasks-context";
 
@@ -146,6 +149,8 @@ export function WorkspaceToolbar() {
             </Chip>
           ))}
           {members.length > 1 && <PersonFilter />}
+          <ProjectFilter />
+          {labels.length > 0 && <TagFilter />}
         </div>
 
         <div className="ms-auto flex flex-1 items-center justify-end gap-2 sm:flex-none">
@@ -202,48 +207,6 @@ export function WorkspaceToolbar() {
                 Open to the club
                 {ws.query.visibility === TaskVisibility.ORG && <Check className="ms-auto size-4" />}
               </DropdownMenuItem>
-
-              {labels.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Label</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => ws.setFilters({ labelId: undefined })}>
-                    Any label
-                    {!ws.query.labelId && <Check className="ms-auto size-4" />}
-                  </DropdownMenuItem>
-                  {labels.map((l) => (
-                    <DropdownMenuItem key={l.id} onSelect={() => ws.setFilters({ labelId: l.id })}>
-                      <span
-                        aria-hidden="true"
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: l.color }}
-                      />
-                      {l.name}
-                      {ws.query.labelId === l.id && <Check className="ms-auto size-4" />}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {projects.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Project</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => ws.setFilters({ projectId: undefined })}>
-                    All projects
-                    {!ws.query.projectId && <Check className="ms-auto size-4" />}
-                  </DropdownMenuItem>
-                  {projects.map((p) => (
-                    <DropdownMenuItem
-                      key={p.id}
-                      onSelect={() => ws.setFilters({ projectId: p.id })}
-                    >
-                      {p.name}
-                      {ws.query.projectId === p.id && <Check className="ms-auto size-4" />}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -327,6 +290,110 @@ export function WorkspaceToolbar() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Filter by project, as a pill of its own so it is there even before the
+ * club has a project: its menu can make the first one, and links to the
+ * projects list.
+ */
+function ProjectFilter() {
+  const { projectById } = useTasks();
+  const ws = useWorkspace();
+  const [open, setOpen] = useState(false);
+  const project = ws.query.projectId ? projectById.get(ws.query.projectId) : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={project ? `Filtered to project ${project.name}` : "Filter by project"}
+          className={chipClass(Boolean(project))}
+        >
+          {project ? (
+            <ProjectDot project={project} />
+          ) : (
+            <FolderKanban className="size-3.5" aria-hidden="true" />
+          )}
+          <span className="max-w-36 truncate">{project?.name ?? "Project"}</span>
+          <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 gap-px p-1.5">
+        <ProjectMenu
+          value={ws.query.projectId ?? null}
+          noneLabel="All projects"
+          onPick={(id) => {
+            ws.setFilters({ projectId: id ?? undefined });
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Filter by tag (one at a time, ?label=). */
+function TagFilter() {
+  const { labels } = useTasks();
+  const ws = useWorkspace();
+  const [open, setOpen] = useState(false);
+  const tag = ws.query.labelId ? labels.find((l) => l.id === ws.query.labelId) : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={tag ? `Filtered to tag ${tag.name}` : "Filter by tag"}
+          className={chipClass(Boolean(tag))}
+        >
+          {tag ? (
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full"
+              style={{ background: tag.color }}
+            />
+          ) : (
+            <Tag className="size-3.5" aria-hidden="true" />
+          )}
+          <span className="max-w-36 truncate">{tag?.name ?? "Tag"}</span>
+          <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 gap-px p-1.5">
+        <div role="listbox" aria-label="Tag" className="flex max-h-72 flex-col gap-px overflow-y-auto">
+          <button
+            type="button"
+            role="option"
+            aria-selected={!tag}
+            className={menuItemClass(!tag)}
+            onClick={() => (ws.setFilters({ labelId: undefined }), setOpen(false))}
+          >
+            Any tag
+            {!tag && <Check className="ms-auto size-3.5" aria-hidden="true" />}
+          </button>
+          {labels.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="option"
+              aria-selected={l.id === tag?.id}
+              className={menuItemClass(l.id === tag?.id)}
+              onClick={() => (ws.setFilters({ labelId: l.id }), setOpen(false))}
+            >
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-full"
+                style={{ background: l.color }}
+              />
+              <span className="truncate">{l.name}</span>
+              {l.id === tag?.id && <Check className="ms-auto size-3.5" aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

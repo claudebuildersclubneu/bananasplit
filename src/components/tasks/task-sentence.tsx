@@ -8,7 +8,8 @@ import { UserAvatar } from "@/components/user-avatar";
 import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-import { DueMenu, longDue, menuItemClass, PRIORITY_LABEL, projectColor } from "./task-fields";
+import { ProjectMenu } from "./project-menu";
+import { DueMenu, longDue, menuItemClass, PRIORITY_LABEL } from "./task-fields";
 import { STATUS_LABEL } from "./layout-ui";
 import { useTasks } from "./tasks-context";
 
@@ -55,7 +56,7 @@ export function TaskSentence({
   onMore: () => void;
   onSubmit: () => void;
 }) {
-  const { members, memberById, projects, projectById, viewer } = useTasks();
+  const { members, memberById, projectById, viewer } = useTasks();
   const owner = ownerId ? memberById.get(ownerId) : undefined;
   const ownerText = owner
     ? ownerId === viewer.userId
@@ -119,35 +120,7 @@ export function TaskSentence({
         , for{" "}
         <Slot label="Project" text={project?.name ?? "any project"} empty={!project}>
           {(close) => (
-            <div className="flex max-h-72 flex-col gap-px overflow-y-auto">
-              <button
-                type="button"
-                className={menuItemClass(!projectId)}
-                onClick={() => (onProject(null), close())}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-2 rounded-[2px]"
-                  style={{ background: projectColor(null) }}
-                />
-                No project
-              </button>
-              {projects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={menuItemClass(p.id === projectId)}
-                  onClick={() => (onProject(p.id), close())}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="size-2 rounded-[2px]"
-                    style={{ background: projectColor(p.id) }}
-                  />
-                  <span className="truncate">{p.name}</span>
-                </button>
-              ))}
-            </div>
+            <ProjectMenu value={projectId} onPick={(id) => (onProject(id), close())} />
           )}
         </Slot>
         . It&apos;s{" "}

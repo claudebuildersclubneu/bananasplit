@@ -465,6 +465,7 @@ export function TaskEditor({
             value={projectId}
             onChange={setProjectId}
             disabled={readOnly}
+            current={task?.project}
           />
         </Field>
       </div>

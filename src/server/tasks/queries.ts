@@ -1,4 +1,4 @@
-import { Prisma, TaskStatus, TaskVisibility } from "@/generated/prisma/client";
+import { Prisma, TaskStatus, TaskType, TaskVisibility } from "@/generated/prisma/client";
 import { OPEN_STATUSES } from "@/lib/tasks/status";
 import type { TxClient } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
@@ -20,6 +20,7 @@ import { everyWord } from "@/server/search/where";
 export const taskListSelect = {
   id: true,
   organizationId: true,
+  type: true,
   title: true,
   description: true,
   status: true,
@@ -58,17 +59,31 @@ export const taskListSelect = {
     select: {
       id: true,
       title: true,
+      type: true,
       status: true,
       visibility: true,
       dueDate: true,
       ownerId: true,
       version: true,
       owner: { select: userPublicSelect },
+      // An epic's stories carry their own tasks: the roll-up counts them.
+      subtasks: {
+        where: { deletedAt: null },
+        select: { id: true, status: true },
+      },
     },
     orderBy: { rank: "asc" },
   },
-  project: { select: { id: true, name: true } },
-  parentTask: { select: { id: true, title: true } },
+  project: { select: { id: true, name: true, color: true } },
+  // Two levels up: a task under a story still knows its epic.
+  parentTask: {
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      parentTask: { select: { id: true, title: true, type: true } },
+    },
+  },
   _count: { select: { comments: { where: { deletedAt: null } } } },
 } satisfies Prisma.TaskSelect;
 
@@ -416,12 +431,69 @@ export function getOrgLabels(db: TxClient, organizationId: string) {
   });
 }
 
+/** What every project picker, filter and chip needs. */
+export const projectOptionSelect = {
+  id: true,
+  name: true,
+  color: true,
+  leadId: true,
+  status: true,
+  startDate: true,
+  targetDate: true,
+  archivedAt: true,
+} satisfies Prisma.ProjectSelect;
+
+/**
+ * The club's projects, by name. Pickers and filters take the live ones only
+ * (an archived project can't be picked: createTask and updateTask refuse
+ * it); the projects list asks for the archived ones too.
+ */
 export function getOrgProjects(db: TxClient, organizationId: string, includeArchived = false) {
   return db.project.findMany({
     where: { organizationId, ...(includeArchived ? {} : { archivedAt: null }) },
-    select: { id: true, name: true, archivedAt: true },
+    select: projectOptionSelect,
     orderBy: { name: "asc" },
   });
 }
 
-export type ProjectOption = Awaited<ReturnType<typeof getOrgProjects>>[number];
+export type ProjectOption = Prisma.ProjectGetPayload<{ select: typeof projectOptionSelect }>;
+
+/**
+ * The projects list: every project (archived ones too) with its lead and
+ * how much of its work is open and done. Counts are what the viewer can see
+ * (RLS hides private tasks they aren't on), epics left out: an epic holds
+ * work, its stories and tasks are the work.
+ */
+export async function getProjectsOverview(db: TxClient, organizationId: string) {
+  const projects = await db.project.findMany({
+    where: { organizationId },
+    select: {
+      ...projectOptionSelect,
+      description: true,
+      lead: { select: userPublicSelect },
+    },
+    orderBy: { name: "asc" },
+  });
+  const counts = await db.task.groupBy({
+    by: ["projectId", "status"],
+    where: {
+      organizationId,
+      deletedAt: null,
+      projectId: { not: null },
+      type: { not: TaskType.EPIC },
+    },
+    _count: { _all: true },
+  });
+  return projects.map((p) => {
+    let open = 0;
+    let done = 0;
+    for (const c of counts) {
+      if (c.projectId !== p.id) continue;
+      if (c.status === TaskStatus.COMPLETED) done += c._count._all;
+      else open += c._count._all;
+    }
+    return { ...p, open, done };
+  });
+}
+
+export type ProjectOverviewItem = Awaited<ReturnType<typeof getProjectsOverview>>[number];

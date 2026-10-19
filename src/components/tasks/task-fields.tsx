@@ -8,22 +8,24 @@ import {
   ChevronsUpDown,
   Globe,
   Lock,
-  Plus,
   TriangleAlert,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { TagChip } from "@/components/ui/chip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/user-avatar";
 import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
 import { relationFor } from "@/lib/tasks/assignment";
 import { addDaysToKey, weekdayOfKey } from "@/lib/tasks/dates";
 import { parseDueText, quickDues } from "@/lib/tasks/due-text";
+import { projectColor } from "@/lib/tasks/project-color";
 import { cn } from "@/lib/utils";
 
 import { STATUS_LABEL, STATUS_TOKEN } from "./layout-ui";
+import { ProjectDot, ProjectMenu } from "./project-menu";
+import { TagMenu } from "./tag-menu";
 import { useTasks } from "./tasks-context";
 import type { LabelOption, MemberOption, ProjectOption } from "./types";
 
@@ -762,30 +764,31 @@ export function DueField({
 
 /* --------------------------------------------------------------- projects */
 
-const PROJECT_TOKENS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
+export { projectColor };
 
-/** A project's swatch: steady per project (projects carry no colour of their own). */
-export function projectColor(id: string | null): string {
-  if (!id) return "var(--muted-foreground)";
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return `var(${PROJECT_TOKENS[h % PROJECT_TOKENS.length]})`;
-}
-
+/**
+ * The Project field. `current` is the task's project as it was loaded: an
+ * archived one isn't offered in the menu, but the task still shows where it
+ * is filed until somebody moves it.
+ */
 export function ProjectField({
   id,
   value,
   onChange,
   disabled,
+  current,
 }: {
   id?: string;
   value: string | null;
   onChange: (id: string | null) => void;
   disabled?: boolean;
+  current?: { id: string; name: string; color?: string | null } | null;
 }) {
-  const { projects, projectById } = useTasks();
+  const { projectById } = useTasks();
   const [open, setOpen] = useState(false);
-  const project = value ? projectById.get(value) : undefined;
+  const project: Pick<ProjectOption, "id" | "name" | "color"> | undefined = value
+    ? (projectById.get(value) ?? (current?.id === value ? { color: null, ...current } : undefined))
+    : undefined;
   const pick = (next: string | null) => {
     onChange(next);
     setOpen(false);
@@ -800,74 +803,29 @@ export function ProjectField({
           aria-label="Project"
           className={wellClass(open, !project)}
         >
-          <span
-            aria-hidden="true"
-            className="size-[9px] shrink-0 rounded-[3px]"
-            style={{ background: projectColor(project?.id ?? null) }}
-          />
+          <ProjectDot project={project ?? null} />
           <span className="truncate">{project?.name ?? "No project"}</span>
+          {project && !projectById.has(project.id) && (
+            <span className="text-muted-foreground text-xs font-normal">Archived</span>
+          )}
           <UpDown />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className={MENU}>
-        <div
-          role="listbox"
-          aria-label="Project"
-          className="flex max-h-72 flex-col gap-px overflow-y-auto"
-        >
-          <button
-            type="button"
-            role="option"
-            aria-selected={!value}
-            className={menuItemClass(!value)}
-            onClick={() => pick(null)}
-          >
-            <span
-              aria-hidden="true"
-              className="size-2 shrink-0 rounded-[2px]"
-              style={{ background: projectColor(null) }}
-            />
-            No project
-          </button>
-          {projects.map((p: ProjectOption) => (
-            <button
-              key={p.id}
-              type="button"
-              role="option"
-              aria-selected={p.id === value}
-              className={menuItemClass(p.id === value)}
-              onClick={() => pick(p.id)}
-            >
-              <span
-                aria-hidden="true"
-                className="size-2 shrink-0 rounded-[2px]"
-                style={{ background: projectColor(p.id) }}
-              />
-              <span className="truncate">{p.name}</span>
-            </button>
-          ))}
-        </div>
+        <ProjectMenu value={value} onPick={pick} />
       </PopoverContent>
     </Popover>
   );
 }
 
-/* ----------------------------------------------------------------- labels */
+/* ------------------------------------------------------------------- tags */
 
+/** A tag on a task (stored as a Label): the shared TagChip. */
 export function LabelChip({ label }: { label: LabelOption }) {
-  return (
-    <span
-      className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium"
-      style={{
-        background: `color-mix(in oklab, ${label.color} 22%, transparent)`,
-        color: `color-mix(in oklab, ${label.color} 70%, var(--foreground))`,
-      }}
-    >
-      {label.name}
-    </span>
-  );
+  return <TagChip color={label.color}>{label.name}</TagChip>;
 }
 
+/** The Tags field: the task's tags as chips, opening the tag menu (find, toggle, create). */
 export function LabelsField({
   id,
   labels,
@@ -881,9 +839,10 @@ export function LabelsField({
   onChange: (ids: string[]) => void;
   disabled?: boolean;
 }) {
-  const { org, viewer } = useTasks();
   const [open, setOpen] = useState(false);
-  const picked = labels.filter((l) => value.includes(l.id));
+  const picked = value
+    .map((v) => labels.find((l) => l.id === v))
+    .filter((l): l is LabelOption => Boolean(l));
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -891,7 +850,7 @@ export function LabelsField({
           id={id}
           type="button"
           disabled={disabled}
-          aria-label="Labels"
+          aria-label="Tags"
           className={wellClass(open, picked.length === 0)}
         >
           {picked.length > 0 ? (
@@ -901,7 +860,7 @@ export function LabelsField({
               ))}
             </span>
           ) : (
-            <span>No labels</span>
+            <span>Add a tag</span>
           )}
           <UpDown />
         </button>
@@ -909,53 +868,9 @@ export function LabelsField({
       <PopoverContent
         align="start"
         side="top"
-        className={cn(MENU, "w-[var(--radix-popover-trigger-width)]")}
+        className={cn(MENU, "w-[max(var(--radix-popover-trigger-width),280px)]")}
       >
-        <div
-          role="listbox"
-          aria-multiselectable="true"
-          aria-label="Labels"
-          className="flex max-h-72 flex-col gap-px overflow-y-auto"
-        >
-          {labels.length === 0 && (
-            <p className="text-muted-foreground px-2 py-1.5 text-[13px]">No labels yet.</p>
-          )}
-          {labels.map((l) => {
-            const on = value.includes(l.id);
-            return (
-              <button
-                key={l.id}
-                type="button"
-                role="option"
-                aria-selected={on}
-                className={menuItemClass(on)}
-                onClick={() => onChange(on ? value.filter((v) => v !== l.id) : [...value, l.id])}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-[7px] shrink-0 rounded-full"
-                  style={{ background: l.color }}
-                />
-                <span className="truncate">{l.name}</span>
-                {on && (
-                  <Check className="text-primary ms-auto size-3.5 shrink-0" aria-hidden="true" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-        {viewer.isAdmin && (
-          <>
-            <div className="bg-border mx-1 my-1 h-px" />
-            <Link
-              href={`/app/${org.slug}/settings/labels`}
-              className={cn(menuItemClass(), "text-primary")}
-            >
-              <Plus className="size-3.5" aria-hidden="true" />
-              New label
-            </Link>
-          </>
-        )}
+        <TagMenu value={value} onChange={onChange} />
       </PopoverContent>
     </Popover>
   );

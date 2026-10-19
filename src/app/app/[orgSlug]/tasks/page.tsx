@@ -15,6 +15,7 @@ import {
   updateWeekStartKey,
   updateWeekStartOfKey,
 } from "@/lib/tasks/dates";
+import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
@@ -184,6 +185,7 @@ export default async function TasksPage({
       members={members}
       labels={base.labels}
       projects={base.projects}
+      can={creationRights(isAdmin, settings)}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
         <WorkspaceHeader
