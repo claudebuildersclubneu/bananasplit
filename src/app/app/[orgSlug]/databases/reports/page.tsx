@@ -1,3 +1,4 @@
+import { ChartNoAxesColumn } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 
@@ -133,10 +134,10 @@ export default async function ReportsPage({
 
   return (
     <ReportsFrame>
-      <div className="space-y-6">
+      <div className="space-y-7.5">
         <PageHeader
           title="Reports"
-          description={`Attendance, retention, signups and ballot results for ${organization.name}. Times are in ${tz}.`}
+          description={`${range.label} · ${ids.length} ${ids.length === 1 ? "report" : "reports"} · times in ${tz}`}
           actions={
             <>
               <RangePicker
@@ -155,11 +156,12 @@ export default async function ReportsPage({
 
         {ids.length === 0 ? (
           <EmptyState
+            icon={ChartNoAxesColumn}
             title="No reports to show"
             description="The databases these reports read are not visible to your role in this organization."
           />
         ) : (
-          <ReportsBody className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <ReportsBody className="grid grid-cols-1 gap-4.5 lg:grid-cols-3">
             {ids.map((id) => (
               <div key={id} className={`min-w-0 ${SLOTS[id].className} flex flex-col`}>
                 <Suspense fallback={SLOTS[id].skeleton}>{SLOTS[id].render(ctx)}</Suspense>

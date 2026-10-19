@@ -1,10 +1,19 @@
-import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, Minus } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { reportLinks } from "@/server/reports/links";
 
 import { BarList } from "../bar-list";
 import { LazyAttendanceLineChart } from "../charts/lazy";
-import { formatCount, formatDecimal, formatSigned, formatSignedPct, kindLabel, longDate, shortDate } from "../format";
+import {
+  formatCount,
+  formatDecimal,
+  formatSigned,
+  formatSignedPct,
+  kindLabel,
+  longDate,
+  shortDate,
+} from "../format";
 import { ReportCard, ReportEmpty, ReportError } from "../report-card";
 import { Stat, StatRow } from "../stat";
 import { TableView } from "../table-view";
@@ -27,35 +36,44 @@ export async function LastSessionSection({ ctx }: { ctx: ReportViewContext }) {
       tz={ctx.tz}
     >
       {!current ? (
-        <ReportEmpty>No session with check-ins in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={CalendarDays}>
+          No session with check-ins in {ctx.rangeLabel.toLowerCase()}.
+        </ReportEmpty>
       ) : (
         <>
-          <p className="text-lg leading-snug">
-            <span className="text-4xl font-semibold">{formatCount(current.checkIns)}</span>{" "}
-            {current.checkIns === 1 ? "member" : "members"} checked in at{" "}
-            <span className="font-medium">{current.title}</span> on{" "}
-            <span className="whitespace-nowrap">{longDate(current.localDate)}</span>.
-          </p>
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+            <span className="numeral text-[44px]">{formatCount(current.checkIns)}</span>
+            <p className="text-muted-foreground pb-1 text-sm leading-snug">
+              {current.checkIns === 1 ? "member" : "members"} checked in at{" "}
+              <span className="text-foreground font-medium">{current.title}</span> on{" "}
+              <span className="whitespace-nowrap">{longDate(current.localDate)}</span>
+            </p>
+          </div>
           {previous && delta !== null ? (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <span className="bg-muted inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium tabular-nums">
+              <Badge variant={delta > 0 ? "success" : delta < 0 ? "destructive" : "secondary"}>
                 {delta > 0 ? (
-                  <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                  <ArrowUpRight aria-hidden="true" />
                 ) : delta < 0 ? (
-                  <ArrowDownRight className="size-3.5" aria-hidden="true" />
+                  <ArrowDownRight aria-hidden="true" />
                 ) : (
-                  <Minus className="size-3.5" aria-hidden="true" />
+                  <Minus aria-hidden="true" />
                 )}
-                <span className="sr-only">{delta > 0 ? "Up" : delta < 0 ? "Down" : "No change"}</span>
+                <span className="sr-only">
+                  {delta > 0 ? "Up" : delta < 0 ? "Down" : "No change"}
+                </span>
                 {formatSigned(delta)}
                 {deltaPct !== null ? ` (${formatSignedPct(deltaPct)})` : ""}
-              </span>
+              </Badge>
               <span className="text-muted-foreground">
-                vs. {previous.title} on {shortDate(previous.localDate)} ({formatCount(previous.checkIns)})
+                vs. {previous.title} on {shortDate(previous.localDate)} (
+                {formatCount(previous.checkIns)})
               </span>
             </p>
           ) : (
-            <p className="text-muted-foreground text-sm">The first session on record: nothing to compare with yet.</p>
+            <p className="text-muted-foreground text-sm">
+              The first session on record: nothing to compare with yet.
+            </p>
           )}
           <StatRow className="sm:grid-cols-2">
             <Stat
@@ -67,7 +85,10 @@ export async function LastSessionSection({ ctx }: { ctx: ReportViewContext }) {
                   : undefined
               }
             />
-            <Stat label="Type" value={<span className="text-base">{kindLabel(current.kind)}</span>} />
+            <Stat
+              label="Type"
+              value={<span className="text-[19px]">{kindLabel(current.kind)}</span>}
+            />
           </StatRow>
         </>
       )}
@@ -92,13 +113,22 @@ export async function AttendanceSection({ ctx }: { ctx: ReportViewContext }) {
       tz={ctx.tz}
     >
       {r.totalSessions === 0 ? (
-        <ReportEmpty>No sessions with check-ins in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={CalendarDays}>
+          No sessions with check-ins in {ctx.rangeLabel.toLowerCase()}.
+        </ReportEmpty>
       ) : (
         <>
           <StatRow className="sm:grid-cols-4">
-            <Stat label="Sessions" value={formatCount(r.totalSessions)} href={reportLinks.sessions(ctx.slug, ctx.link)} />
+            <Stat
+              label="Sessions"
+              value={formatCount(r.totalSessions)}
+              href={reportLinks.sessions(ctx.slug, ctx.link)}
+            />
             <Stat label="Check-ins" value={formatCount(r.totalCheckIns)} />
-            <Stat label="Average per session" value={r.average === null ? "–" : formatDecimal(r.average)} />
+            <Stat
+              label="Average per session"
+              value={r.average === null ? "–" : formatDecimal(r.average)}
+            />
             <Stat
               label="Best turnout"
               value={r.peak ? formatCount(r.peak.checkIns) : "–"}
@@ -107,6 +137,7 @@ export async function AttendanceSection({ ctx }: { ctx: ReportViewContext }) {
           </StatRow>
           {r.sessions.length >= 2 ? (
             <LazyAttendanceLineChart
+              average={r.average}
               points={r.sessions.map((s) => ({
                 id: s.id,
                 title: s.title,
@@ -118,7 +149,8 @@ export async function AttendanceSection({ ctx }: { ctx: ReportViewContext }) {
           ) : null}
           {r.sessions.length < r.totalSessions ? (
             <p className="text-muted-foreground text-xs">
-              Showing the latest {formatCount(r.sessions.length)} of {formatCount(r.totalSessions)} sessions.
+              Showing the latest {formatCount(r.sessions.length)} of {formatCount(r.totalSessions)}{" "}
+              sessions.
             </p>
           ) : null}
           <TableView
@@ -156,7 +188,9 @@ export async function SessionTypesSection({ ctx }: { ctx: ReportViewContext }) {
       tz={ctx.tz}
     >
       {rows.length === 0 ? (
-        <ReportEmpty>No sessions with check-ins in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={CalendarDays}>
+          No sessions with check-ins in {ctx.rangeLabel.toLowerCase()}.
+        </ReportEmpty>
       ) : (
         <>
           <BarList

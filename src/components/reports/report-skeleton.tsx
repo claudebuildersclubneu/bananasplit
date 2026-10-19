@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-/** Card-shaped placeholder with roughly the finished card's height. */
+/** Card-shaped placeholder with roughly the finished card's height and layout. */
 export function ReportSkeleton({
   title,
   bodyHeight = 240,
@@ -21,18 +21,18 @@ export function ReportSkeleton({
       aria-label={`${title} loading`}
     >
       <CardHeader>
-        <div className="font-heading text-base font-medium">{title}</div>
-        <Skeleton className="h-4 w-2/3" />
+        <CardTitle>{title}</CardTitle>
+        <Skeleton className="h-4 w-2/3 rounded-full" />
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-5">
         {stats > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {Array.from({ length: stats }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
+              <Skeleton key={i} className="rounded-tile h-[92px]" />
             ))}
           </div>
         ) : null}
-        <Skeleton className="w-full" style={{ height: bodyHeight }} />
+        <Skeleton className="rounded-tile w-full" style={{ height: bodyHeight }} />
       </CardContent>
     </Card>
   );

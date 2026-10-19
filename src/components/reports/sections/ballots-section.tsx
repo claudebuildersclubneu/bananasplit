@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, EyeOff } from "lucide-react";
+import { ArrowUpRight, EyeOff, Vote } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 import { reportLinks } from "@/server/reports/links";
 import type { BallotQuestionResult, BallotResult } from "@/server/reports/types";
@@ -15,7 +17,7 @@ function Question({ q, k }: { q: BallotQuestionResult; k: number }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h4 className="text-sm font-medium">{q.label}</h4>
+        <h4 className="heading text-sm">{q.label}</h4>
         <span className="text-muted-foreground text-xs">
           {formatCount(q.ballots)} {q.ballots === 1 ? "answer" : "answers"}
           {ranked ? " · ranked by Borda points" : ""}
@@ -53,11 +55,11 @@ function Question({ q, k }: { q: BallotQuestionResult; k: number }) {
 
 function Ballot({ ballot, ctx, k }: { ballot: BallotResult; ctx: ReportViewContext; k: number }) {
   return (
-    <section className="flex flex-col gap-4 rounded-xl border p-4" aria-label={ballot.title}>
+    <section className="bg-muted/40 rounded-tile flex flex-col gap-4 p-5" aria-label={ballot.title}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-medium">{ballot.title}</h3>
-          <p className="text-muted-foreground text-xs">
+          <h3 className="heading text-[15px]">{ballot.title}</h3>
+          <p className="text-muted-foreground mt-0.5 text-xs">
             {formatCount(ballot.ballots)} {ballot.ballots === 1 ? "ballot" : "ballots"}
             {ballot.opensOn ? ` · opened ${shortDate(ballot.opensOn)}` : ""}
             {" · turnout "}
@@ -71,16 +73,18 @@ function Ballot({ ballot, ctx, k }: { ballot: BallotResult; ctx: ReportViewConte
             )}
           </p>
         </div>
-        <Link
-          href={reportLinks.ballot(ctx.slug, ballot.id)}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 rounded-md text-xs font-medium whitespace-nowrap outline-none focus-visible:ring-3"
-        >
-          View ballot data
-          <ArrowUpRight className="size-3.5" aria-hidden="true" />
-        </Link>
+        <Button asChild variant="outline" size="icon-sm">
+          <Link
+            href={reportLinks.ballot(ctx.slug, ballot.id)}
+            aria-label="View ballot data"
+            title="View ballot data"
+          >
+            <ArrowUpRight aria-hidden="true" />
+          </Link>
+        </Button>
       </div>
       {ballot.ballots === 0 ? (
-        <ReportEmpty>No valid ballots yet.</ReportEmpty>
+        <ReportEmpty icon={Vote}>No valid ballots yet.</ReportEmpty>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {ballot.questions.map((q) => (
@@ -114,14 +118,11 @@ export async function BallotsSection({ ctx }: { ctx: ReportViewContext }) {
       tz={ctx.tz}
     >
       {r.hidden ? (
-        <ReportEmpty>
-          <span className="inline-flex items-center gap-2">
-            <EyeOff className="size-4" aria-hidden="true" />
-            Ballot results are not shared with members in this organization.
-          </span>
+        <ReportEmpty icon={EyeOff}>
+          Ballot results are not shared with members in this organization.
         </ReportEmpty>
       ) : r.ballots.length === 0 ? (
-        <ReportEmpty>No ballots in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={Vote}>No ballots in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
       ) : (
         <>
           {!r.fullCounts ? (

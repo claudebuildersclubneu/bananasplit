@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowUpRight, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, ChartNoAxesColumn, TriangleAlert, type LucideIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -15,8 +16,9 @@ import { cn } from "@/lib/utils";
 import { asOfLabel } from "./format";
 
 /**
- * The frame of one report: title, a one-line definition, a "View data" deep
- * link into the filtered database view, the body, and when the numbers were
+ * The frame of one report (a Moonstone surface card): the title and a
+ * one-line definition on space, the ↗ circle that opens the rows behind it
+ * in the filtered database view, the body, and when the numbers were
  * computed ("as of", in the org timezone).
  */
 export function ReportCard({
@@ -48,17 +50,15 @@ export function ReportCard({
         <CardDescription>{description}</CardDescription>
         {viewHref ? (
           <CardAction>
-            <Link
-              href={viewHref}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 rounded-md text-xs font-medium whitespace-nowrap outline-none focus-visible:ring-3"
-            >
-              {viewLabel}
-              <ArrowUpRight className="size-3.5" aria-hidden="true" />
-            </Link>
+            <Button asChild variant="outline" size="icon-sm">
+              <Link href={viewHref} aria-label={viewLabel} title={viewLabel}>
+                <ArrowUpRight aria-hidden="true" />
+              </Link>
+            </Button>
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">{children}</CardContent>
+      <CardContent className="flex flex-1 flex-col gap-5">{children}</CardContent>
       {computedAt ? (
         <p className="text-muted-foreground px-(--card-spacing) text-xs tabular-nums">
           {asOfLabel(computedAt, tz)}
@@ -72,8 +72,8 @@ export function ReportCard({
 export function ReportError({ id, title, tz }: { id: string; title: string; tz: string }) {
   return (
     <ReportCard id={id} title={title} description="This report could not be loaded." tz={tz}>
-      <p className="text-muted-foreground flex items-center gap-2 text-sm">
-        <TriangleAlert className="size-4" aria-hidden="true" />
+      <p className="bg-tint-danger text-tint-danger-foreground rounded-tile flex items-start gap-2 p-3 text-sm">
+        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         Something went wrong while computing it. Refresh the reports to try again, or reload the
         page.
       </p>
@@ -81,11 +81,20 @@ export function ReportError({ id, title, tz }: { id: string; title: string; tz: 
   );
 }
 
-/** A body for a report with nothing to show in the range. */
-export function ReportEmpty({ children }: { children: ReactNode }) {
+/** A body for a report with nothing to show in the range: the section's icon and one sentence. */
+export function ReportEmpty({
+  children,
+  icon: Icon = ChartNoAxesColumn,
+}: {
+  children: ReactNode;
+  icon?: LucideIcon;
+}) {
   return (
-    <div className="text-muted-foreground flex min-h-24 flex-1 items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm">
-      {children}
+    <div className="bg-muted/40 rounded-tile text-muted-foreground flex min-h-28 flex-1 flex-col items-center justify-center gap-2.5 p-6 text-center text-sm">
+      <span className="bg-muted grid size-10 place-items-center rounded-full">
+        <Icon className="size-[18px]" aria-hidden="true" />
+      </span>
+      <p className="max-w-[34ch]">{children}</p>
     </div>
   );
 }
