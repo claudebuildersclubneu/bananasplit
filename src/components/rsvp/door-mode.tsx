@@ -300,7 +300,7 @@ export function DoorMode({
         <div
           role="status"
           className={cn(
-            "rounded-block shadow-e3 fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl px-6 py-5",
+            "rounded-block shadow-e3 fixed inset-x-4 bottom-[calc(var(--shell-bottom,0px)+1rem)] z-50 mx-auto max-w-xl px-6 py-5",
             flash.tone === "ok" && "bg-block-goal text-block-goal-foreground",
             flash.tone === "warn" && "bg-block-answer text-block-answer-foreground",
             flash.tone === "bad" && "bg-block-alert text-block-alert-foreground",

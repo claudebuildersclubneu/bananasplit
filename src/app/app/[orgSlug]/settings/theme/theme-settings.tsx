@@ -465,7 +465,7 @@ export function ThemeSettings({
         </div>
       </section>
 
-      <div className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <div className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky bottom-[var(--shell-bottom,0px)] z-10 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
         <Button onClick={save} disabled={isPending || !dirty}>
           {isPending ? "Saving…" : "Save theme"}
         </Button>

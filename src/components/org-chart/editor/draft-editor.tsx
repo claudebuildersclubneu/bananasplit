@@ -229,7 +229,7 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
 
   return (
     <div className="space-y-4">
-      <div className="bg-background/95 sticky top-14 z-30 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
+      <div className="bg-background/95 sticky top-[var(--shell-top,3.5rem)] z-30 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <span className="font-medium">Draft v{version.number}</span>
           <Badge variant="outline">{sourceLabel(version.source)}</Badge>

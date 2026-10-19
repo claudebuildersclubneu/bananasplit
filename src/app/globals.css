@@ -14,6 +14,8 @@
   --color-thumb: var(--thumb);
   --color-chrome: var(--chrome);
   --color-chrome-foreground: var(--chrome-foreground);
+  --color-chrome-accent: var(--chrome-accent);
+  --color-chrome-accent-foreground: var(--chrome-accent-foreground);
   --color-block-quiet: var(--block-quiet);
   --color-block-quiet-foreground: var(--block-quiet-foreground);
   --color-block-quiet-meta: var(--block-quiet-meta);
@@ -165,6 +167,8 @@
   --thumb: #ffffff;
   --chrome: #1d1e20;
   --chrome-foreground: #ffffff;
+  --chrome-accent: #ffffff;
+  --chrome-accent-foreground: #111318;
   --block-quiet: #646668;
   --block-quiet-foreground: #ffffff;
   --block-quiet-meta: #e5e6e6;
@@ -255,6 +259,8 @@
   --thumb: #37383b;
   --chrome: #222328;
   --chrome-foreground: #ffffff;
+  --chrome-accent: #eef0f4;
+  --chrome-accent-foreground: #0c0d10;
   --block-quiet: #232429;
   --block-quiet-foreground: #eef0f4;
   --block-quiet-meta: #abadb1;

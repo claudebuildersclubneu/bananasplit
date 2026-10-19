@@ -209,5 +209,22 @@ INSERT INTO "OrgTheme" ("organizationId", "preset", "mode", "light", "tokens", "
   ('org_A', 'cbc-light', 'LIGHT',
    '{"primary":"#a34a2a","accent":"#d97757","background":"#faf9f5","surface":"#ffffff","text":"#141413"}', '{}', CURRENT_TIMESTAMP);
 
+-- ---- Moonstone: note comments and versions, the weekly pulse -------------
+-- n_A_org (a club note by u_formerA, memberCanEdit off) carries a thread by
+-- u_memberA with a reply by u_adminA; org B has one of each, so the
+-- isolation cases have rows on both sides.
+INSERT INTO "NoteComment" ("id", "organizationId", "noteId", "authorId", "threadId", "body", "anchorText") VALUES
+  ('nc_A_root',  'org_A', 'n_A_org', 'u_memberA', NULL,        'Is the date final?', 'Org note'),
+  ('nc_A_reply', 'org_A', 'n_A_org', 'u_adminA',  'nc_A_root', 'Yes, booked.', NULL),
+  ('nc_B',       'org_B', 'n_B',     'u_memberB', NULL,        'B comment', NULL);
+-- sizeBytes is the database's to count (app.note_version_size).
+INSERT INTO "NoteVersion" ("id", "organizationId", "noteId", "name", "createdById", "contentJson") VALUES
+  ('nv_A',      'org_A', 'n_A_org',  'First draft', 'u_adminA',  '{"type":"doc"}'),
+  ('nv_A_priv', 'org_A', 'n_A_priv', NULL,          'u_adminA',  '{"type":"doc"}'),
+  ('nv_B',      'org_B', 'n_B',      NULL,          'u_memberB', '{"type":"doc"}');
+INSERT INTO "PulseIssue" ("id", "organizationId", "weekStart", "data") VALUES
+  ('pi_A', 'org_A', '2026-09-12', '{"v":1,"doneCount":3}'),
+  ('pi_B', 'org_B', '2026-09-12', '{"v":1,"doneCount":1}');
+
 -- u_formerA leaves org A but keeps authorship of t_A2 and n_A_org.
 DELETE FROM "Membership" WHERE "id" = 'm_formerA';
