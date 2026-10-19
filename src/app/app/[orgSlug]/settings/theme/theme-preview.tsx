@@ -1,10 +1,24 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, LayoutDashboard, ListTodo, TriangleAlert } from "lucide-react";
+import {
+  ArrowUp,
+  CalendarDays,
+  Check,
+  Flag,
+  LayoutDashboard,
+  ListTodo,
+  Plus,
+  Users,
+  Wallet,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { BlockCard } from "@/components/ui/block-card";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusDot, TagChip } from "@/components/ui/chip";
+import { Gauge, TickMeter } from "@/components/ui/meters";
+import { Stat, StatStrip } from "@/components/ui/stat";
 import { accentScaleStyle, type AccentScale } from "@/lib/theme/accent";
 import { tokenStyle } from "@/lib/theme/css";
 import type { TokenMap } from "@/lib/theme/derive";
@@ -13,25 +27,27 @@ import { styleDeclarations, TEXT_SIZE_ZOOM, type ThemeStyle } from "@/lib/theme/
 import type { ColorMode } from "@/lib/theme/types";
 import { cn } from "@/lib/utils";
 
-const BAR_HEIGHTS = ["h-10", "h-14", "h-8", "h-12", "h-6"] as const;
-const CHART_CLASSES = [
-  "bg-chart-1",
-  "bg-chart-2",
-  "bg-chart-3",
-  "bg-chart-4",
-  "bg-chart-5",
+const NAV = [
+  { label: "Overview", icon: LayoutDashboard },
+  { label: "Tasks", icon: ListTodo },
+  { label: "Calendar", icon: CalendarDays },
+  { label: "People", icon: Users },
+  { label: "Finance", icon: Wallet },
 ] as const;
 
 /**
- * A live preview of a palette: a scoped wrapper that sets every design
- * token as a custom property on itself (so everything inside reads the
- * draft theme, not the org's current one), around NON-portaled mock
- * components (a Radix portal would escape the wrapper and show the live
- * theme instead). The `dark` class on the wrapper turns on the `dark:`
- * variants inside it. The same derive() output is what the save stores and
- * the layout renders, so the preview equals the saved result. The accent
- * scale (bg-banana, bg-butter, text-honey ...) and Look and feel (corners,
- * fonts; text size as a zoom, since rem cannot be scoped) are set the same way.
+ * A live preview of a palette as a mini Overview, built from the real
+ * components (block cards, the stat strip, a surface card with task rows,
+ * chips, meters and buttons), so admins see their colours where members
+ * will. It sits in a scoped wrapper that sets every design token as a
+ * custom property on itself (so everything inside reads the draft theme,
+ * not the org's current one); nothing inside is portaled (a Radix portal
+ * would escape the wrapper and show the live theme instead). The `dark`
+ * class on the wrapper turns on the `dark:` variants inside it. The same
+ * derive() output is what the save stores and the layout renders, so the
+ * preview equals the saved result. The accent scale and Look and feel
+ * (corners, fonts; text size as a zoom, since rem cannot be scoped) are set
+ * the same way. The whole thing is inert: nothing in it is a real control.
  */
 export function ThemePreview({
   tokens,
@@ -47,14 +63,14 @@ export function ThemePreview({
   orgName: string;
 }) {
   return (
-    <figure className="space-y-2">
-      <figcaption className="text-muted-foreground text-xs font-medium">
+    <figure className="min-w-0 space-y-2">
+      <figcaption className="text-muted-foreground text-[13px] font-medium">
         {mode === "light" ? "Light" : "Dark"}
       </figcaption>
       <div
         data-theme-preview={mode}
         className={cn(
-          "bg-background text-foreground overflow-hidden rounded-xl border text-sm",
+          "bg-background text-foreground ring-foreground/8 rounded-card relative isolate overflow-hidden text-sm ring-1",
           mode === "dark" && "dark",
         )}
         style={{
@@ -64,114 +80,178 @@ export function ThemePreview({
           colorScheme: mode,
           zoom: TEXT_SIZE_ZOOM[style.textSize],
         }}
-        // Mock controls: nothing here is a real control, so keep it out of
-        // the tab order and the accessibility tree's interactive roles.
         inert
       >
-        <div className="grid grid-cols-[8.5rem_1fr]">
-          <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border flex flex-col gap-1 border-r p-2.5">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md text-[10px] font-semibold">
+        {/* The glow as light behind the top of the page, as in the app. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-64 bg-[radial-gradient(60%_70%_at_50%_0%,color-mix(in_oklab,var(--glow)_calc(var(--glow-strength,20%)*0.9),transparent),transparent_75%)]"
+        />
+        <div className="@container grid grid-cols-[8.25rem_minmax(0,1fr)]" style={{ zoom: 0.8 }}>
+          <aside className="bg-sidebar text-sidebar-foreground flex flex-col gap-1 p-3">
+            <div className="mb-3 flex items-center gap-2 px-1">
+              <span className="bg-primary text-primary-foreground rounded-field grid size-7 shrink-0 place-items-center text-[11px] font-semibold">
                 {orgInitials(orgName)}
               </span>
-              <span className="truncate text-xs font-semibold">{orgName}</span>
+              <span className="truncate text-[13px] font-semibold">{orgName}</span>
             </div>
-            <span className="bg-sidebar-accent text-sidebar-accent-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium">
-              <LayoutDashboard className="size-3.5" aria-hidden="true" />
-              Overview
-            </span>
-            <span className="text-sidebar-foreground/80 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium">
-              <ListTodo className="size-3.5" aria-hidden="true" />
-              Tasks
-            </span>
-            <span className="text-sidebar-foreground/80 flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium">
-              <CalendarDays className="size-3.5" aria-hidden="true" />
-              Calendar
-            </span>
+            {NAV.map(({ label, icon: Icon }, i) => (
+              <span
+                key={label}
+                className={cn(
+                  "flex h-9 items-center gap-2.5 rounded-full px-3 text-[13px] font-medium",
+                  i === 0
+                    ? "bg-brand-accent text-brand-accent-foreground glow-halo font-semibold"
+                    : "text-sidebar-foreground/80",
+                )}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                {label}
+              </span>
+            ))}
           </aside>
 
-          <div className="min-w-0 space-y-3 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-heading mr-auto text-base [font-weight:var(--heading-weight,400)]">
-                Weekly meeting
+          <div className="min-w-0 space-y-5 p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="page-title text-[30px]">Good afternoon</p>
+                <p className="text-muted-foreground mt-1.5 text-[13px]">3 things need you today</p>
+              </div>
+              <span className={buttonVariants({ variant: "create", size: "sm" })}>
+                <Plus aria-hidden="true" />
+                New task
               </span>
-              <Button size="sm" variant="outline">
-                Edit
-              </Button>
-              <Button size="sm">Publish</Button>
             </div>
 
-            <div className="bg-card text-card-foreground space-y-2 rounded-lg border p-3">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Kickoff meeting</span>
-                <Badge>Public</Badge>
-                <Badge variant="secondary">Workshop</Badge>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Thursday, 6 pm in the student center. 42 members checked in last week.
-              </p>
-              <p className="text-xs">
-                Read the{" "}
-                <span className="text-primary underline underline-offset-4">run of show</span>{" "}
-                before you set up.
-              </p>
-              <div className="flex flex-wrap gap-3 text-xs">
-                <span className="text-success inline-flex items-center gap-1">
-                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
-                  Room booked
-                </span>
-                <span className="text-warning inline-flex items-center gap-1">
-                  <TriangleAlert className="size-3.5" aria-hidden="true" />
-                  Food pending
-                </span>
-                <span className="text-destructive">1 overdue task</span>
-              </div>
-            </div>
+            <StatStrip className="sm:gap-x-10">
+              <Stat
+                icon={ListTodo}
+                value="31"
+                label="Open tasks"
+                chip={<Badge variant="destructive">2 due today</Badge>}
+              />
+              <Stat
+                icon={Users}
+                value="42"
+                label="At the last meeting"
+                chip={
+                  <Badge variant="success">
+                    <ArrowUp aria-hidden="true" />8
+                  </Badge>
+                }
+              />
+              <Stat icon={CalendarDays} value="4" label="Events this week" />
+            </StatStrip>
 
-            <div className="grid grid-cols-[1fr_auto] items-end gap-3">
-              <div className="bg-popover text-popover-foreground space-y-2 rounded-lg border p-3 shadow-md">
-                <p className="text-xs font-medium">Rename session</p>
-                <Input
-                  defaultValue="Intro to agents"
-                  className="h-7 text-xs"
-                  readOnly
-                  tabIndex={-1}
+            <div className="grid gap-4 @3xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] @3xl:items-start">
+              <div className="grid grid-cols-2 gap-3">
+                <BlockCard
+                  tone="alert"
+                  kicker="Due today"
+                  title="Send the GBM agenda"
+                  figure="2 of 3"
+                  figureLabel="subtasks done"
+                  className="min-h-0 p-4 [&_h3]:text-[19px]"
                 />
-                <div className="flex justify-end gap-2">
-                  <Button size="xs" variant="ghost">
-                    Cancel
-                  </Button>
-                  <Button size="xs" variant="destructive">
-                    Delete
-                  </Button>
-                </div>
+                <BlockCard
+                  tone="quiet"
+                  kicker="Tomorrow · 7:00 PM"
+                  title="Officer meeting"
+                  subtitle="Engineering Hall 112"
+                  figure="8"
+                  figureLabel="going"
+                  className="min-h-0 p-4 [&_h3]:text-[19px]"
+                />
+                <BlockCard
+                  tone="answer"
+                  kicker="Your answer"
+                  title="Pick a weekend for the retreat"
+                  figure="3"
+                  figureLabel="options"
+                  className="min-h-0 p-4 [&_h3]:text-[19px]"
+                />
+                <BlockCard tone="goal" kicker="RSVPs · Sat, Oct 24" className="min-h-0 p-4">
+                  <div className="mt-2 flex items-center gap-3">
+                    <Gauge value={53} size={84} className="[&_b]:text-[20px]" />
+                    <div className="min-w-0">
+                      <p className="display-title text-[17px]">Fall Showcase</p>
+                      <p className="mt-1 text-xs text-(--meta)">64 of 120 seats</p>
+                    </div>
+                  </div>
+                </BlockCard>
               </div>
-              <div
-                className="bg-card flex items-end gap-1 rounded-lg border p-2"
-                aria-hidden="true"
-              >
-                {CHART_CLASSES.map((chart, i) => (
-                  <span key={chart} className={cn("w-3 rounded-sm", chart, BAR_HEIGHTS[i])} />
-                ))}
-              </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="bg-accent text-accent-foreground rounded-md px-2 py-1">
-                Highlighted item
-              </span>
-              <span className="bg-banana text-banana-ink rounded-md px-2 py-1 font-medium">
-                Accent fill
-              </span>
-              <span className="bg-butter text-honey rounded-full px-2 py-1 font-semibold">
-                12 going
-              </span>
-              <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
-                Muted panel
-              </span>
-              <span className="ring-ring/50 border-ring rounded-md border px-2 py-1 ring-3">
-                Focus
-              </span>
+              <Card size="sm">
+                <CardHeader className="flex items-center gap-2">
+                  <CardTitle>My tasks</CardTitle>
+                  <Badge variant="secondary">6</Badge>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ul className="divide-border/70 divide-y">
+                    <li className="flex items-center gap-3 py-2">
+                      <span className="ring-input size-[18px] shrink-0 rounded-full ring-[1.5px] ring-inset" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">Confirm the venue</span>
+                        <span className="mt-1 flex items-center gap-2">
+                          <TagChip color="var(--chart-3)">Fall Showcase</TagChip>
+                          <span className="text-tint-danger-foreground text-xs font-semibold">
+                            Today
+                          </span>
+                        </span>
+                      </span>
+                      <Badge variant="destructive">
+                        <Flag aria-hidden="true" />
+                        Urgent
+                      </Badge>
+                    </li>
+                    <li className="flex items-center gap-3 py-2">
+                      <span className="bg-block-goal text-block-goal-foreground grid size-[18px] shrink-0 place-items-center rounded-full">
+                        <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="text-muted-foreground block truncate line-through">
+                          Book Engineering Hall 112
+                        </span>
+                        <span className="mt-1 flex items-center gap-2">
+                          <TagChip color="var(--chart-2)">Club operations</TagChip>
+                        </span>
+                      </span>
+                      <Badge variant="accent">High</Badge>
+                    </li>
+                  </ul>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={buttonVariants({ size: "sm" })}>Save</span>
+                    <span className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      Cancel
+                    </span>
+                    <span className={buttonVariants({ variant: "destructive", size: "sm" })}>
+                      Delete task
+                    </span>
+                    <StatusDot color="var(--success)" className="ml-auto">
+                      Synced
+                    </StatusDot>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <TickMeter
+                      total={20}
+                      filled={12}
+                      height={14}
+                      label="12 of 20"
+                      color="var(--chart-1)"
+                      className="flex-1"
+                    />
+                    <span className="flex gap-1" aria-hidden="true">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span
+                          key={n}
+                          className="size-2.5 rounded-full"
+                          style={{ background: `var(--chart-${n})` }}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
