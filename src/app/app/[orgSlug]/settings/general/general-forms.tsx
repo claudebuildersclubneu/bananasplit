@@ -27,8 +27,8 @@ import { Label } from "@/components/ui/label";
 import { slugify } from "@/lib/slug";
 import { WEEKDAY_NAMES } from "@/lib/tasks/dates";
 import { timeZoneOptions } from "@/lib/timezones";
-import { SUCCESS_TEXT } from "@/lib/status-tones";
 
+import { nativeSelectClass, SettingsCard, SettingsStatus } from "../settings-card";
 import { renameOrgSlug, updateOrgName, updateOrgTimezone, updateWeeklyUpdateDay } from "./actions";
 
 type Status = { tone: "ok" | "error"; text: string } | null;
@@ -37,15 +37,7 @@ const loadCropDialog = () => import("@/components/images/crop-dialog");
 const CropDialog = dynamic(loadCropDialog, { ssr: false });
 
 function StatusLine({ status }: { status: Status }) {
-  if (!status) return null;
-  return (
-    <p
-      role="status"
-      className={status.tone === "error" ? "text-destructive text-sm" : `text-sm ${SUCCESS_TEXT}`}
-    >
-      {status.text}
-    </p>
-  );
+  return <SettingsStatus status={status} />;
 }
 
 export function NameForm({
@@ -63,7 +55,6 @@ export function NameForm({
   const [isPending, startTransition] = useTransition();
   return (
     <form
-      className="space-y-2"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         setStatus(null);
@@ -78,23 +69,30 @@ export function NameForm({
         });
       }}
     >
-      <Label htmlFor="org-name">Name</Label>
-      <div className="flex flex-wrap gap-2">
+      <SettingsCard
+        title="Name"
+        description="How the club appears across the app, in emails and on invite pages."
+        status={status && <StatusLine status={status} />}
+        footer={
+          canEdit && (
+            <Button type="submit" disabled={isPending || value.trim() === name}>
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          )
+        }
+      >
+        <Label htmlFor="org-name" className="sr-only">
+          Name
+        </Label>
         <Input
           id="org-name"
           value={value}
           maxLength={80}
           disabled={!canEdit}
           onChange={(e) => setValue(e.target.value)}
-          className="max-w-sm"
+          className="max-w-md"
         />
-        {canEdit && (
-          <Button type="submit" variant="outline" disabled={isPending || value.trim() === name}>
-            {isPending ? "Saving…" : "Save"}
-          </Button>
-        )}
-      </div>
-      <StatusLine status={status} />
+      </SettingsCard>
     </form>
   );
 }
@@ -118,7 +116,6 @@ export function WeeklyUpdateDayForm({
   const [isPending, startTransition] = useTransition();
   return (
     <form
-      className="space-y-2"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         setStatus(null);
@@ -133,14 +130,33 @@ export function WeeklyUpdateDayForm({
         });
       }}
     >
-      <Label htmlFor="org-weekly-day">Weekly update day</Label>
-      <div className="flex flex-wrap gap-2">
+      <SettingsCard
+        title="Weekly update day"
+        description={
+          <>
+            When everyone&apos;s done / next / blocked update is due. Each week runs{" "}
+            {WEEKDAY_NAMES[(value + 1) % 7]} to {WEEKDAY_NAMES[value]}, and leads who haven&apos;t
+            posted get a reminder {WEEKDAY_NAMES[value]} evening.
+          </>
+        }
+        status={status && <StatusLine status={status} />}
+        footer={
+          canEdit && (
+            <Button type="submit" disabled={isPending || value === day}>
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          )
+        }
+      >
+        <Label htmlFor="org-weekly-day" className="sr-only">
+          Weekly update day
+        </Label>
         <select
           id="org-weekly-day"
           value={value}
           disabled={!canEdit}
           onChange={(e) => setValue(Number(e.target.value))}
-          className="border-input bg-background h-8 w-full max-w-sm rounded-lg border px-2.5 text-sm"
+          className={`${nativeSelectClass} max-w-md`}
         >
           {WEEKDAY_NAMES.map((name, i) => (
             <option key={name} value={i}>
@@ -148,18 +164,7 @@ export function WeeklyUpdateDayForm({
             </option>
           ))}
         </select>
-        {canEdit && (
-          <Button type="submit" variant="outline" disabled={isPending || value === day}>
-            {isPending ? "Saving…" : "Save"}
-          </Button>
-        )}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        When everyone&apos;s done / next / blocked update is due. Each week runs{" "}
-        {WEEKDAY_NAMES[(value + 1) % 7]} to {WEEKDAY_NAMES[value]}, and leads who haven&apos;t
-        posted get a reminder {WEEKDAY_NAMES[value]} evening.
-      </p>
-      <StatusLine status={status} />
+      </SettingsCard>
     </form>
   );
 }
@@ -180,7 +185,6 @@ export function TimezoneForm({
   const [isPending, startTransition] = useTransition();
   return (
     <form
-      className="space-y-2"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         setStatus(null);
@@ -195,14 +199,27 @@ export function TimezoneForm({
         });
       }}
     >
-      <Label htmlFor="org-timezone">Timezone</Label>
-      <div className="flex flex-wrap gap-2">
+      <SettingsCard
+        title="Timezone"
+        description="Weeks, reminders, digests and reports follow this zone. Members can override it for themselves in their profile."
+        status={status && <StatusLine status={status} />}
+        footer={
+          canEdit && (
+            <Button type="submit" disabled={isPending || value === timezone}>
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          )
+        }
+      >
+        <Label htmlFor="org-timezone" className="sr-only">
+          Timezone
+        </Label>
         <select
           id="org-timezone"
           value={value}
           disabled={!canEdit}
           onChange={(e) => setValue(e.target.value)}
-          className="border-input bg-background h-8 w-full max-w-sm rounded-lg border px-2.5 text-sm"
+          className={`${nativeSelectClass} max-w-md`}
         >
           {!zones.includes(value) && <option value={value}>{value}</option>}
           {zones.map((z) => (
@@ -211,17 +228,7 @@ export function TimezoneForm({
             </option>
           ))}
         </select>
-        {canEdit && (
-          <Button type="submit" variant="outline" disabled={isPending || value === timezone}>
-            {isPending ? "Saving…" : "Save"}
-          </Button>
-        )}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Weeks, reminders, digests and reports follow this zone. Members can override it for
-        themselves in their profile.
-      </p>
-      <StatusLine status={status} />
+      </SettingsCard>
     </form>
   );
 }
@@ -245,13 +252,15 @@ export function SlugForm({
   const next = slugify(value);
 
   return (
-    <div className="space-y-2">
-      <Label>URL</Label>
-      <div className="flex flex-wrap items-center gap-2">
-        <code className="bg-muted rounded px-2 py-1 text-sm">
-          {appOrigin}/app/{slug}
-        </code>
-        {canEdit && (
+    <SettingsCard
+      title="URL"
+      description={
+        canEdit
+          ? "Old links keep working: the current URL redirects to the new one."
+          : "Only an owner can change the URL."
+      }
+      footer={
+        canEdit && (
           <Dialog
             open={open}
             onOpenChange={(o) => {
@@ -261,9 +270,7 @@ export function SlugForm({
             }}
           >
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                Change URL
-              </Button>
+              <Button variant="outline">Change URL</Button>
             </DialogTrigger>
             <DialogContent>
               <form
@@ -291,7 +298,7 @@ export function SlugForm({
                 </DialogHeader>
                 <div className="grid gap-1.5">
                   <Label htmlFor="new-slug">New URL</Label>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-sm">/app/</span>
                     <Input
                       id="new-slug"
@@ -302,7 +309,7 @@ export function SlugForm({
                   </div>
                 </div>
                 {next !== slug && (
-                  <div className="bg-muted space-y-1 rounded-md p-3 text-xs">
+                  <div className="bg-muted/60 rounded-tile space-y-1.5 p-3 text-[13px]">
                     <p>
                       The public events feed moves to{" "}
                       <code className="break-all">
@@ -316,7 +323,14 @@ export function SlugForm({
                     </p>
                   </div>
                 )}
-                {error && <p className="text-destructive text-sm">{error}</p>}
+                {error && (
+                  <p
+                    role="alert"
+                    className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+                  >
+                    {error}
+                  </p>
+                )}
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                     Cancel
@@ -328,12 +342,13 @@ export function SlugForm({
               </form>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
-      {!canEdit && (
-        <p className="text-muted-foreground text-xs">Only an owner can change the URL.</p>
-      )}
-    </div>
+        )
+      }
+    >
+      <p className="bg-muted/60 rounded-field px-3.5 py-2.5 font-mono text-[13px] break-all">
+        {appOrigin}/app/{slug}
+      </p>
+    </SettingsCard>
   );
 }
 
@@ -427,14 +442,11 @@ export function LogoForm({
     .join("");
 
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-sm font-medium">Club picture</h2>
-        <p className="text-muted-foreground text-xs">
-          Your club&apos;s profile picture: the sidebar, the organization switcher, and the page
-          people see when they join.
-        </p>
-      </div>
+    <SettingsCard
+      title="Club picture"
+      description="Your club's profile picture: the sidebar, the organization switcher, and the page people see when they join."
+      status={status && <StatusLine status={status} />}
+    >
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
@@ -442,13 +454,13 @@ export function LogoForm({
           onClick={() => input.current?.click()}
           onPointerEnter={() => void loadCropDialog()}
           aria-label={logoUrl ? "Change the club picture" : "Upload a club picture"}
-          className="group focus-visible:ring-ring/50 relative size-20 shrink-0 overflow-hidden rounded-2xl border outline-none focus-visible:ring-3 disabled:cursor-default"
+          className="group rounded-tile ring-foreground/6 focus-visible:outline-foreground relative size-20 shrink-0 overflow-hidden ring-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
         >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
             <img src={logoUrl} alt="" width={80} height={80} className="size-full object-cover" />
           ) : (
-            <span className="bg-primary/10 text-primary grid size-full place-items-center text-xl font-semibold">
+            <span className="bg-muted text-foreground grid size-full place-items-center text-xl font-semibold">
               {initials || <Building2 className="size-6" aria-hidden="true" />}
             </span>
           )}
@@ -463,39 +475,37 @@ export function LogoForm({
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 disabled={busy}
                 onClick={() => input.current?.click()}
                 onFocus={() => void loadCropDialog()}
               >
                 {busy ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 ) : (
-                  <ImageUp className="size-3.5" aria-hidden="true" />
+                  <ImageUp className="size-4" aria-hidden="true" />
                 )}
                 {logoUrl ? "Change picture" : "Upload picture"}
               </Button>
               {logoUrl && (
                 <Button
                   variant="ghost"
-                  size="sm"
                   disabled={busy}
                   onClick={async () => {
                     const error = await send("DELETE");
                     if (error) setStatus({ tone: "error", text: error });
                   }}
                 >
-                  <Trash2 className="size-3.5" aria-hidden="true" />
+                  <Trash2 className="size-4" aria-hidden="true" />
                   Remove
                 </Button>
               )}
             </div>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-[13px]">
               JPEG, PNG or WebP. You&apos;ll crop it to a square; location data is removed.
             </p>
           </div>
         ) : (
-          <p className="text-muted-foreground text-xs">Owners and admins can change it.</p>
+          <p className="text-muted-foreground text-sm">Owners and admins can change it.</p>
         )}
         <input
           ref={input}
@@ -508,7 +518,6 @@ export function LogoForm({
           onChange={pick}
         />
       </div>
-      <StatusLine status={status} />
       {source && (
         <CropDialog
           imageSrc={source}
@@ -520,6 +529,6 @@ export function LogoForm({
           onConfirm={confirm}
         />
       )}
-    </section>
+    </SettingsCard>
   );
 }

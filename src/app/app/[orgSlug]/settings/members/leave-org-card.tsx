@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+import { SettingsCard } from "../settings-card";
 import { leaveOrg } from "./actions";
 
 export function LeaveOrgCard({
@@ -29,53 +30,58 @@ export function LeaveOrgCard({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <section
+    <SettingsCard
       id="leave"
-      className="flex scroll-mt-20 flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
-    >
-      <div>
-        <h2 className="text-sm font-medium">Leave {orgName}</h2>
-        <p className="text-muted-foreground text-xs">
-          {isLastOwner
-            ? "You're the only owner. Transfer ownership to another member first."
-            : "You lose access to this organization. An admin can invite you again."}
-        </p>
-      </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" disabled={isLastOwner}>
-            Leave organization
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Leave {orgName}?</DialogTitle>
-            <DialogDescription>
-              Your task assignments and event invitations here are removed and open tasks you own
-              become unowned. Notes and comments you wrote stay.
-            </DialogDescription>
-          </DialogHeader>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+      title={`Leave ${orgName}`}
+      description={
+        isLastOwner
+          ? "You're the only owner. Transfer ownership to another member first."
+          : "You lose access to this organization. An admin can invite you again."
+      }
+      footer={
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" disabled={isLastOwner}>
+              Leave organization
             </Button>
-            <Button
-              variant="destructive"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  setError(null);
-                  const result = await leaveOrg(orgId);
-                  if (result?.error) setError(result.error);
-                })
-              }
-            >
-              {isPending ? "Leaving…" : "Leave"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </section>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Leave {orgName}?</DialogTitle>
+              <DialogDescription>
+                Your task assignments and event invitations here are removed and open tasks you own
+                become unowned. Notes and comments you wrote stay.
+              </DialogDescription>
+            </DialogHeader>
+            {error && (
+              <p
+                role="alert"
+                className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+              >
+                {error}
+              </p>
+            )}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    setError(null);
+                    const result = await leaveOrg(orgId);
+                    if (result?.error) setError(result.error);
+                  })
+                }
+              >
+                {isPending ? "Leaving…" : `Leave ${orgName}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      }
+    />
   );
 }
