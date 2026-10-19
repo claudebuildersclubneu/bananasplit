@@ -49,7 +49,7 @@ export function PagePreview({
             className="size-14 flex-none rounded-[10px] object-cover shadow-sm"
           />
         ) : (
-          <span className="bg-banana font-heading text-banana-ink grid size-14 flex-none place-items-center rounded-[10px] text-2xl">
+          <span className="bg-brand-accent font-heading text-brand-accent-foreground grid size-14 flex-none place-items-center rounded-[10px] text-2xl">
             {title.trim()[0]?.toUpperCase() ?? "B"}
           </span>
         )}
@@ -57,7 +57,7 @@ export function PagePreview({
           {title}
         </span>
       </div>
-      <span className="bg-paper mt-auto h-9 rounded-full shadow-sm" />
+      <span className="bg-card mt-auto h-9 rounded-full shadow-sm" />
     </div>
   );
 }

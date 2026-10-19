@@ -75,7 +75,7 @@ export function TicketCheckIn({
         <span
           className={cn(
             "text-[15px]",
-            status === "GOING" ? "text-ink-muted" : "text-brick font-semibold",
+            status === "GOING" ? "text-muted-foreground" : "text-destructive font-semibold",
           )}
         >
           {standing}
@@ -83,14 +83,14 @@ export function TicketCheckIn({
       </div>
 
       {checkedIn && (
-        <p className="bg-leaf text-leaf-ink rounded-field m-0 flex items-center gap-2 px-4 py-3 text-[15px] font-semibold">
+        <p className="bg-tint-success text-tint-success-foreground rounded-field m-0 flex items-center gap-2 px-4 py-3 text-[15px] font-semibold">
           <Check className="size-5 flex-none" strokeWidth={2.6} aria-hidden="true" />
           Checked in at {checkedInAt}
         </p>
       )}
 
       {cost && status === "GOING" && (
-        <div className="border-ink/10 rounded-field flex items-center justify-between gap-3 border px-4 py-3">
+        <div className="border-border rounded-field flex items-center justify-between gap-3 border px-4 py-3">
           <span className="text-[15px]">
             {cost.confirmed
               ? `Paid ${formatCents(cost.paidCents ?? cost.owes)}`
@@ -119,7 +119,7 @@ export function TicketCheckIn({
             onClick={() =>
               run(() => setGuestCheckedIn(organizationId, eventId, registrationId, false))
             }
-            className="text-ink-muted hover:text-ink w-fit cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline"
+            className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline"
           >
             Undo check-in
           </button>
@@ -143,7 +143,7 @@ export function TicketCheckIn({
 
       <Link
         href={doorHref}
-        className="border-ink/10 text-ink-muted hover:text-ink border-t pt-4 text-[14px] font-semibold"
+        className="border-border text-muted-foreground hover:text-foreground border-t pt-4 text-[14px] font-semibold"
       >
         Open the full guest list at the door
       </Link>

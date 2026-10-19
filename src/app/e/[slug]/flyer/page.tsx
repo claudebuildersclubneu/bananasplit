@@ -82,7 +82,7 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
   ].filter(Boolean) as string[];
 
   return (
-    <BrandRoot>
+    <BrandRoot look="cream">
       <div className="flyer-screen flex flex-1 flex-col items-center gap-5 px-4 py-6">
         <div className="flyer-toolbar flex w-full max-w-[8.5in] flex-wrap items-center justify-between gap-3">
           <Link href={`/e/${slug}`} className="text-ink-muted text-[14px] font-semibold">

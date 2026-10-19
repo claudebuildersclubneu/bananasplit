@@ -16,7 +16,7 @@ export function MapEmbed({ src, title }: { src: string; title: string }) {
 
   if (shown) {
     return (
-      <div className="border-ink/10 rounded-tile overflow-hidden border bg-(--rsvp-tile)">
+      <div className="border-border rounded-tile overflow-hidden border bg-(--rsvp-tile)">
         <iframe
           title={title}
           src={src}

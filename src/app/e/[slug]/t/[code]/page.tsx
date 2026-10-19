@@ -39,21 +39,21 @@ export default async function TicketPage({ params }: PageProps<"/e/[slug]/t/[cod
   const when = `${dateLine(e.startsAt, e.timeZone)} · ${timeLine(e.startsAt, e.endsAt, e.timeZone, e.allDay)}`;
 
   return (
-    <BrandRoot className="bg-cream">
+    <BrandRoot className="bg-background">
       <header className="mx-auto flex w-full max-w-[480px] items-center justify-between px-5 py-4">
-        <Link href={`/e/${slug}`} aria-label="Back to the event page" className="text-ink">
+        <Link href={`/e/${slug}`} aria-label="Back to the event page" className="text-foreground">
           <Logo size={22} textSize={16} />
         </Link>
-        <span className="text-ink-soft text-[13px] font-semibold">
+        <span className="text-muted-foreground text-[13px] font-semibold">
           {host ? "Check-in" : "Your ticket"}
         </span>
       </header>
       <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-4 px-5 pb-12">
-        <section className="border-ink/10 bg-paper rounded-block flex flex-col gap-5 border p-5 sm:p-6">
-          <div className="border-ink/10 flex flex-col gap-0.5 border-b pb-4">
+        <section className="border-border bg-card rounded-block flex flex-col gap-5 border p-5 sm:p-6">
+          <div className="border-border flex flex-col gap-0.5 border-b pb-4">
             <h1 className="m-0 text-[17px] leading-[1.3] font-bold text-balance">{e.title}</h1>
-            <p className="text-ink-muted m-0 text-[14px]">{when}</p>
-            <p className="text-ink-soft m-0 text-[14px]">Hosted by {e.hostName}</p>
+            <p className="text-muted-foreground m-0 text-[14px]">{when}</p>
+            <p className="text-muted-foreground m-0 text-[14px]">Hosted by {e.hostName}</p>
           </div>
           {host ? (
             <TicketCheckIn
@@ -97,7 +97,7 @@ function GuestTicket({
       </div>
       <div className="flex flex-col gap-1">
         <span className="font-heading text-[26px] leading-[1.1]">{name}</span>
-        <span className="text-ink-muted text-[15px]">
+        <span className="text-muted-foreground text-[15px]">
           {ticket.checkedInAt
             ? "You're checked in. Enjoy it!"
             : going
@@ -108,7 +108,7 @@ function GuestTicket({
         </span>
       </div>
       {ticket.cost && going && !ticket.cost.confirmed && (
-        <p className="bg-oat text-ink rounded-field m-0 w-full px-4 py-3 text-[14px]">
+        <p className="bg-muted text-foreground rounded-field m-0 w-full px-4 py-3 text-[14px]">
           {ticket.cost.claimed
             ? `You said you paid ${formatCents(ticket.cost.paidCents ?? ticket.cost.owes)}.`
             : `You still owe the host ${formatCents(ticket.cost.owes)}.`}
@@ -120,13 +120,13 @@ function GuestTicket({
 
 function Missing({ slug }: { slug: string }) {
   return (
-    <BrandRoot className="bg-cream">
+    <BrandRoot className="bg-background">
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
         <Logo size={28} textSize={20} />
         <h1 className="font-heading m-0 text-[32px] leading-[1.05] tracking-[-0.02em]">
           This ticket isn&apos;t valid
         </h1>
-        <p className="text-ink-muted m-0 max-w-[400px] text-[16px]">
+        <p className="text-muted-foreground m-0 max-w-[400px] text-[16px]">
           The link may be mistyped, or the event was removed. Open the event page to check your
           sign-up.
         </p>

@@ -17,10 +17,10 @@ import { MapEmbed } from "@/components/rsvp/map-embed";
 import { QrCode } from "@/components/rsvp/qr-code";
 import { RegistrationCard } from "@/components/rsvp/registration-card";
 import { BlockCard } from "@/components/ui/block-card";
+import { avatarTint } from "@/components/user-avatar";
 import { Gauge } from "@/components/ui/meters";
 import { appUrl } from "@/lib/app-url";
 import {
-  avatarTone,
   googleCalendarUrl,
   initials,
   mapsEmbedUrl,
@@ -183,7 +183,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                   <span
                     className={cn(
                       "grid size-7 place-items-center rounded-full text-[11px] font-bold",
-                      avatarTone(page.invitedBy),
+                      avatarTint(page.invitedBy),
                     )}
                   >
                     {initials(page.invitedBy)}
@@ -199,7 +199,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                 <InfoRow
                   tile={
                     <span className="rounded-tile flex w-12 flex-col overflow-hidden border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-center">
-                      <span className="bg-banana text-banana-ink py-[2px] text-[11px] font-semibold lowercase first-letter:uppercase">
+                      <span className="bg-brand-accent text-brand-accent-foreground py-[2px] text-[11px] font-semibold lowercase first-letter:uppercase">
                         {tile.month}
                       </span>
                       <span className="font-heading py-0.5 text-[20px] leading-7">{tile.day}</span>
@@ -440,7 +440,7 @@ function Cover({ page }: { page: RsvpPageData }) {
         alt=""
         width={960}
         height={960}
-        className="shadow-float rounded-block aspect-square w-full object-cover ring-1 ring-(--rsvp-tile-line) max-md:max-w-[440px]"
+        className="shadow-e2 rounded-block aspect-square w-full object-cover ring-1 ring-(--rsvp-tile-line) max-md:max-w-[440px]"
       />
     );
   }
@@ -448,9 +448,9 @@ function Cover({ page }: { page: RsvpPageData }) {
   return (
     <div
       aria-hidden="true"
-      className="bg-banana rounded-block grid aspect-square w-full place-items-center overflow-hidden max-md:max-w-[440px]"
+      className="bg-muted rounded-block grid aspect-square w-full place-items-center overflow-hidden bg-[radial-gradient(120%_90%_at_25%_12%,color-mix(in_oklab,var(--glow)_55%,transparent),transparent_70%)] ring-1 ring-(--rsvp-tile-line) max-md:max-w-[440px]"
     >
-      <span className="font-heading text-banana-ink text-[120px] leading-none tracking-[-0.05em]">
+      <span className="font-heading text-foreground text-[120px] leading-none tracking-[-0.05em]">
         {page.title.trim()[0]?.toUpperCase() ?? "B"}
       </span>
     </div>
@@ -503,7 +503,7 @@ function HostedBy({ page }: { page: RsvpPageData }) {
             // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
             <img src={page.org.logoUrl} alt="" className="size-9 rounded-xl object-cover" />
           ) : (
-            <span className="bg-ink text-cream font-heading grid size-9 place-items-center rounded-xl text-[16px] ring-1 ring-(--rsvp-tile-line)">
+            <span className="bg-primary text-primary-foreground font-heading grid size-9 place-items-center rounded-xl text-[16px] ring-1 ring-(--rsvp-tile-line)">
               {page.org.name.trim()[0]?.toUpperCase()}
             </span>
           )}
@@ -534,7 +534,7 @@ function GuestRow({ guest }: { guest: RsvpGuest }) {
         aria-hidden="true"
         className={cn(
           "grid size-8 flex-none place-items-center rounded-full text-[11px] font-bold",
-          guest.tone,
+          avatarTint(guest.name),
         )}
       >
         {guest.initials}
@@ -565,7 +565,7 @@ function Guests({ page }: { page: RsvpPageData }) {
                 className={cn(
                   "grid size-9 flex-none place-items-center rounded-full text-[12px] font-bold ring-2 ring-(--rsvp-ring)",
                   i > 0 && "-ml-2",
-                  g.tone,
+                  avatarTint(g.name),
                 )}
               >
                 {g.initials}
