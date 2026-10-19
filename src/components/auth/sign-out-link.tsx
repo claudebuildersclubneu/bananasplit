@@ -19,7 +19,10 @@ export function SignOutLink({
   return (
     <button
       type="button"
-      className={className ?? "text-ink cursor-pointer font-semibold underline underline-offset-2"}
+      className={
+        className ??
+        "text-foreground cursor-pointer font-semibold underline decoration-current/30 underline-offset-2 hover:decoration-current"
+      }
       disabled={pending}
       onClick={() => {
         setPending(true);
