@@ -89,7 +89,7 @@ export default async function ProfilePage({ params }: PageProps<"/app/[orgSlug]/
         <Card>
           <CardHeader>
             <CardTitle id="details-title">Details</CardTitle>
-            <CardDescription>Your name and a little about you. The same in every organization.</CardDescription>
+            <CardDescription>Your name and a little about you. The same in every club.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <DetailsForm
@@ -157,7 +157,7 @@ export default async function ProfilePage({ params }: PageProps<"/app/[orgSlug]/
           <CardHeader>
             <CardTitle id="theme-title">Theme</CardTitle>
             <CardDescription>
-              Only changes your view, in every organization. An organization that locks light or dark keeps its lock.
+              Only changes your view, in every club. A club that locks light or dark keeps its lock.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -185,7 +185,7 @@ export default async function ProfilePage({ params }: PageProps<"/app/[orgSlug]/
         <Card>
           <CardHeader>
             <CardTitle id="notifications-title">Email notifications</CardTitle>
-            <CardDescription>For every organization you belong to.</CardDescription>
+            <CardDescription>For every club you belong to.</CardDescription>
           </CardHeader>
           <CardContent>
             <NotificationPreferencesForm

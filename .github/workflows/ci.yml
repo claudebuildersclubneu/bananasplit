@@ -4,10 +4,14 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Run on main from the Actions tab to redeploy without a new commit.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only PR runs cancel each other. A run on main is never cut off mid-deploy,
+  # and main deploys land in commit order.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
@@ -84,3 +88,62 @@ jobs:
 
       - name: RLS tests and attacks
         run: pnpm test:rls
+
+  deploy:
+    name: Deploy to production (Vercel)
+    # Production deploys come from here, not Vercel's GitHub app (vercel.json
+    # turns Git-triggered deploys off), so main ships only once both suites
+    # pass, whoever owns the repo. Vercel still runs the build, with
+    # vercel.json's buildCommand and the Production-scope variables, so no
+    # database URL or other app secret ever reaches this runner.
+    #
+    # Needs the VERCEL_TOKEN secret (a Vercel access token scoped to the team
+    # below), ideally as a secret of the Production environment.
+    needs: [ci, rls]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    environment:
+      name: Production
+      url: ${{ steps.deploy.outputs.url }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      # Identifiers, not credentials: nothing deploys without the token.
+      VERCEL_ORG_ID: team_EDAHlGx13l9469ZVdH0dthUl
+      VERCEL_PROJECT_ID: prj_V73fgrgykRJCTtJW6AxFhVzeegnL
+      PRODUCTION_URL: https://www.bananasplit.fyi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN is not set, so main was not deployed. Add it under Settings > Environments > Production (or as a repository secret), then re-run this job."
+            exit 1
+          fi
+          # stdout is the deployment URL; progress goes to stderr. Waits for
+          # the build and fails the job if it fails.
+          url=$(npx --yes vercel@61.1.0 deploy --prod --yes --archive=tgz --token "$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Health check
+        # RUNBOOK step 7: 200 only when the roles, manifest and production
+        # environment checks all pass. A failure here doesn't roll back; it
+        # flags the deploy for a look (Vercel > Deployments > Instant Rollback).
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            status=$(curl --silent --max-time 30 --output /dev/null \
+              --write-out "%{http_code}" "$PRODUCTION_URL/api/health" || true)
+            echo "attempt ${attempt}: /api/health answered ${status}"
+            [ "$status" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::$PRODUCTION_URL/api/health is not 200. curl -H \"Authorization: Bearer \$CRON_SECRET\" $PRODUCTION_URL/api/health lists the failing checks."
+          exit 1

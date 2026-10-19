@@ -11,8 +11,8 @@ import {
   Plus,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { moveEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ import {
   weekWindowFor,
   windowDays,
 } from "@/lib/calendar/grid";
-import { calendarSearch, type CalendarView } from "@/lib/calendar/range";
+import { calendarSearch, NEW_EVENT_PARAM, type CalendarView } from "@/lib/calendar/range";
 import { cn } from "@/lib/utils";
 
 import { AgendaList } from "./agenda-list";
@@ -129,15 +129,28 @@ export function EventCalendar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // ?new=rsvp (the RSVPs page's "New event with RSVPs") arrives with New
+  // event open and its RSVP page switched on.
+  const startRsvp = canManage && searchParams.get(NEW_EVENT_PARAM) === "rsvp";
   const [peek, setPeek] = useState<PeekAnchor | null>(null);
   const [dialog, setDialog] = useState<
-    | { mode: "create"; start: Date | null; allDay: boolean }
+    | { mode: "create"; start: Date | null; allDay: boolean; rsvp?: boolean }
     | { mode: "edit"; event: EventFormEvent }
     | null
-  >(null);
+  >(() => (startRsvp ? { mode: "create", start: null, allDay: false, rsvp: true } : null));
+
+  // Then drop the param, so a reload or Back doesn't open another.
+  useEffect(() => {
+    if (!startRsvp) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(NEW_EVENT_PARAM);
+    const search = params.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+  }, [startRsvp, searchParams, router, pathname]);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [shotOpen, setShotOpen] = useState(false);
@@ -611,6 +624,7 @@ export function EventCalendar({
           event={null}
           defaultStart={dialog.start}
           defaultAllDay={dialog.allDay}
+          defaultRsvpPage={dialog.rsvp}
           members={members}
           onSaved={() => setDialog(null)}
         />

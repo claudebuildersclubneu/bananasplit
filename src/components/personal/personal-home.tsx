@@ -369,7 +369,7 @@ function JoinOrStart({ prominent }: { prominent: boolean }) {
           <Input
             id="join-code"
             name="code"
-            placeholder="Club code"
+            placeholder="Invite code"
             autoComplete="off"
             spellCheck={false}
             maxLength={20}

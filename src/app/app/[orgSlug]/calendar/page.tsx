@@ -8,6 +8,7 @@ import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
 import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
 import { parseCalendarRange } from "@/lib/calendar/range";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
@@ -31,7 +32,7 @@ export default async function CalendarPage({
   searchParams,
 }: PageProps<"/app/[orgSlug]/calendar">) {
   const { orgSlug } = await params;
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   const range = parseCalendarRange(await searchParams, org.timezone);
   const canManage = can({ role }, "events.write");
   // The Tasks layer is one of the task views; Google sync a data connection.
@@ -108,7 +109,7 @@ export default async function CalendarPage({
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Calendar"
+        title={sectionLabel(settings?.sidebar, "calendar")}
         actions={
           <>
             {/* Planning a meeting starts here as often as from the sidebar. */}

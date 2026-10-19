@@ -188,6 +188,14 @@ export function visibleSidebar(raw: unknown): ResolvedGroup[] {
     .filter((g) => g.items.length > 0);
 }
 
+/** A section's name in the club's sidebar, for its page title (Files may be "Docs"). */
+export function sectionLabel(raw: unknown, id: SectionId): string {
+  const item = resolveSidebar(raw)
+    .flatMap((g) => g.items)
+    .find((i) => i.id === id);
+  return item?.label ?? SECTIONS.find((s) => s.id === id)!.label;
+}
+
 export function hiddenSectionPaths(raw: unknown): string[] {
   return resolveSidebar(raw)
     .flatMap((g) => g.items)

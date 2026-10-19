@@ -24,8 +24,8 @@ import type { TaskItem } from "./types";
 import { labelTextColor } from "@/lib/label-colors";
 
 /**
- * One task as a list row — the Week, the Team lanes and the request queue
- * all use this, so a task reads the same wherever you meet it.
+ * One task as a list row — the Week, the List and Personal home all use
+ * this, so a task reads the same wherever you meet it.
  *
  * Labels and the above-level flag sit immediately after the title, because
  * they describe the task and the eye is already there; only the things you
