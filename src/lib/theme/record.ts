@@ -44,7 +44,7 @@ export function buildThemeRecord(
     light,
     dark,
     style,
-    tokens: deriveTheme(effective.light, effective.dark),
+    tokens: deriveTheme(effective.light, effective.dark, style.glow ?? preset?.glow ?? null),
     contrastWarnings: contrastWarnings(effective.light, effective.dark),
   };
 }

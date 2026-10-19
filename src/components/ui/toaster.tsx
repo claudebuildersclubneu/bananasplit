@@ -84,7 +84,7 @@ export function Toaster() {
       aria-live="polite"
       role="region"
       aria-label="Notifications"
-      className="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[calc(100%-2rem)] max-w-sm flex-col items-end gap-2"
+      className="pointer-events-none fixed inset-x-0 top-4 z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-md flex-col items-center gap-2 max-md:top-auto max-md:bottom-[calc(5.75rem+env(safe-area-inset-bottom))]"
     >
       {list.map((t) => (
         <ToastCard key={t.id} item={t} />
@@ -100,7 +100,10 @@ function ToastCard({ item }: { item: ToastItem }) {
   return (
     <div
       role="status"
-      className="bg-popover text-popover-foreground animate-in fade-in-0 slide-in-from-bottom-2 pointer-events-auto flex w-full items-start gap-3 rounded-xl border p-3 pr-2 shadow-lg"
+      className={cn(
+        "glass animate-in fade-in-0 zoom-in-95 slide-in-from-top-3 max-md:slide-in-from-bottom-3 pointer-events-auto relative flex max-w-full gap-3 py-1.5 pr-1.5 pl-2 duration-500 ease-(--ease-spring) motion-reduce:animate-none",
+        item.description || error ? "items-start rounded-[1.5rem]" : "items-center rounded-full",
+      )}
       onMouseEnter={() => {
         const timer = timers.get(item.id);
         if (timer) clearTimeout(timer);
@@ -108,15 +111,31 @@ function ToastCard({ item }: { item: ToastItem }) {
       onMouseLeave={() => schedule(item.id, 4_000)}
     >
       {Icon && (
-        <Icon
-          className={cn("mt-0.5 size-4 shrink-0", item.tone === "error" ? "text-destructive" : "text-success")}
-          aria-hidden="true"
-        />
+        <span
+          className={cn(
+            "grid size-[30px] shrink-0 place-items-center rounded-full",
+            item.tone === "error"
+              ? "bg-block-alert text-block-alert-foreground"
+              : "bg-block-goal text-block-goal-foreground",
+          )}
+        >
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
       )}
-      <div className="min-w-0 flex-1 text-sm">
-        <p className="font-medium">{item.title}</p>
-        {item.description && <p className="text-muted-foreground mt-0.5 text-xs">{item.description}</p>}
-        {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
+      <div
+        className={cn(
+          "min-w-0 flex-1 text-sm",
+          !Icon && "pl-2",
+          (item.description || error) && "py-1",
+        )}
+      >
+        <p className="truncate font-semibold">{item.title}</p>
+        {item.description && (
+          <p className="mt-0.5 text-xs text-[color-mix(in_oklab,var(--chrome-foreground)_66%,transparent)]">
+            {item.description}
+          </p>
+        )}
+        {error && <p className="text-tint-danger-foreground mt-1 text-xs">{error}</p>}
       </div>
       {item.action && (
         <button
@@ -135,7 +154,7 @@ function ToastCard({ item }: { item: ToastItem }) {
               setRunning(false);
             }
           }}
-          className="text-primary hover:bg-primary/10 inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold"
+          className="text-chrome-foreground inline-flex h-[34px] shrink-0 items-center gap-1 rounded-full bg-[color-mix(in_oklab,var(--chrome-foreground)_15%,transparent)] px-3.5 text-[0.8125rem] font-semibold transition-colors hover:bg-[color-mix(in_oklab,var(--chrome-foreground)_22%,transparent)]"
         >
           {running && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
           {item.action.label}
@@ -145,7 +164,7 @@ function ToastCard({ item }: { item: ToastItem }) {
         type="button"
         aria-label="Dismiss"
         onClick={() => dismissToast(item.id)}
-        className="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+        className="hover:text-chrome-foreground grid size-[30px] shrink-0 place-items-center rounded-full text-[color-mix(in_oklab,var(--chrome-foreground)_66%,transparent)] transition-colors hover:bg-[color-mix(in_oklab,var(--chrome-foreground)_12%,transparent)]"
       >
         <X className="size-3.5" aria-hidden="true" />
       </button>

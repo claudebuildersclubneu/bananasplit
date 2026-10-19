@@ -3,8 +3,8 @@ import { deriveDarkRoles, deriveTheme, type DerivedTheme } from "./derive";
 import {
   DEFAULT_PRESET,
   DEFAULT_PRESET_ID,
-  LEGACY_DEFAULT_LIGHT,
-  sameRoles,
+  isFormerDefault,
+  presetGlow,
   savedPresetId,
 } from "./presets";
 import { DEFAULT_THEME_STYLE, parseThemeStyle, type ThemeStyle } from "./style";
@@ -48,9 +48,11 @@ export interface ResolvedTheme {
   dark: ThemeRoles | null;
   /** The dark palette in effect (the org's own, or derived). */
   effectiveDark: ThemeRoles;
-  /** Look and feel: accent override, corners, text size, fonts. */
+  /** Look and feel: accent and glow overrides, corners, text size, fonts. */
   style: ThemeStyle;
-  /** Derived from light / effectiveDark with the style's accent applied. */
+  /** The glow in effect: the style's, else the preset's, else null (each mode's accent). */
+  glow: string | null;
+  /** Derived from light / effectiveDark with the style's accent and the glow applied. */
   tokens: DerivedTheme;
   /** True when there is no row: the globals.css default applies and nothing is injected. */
   isDefault: boolean;
@@ -66,9 +68,10 @@ function asLogoDisplay(value: string | null | undefined): LogoDisplayValue {
     : "LOGO_AND_NAME";
 }
 
+// Moonstone is dark first: an org with no theme row opens in dark mode.
 export const DEFAULT_RESOLVED_THEME: ResolvedTheme = buildResolved({
   preset: DEFAULT_PRESET.id,
-  mode: "SYSTEM",
+  mode: "DARK",
   lockMode: false,
   logoDisplay: "LOGO_AND_NAME",
   light: DEFAULT_PRESET.light,
@@ -77,10 +80,18 @@ export const DEFAULT_RESOLVED_THEME: ResolvedTheme = buildResolved({
   isDefault: true,
 });
 
-function buildResolved(input: Omit<ResolvedTheme, "effectiveDark" | "tokens">): ResolvedTheme {
+function buildResolved(
+  input: Omit<ResolvedTheme, "effectiveDark" | "tokens" | "glow">,
+): ResolvedTheme {
   const effectiveDark = input.dark ?? deriveDarkRoles(input.light);
   const effective = withAccent(input.light, effectiveDark, input.style.accent);
-  return { ...input, effectiveDark, tokens: deriveTheme(effective.light, effective.dark) };
+  const glow = input.style.glow ?? presetGlow(input.preset);
+  return {
+    ...input,
+    effectiveDark,
+    glow,
+    tokens: deriveTheme(effective.light, effective.dark, glow),
+  };
 }
 
 /** The palettes the app actually paints with: the theme's, with the style's accent on top. */
@@ -104,9 +115,9 @@ export function resolveTheme(row: OrgThemeRowLike | null | undefined): ResolvedT
   const stored = parseRoles(row.light);
   if (!stored) return DEFAULT_RESOLVED_THEME;
   const mode = asMode(row.mode);
-  // Bananasplit saved before the brand redesign: follow the brand onto
-  // today's palettes rather than keep the old raspberry.
-  const legacy = row.preset === DEFAULT_PRESET_ID && sameRoles(stored, LEGACY_DEFAULT_LIGHT);
+  // A former default (the raspberry or the cream Bananasplit) saved as
+  // "default": follow the brand onto today's default, Moonstone.
+  const legacy = row.preset === DEFAULT_PRESET_ID && isFormerDefault(stored);
   const light = legacy ? DEFAULT_PRESET.light : stored;
   const preset = savedPresetId(row.preset, light);
   return buildResolved({

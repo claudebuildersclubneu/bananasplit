@@ -156,13 +156,39 @@ export function deriveChartPalette(
   primary: string,
   mode: ChartMode,
   surfaces: readonly string[],
+  options: {
+    /** Further brand candidates after the primary (the accent, the glow): the first with real colour is slot 1. */
+    brands?: readonly string[];
+    /** A theme with no hue of its own: try the reference slots at the chroma floor first, so charts stay quiet. */
+    quiet?: boolean;
+  } = {},
 ): string[] {
   const reference = REFERENCE_CHART_PALETTE[mode];
+  const quietRef = options.quiet
+    ? reference.map((hex) => {
+        const c = hexToOklch(hex);
+        return oklchToHex({ L: c.L, C: Math.min(c.C, CHART_CHROMA_FLOOR + 0.01), h: c.h });
+      })
+    : null;
+
+  const brandSource = [primary, ...(options.brands ?? [])].find(
+    (hex) => hexToOklch(hex).C >= CHART_CHROMA_FLOOR,
+  );
+  const brand = brandSource ? snapChartColor(brandSource, mode, surfaces) : null;
+
+  if (quietRef) {
+    const quiet = pickSlots(
+      quietRef.map((hex) => snapChartColor(hex, mode, surfaces)),
+      brand,
+    );
+    if (quiet) return quiet;
+  }
   const snapped = reference.map((hex) => snapChartColor(hex, mode, surfaces));
+  return pickSlots(snapped, brand) ?? reference.slice(0, CHART_SLOTS);
+}
 
-  const brand =
-    hexToOklch(primary).C >= CHART_CHROMA_FLOOR ? snapChartColor(primary, mode, surfaces) : null;
-
+/** Five slots from `snapped` in reference order, the brand first when it fits; null when five can't be found. */
+function pickSlots(snapped: readonly (string | null)[], brand: string | null): string[] | null {
   const pick = (seed: string[], pool: (string | null)[]): string[] => {
     const out = [...seed];
     const rest = pool.filter(
@@ -182,15 +208,15 @@ export function deriveChartPalette(
   };
 
   if (brand) {
-    const withBrand = pick([brand], snapped);
+    const withBrand = pick([brand], [...snapped]);
     if (withBrand.length === CHART_SLOTS) return withBrand;
   }
-  const plain = pick([], snapped);
+  const plain = pick([], [...snapped]);
   if (plain.length === CHART_SLOTS) return plain;
-  // Nothing in band clears the surfaces (an unusual mid-grey page): fall back
-  // to the reference hexes. The contrast check then warns, and charts must
-  // carry labels or a table view (the relief rule).
-  return reference.slice(0, CHART_SLOTS);
+  // Nothing in band clears the surfaces (an unusual mid-grey page): the
+  // caller falls back to the reference hexes. The contrast check then warns,
+  // and charts must carry labels or a table view (the relief rule).
+  return null;
 }
 
 export interface ChartPaletteReport {

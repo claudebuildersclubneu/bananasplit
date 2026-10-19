@@ -39,6 +39,15 @@
   --color-wheat: #e8d6a8;
   --color-straw: #e3d6b4;
   --color-fog: #e2dccd;
+  /* The logo's own colours: never re-pointed at a club's accent (the yellow
+     names below are, inside a club; see the header). The Core always wears
+     these, in every theme. */
+  --color-logo-ring: #f2c230;
+  --color-logo-flesh: #f7ebc4;
+  --color-logo-seed: #b58a00;
+  --color-logo-ink: #1c1810;
+  /* The wordmark's face: Young Serif, always (titles moved to Bricolage). */
+  --font-logo: var(--font-young-serif), Georgia, serif;
   /* Bananas, from soft to ripe. */
   --color-butter: #f6e7b4;
   --color-lemon: #f7d660;

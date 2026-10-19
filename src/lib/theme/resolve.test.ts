@@ -10,7 +10,7 @@ describe("resolveTheme", () => {
     expect(resolveTheme(null)).toBe(DEFAULT_RESOLVED_THEME);
     expect(DEFAULT_RESOLVED_THEME.isDefault).toBe(true);
     expect(DEFAULT_RESOLVED_THEME.light).toEqual(DEFAULT_PRESET.light);
-    expect(DEFAULT_RESOLVED_THEME.mode).toBe("SYSTEM");
+    expect(DEFAULT_RESOLVED_THEME.mode).toBe("DARK");
   });
 
   it("resolves the seeded CBC row", () => {

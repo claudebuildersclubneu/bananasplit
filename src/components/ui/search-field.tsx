@@ -47,7 +47,7 @@ export function SearchField({
   return (
     <div className={cn("relative w-full sm:w-56", className)}>
       <Search
-        className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+        className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2"
         aria-hidden="true"
       />
       <Input
@@ -62,7 +62,7 @@ export function SearchField({
           onChange?.(e);
         }}
         className={cn(
-          "h-7 ps-8 pe-8 text-sm [&::-webkit-search-cancel-button]:appearance-none",
+          "h-10 rounded-full ps-10 pe-9 text-sm [&::-webkit-search-cancel-button]:appearance-none",
           inputClassName,
         )}
       />
@@ -70,7 +70,7 @@ export function SearchField({
         <button
           type="button"
           aria-label="Clear search"
-          className="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-1/2 right-1.5 grid size-5 -translate-y-1/2 place-items-center rounded-md"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-full"
           onClick={() => {
             if (value === undefined) {
               setDraft("");
@@ -85,7 +85,7 @@ export function SearchField({
           <X className="size-3.5" aria-hidden="true" />
         </button>
       ) : hint ? (
-        <kbd className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded-md border px-1 font-sans text-[10px] leading-4 sm:block">
+        <kbd className="text-muted-foreground bg-muted pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded-md px-1.5 py-0.5 font-mono text-[11px] leading-4 sm:block">
           {hint}
         </kbd>
       ) : null}

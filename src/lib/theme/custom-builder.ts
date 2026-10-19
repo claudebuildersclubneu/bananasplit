@@ -58,10 +58,16 @@ export function buildCustomRoles(colourId: string, pageId: string): ThemeRoles {
 }
 
 /** Which swatch and page style made these roles, if the guided picker did. */
-export function matchCustomRoles(roles: ThemeRoles): { colour: string | null; page: string | null } {
-  const colour = COLOUR_SWATCHES.find((c) => c.primary === roles.primary && c.accent === roles.accent);
+export function matchCustomRoles(roles: ThemeRoles): {
+  colour: string | null;
+  page: string | null;
+} {
+  const colour = COLOUR_SWATCHES.find(
+    (c) => c.primary === roles.primary && c.accent === roles.accent,
+  );
   const page = PAGE_STYLES.find(
-    (p) => p.background === roles.background && p.surface === roles.surface && p.text === roles.text,
+    (p) =>
+      p.background === roles.background && p.surface === roles.surface && p.text === roles.text,
   );
   return { colour: colour?.id ?? null, page: page?.id ?? null };
 }

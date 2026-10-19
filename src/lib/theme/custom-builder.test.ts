@@ -13,7 +13,10 @@ describe("guided custom theme", () => {
   });
 
   it("recognises the swatch and page style it built", () => {
-    expect(matchCustomRoles(buildCustomRoles("teal", "warm"))).toEqual({ colour: "teal", page: "warm" });
+    expect(matchCustomRoles(buildCustomRoles("teal", "warm"))).toEqual({
+      colour: "teal",
+      page: "warm",
+    });
     expect(matchCustomRoles({ ...buildCustomRoles("teal", "warm"), primary: "#123456" })).toEqual({
       colour: null,
       page: "warm",

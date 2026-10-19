@@ -168,7 +168,7 @@ export function EditorToolbar({
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-14 z-10 -mx-1 flex flex-wrap items-center gap-0.5 rounded-xl border p-1 backdrop-blur"
+      className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-[var(--shell-top,3.5rem)] z-10 -mx-1 flex flex-wrap items-center gap-0.5 rounded-xl border p-1 backdrop-blur"
     >
       {GROUPS.map((group, g) => (
         <div key={g} className="flex items-center gap-0.5">

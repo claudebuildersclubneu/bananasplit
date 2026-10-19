@@ -39,6 +39,7 @@ export const presetIdSchema = z.string().regex(/^[a-z0-9-]{1,32}$/);
 export const themeStyleSchema = z
   .object({
     accent: hexSchema.nullable().default(DEFAULT_THEME_STYLE.accent),
+    glow: hexSchema.nullable().default(DEFAULT_THEME_STYLE.glow),
     radius: z.enum(RADIUS_OPTIONS).default(DEFAULT_THEME_STYLE.radius),
     textSize: z.enum(TEXT_SIZE_OPTIONS).default(DEFAULT_THEME_STYLE.textSize),
     headingFont: z.enum(HEADING_FONT_OPTIONS).default(DEFAULT_THEME_STYLE.headingFont),

@@ -133,24 +133,37 @@ export function EventCalendar({
   const [isPending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // ?new=rsvp (the RSVPs page's "New event with RSVPs") arrives with New
-  // event open and its RSVP page switched on.
-  const startRsvp = canManage && searchParams.get(NEW_EVENT_PARAM) === "rsvp";
+  // ?new=1 (the create menu's "New event") and ?new=rsvp (the RSVPs page's
+  // "New event with RSVPs", its RSVP page switched on) arrive with New event
+  // open. The state is adjusted while rendering, not in an effect, so it
+  // also works when the calendar is already on screen.
+  const asked = canManage ? searchParams.get(NEW_EVENT_PARAM) : null;
+  const askedNew = asked === "1" || asked === "rsvp" ? asked : null;
   const [peek, setPeek] = useState<PeekAnchor | null>(null);
   const [dialog, setDialog] = useState<
     | { mode: "create"; start: Date | null; allDay: boolean; rsvp?: boolean }
     | { mode: "edit"; event: EventFormEvent }
     | null
-  >(() => (startRsvp ? { mode: "create", start: null, allDay: false, rsvp: true } : null));
+  >(() =>
+    askedNew ? { mode: "create", start: null, allDay: false, rsvp: askedNew === "rsvp" } : null,
+  );
+  const [openedNew, setOpenedNew] = useState(askedNew);
+  if (askedNew !== openedNew) {
+    setOpenedNew(askedNew);
+    if (askedNew) {
+      setPeek(null);
+      setDialog({ mode: "create", start: null, allDay: false, rsvp: askedNew === "rsvp" });
+    }
+  }
 
   // Then drop the param, so a reload or Back doesn't open another.
   useEffect(() => {
-    if (!startRsvp) return;
+    if (!askedNew) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete(NEW_EVENT_PARAM);
     const search = params.toString();
     router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
-  }, [startRsvp, searchParams, router, pathname]);
+  }, [askedNew, searchParams, router, pathname]);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [shotOpen, setShotOpen] = useState(false);

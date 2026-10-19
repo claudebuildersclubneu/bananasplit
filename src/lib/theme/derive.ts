@@ -65,6 +65,48 @@ export const TOKEN_NAMES = [
   "sidebar-accent-foreground",
   "sidebar-border",
   "sidebar-ring",
+  // The Moonstone layer (docs/features/themes.md, "The look"): light behind
+  // the page, floating chrome, the four block cards, chip tints and avatar
+  // tints. All derived from the five roles plus the optional glow colour.
+  "glow",
+  "haze",
+  "raised",
+  "muted-strong",
+  "thumb",
+  "chrome",
+  "chrome-foreground",
+  "chrome-accent",
+  "chrome-accent-foreground",
+  "block-quiet",
+  "block-quiet-foreground",
+  "block-quiet-meta",
+  "block-alert",
+  "block-alert-foreground",
+  "block-alert-meta",
+  "block-answer",
+  "block-answer-foreground",
+  "block-answer-meta",
+  "block-goal",
+  "block-goal-foreground",
+  "block-goal-meta",
+  "tint-danger",
+  "tint-danger-foreground",
+  "tint-accent",
+  "tint-accent-foreground",
+  "tint-success",
+  "tint-success-foreground",
+  "tint-info",
+  "tint-info-foreground",
+  "avatar-1",
+  "avatar-1-foreground",
+  "avatar-2",
+  "avatar-2-foreground",
+  "avatar-3",
+  "avatar-3-foreground",
+  "avatar-4",
+  "avatar-4-foreground",
+  "avatar-5",
+  "avatar-5-foreground",
 ] as const;
 
 export type TokenName = (typeof TOKEN_NAMES)[number];
@@ -145,11 +187,43 @@ function primaryHover(primary: string, foreground: string, background: string): 
   return contrastRatio(foreground, firm) >= contrastRatio(foreground, primary) ? firm : primary;
 }
 
+/** Options beyond the five roles. */
+export interface DeriveOptions {
+  /**
+   * The glow: the colour of the light behind the page (Look and feel, or a
+   * preset's own, e.g. Moonstone's banana). Null or absent: the accent.
+   */
+  glow?: string | null;
+}
+
+/** A tint of `surface` towards `color`, and an ink for text on it (>= 4.6:1 on the tint and the surface). */
+function tintPair(surface: string, color: string, amount: number, dark: boolean): [string, string] {
+  const tint = mixOklab(surface, color, amount);
+  const c = hexToOklch(color);
+  const start = dark
+    ? oklchToHex({ L: Math.max(c.L, 0.8), C: Math.min(c.C, 0.16), h: c.h })
+    : oklchToHex({ L: Math.min(c.L, 0.5), C: c.C, h: c.h });
+  return [tint, readableOn(start, [tint, surface], TEXT_TARGET)];
+}
+
+/** The quiet label on a block: its foreground mixed towards the block, still readable. */
+function blockMeta(foreground: string, block: string): string {
+  return readableOn(mixOklab(foreground, block, 0.3), [block], TEXT_TARGET);
+}
+
+/** A white-label block in a fixed hue family, darkened until white text reads on it. */
+function whiteLabelBlock(L: number, C: number, h: number): string {
+  return adjustForContrast(oklchToHex({ L, C, h }), WHITE, TEXT_TARGET);
+}
+
 /** The full token map for one palette. */
-export function deriveTokens(roles: ThemeRoles): TokenMap {
+export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): TokenMap {
   const { primary, accent, background, surface, text } = roles;
   const dark = !isLight(background);
   const palette = [text, background, surface];
+  const glow = options.glow ?? accent;
+  // No hue of its own in primary or accent (Moonstone, Graphite).
+  const mono = hexToOklch(primary).C < 0.05 && hexToOklch(accent).C < 0.05;
 
   const primaryForeground = onFill(primary, palette);
 
@@ -180,14 +254,53 @@ export function deriveTokens(roles: ThemeRoles): TokenMap {
     primary,
     dark ? "dark" : "light",
     [background, surface],
+    { brands: [accent, glow], quiet: mono },
   );
+  const charts = [chart1, chart2, chart3, chart4, chart5];
+
+  // Elevation: in dark mode a surface one step up is lighter; in light mode
+  // floats are white with a shadow.
+  const raised = dark ? mixOklab(surface, text, 0.05) : mixOklab(surface, WHITE, 0.6);
+  const mutedStrong = mixOklab(background, text, dark ? 0.2 : 0.12);
+  const thumb = dark ? mixOklab(muted, text, 0.13) : surface;
+
+  // Floating chrome (the collapsed sidebar, toasts, the phone tab bar): near
+  // black with the primary's hue in light mode, one step above the cards in dark.
+  const p = hexToOklch(primary);
+  const hueSource = p.C > 0.03 ? p : hexToOklch(background);
+  const chrome = dark
+    ? mixOklab(surface, text, 0.075)
+    : oklchToHex({ L: 0.235, C: Math.min(hueSource.C, 0.035), h: hueSource.h });
+  const chromeForeground = onFill(chrome, [text, background, surface, WHITE]);
+  // The accent as it sits on the chrome (the active item on the rail, the
+  // tab bar's create button): the accent itself, unless it is about as dark
+  // as the chrome (an ink accent in light mode); then the chrome's own label.
+  const chromeAccent = contrastRatio(accent, chrome) >= 1.6 ? accent : chromeForeground;
+
+  // The four block cards. Quiet comes from the chrome; it moves towards
+  // mid-grey when it would read as the accent block (an ink or pearl accent).
+  let quiet = dark ? mixOklab(surface, text, 0.08) : chrome;
+  if (contrastRatio(quiet, accent) < 1.6) {
+    quiet = dark ? mixOklab(surface, text, 0.2) : mixOklab(chrome, background, 0.38);
+  }
+  const quietForeground = onFill(quiet, palette);
+  const alert = whiteLabelBlock(dark ? 0.52 : 0.54, 0.17, 30);
+  const goal = whiteLabelBlock(dark ? 0.47 : 0.45, 0.085, 165);
+  const answerForeground = onFill(accent, palette);
+
+  const info = p.C >= 0.1 ? primary : chart2;
+  const [tintDanger, tintDangerInk] = tintPair(surface, destructive, dark ? 0.2 : 0.15, dark);
+  const [tintAccent, tintAccentInk] = tintPair(surface, accent, dark ? 0.18 : 0.26, dark);
+  const [tintSuccess, tintSuccessInk] = tintPair(surface, success, dark ? 0.2 : 0.15, dark);
+  const [tintInfo, tintInfoInk] = tintPair(surface, info, dark ? 0.2 : 0.15, dark);
+  const avatars = charts.map((c) => tintPair(surface, c, dark ? 0.26 : 0.2, dark));
 
   return {
     background,
     foreground: text,
     card: surface,
     "card-foreground": text,
-    popover: surface,
+    popover: dark ? raised : surface,
     "popover-foreground": text,
     primary,
     "primary-foreground": primaryForeground,
@@ -199,7 +312,7 @@ export function deriveTokens(roles: ThemeRoles): TokenMap {
     accent: accentTint,
     "accent-foreground": text,
     "brand-accent": accent,
-    "brand-accent-foreground": onFill(accent, palette),
+    "brand-accent-foreground": answerForeground,
     destructive,
     "destructive-foreground": onFill(destructive, [WHITE, BLACK]),
     success,
@@ -222,6 +335,45 @@ export function deriveTokens(roles: ThemeRoles): TokenMap {
     "sidebar-accent-foreground": text,
     "sidebar-border": mixOklab(sidebar, text, dark ? 0.16 : 0.11),
     "sidebar-ring": ring,
+    glow,
+    haze: mono ? primary : chart2,
+    raised,
+    "muted-strong": mutedStrong,
+    thumb,
+    chrome,
+    "chrome-foreground": chromeForeground,
+    "chrome-accent": chromeAccent,
+    "chrome-accent-foreground": onFill(chromeAccent, [chrome, text, background, surface]),
+    "block-quiet": quiet,
+    "block-quiet-foreground": quietForeground,
+    "block-quiet-meta": blockMeta(quietForeground, quiet),
+    "block-alert": alert,
+    "block-alert-foreground": WHITE,
+    "block-alert-meta": blockMeta(WHITE, alert),
+    "block-answer": accent,
+    "block-answer-foreground": answerForeground,
+    "block-answer-meta": blockMeta(answerForeground, accent),
+    "block-goal": goal,
+    "block-goal-foreground": WHITE,
+    "block-goal-meta": blockMeta(WHITE, goal),
+    "tint-danger": tintDanger,
+    "tint-danger-foreground": tintDangerInk,
+    "tint-accent": tintAccent,
+    "tint-accent-foreground": tintAccentInk,
+    "tint-success": tintSuccess,
+    "tint-success-foreground": tintSuccessInk,
+    "tint-info": tintInfo,
+    "tint-info-foreground": tintInfoInk,
+    "avatar-1": avatars[0][0],
+    "avatar-1-foreground": avatars[0][1],
+    "avatar-2": avatars[1][0],
+    "avatar-2-foreground": avatars[1][1],
+    "avatar-3": avatars[2][0],
+    "avatar-3-foreground": avatars[2][1],
+    "avatar-4": avatars[3][0],
+    "avatar-4-foreground": avatars[3][1],
+    "avatar-5": avatars[4][0],
+    "avatar-5-foreground": avatars[4][1],
   };
 }
 
@@ -250,10 +402,17 @@ export function deriveDarkRoles(light: ThemeRoles): ThemeRoles {
   return { primary, accent, background, surface, text };
 }
 
-/** Both modes' tokens. `dark` null means "derive it from light". */
-export function deriveTheme(light: ThemeRoles, dark: ThemeRoles | null): DerivedTheme {
+/**
+ * Both modes' tokens. `dark` null means "derive it from light". The glow
+ * (one colour for both modes) defaults to each mode's own accent.
+ */
+export function deriveTheme(
+  light: ThemeRoles,
+  dark: ThemeRoles | null,
+  glow: string | null = null,
+): DerivedTheme {
   return {
-    light: deriveTokens(light),
-    dark: deriveTokens(dark ?? deriveDarkRoles(light)),
+    light: deriveTokens(light, { glow }),
+    dark: deriveTokens(dark ?? deriveDarkRoles(light), { glow }),
   };
 }

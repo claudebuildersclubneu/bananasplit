@@ -37,6 +37,7 @@ import {
   CUSTOM_PRESET_ID,
   DEFAULT_PRESET_ID,
   findPreset,
+  presetGlow,
   THEME_PRESETS,
   type ThemePreset,
 } from "@/lib/theme/presets";
@@ -161,7 +162,8 @@ export function ThemeSettings({
     () => withAccent(draft.light, draft.dark ?? deriveDarkRoles(draft.light), draft.style.accent),
     [draft.light, draft.dark, draft.style.accent],
   );
-  const tokens = useMemo(() => deriveTheme(palettes.light, palettes.dark), [palettes]);
+  const glow = draft.style.glow ?? presetGlow(draft.preset);
+  const tokens = useMemo(() => deriveTheme(palettes.light, palettes.dark, glow), [palettes, glow]);
   const accents = useMemo(
     () => ({ light: accentScale(palettes.light), dark: accentScale(palettes.dark) }),
     [palettes],
@@ -337,6 +339,7 @@ export function ThemeSettings({
           groupId={`${groupId}-look`}
           style={draft.style}
           paletteAccent={draft.light.accent}
+          paletteGlow={presetGlow(draft.preset) ?? draft.light.accent}
           tokens={tokens}
           onChange={(style) => update({ style })}
         />
@@ -462,7 +465,7 @@ export function ThemeSettings({
         </div>
       </section>
 
-      <div className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <div className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky bottom-[var(--shell-bottom,0px)] z-10 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
         <Button onClick={save} disabled={isPending || !dirty}>
           {isPending ? "Saving…" : "Save theme"}
         </Button>
