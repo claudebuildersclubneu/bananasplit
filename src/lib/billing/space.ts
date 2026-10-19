@@ -74,7 +74,10 @@ export function trialDaysLeft(space: SpaceInfo, now: Date = new Date()): number 
 /** The priced plan whose features the space has (a trial is Society). */
 export function effectivePlan(space: SpaceInfo): PricedPlan {
   if (space.kind === "PERSONAL") return "FREE";
-  if (space.plan === "TRIAL" || space.plan === "FREE") return "SOCIETY";
+  // A club is never on a Personal plan (the database refuses it).
+  if (space.plan === "TRIAL" || space.plan === "FREE" || space.plan === "PERSONAL_PLUS") {
+    return "SOCIETY";
+  }
   return space.plan;
 }
 

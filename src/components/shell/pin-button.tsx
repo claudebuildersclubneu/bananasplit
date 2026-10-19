@@ -6,16 +6,16 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { recordVisitAction, togglePinAction } from "@/app/app/[orgSlug]/_shell/pin-actions";
 import { usePins } from "@/components/pins/pins-context";
-import { Button } from "@/components/ui/button";
 import { canonicalHref } from "@/lib/pins/pages";
 import { cn } from "@/lib/utils";
 
 /**
- * The top bar's pin: pins whatever is on screen (a note, a folder, a task, a
- * Tasks board, a database, any page) to the sidebar and the Overview, and
- * unpins it again. Pinning anything else is the sidebar's + under Pinned.
+ * The tool capsule's pin: pins whatever is on screen (a note, a folder, a
+ * task, a Tasks board, a database, any page) to the sidebar and the
+ * Overview, and unpins it again. Pinning anything else is the sidebar's +
+ * under Pinned. `className` styles the button (the capsule's round one).
  */
-export function PinButton() {
+export function PinButton({ className }: { className?: string }) {
   const pins = usePins();
   const pathname = usePathname().replace(/\/+$/, "");
   const search = useSearchParams().toString();
@@ -31,14 +31,13 @@ export function PinButton() {
   const label = pinned ? "Unpin this page" : "Pin this page";
 
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
+    <button
+      type="button"
       aria-pressed={pinned}
       aria-label={label}
       disabled={pending}
       title={error ?? (pinned ? "Unpin this page" : "Pin this page to your sidebar and Overview")}
-      className={cn(pinned && "text-primary")}
+      className={className}
       onClick={() =>
         start(async () => {
           setError(null);
@@ -48,8 +47,12 @@ export function PinButton() {
         })
       }
     >
-      <Pin className={cn("size-4", pinned && "fill-current")} aria-hidden="true" />
-    </Button>
+      <Pin
+        className={cn("size-5", pinned && "fill-current")}
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
+    </button>
   );
 }
 

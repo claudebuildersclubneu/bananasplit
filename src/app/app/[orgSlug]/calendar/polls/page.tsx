@@ -7,6 +7,7 @@ import { PollList } from "@/components/polls/poll-list";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { isPollOpen } from "@/lib/polls/question-poll";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listQuestionPolls } from "@/server/polls/question-polls";
@@ -25,7 +26,7 @@ export default async function PollsListPage({
   const planLock = await planGate(orgSlug, "polls");
   if (planLock) return planLock;
 
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   const questions = await withOrgTx(org.id, ({ db }) => listQuestionPolls(db, org.id));
   const now = new Date();
   const isAdmin = can({ role }, "events.write");
@@ -42,7 +43,7 @@ export default async function PollsListPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Polls"
+        title={sectionLabel(settings?.sidebar, "polls")}
         description={
           <>
             Ask the club a question and let people vote. Picking a meeting time?{" "}

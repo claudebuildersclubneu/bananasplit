@@ -39,8 +39,11 @@ import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
  * rather than beside it.
  */
 export function WorkspaceHeader({
+  title = "Tasks",
   teamwork = true,
 }: {
+  /** The section's name in the club's sidebar. */
+  title?: string;
   /** The weekly update exists (a club's layouts; not Personal or the Free plan). */
   teamwork?: boolean;
 }) {
@@ -98,7 +101,7 @@ export function WorkspaceHeader({
   return (
     <div className="mb-5 space-y-4">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <h1 className="page-title mr-auto">Tasks</h1>
+        <h1 className="page-title mr-auto">{title}</h1>
 
         <div className="flex flex-wrap items-center gap-2">
           {inDestination ? (

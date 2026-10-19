@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { PollList } from "@/components/polls/poll-list";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { FIND_A_TIME_KEEP_DAYS } from "@/lib/polls/expiry";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { planGate } from "@/server/billing/plan-gate";
@@ -27,7 +28,7 @@ export default async function FindATimePage({
   const planLock = await planGate(orgSlug, "polls");
   if (planLock) return planLock;
 
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   const personal = org.kind === "PERSONAL";
   const { polls, questionCount } = await withOrgTx(org.id, async ({ db }) => ({
     polls: await getOrgPolls(db, org.id),
@@ -44,7 +45,7 @@ export default async function FindATimePage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Find a time"
+        title={sectionLabel(settings?.sidebar, "find-a-time")}
         description={`${
           personal
             ? "Offer some days and hours and share the link: anyone marks when they're free, no account needed, and you pick the time."

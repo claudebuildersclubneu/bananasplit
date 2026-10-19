@@ -27,9 +27,7 @@ export default async function LabelsPage({ params }: PageProps<"/app/[orgSlug]/s
     <div className="space-y-8">
       <div>
         <h1 className="page-title">Labels</h1>
-        <p className="text-muted-foreground text-sm">
-          Shared across every task in this organization.
-        </p>
+        <p className="text-muted-foreground text-sm">Shared across every task in this club.</p>
       </div>
 
       <LabelForm orgId={organization.id} />

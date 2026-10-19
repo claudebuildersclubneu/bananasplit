@@ -89,6 +89,8 @@ interface Props {
   event: EventFormEvent | null;
   defaultStart?: Date | null;
   defaultAllDay?: boolean;
+  /** A new event starts with "Take RSVPs with a public page" switched on. */
+  defaultRsvpPage?: boolean;
   members: CalendarMember[];
   onSaved?: () => void;
   onDeleted?: () => void;
@@ -158,6 +160,7 @@ function EventForm({
   event,
   defaultStart,
   defaultAllDay,
+  defaultRsvpPage,
   members,
   onSaved,
   onDeleted,
@@ -203,7 +206,7 @@ function EventForm({
   const [notifyAttendees, setNotifyAttendees] = useState(true);
   const [showMore, setShowMore] = useState(() => usesMoreDetails(event));
   // New events only: also turn on a public RSVP page and go set it up.
-  const [withRsvpPage, setWithRsvpPage] = useState(false);
+  const [withRsvpPage, setWithRsvpPage] = useState(defaultRsvpPage ?? false);
   const params = useParams<{ orgSlug?: string }>();
 
   const isPublic = visibility === EventVisibility.PUBLIC;

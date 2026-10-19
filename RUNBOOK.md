@@ -100,8 +100,9 @@ owns every table, so it bypasses RLS and the app never connects as it).
       If `SELECT 1 FROM pg_roles WHERE rolname = 'app_legacy'` still returns
       a row, run `DROP ROLE app_legacy;` (the same applies to any cluster
       upgraded from before 0C, once every database on it has run 0C).
-3. **Vercel.** Import this repo and set the database variables in the
-   **Production scope only**:
+3. **Vercel.** Create a project for this repo (importing it is fine, but
+   pushes don't deploy through Vercel's GitHub app: see "How deploys run"
+   below) and set the database variables in the **Production scope only**:
 
    | Variable | Value |
    |---|---|
@@ -240,6 +241,29 @@ owns every table, so it bypasses RLS and the app never connects as it).
    `password123`. It refuses only when `VERCEL_ENV=production`, so a local
    shell holding the production URL is not stopped.
 
+### How deploys run
+
+The `deploy` job in `.github/workflows/ci.yml` deploys every push to `main`
+to production, after the lint/typecheck/unit and RLS jobs pass. It runs
+`vercel deploy --prod`, so Vercel still does the build (`vercel.json`'s
+`buildCommand`, migrations included) with the Production-scope variables,
+then the job checks `/api/health` (step 7). `vercel.json` sets
+`git.deploymentEnabled: false`, so Vercel's GitHub app deploys nothing even
+if it's connected: changing who owns the repo can't stop or duplicate
+deploys, and a commit that fails CI never ships.
+
+- **Setup / after a repo transfer.** Create a Vercel access token (Account
+  Settings → Tokens, scoped to the project's team) and store it as
+  `VERCEL_TOKEN` under GitHub → Settings → Environments → **Production**
+  (`gh secret set VERCEL_TOKEN --env Production`). Limit that environment's
+  deployment branches to `main`, so only main runs can read it. The team and
+  project IDs are in the workflow; update them if the Vercel project moves.
+- **Redeploy without a commit:** Actions → CI → Run workflow on `main`.
+- **Rolling back:** Instant Rollback in Vercel (Deployments). The next push
+  to `main` deploys over it.
+- Without the token the `deploy` job fails with an error saying so, rather
+  than skipping.
+
 ### Vercel previews
 
 The Neon integration gave every preview its own database branch. This
@@ -271,8 +295,8 @@ Supabase setup has no per-preview database, so:
   leaves it out of step.
 - **Option B: no preview database.** Leave every database variable out of
   the Preview scope. Preview builds then stop at `prisma migrate deploy`,
-  which has no URL: a loud, safe failure. To skip preview builds instead,
-  use Vercel's Ignored Build Step (Project Settings → Git).
+  which has no URL: a loud, safe failure. Branches and PRs get no preview
+  builds today anyway (see "How deploys run" below).
 
 ### Alternative: Neon
 

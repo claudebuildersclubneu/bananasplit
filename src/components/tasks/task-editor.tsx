@@ -22,9 +22,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toaster";
 import { UserAvatar } from "@/components/user-avatar";
 import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
-import { canAcknowledgeFlag, canEditTask, canTriage } from "@/lib/tasks/access";
+import { canAcknowledgeFlag, canEditTask } from "@/lib/tasks/access";
 import { relationFor } from "@/lib/tasks/assignment";
-import { addDaysToKey, dueDateKey } from "@/lib/tasks/dates";
+import { dueDateKey } from "@/lib/tasks/dates";
 import { MAX_BLOCKED_REASON } from "@/lib/tasks/status";
 import { canChangeVisibility, namedAudienceIds } from "@/lib/tasks/visibility";
 import { cn } from "@/lib/utils";
@@ -67,9 +67,8 @@ import { AudienceList } from "./visibility-control";
  * subtasks, comments and history.
  *
  * Without edit rights the fields are read-only and the self-assign
- * carve-out offers Join / Leave / Take ownership. In an intake project only
- * the triage owner or an admin sets the priority and owner. An above-level
- * assignment asks for confirmation before it is saved.
+ * carve-out offers Join / Leave / Take ownership. An above-level assignment
+ * asks for confirmation before it is saved.
  */
 
 export interface TaskEditorDefaults {
@@ -102,7 +101,7 @@ export function TaskEditor({
   mode?: "dialog" | "page";
   initialComments?: React.ComponentProps<typeof TaskComments>["initial"];
 }) {
-  const { org, viewer, actor, labels, projectById, memberById, members, announce } = useTasks();
+  const { org, viewer, actor, labels, memberById, members, announce } = useTasks();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmElement, confirmFlagged] = useConfirmFlagged();
@@ -112,7 +111,6 @@ export function TaskEditor({
   const [view, setView] = useState<"form" | "sentence">("form");
 
   const initialProjectId = task?.projectId ?? defaults?.projectId ?? null;
-  const initialProject = initialProjectId ? projectById.get(initialProjectId) : undefined;
   const isNew = task === null;
   const parentTaskId = task?.parentTaskId ?? defaults?.parentTaskId ?? null;
 
@@ -123,33 +121,18 @@ export function TaskEditor({
   );
   const [blockedReason, setBlockedReason] = useState(task?.blockedReason ?? "");
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? TaskPriority.MEDIUM);
-  const [dueDate, setDueDate] = useState(() => {
-    if (task?.dueDate) return dueDateKey(task.dueDate);
-    if (defaults?.dueDate) return defaults.dueDate;
-    if (isNew && initialProject?.isIntake && initialProject.defaultDueInDays) {
-      return addDaysToKey(org.todayKey, initialProject.defaultDueInDays);
-    }
-    return "";
-  });
+  const [dueDate, setDueDate] = useState(() =>
+    task?.dueDate ? dueDateKey(task.dueDate) : (defaults?.dueDate ?? ""),
+  );
   const [projectId, setProjectId] = useState<string | null>(initialProjectId);
-  const project = projectId ? projectById.get(projectId) : undefined;
-  const intake = project?.isIntake ?? false;
-  const triage = canTriage(actor, {
-    isIntake: intake,
-    triageUserId: project?.triageUserId ?? null,
-  });
   const [visibility, setVisibility] = useState<TaskVisibility>(
     task?.visibility ?? defaults?.visibility ?? TaskVisibility.ORG,
   );
   const [ownerId, setOwnerId] = useState<string | null>(() => {
     if (task) return task.ownerId;
     if (defaults?.ownerId !== undefined && defaults.ownerId !== null) return defaults.ownerId;
-    // New tasks default to the creator ("anyone can assign to themselves"),
-    // except requests, which the triage owner assigns.
-    return initialProject?.isIntake &&
-      !canTriage(actor, { isIntake: true, triageUserId: initialProject.triageUserId })
-      ? null
-      : viewer.userId;
+    // New tasks default to the creator ("anyone can assign to themselves").
+    return viewer.userId;
   });
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
     task?.assignees.map((a) => a.userId) ?? [],
@@ -163,14 +146,12 @@ export function TaskEditor({
   // publish it, and a subtask never decides on its own.
   const canSetVisibility = task
     ? canChangeVisibility(actor, visibilitySubjectOf(task)) && isTopLevel
-    : isTopLevel && !intake;
+    : isTopLevel;
   const visibilityLocked = !isTopLevel
     ? "A subtask is as private as the task it belongs to."
-    : intake
-      ? "Requests stay open: a queue nobody can see is not a queue."
-      : task && !canSetVisibility
-        ? "Only the owner, the creator or an admin changes who can see this."
-        : null;
+    : task && !canSetVisibility
+      ? "Only the owner, the creator or an admin changes who can see this."
+      : null;
   const audience = namedAudienceIds({
     visibility,
     ownerId,
@@ -185,7 +166,7 @@ export function TaskEditor({
       ...members.filter((m) => m.role === "OWNER" || m.role === "ADMIN").map((m) => m.id),
     ]),
   ];
-  const ownerRequired = org.requireOwner && isTopLevel && !intake;
+  const ownerRequired = org.requireOwner && isTopLevel;
   const dueRequired = org.requireDueDate && isTopLevel;
 
   async function save() {
@@ -225,10 +206,10 @@ export function TaskEditor({
       description: description.trim() ? description : null,
       status,
       blockedReason: status === TaskStatus.BLOCKED ? blockedReason.trim() : null,
-      ...(intake && !triage ? {} : { priority }),
+      priority,
       dueDate: dueDate || null,
       projectId,
-      ...(intake && !triage ? {} : { ownerId }),
+      ownerId,
       assigneeIds: assigneeIds.filter((id) => id !== ownerId),
       labelIds,
       ...(canSetVisibility ? { visibility } : {}),
@@ -443,17 +424,9 @@ export function TaskEditor({
             id="task-owner"
             value={ownerId}
             onChange={setOwnerId}
-            disabled={readOnly || (intake && !triage)}
+            disabled={readOnly}
             allowNone={!ownerRequired}
           />
-          {intake && !triage && (
-            <p className="text-muted-foreground text-xs">
-              {project?.triageUserId
-                ? (memberById.get(project.triageUserId)?.name ?? "The triage owner")
-                : "An admin"}{" "}
-              sets the owner and priority of requests.
-            </p>
-          )}
           {ownerId &&
             relationFor(viewer.chart, ownerId) === "ABOVE" &&
             ownerId !== task?.ownerId && (
@@ -529,7 +502,7 @@ export function TaskEditor({
           value={priority}
           onChange={setPriority}
           options={PRIORITY_OPTIONS}
-          disabled={readOnly || (intake && !triage)}
+          disabled={readOnly}
         />
       </Field>
 
@@ -642,7 +615,7 @@ export function TaskEditor({
           </span>
           {self.owner && <span className="text-sm font-medium">You own this task.</span>}
           {self.joined && <span className="text-sm font-medium">You&apos;re on this task.</span>}
-          {!task.ownerId && !self.owner && !intake && (
+          {!task.ownerId && !self.owner && (
             <Button
               size="sm"
               variant="outline"
@@ -788,14 +761,12 @@ export function TaskEditor({
             onTitle={setTitle}
             ownerId={ownerId}
             onOwner={setOwnerId}
-            ownerLocked={intake && !triage}
             dueDate={dueDate}
             onDue={setDueDate}
             projectId={projectId}
             onProject={setProjectId}
             priority={priority}
             onPriority={setPriority}
-            priorityLocked={intake && !triage}
             status={status}
             onStatus={setStatus}
             visibility={visibility}

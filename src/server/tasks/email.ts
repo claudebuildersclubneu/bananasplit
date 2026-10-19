@@ -22,7 +22,6 @@ import {
   taskDigestEmail,
   taskMentionedEmail,
   taskReminderEmail,
-  taskRequestFiledEmail,
   weeklyUpdateReminderEmail,
   type TaskFacts,
 } from "./email-templates";
@@ -238,10 +237,7 @@ export async function renderTaskNotificationEmail(
 
     switch (n.type) {
       case NotificationType.TASK_ASSIGNED:
-      case NotificationType.TASK_FLAGGED: {
-        if (n.dedupeKey?.startsWith("intake:")) {
-          return taskRequestFiledEmail({ orgName: org.name, actorName, task: facts, url });
-        }
+      case NotificationType.TASK_FLAGGED:
         return taskAssignedEmail({
           orgName: org.name,
           actorName,
@@ -250,7 +246,6 @@ export async function renderTaskNotificationEmail(
           flagged: n.type === NotificationType.TASK_FLAGGED,
           url,
         });
-      }
       case NotificationType.TASK_MENTIONED:
         return taskMentionedEmail({
           orgName: org.name,

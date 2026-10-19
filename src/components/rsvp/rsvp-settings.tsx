@@ -600,7 +600,7 @@ export function RsvpSettings({
 
         {/* Only while there's something to save, pinned to the bottom of the screen. */}
         {dirty && (
-          <div className="bg-card sticky bottom-3 flex items-center justify-end gap-3 rounded-xl border p-3 shadow-lg">
+          <div className="bg-card sticky bottom-[calc(var(--shell-bottom,0px)+0.75rem)] flex items-center justify-end gap-3 rounded-xl border p-3 shadow-lg">
             <span className="text-muted-foreground me-auto text-sm">Unsaved changes</span>
             <Button
               variant="outline"

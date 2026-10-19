@@ -32,7 +32,7 @@ import type {
  * area for optimistic actions that fail, and ONE task detail surface.
  *
  * The detail surface living here is the point: every layout — the week, the
- * board, the table, the calendar, the team lanes, the request queue — opens
+ * board, the table, the list, the dashboard — opens
  * the same panel with the same controls, so a task looks and behaves the
  * same wherever you found it.
  */
@@ -170,14 +170,12 @@ export function useTasks(): TasksContextValue {
 
 /** The access-rule view of a loaded task. */
 export function accessSubjectOf(
-  task: Pick<TaskItem, "createdById" | "ownerId" | "assignees" | "project">,
+  task: Pick<TaskItem, "createdById" | "ownerId" | "assignees">,
 ): TaskAccessSubject {
   return {
     createdById: task.createdById,
     ownerId: task.ownerId,
     assigneeIds: task.assignees.map((a) => a.userId),
-    isIntake: task.project?.isIntake ?? false,
-    triageUserId: task.project?.triageUserId ?? null,
   };
 }
 

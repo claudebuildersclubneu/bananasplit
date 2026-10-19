@@ -156,7 +156,7 @@ export default async function ReportsPage({
         {ids.length === 0 ? (
           <EmptyState
             title="No reports to show"
-            description="The databases these reports read are not visible to your role in this organization."
+            description="The databases these reports read are not visible to your role in this club."
           />
         ) : (
           <ReportsBody className="grid grid-cols-1 gap-4 lg:grid-cols-3">
