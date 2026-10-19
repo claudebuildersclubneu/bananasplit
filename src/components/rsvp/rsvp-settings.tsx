@@ -80,9 +80,9 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-card space-y-4 rounded-xl border p-5">
+    <section className="bg-card text-card-foreground ring-foreground/6 edge rounded-card space-y-4 p-6 ring-1">
       <div className="space-y-1">
-        <h2 className="heading text-base">{title}</h2>
+        <h2 className="heading text-[17px]">{title}</h2>
         {description && <p className="text-muted-foreground text-sm">{description}</p>}
       </div>
       {children}
@@ -142,13 +142,13 @@ function PrivacyTile({
     <label
       htmlFor={id}
       className={cn(
-        "flex cursor-pointer items-start gap-3.5 rounded-xl border-2 p-4 transition-colors",
+        "rounded-tile flex cursor-pointer items-start gap-3.5 border-2 p-4 transition-colors",
         checked ? "border-primary bg-primary/6" : "hover:bg-muted/50 border-border",
       )}
     >
       <span
         className={cn(
-          "grid size-10 flex-none place-items-center rounded-lg",
+          "grid size-10 flex-none place-items-center rounded-full",
           checked ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
         )}
       >
@@ -300,10 +300,10 @@ export function RsvpSettings({
               <img
                 src={cover.s480}
                 alt="Cover"
-                className="size-24 rounded-xl border object-cover"
+                className="rounded-tile size-24 border object-cover"
               />
             ) : (
-              <span className="bg-muted text-muted-foreground grid size-24 place-items-center rounded-xl border border-dashed">
+              <span className="bg-muted text-muted-foreground rounded-tile grid size-24 place-items-center border border-dashed">
                 <ImagePlus className="size-6" aria-hidden="true" />
               </span>
             )}
@@ -369,7 +369,7 @@ export function RsvpSettings({
                   >
                     <span
                       className={cn(
-                        "block aspect-square w-full rounded-lg border",
+                        "rounded-field block aspect-square w-full border",
                         b.swatch,
                         active
                           ? "ring-primary ring-2 ring-offset-2 ring-offset-(--card)"
@@ -448,13 +448,13 @@ export function RsvpSettings({
           title="Getting there"
           description="The address comes from the event. Add how to find the room once people are in the building."
         >
-          <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm">
+          <div className="bg-muted rounded-field flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm">
             <span className={cn("min-w-0 truncate", !location && "text-muted-foreground")}>
               {location ?? "No location set"}
             </span>
             <Link
               href={editHref}
-              className="text-primary shrink-0 text-xs font-medium hover:underline"
+              className="shrink-0 text-xs font-semibold underline-offset-4 hover:underline"
             >
               Edit event
             </Link>
@@ -487,7 +487,7 @@ export function RsvpSettings({
                   aria-checked={active}
                   onClick={() => set("costMode", m.id)}
                   className={cn(
-                    "flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-colors",
+                    "rounded-tile flex flex-col items-start gap-1 border-2 p-3 text-left transition-colors",
                     active ? "border-primary bg-primary/6" : "border-border hover:bg-muted/50",
                   )}
                 >
@@ -530,7 +530,7 @@ export function RsvpSettings({
                 </div>
               </div>
               {costPreview && (
-                <p className="bg-muted/50 flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
+                <p className="bg-muted rounded-field flex items-center gap-2 px-3.5 py-2.5 text-sm">
                   <Banknote className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
                   {costPreview}
                 </p>
@@ -600,7 +600,7 @@ export function RsvpSettings({
 
         {/* Only while there's something to save, pinned to the bottom of the screen. */}
         {dirty && (
-          <div className="bg-card sticky bottom-[calc(var(--shell-bottom,0px)+0.75rem)] flex items-center justify-end gap-3 rounded-xl border p-3 shadow-lg">
+          <div className="bg-popover text-popover-foreground ring-foreground/6 shadow-e2 sticky bottom-[calc(var(--shell-bottom,0px)+0.75rem)] flex items-center justify-end gap-3 rounded-full p-2 ps-5 ring-1">
             <span className="text-muted-foreground me-auto text-sm">Unsaved changes</span>
             <Button
               variant="outline"
@@ -621,12 +621,10 @@ export function RsvpSettings({
 
       <aside className="space-y-4 lg:sticky lg:top-4">
         <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Preview
-          </p>
+          <p className="text-muted-foreground text-[13px] font-medium">Preview</p>
           <PagePreview cover={cover} background={value.background} title={title} />
         </div>
-        <div className="bg-card space-y-3 rounded-xl border p-4 text-sm">
+        <div className="bg-card ring-foreground/6 edge rounded-tile space-y-3 p-4 text-sm ring-1">
           <p className="font-medium">What guests get</p>
           <p className="text-muted-foreground flex gap-2 text-xs leading-relaxed">
             <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

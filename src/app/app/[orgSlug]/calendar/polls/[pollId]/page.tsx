@@ -32,7 +32,9 @@ export default async function PollDetailPage({
       where: { id: user.id },
       select: { name: true, image: true, avatar: true },
     });
-    return { kind: "question" as const, question, me };
+    // The turnout meter: one tick per member who could vote.
+    const memberCount = await db.membership.count({ where: { organizationId: org.id } });
+    return { kind: "question" as const, question, me, memberCount };
   });
   if (!loaded) notFound();
   if (loaded.kind === "availability") redirect(`/app/${orgSlug}/calendar/find-a-time/${pollId}`);
@@ -47,13 +49,14 @@ export default async function PollDetailPage({
     new Date(),
   );
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-6">
       <BackLink href={`/app/${orgSlug}/calendar/polls`} label="Polls" />
       <QuestionPoll
         poll={view}
         orgId={org.id}
         orgSlug={orgSlug}
         timeZone={safeTimeZone(org.timezone)}
+        memberCount={loaded.memberCount}
       />
     </div>
   );

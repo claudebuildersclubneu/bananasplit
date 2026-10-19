@@ -33,7 +33,7 @@ import {
 export function heatFill(percent: number): CSSProperties | undefined {
   if (percent <= 0) return undefined;
   return {
-    backgroundColor: `color-mix(in oklab, var(--success) ${percent}%, var(--background))`,
+    backgroundColor: `color-mix(in oklab, var(--success) ${percent}%, var(--card))`,
     borderColor: "transparent",
   };
 }
@@ -45,7 +45,7 @@ export function heatTextClass(percent: number): string | undefined {
 
 /** "If needed" is striped: a texture, so it never depends on telling amber from green. */
 export const IF_NEEDED_STYLE: CSSProperties = {
-  backgroundColor: "color-mix(in oklab, var(--warning) 14%, var(--background))",
+  backgroundColor: "color-mix(in oklab, var(--warning) 14%, var(--card))",
   backgroundImage:
     "repeating-linear-gradient(135deg, color-mix(in oklab, var(--warning) 70%, transparent) 0 2px, transparent 2px 6px)",
   borderColor: "color-mix(in oklab, var(--warning) 60%, transparent)",
@@ -121,7 +121,10 @@ export function HeatLegend({ total }: { total: number }) {
               <li key={count} className="flex flex-col items-center gap-0.5">
                 <span
                   aria-hidden
-                  className={cn("h-3.5 w-6 rounded-[3px] border", percent === 0 && "bg-background")}
+                  className={cn(
+                    "h-3.5 w-6 rounded-[5px] border",
+                    percent === 0 && "bg-muted border-transparent",
+                  )}
                   style={heatFill(percent)}
                 />
                 <span className="text-[10px] leading-none tabular-nums">{count}</span>
@@ -131,7 +134,7 @@ export function HeatLegend({ total }: { total: number }) {
         </ol>
       </div>
       <span className="flex items-center gap-1.5">
-        <span aria-hidden className="bg-muted relative inline-block h-3.5 w-6 rounded-[3px] border">
+        <span aria-hidden className="bg-muted relative inline-block h-3.5 w-6 rounded-[5px] border">
           <IfNeededMark />
         </span>
         Some only if needed
@@ -174,7 +177,7 @@ export function SlotDetails({
   if (!slot || !summary) {
     return (
       <section
-        className={cn("bg-card rounded-xl border p-3 text-sm", className)}
+        className={cn("bg-card ring-foreground/6 edge rounded-tile p-4 text-sm ring-1", className)}
         aria-label="Who can make it"
       >
         <p className="text-muted-foreground">
@@ -188,11 +191,14 @@ export function SlotDetails({
   const { day, time } = intervalParts(slot.startsAt, slot.endsAt, timeZone);
   return (
     <section
-      className={cn("bg-card space-y-2 rounded-xl border p-3 text-sm", className)}
+      className={cn(
+        "bg-card ring-foreground/6 edge rounded-tile space-y-2.5 p-4 text-sm ring-1",
+        className,
+      )}
       aria-label="Who can make it"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-medium">
+        <h3 className="heading">
           {day}, {time}
         </h3>
         <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
@@ -266,23 +272,23 @@ export function BestTimes({
   onSchedule?: (window: RankedSlot) => void;
 }) {
   return (
-    <section className="space-y-2" aria-labelledby="poll-best-times">
+    <section className="space-y-3" aria-labelledby="poll-best-times">
       <div>
-        <h2 id="poll-best-times" className="text-sm font-medium">
+        <h2 id="poll-best-times" className="heading text-[17px]">
           Best times
         </h2>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-0.5 text-[13px]">
           {durationMinutes}-minute windows that suit the most people.
         </p>
       </div>
       {windows.length === 0 ? (
-        <p className="text-muted-foreground rounded-xl border border-dashed p-3 text-sm">
+        <p className="text-muted-foreground bg-muted hatch rounded-tile p-3.5 text-sm">
           {total === 0
             ? "No answers yet. The best times show up here as people respond."
             : "No time works for anyone yet."}
         </p>
       ) : (
-        <ol className="space-y-1.5">
+        <ol className="space-y-2">
           {windows.map((w, index) => {
             const { day, time } = intervalParts(w.slot.startsAt, w.endsAt, timeZone);
             const selected = selectedStartId === w.slot.id;
@@ -290,20 +296,23 @@ export function BestTimes({
               <li
                 key={w.slot.id}
                 className={cn(
-                  "bg-card flex items-center gap-2 rounded-xl border p-2 transition-colors",
-                  selected && "border-foreground/40 bg-muted/50",
+                  "bg-card ring-foreground/6 edge rounded-tile flex items-center gap-2 p-2.5 ring-1 transition-[box-shadow]",
+                  index === 0 &&
+                    "ring-glow shadow-[0_0_18px_-4px_color-mix(in_oklab,var(--glow)_70%,transparent)]",
+                  selected && "ring-foreground ring-2",
                 )}
               >
                 <button
                   type="button"
-                  className="focus-visible:ring-ring/50 min-w-0 flex-1 rounded-md px-1 text-left outline-none focus-visible:ring-3"
+                  className="focus-visible:outline-foreground min-w-0 flex-1 rounded-[10px] px-1.5 text-left outline-none focus-visible:outline-2"
                   aria-pressed={selected}
                   onClick={() => onSelect(w)}
                 >
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-medium">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
                       <span className="sr-only">Option {index + 1}: </span>
-                      {day}
+                      <span className="truncate">{day}</span>
+                      {index === 0 && <Badge variant="accent">Best</Badge>}
                     </span>
                     <span className="text-xs tabular-nums">
                       <span className="font-semibold">{w.score}</span>
@@ -357,7 +366,7 @@ export function RespondentList({
   const named = respondents.filter((r) => r.isGuest || r.name !== "Member");
   return (
     <section className="space-y-2" aria-labelledby="poll-respondents">
-      <h2 id="poll-respondents" className="text-sm font-medium">
+      <h2 id="poll-respondents" className="heading text-[17px]">
         Responded{" "}
         <span className="text-muted-foreground font-normal tabular-nums">
           ({respondents.length})

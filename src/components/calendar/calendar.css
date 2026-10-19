@@ -1,12 +1,13 @@
 /*
- * The org calendar's month grid, week column and agenda.
+ * The org calendar's month grid, week column and agenda (Moonstone).
  *
- * Structure and density follow the club website's events calendar
- * (anthropic-club-website/src/index.css, ".cal-*"): a real table, Sunday
- * first, a tonal step on days that carry something, a full-width chip per
- * event, and colour bars instead of a sideways scroll on a phone. Colour,
- * shape and type come from this app's own tokens instead, so every org
- * theme restyles the calendar (Settings > Theme).
+ * Month: days are separate rounded tiles on the page (the field corner,
+ * gaps instead of a ruled grid), today's date sits in the accent circle
+ * with a soft glow, events are tinted pills (the kind's colour mixed into
+ * the card, like TagChip) and the events you said you're going to are
+ * solid. Week: blocks with 12px corners and a tinted fill, no stripe.
+ * On a phone the month's pills become colour bars instead of the grid
+ * scrolling sideways.
  *
  * Every colour here is a token or a mix of tokens. `--kind` is set per
  * element from KIND_META (src/components/calendar/kinds.ts) and is the only
@@ -14,14 +15,14 @@
  */
 
 .cal {
-  --cal-cell-height: clamp(5.5rem, 7.6vw, 7.75rem);
+  --cal-cell-height: clamp(6rem, 7.6vw, 8rem);
   --cal-hour-height: 3.25rem;
-  --cal-line: var(--border);
-  /* Mixed toward the foreground rather than toward --muted, so the step is
-     the same size in light and dark. A muted-based tint is nearly
-     invisible on a dark card. */
-  --cal-tint: color-mix(in oklab, var(--foreground) 4.5%, var(--card));
-  --cal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cal-gap: 0.375rem;
+  /* Hairlines inside the week card: quieter than --border. */
+  --cal-line: color-mix(in oklab, var(--border) 70%, transparent);
+  /* The tile edge: the card ring every surface card wears. */
+  --cal-ring: color-mix(in oklab, var(--foreground) 6%, transparent);
+  --cal-ease: var(--ease-ink);
 }
 
 /* ---------------------------------------------------------------- header */
@@ -31,26 +32,28 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.75rem 1rem;
 }
 
 .cal-head__label {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: center;
+  gap: 0.75rem;
   min-width: 0;
 }
 
 .cal-head__month {
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: var(--heading-weight, 640);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: var(--foreground);
 }
 
 .cal-head__count {
-  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
   line-height: 1.2;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -70,38 +73,47 @@
   min-width: 100%;
 }
 
-/* A filter chip. Selected is a tonal fill plus a stronger border, never a
-   colour change, so the kind dot stays the only coloured thing in the row. */
+/* A filter pill (chipClass in ui/segmented): 32px, outlined, filled with
+   the primary when on. The kind dot keeps its colour either way. */
 .cal-filter {
   display: inline-flex;
   align-items: center;
-  gap: 0.4375rem;
-  height: 1.875rem;
-  padding: 0 0.625rem;
-  border: 1px solid var(--cal-line);
-  border-radius: var(--radius-sm);
+  gap: 0.5rem;
+  height: 2rem;
+  padding: 0 0.875rem 0 0.75rem;
+  border: 1px solid var(--input);
+  border-radius: 999px;
   background: transparent;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
+  color: var(--foreground);
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color 150ms var(--cal-ease),
-    border-color 150ms var(--cal-ease),
-    color 150ms var(--cal-ease);
+    background-color 180ms var(--cal-ease),
+    border-color 180ms var(--cal-ease),
+    color 180ms var(--cal-ease),
+    transform 180ms var(--cal-ease);
 }
 
 .cal-filter:hover {
   background: var(--muted);
-  color: var(--foreground);
+}
+
+.cal-filter:active {
+  transform: scale(0.97);
+}
+
+.cal-filter:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
 }
 
 .cal-filter[aria-pressed="true"] {
-  background: var(--muted);
-  border-color: color-mix(in oklab, var(--foreground) 35%, transparent);
-  color: var(--foreground);
+  background: var(--primary);
+  border-color: transparent;
+  color: var(--primary-foreground);
 }
 
 .cal-filter__dot {
@@ -109,12 +121,8 @@
   height: 0.5rem;
   border-radius: 999px;
   background: var(--kind);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--kind) 22%, transparent);
   flex: none;
-}
-
-/* Unselected chips keep the dot legible but quiet. */
-.cal-filter:not([aria-pressed="true"]) .cal-filter__dot {
-  opacity: 0.55;
 }
 
 /* ------------------------------------------------------------ month grid */
@@ -123,63 +131,51 @@
   position: relative;
 }
 
+/* No frame: the day tiles sit straight on the page. */
 .cal-shell {
-  border: 1px solid var(--cal-line);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--card);
+  margin: calc(var(--cal-gap) * -1);
 }
 
 .cal-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: var(--cal-gap);
   table-layout: fixed;
 }
 
 .cal-th {
-  padding: 0.625rem 0.75rem;
+  padding: 0 0.5rem 0.125rem;
   text-align: left;
-  background: var(--muted);
-  border-bottom: 1px solid var(--cal-line);
-  border-right: 1px solid var(--cal-line);
-  font-size: 0.6875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--muted-foreground);
-}
-
-.cal-th:last-child,
-.cal-td:last-child {
-  border-right: 0;
-}
-
-.cal-table tbody tr:last-child .cal-td {
-  border-bottom: 0;
 }
 
 .cal-td {
   height: var(--cal-cell-height);
   vertical-align: top;
-  padding: 0.3125rem 0.375rem 0.375rem;
-  border-right: 1px solid var(--cal-line);
-  border-bottom: 1px solid var(--cal-line);
+  padding: 0.375rem;
+  border-radius: var(--radius-field);
   background: var(--card);
-}
-
-/* The tonal step that marks a day with something on it. */
-.cal-td[data-has-events="true"] {
-  background: var(--cal-tint);
+  box-shadow: inset 0 0 0 1px var(--cal-ring);
+  transition:
+    background-color 180ms var(--cal-ease),
+    box-shadow 180ms var(--cal-ease);
 }
 
 /* Leading and trailing days of the neighbouring months recede but stay
    usable: an admin can still click one to add an event there. */
 .cal-td[data-outside="true"] {
-  background: color-mix(in oklab, var(--muted) 25%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .cal-td[data-outside="true"] .cal-day__num {
-  opacity: 0.45;
+  opacity: 0.5;
+}
+
+.cal-td[data-outside="true"] .cal-chip {
+  opacity: 0.7;
 }
 
 .cal-day {
@@ -187,49 +183,46 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.25rem;
-  min-height: 1.375rem;
+  min-height: 1.625rem;
 }
 
 .cal-day__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.375rem;
-  height: 1.375rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.625rem;
+  height: 1.625rem;
   padding: 0 0.3125rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 500;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--muted-foreground);
-}
-
-.cal-td[data-has-events="true"] .cal-day__num {
   color: var(--foreground);
 }
 
-/* Today is the one filled mark on the grid. */
+/* Today: the accent circle with the glow under it, the one lit mark. */
 .cal-td[data-today="true"] .cal-day__num {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 600;
+  background: var(--brand-accent);
+  color: var(--brand-accent-foreground);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--glow) 35%, transparent),
+    0 0 14px color-mix(in oklab, var(--glow) 55%, transparent);
 }
 
-/* The add-here affordance: invisible until the cell is hovered or it is
+/* The add-here affordance: invisible until the tile is hovered or it is
    focused, so the grid is not a field of plus signs. */
 .cal-day__add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: var(--radius-sm);
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
   color: var(--muted-foreground);
   opacity: 0;
   cursor: pointer;
   transition:
-    opacity 150ms var(--cal-ease),
-    background-color 150ms var(--cal-ease);
+    opacity 180ms var(--cal-ease),
+    background-color 180ms var(--cal-ease),
+    transform 180ms var(--cal-ease);
 }
 
 .cal-td:hover .cal-day__add,
@@ -238,8 +231,12 @@
 }
 
 .cal-day__add:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.cal-day__add:active {
+  transform: scale(0.94);
 }
 
 @media (hover: none) {
@@ -248,35 +245,71 @@
   }
 }
 
-/* ----------------------------------------------------------- event chips */
+/* ----------------------------------------------------------- event pills */
 
 .cal-chip {
   display: block;
   width: 100%;
-  margin-top: 0.1875rem;
-  padding: 0.25rem 0.375rem;
-  border: 1px solid color-mix(in oklab, var(--kind) 36%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--kind) 15%, var(--card));
+  margin-top: 0.25rem;
+  padding: 0.3125rem 0.5625rem;
+  border: 1px solid transparent;
+  /* A pill on one line; a soft rounded block when the title wraps. */
+  border-radius: 0.875rem;
+  background: color-mix(in oklab, var(--kind) 20%, var(--card));
   color: var(--foreground);
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 150ms var(--cal-ease),
-    background-color 150ms var(--cal-ease);
+    background-color 180ms var(--cal-ease),
+    border-color 180ms var(--cal-ease),
+    transform 180ms var(--cal-ease),
+    box-shadow 180ms var(--cal-ease);
 }
 
 .cal-chip:hover,
 .cal-chip[aria-expanded="true"] {
-  border-color: var(--kind);
-  background: color-mix(in oklab, var(--kind) 22%, var(--card));
+  background: color-mix(in oklab, var(--kind) 30%, var(--card));
 }
 
+.cal-chip:active {
+  transform: scale(0.98);
+}
+
+.cal-chip:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 1px;
+}
+
+/* Internal events: the same tint with a dashed edge, the cue the legend
+   names, so the difference survives a colour-blind reading. */
 .cal-chip[data-internal="true"] {
-  /* Internal events read a shade quieter than public ones, which is the
-     same ordering the legend states. A dashed border rather than a lighter
-     fill, so the difference survives a colour-blind reading. */
   border-style: dashed;
+  border-color: color-mix(in oklab, var(--kind) 55%, transparent);
+}
+
+/* The events you're going to are solid. */
+.cal-chip[data-rsvp="yes"] {
+  background: var(--kind);
+  border-color: transparent;
+  color: var(--foreground);
+  /* Black or white, whichever reads on the kind (declared here: --kind is per element). */
+  color: oklch(from var(--kind) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+}
+
+.cal-chip[data-rsvp="yes"]:hover,
+.cal-chip[data-rsvp="yes"][aria-expanded="true"] {
+  background: color-mix(in oklab, var(--kind) 88%, var(--foreground));
+}
+
+.cal-chip[data-rsvp="yes"] .cal-chip__time,
+.cal-chip[data-rsvp="yes"] .cal-chip__marks {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.cal-chip[data-rsvp="yes"] .cal-chip__dot {
+  background: currentColor;
+  box-shadow: none;
 }
 
 .cal-chip__line {
@@ -301,7 +334,7 @@
 
 .cal-chip__time {
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
   flex: none;
@@ -309,11 +342,11 @@
 
 /* Two lines, then ellipsis. A seven-column grid gives a title about 110px,
    and "Workshop 4: Retrieval-Augmented Gener…" on one line tells you less
-   than the same title wrapped. The cell's height is a minimum, so a day
+   than the same title wrapped. The tile's height is a minimum, so a day
    with a long title grows instead of clipping it. */
 .cal-chip__title {
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.3;
   min-width: 0;
   display: -webkit-box;
@@ -336,25 +369,26 @@
 .cal-more {
   display: block;
   width: 100%;
-  margin-top: 0.1875rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
+  margin-top: 0.25rem;
+  padding: 0.1875rem 0.5625rem;
+  border-radius: 999px;
   text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--muted-foreground);
   cursor: pointer;
+  transition: background-color 180ms var(--cal-ease);
 }
 
 .cal-more:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 /* -------------------------------------------------------- month on phone
  *
  * The grid fits the viewport instead of scrolling sideways. Seven columns
- * at 390px are about 50px each, which cannot carry a title, so the chips
+ * at 390px are about 50px each, which cannot carry a title, so the pills
  * become plain colour bars and every word moves into the card that opens on
  * tap. The text is visually hidden rather than removed, so the bar still
  * reads as "Workshop 3: Tool use, 6:00 PM, workshop, internal" to a screen
@@ -363,42 +397,62 @@
 @media (max-width: 47.99rem) {
   .cal {
     --cal-cell-height: auto;
+    --cal-gap: 0.1875rem;
   }
 
   .cal-th {
-    padding: 0.5rem 0.125rem;
+    padding: 0 0 0.125rem;
     text-align: center;
-    letter-spacing: 0.02em;
   }
 
   .cal-td {
     min-height: 4rem;
+    height: 4rem;
     padding: 0.25rem 0.1875rem 0.3125rem;
+    border-radius: calc(var(--radius-field) * 0.7);
   }
 
   .cal-day {
     justify-content: center;
   }
 
+  .cal-day__num {
+    min-width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.75rem;
+  }
+
   .cal-chip {
-    min-height: 1.5rem;
+    min-height: 0.5rem;
+    height: 0.5rem;
     margin-top: 0.1875rem;
     padding: 0;
-    border-width: 1px;
+    border-radius: 999px;
     background: var(--kind);
   }
 
   .cal-chip[data-internal="true"] {
-    /* A solid bar cannot carry a dashed border legibly at this size, so the
+    /* A solid bar cannot carry a dashed edge legibly at this size, so the
        internal bar is hatched instead: a cue that survives a colour-blind
        reading. The two stripe tones are close together on purpose — the
        bar has to read as one event, not as a warning. */
     background: repeating-linear-gradient(
       135deg,
-      var(--kind) 0 0.3125rem,
-      color-mix(in oklab, var(--kind) 78%, var(--card)) 0.3125rem 0.625rem
+      var(--kind) 0 0.25rem,
+      color-mix(in oklab, var(--kind) 70%, var(--card)) 0.25rem 0.5rem
     );
-    border-style: solid;
+    border-color: transparent;
+  }
+
+  /* The bar is short to look at but the tap target is the full 24px. */
+  .cal-chip {
+    position: relative;
+  }
+
+  .cal-chip::after {
+    content: "";
+    position: absolute;
+    inset: -0.5rem -0.125rem;
   }
 
   .cal-chip__line {
@@ -415,32 +469,34 @@
   .cal-more {
     text-align: center;
     padding: 0.125rem;
+    font-size: 0.6875rem;
   }
 }
 
 /* ------------------------------------------------------- detail popover */
 
 /*
- * No shadow: a 1px border a step stronger than the grid's hairline is what
- * separates it, which is the same device the rest of the app uses for
- * popovers. It stays mounted while you move between events, so left/top
- * glide it to the next anchor instead of blinking out and back.
+ * A level-2 float with the tile corner, like a menu. It stays mounted
+ * while you move between events, so left/top glide it to the next anchor
+ * instead of blinking out and back.
  */
 .cal-pop {
   position: absolute;
   z-index: 30;
   width: 19rem;
   max-width: calc(100% - 1rem);
-  padding: 0.875rem 1rem 1rem;
-  border: 1px solid color-mix(in oklab, var(--foreground) 30%, var(--border));
-  border-radius: var(--radius-lg);
+  padding: 1rem 1.125rem 1.125rem;
+  border-radius: var(--radius-tile);
   background: var(--popover);
   color: var(--popover-foreground);
+  box-shadow:
+    inset 0 0 0 1px var(--cal-ring),
+    var(--elevation-2);
   transform: translateX(-50%);
-  animation: cal-pop-below 180ms var(--cal-ease) both;
+  animation: cal-pop-below 220ms var(--cal-ease) both;
   transition:
-    left 200ms var(--cal-ease),
-    top 200ms var(--cal-ease);
+    left 220ms var(--cal-ease),
+    top 220ms var(--cal-ease);
 }
 
 .cal-pop[data-place="above"] {
@@ -453,7 +509,7 @@
 @keyframes cal-pop-below {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-0.375rem);
+    transform: translateX(-50%) translateY(-0.375rem) scale(0.98);
   }
   to {
     opacity: 1;
@@ -464,7 +520,7 @@
 @keyframes cal-pop-above {
   from {
     opacity: 0;
-    transform: translate(-50%, -100%) translateY(0.375rem);
+    transform: translate(-50%, -100%) translateY(0.375rem) scale(0.98);
   }
   to {
     opacity: 1;
@@ -477,117 +533,130 @@
     animation: none;
     transition: none;
   }
+
+  .cal-chip,
+  .cal-slot,
+  .cal-filter,
+  .cal-day__add {
+    transition: none;
+  }
 }
 
 .cal-pop__kind {
   display: inline-flex;
   align-items: center;
-  gap: 0.4375rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
 .cal-pop__kind .cal-chip__dot {
   width: 0.5rem;
   height: 0.5rem;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--kind) 24%, transparent);
 }
 
 /* ------------------------------------------------------------- week grid */
 
 .cal-week {
-  border: 1px solid var(--cal-line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--cal-ring),
+    var(--elevation-1),
+    var(--edge-highlight);
 }
 
 .cal-week__grid {
   display: grid;
-  grid-template-columns: 3.25rem repeat(var(--cal-days), minmax(0, 1fr));
+  grid-template-columns: 3.5rem repeat(var(--cal-days), minmax(0, 1fr));
 }
 
 .cal-week__corner,
 .cal-week__dayhead {
-  background: var(--muted);
-  border-bottom: 1px solid var(--cal-line);
-  border-right: 1px solid var(--cal-line);
-  padding: 0.5rem 0.5rem 0.4375rem;
+  padding: 0.875rem 0.5rem 0.625rem;
 }
 
-.cal-week__dayhead:last-child {
-  border-right: 0;
+.cal-week__dayhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
 }
 
 .cal-week__dow {
   display: block;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
 .cal-week__date {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  margin-top: 0.125rem;
-  padding: 0 0.3125rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  font-family: var(--font-heading);
+  font-size: 1.0625rem;
+  font-weight: var(--heading-weight, 640);
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
 }
 
 .cal-week__dayhead[data-today="true"] .cal-week__date {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--brand-accent);
+  color: var(--brand-accent-foreground);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--glow) 35%, transparent),
+    0 0 14px color-mix(in oklab, var(--glow) 55%, transparent);
+}
+
+.cal-week__dayhead[data-today="true"] .cal-week__dow {
+  color: var(--foreground);
+  font-weight: 600;
 }
 
 /* The all-day band sits between the header and the hour columns. */
 .cal-week__allday-label,
 .cal-week__allday {
-  border-bottom: 1px solid var(--cal-line);
-  border-right: 1px solid var(--cal-line);
-  padding: 0.25rem 0.3125rem;
-  min-height: 2rem;
-  background: color-mix(in oklab, var(--muted) 40%, transparent);
+  border-top: 1px solid var(--cal-line);
+  padding: 0.3125rem;
+  min-height: 2.25rem;
 }
 
-.cal-week__allday:last-child {
-  border-right: 0;
+.cal-week__allday + .cal-week__allday {
+  border-left: 1px solid var(--cal-line);
 }
 
 .cal-week__allday-label {
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--muted-foreground);
   text-align: right;
-  padding-top: 0.5rem;
+  padding-top: 0.625rem;
+  padding-right: 0.5rem;
 }
 
 .cal-week__scroll {
-  max-height: min(60vh, 34rem);
+  max-height: min(62vh, 36rem);
   overflow-y: auto;
   overscroll-behavior: contain;
+  border-top: 1px solid var(--cal-line);
 }
 
 /* The first hour's label sits half a line above its rule, so the column
    needs that much room at the top or the label is sliced off. */
 .cal-week__scroll > .cal-week__grid {
   padding-top: 0.625rem;
+  padding-bottom: 0.25rem;
 }
 
 .cal-week__axis {
-  border-right: 1px solid var(--cal-line);
   position: relative;
 }
 
@@ -608,7 +677,7 @@
   content: "";
   position: absolute;
   inset: 50% 0 auto 0;
-  border-top: 1px dashed color-mix(in oklab, var(--cal-line) 60%, transparent);
+  border-top: 1px dashed color-mix(in oklab, var(--cal-line) 50%, transparent);
 }
 
 .cal-week__axis .cal-week__hour::before,
@@ -619,8 +688,8 @@
 .cal-week__hourlabel {
   position: absolute;
   top: -0.5rem;
-  right: 0.5rem;
-  font-size: 0.6875rem;
+  right: 0.625rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
   background: var(--card);
@@ -629,52 +698,74 @@
 
 .cal-week__col {
   position: relative;
-  border-right: 1px solid var(--cal-line);
-}
-
-.cal-week__col:last-child {
-  border-right: 0;
+  border-left: 1px solid var(--cal-line);
 }
 
 .cal-week__col[data-weekend="true"] {
-  background: color-mix(in oklab, var(--muted) 22%, transparent);
+  background: color-mix(in oklab, var(--muted) 35%, transparent);
 }
 
 /*
- * A timed event in the hour column. The border is one weight all the way
- * round: a thick coloured edge on one side only is a generated-UI tell,
- * and the tinted fill already carries the type. Internal events dash the
- * whole outline, which is the same rule the month chips follow.
+ * A timed event in the hour column: 12px corners and the kind's tint, no
+ * stripe and no outline. Internal events dash a faint edge, the rule the
+ * month pills follow; yours are solid.
  */
 .cal-slot {
   position: absolute;
-  padding: 0.1875rem 0.375rem;
-  border: 1px solid color-mix(in oklab, var(--kind) 58%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--kind) 16%, var(--card));
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-scale, 1) * 0.75rem);
+  background: color-mix(in oklab, var(--kind) 22%, var(--card));
   color: var(--foreground);
   text-align: left;
   overflow: hidden;
   cursor: pointer;
   transition:
-    border-color 150ms var(--cal-ease),
-    background-color 150ms var(--cal-ease);
+    background-color 180ms var(--cal-ease),
+    box-shadow 200ms var(--cal-ease),
+    transform 200ms var(--cal-ease);
 }
 
 .cal-slot:hover,
 .cal-slot[aria-expanded="true"] {
-  background: color-mix(in oklab, var(--kind) 26%, var(--card));
-  border-color: var(--kind);
+  background: color-mix(in oklab, var(--kind) 32%, var(--card));
+  box-shadow: var(--elevation-2);
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+.cal-slot:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 1px;
 }
 
 .cal-slot[data-internal="true"] {
   border-style: dashed;
+  border-color: color-mix(in oklab, var(--kind) 50%, transparent);
+}
+
+.cal-slot[data-rsvp="yes"] {
+  background: var(--kind);
+  border-color: transparent;
+  color: var(--foreground);
+  /* Black or white, whichever reads on the kind (declared here: --kind is per element). */
+  color: oklch(from var(--kind) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+}
+
+.cal-slot[data-rsvp="yes"]:hover,
+.cal-slot[data-rsvp="yes"][aria-expanded="true"] {
+  background: color-mix(in oklab, var(--kind) 88%, var(--foreground));
+}
+
+.cal-slot[data-rsvp="yes"] .cal-slot__time {
+  color: inherit;
+  opacity: 0.8;
 }
 
 .cal-slot__time {
   display: block;
-  font-size: 0.625rem;
-  font-weight: 500;
+  font-size: 0.6875rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
   line-height: 1.3;
@@ -682,8 +773,8 @@
 
 .cal-slot__title {
   display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 600;
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -696,6 +787,7 @@
   gap: 0.3125rem;
   padding-top: 0;
   padding-bottom: 0;
+  border-radius: calc(var(--radius-scale, 1) * 0.5rem);
 }
 
 .cal-slot[data-compact="true"] .cal-slot__time {
@@ -720,12 +812,13 @@
 .cal-now::before {
   content: "";
   position: absolute;
-  left: -0.25rem;
-  top: -0.25rem;
-  width: 0.5rem;
-  height: 0.5rem;
+  left: -0.3125rem;
+  top: -0.375rem;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 999px;
   background: var(--destructive);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 25%, transparent);
 }
 
 /* The day strip that replaces seven columns on a phone. */
@@ -739,15 +832,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1875rem;
-  padding: 0.375rem 0.125rem 0.3125rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  gap: 0.25rem;
+  padding: 0.5rem 0.125rem 0.4375rem;
+  border-radius: var(--radius-field);
   background: transparent;
   cursor: pointer;
-  transition:
-    background-color 150ms var(--cal-ease),
-    border-color 150ms var(--cal-ease);
+  transition: background-color 180ms var(--cal-ease);
 }
 
 .cal-daystrip__day:hover {
@@ -755,45 +845,45 @@
 }
 
 .cal-daystrip__day[aria-pressed="true"] {
-  background: var(--muted);
-  border-color: color-mix(in oklab, var(--foreground) 35%, transparent);
+  background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--cal-ring),
+    var(--elevation-1);
 }
 
 .cal-daystrip__dow {
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
 .cal-daystrip__num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  height: 1.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
 }
 
 .cal-daystrip__day[data-today="true"] .cal-daystrip__num {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--brand-accent);
+  color: var(--brand-accent-foreground);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--glow) 55%, transparent);
 }
 
 .cal-daystrip__dots {
   display: flex;
-  gap: 0.125rem;
-  height: 0.25rem;
+  gap: 0.1875rem;
+  height: 0.3125rem;
 }
 
 .cal-daystrip__dot {
-  width: 0.25rem;
-  height: 0.25rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
   border-radius: 999px;
   background: var(--kind);
 }
@@ -801,82 +891,117 @@
 /* --------------------------------------------------------------- agenda */
 
 .cal-agenda {
-  border: 1px solid var(--cal-line);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: 0.5rem;
+  border-radius: var(--radius-card);
   background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--cal-ring),
+    var(--elevation-1),
+    var(--edge-highlight);
 }
 
 .cal-agenda__day + .cal-agenda__day {
-  border-top: 1px solid var(--cal-line);
+  margin-top: 0.5rem;
 }
 
+/* A day's heading sits on space, not on a band or a rule. */
 .cal-agenda__head {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--muted);
-  border-bottom: 1px solid var(--cal-line);
-}
-
-.cal-agenda__head[data-today="true"] {
-  background: color-mix(in oklab, var(--primary) 12%, var(--muted));
+  padding: 0.875rem 1rem 0.375rem;
 }
 
 .cal-agenda__date {
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
 }
 
 .cal-agenda__rel {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
+}
+
+.cal-agenda__head[data-today="true"] .cal-agenda__date {
+  display: inline-flex;
+  align-items: center;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--brand-accent);
+  color: var(--brand-accent-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 0 12px color-mix(in oklab, var(--glow) 45%, transparent);
 }
 
 /*
  * No coloured left border. The kind is carried by the dot in the time
  * column, which lines every row's dot up in a single column: that is what
- * makes "where are the socials" answerable by scanning, and it does it
- * without painting a rail down the side of every row.
+ * makes "where are the socials" answerable by scanning. A row becomes a
+ * soft tile on hover; hairlines only between rows, inset past the dot.
  */
 .cal-agenda__row {
+  position: relative;
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 8rem minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.6875rem 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-tile);
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms var(--cal-ease);
+  transition: background-color 180ms var(--cal-ease);
 }
 
-.cal-agenda__row + .cal-agenda__row {
-  border-top: 1px solid color-mix(in oklab, var(--cal-line) 70%, transparent);
+.cal-agenda__row + .cal-agenda__row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 2.25rem;
+  right: 1rem;
+  border-top: 1px solid var(--cal-line);
 }
 
-.cal-agenda__row:hover {
+.cal-agenda__row:hover,
+.cal-agenda__row[aria-expanded="true"] {
   background: var(--muted);
+}
+
+.cal-agenda__row:hover::before,
+.cal-agenda__row:hover + .cal-agenda__row::before,
+.cal-agenda__row[aria-expanded="true"]::before,
+.cal-agenda__row[aria-expanded="true"] + .cal-agenda__row::before {
+  border-color: transparent;
+}
+
+.cal-agenda__row:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: -2px;
 }
 
 .cal-agenda__when {
   display: flex;
   align-items: center;
-  gap: 0.4375rem;
-  font-size: 0.75rem;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
   padding-top: 0.125rem;
 }
 
+.cal-agenda__when .cal-chip__dot {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--kind) 22%, transparent);
+}
+
 .cal-agenda__title {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.9375rem;
+  font-weight: 600;
   line-height: 1.35;
   color: var(--foreground);
   overflow-wrap: anywhere;
@@ -886,9 +1011,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 0.5rem;
-  margin-top: 0.1875rem;
-  font-size: 0.75rem;
+  gap: 0.25rem 0.625rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
 }
 
@@ -896,46 +1021,29 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.25rem;
+  gap: 0.375rem;
   padding-top: 0.0625rem;
 }
 
 @media (max-width: 47.99rem) {
+  .cal-agenda {
+    padding: 0.25rem;
+  }
+
   .cal-agenda__row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.25rem;
-    padding: 0.625rem 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .cal-agenda__row + .cal-agenda__row::before {
+    left: 0.75rem;
+    right: 0.75rem;
   }
 
   .cal-agenda__badges {
     justify-content: flex-start;
   }
-}
-
-/* ---------------------------------------------------------- empty states */
-
-/* Set like EmptyState (src/components/empty-state.tsx): left-aligned text, no icon. */
-.cal-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.375rem;
-  padding: 2rem 1.25rem;
-}
-
-.cal-empty__title {
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--foreground);
-}
-
-.cal-empty__body {
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--muted-foreground);
-  max-width: 34ch;
 }
 
 /* ---------------------------------------------------------------- legend */
@@ -944,22 +1052,42 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.375rem 1rem;
-  font-size: 0.75rem;
+  gap: 0.375rem 1.125rem;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
 }
 
 .cal-legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.4375rem;
 }
 
-/* A dragged chip follows the pointer; the cell under it takes the tint. */
+/* The legend's two pill samples, drawn like the pills themselves. */
+.cal-legend__pill {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.875rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: color-mix(in oklab, var(--muted-foreground) 22%, var(--card));
+}
+
+.cal-legend__pill[data-internal="true"] {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--muted-foreground) 60%, transparent);
+}
+
+.cal-legend__pill[data-rsvp="yes"] {
+  background: var(--chart-1);
+}
+
+/* A dragged pill follows the pointer; the tile under it takes the tint. */
 .cal-td[data-drop="true"] {
-  background: color-mix(in oklab, var(--primary) 14%, var(--card));
-  outline: 2px solid color-mix(in oklab, var(--primary) 45%, transparent);
-  outline-offset: -2px;
+  background: color-mix(in oklab, var(--glow) 12%, var(--card));
+  box-shadow:
+    inset 0 0 0 2px color-mix(in oklab, var(--glow) 60%, transparent),
+    0 0 18px -4px color-mix(in oklab, var(--glow) 50%, transparent);
 }
 
 .cal-chip[data-dragging="true"] {
@@ -968,14 +1096,13 @@
 
 /* ------------------------------------------------------------ task chips */
 
-/* A task's due date: an empty checkbox where an event has its dot, a solid
-   border (tasks aren't public or internal), and done ones struck through. */
+/* A task's due date: an empty circle where an event has its dot, no tint
+   (tasks aren't public or internal), and done ones struck through. */
 .cal-chip[data-task],
 .cal-agenda__row[data-task] {
   border-style: solid;
 }
 
-/* Quieter than an event: no tint, a faint border, the box carries the colour. */
 .cal-chip[data-task] {
   background: transparent;
   border-color: var(--cal-line);
@@ -983,13 +1110,12 @@
 
 .cal-chip[data-task]:hover {
   background: var(--muted);
-  border-color: color-mix(in oklab, var(--kind) 45%, transparent);
+  border-color: color-mix(in oklab, var(--kind) 35%, transparent);
 }
 
 [data-task] .cal-chip__dot {
-  width: 0.5625rem;
-  height: 0.5625rem;
-  border-radius: 2px;
+  width: 0.625rem;
+  height: 0.625rem;
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--kind);
 }
@@ -1004,7 +1130,11 @@
   color: var(--muted-foreground);
 }
 
-/* The Tasks filter: its box fills when tasks are showing. */
+/* The Tasks filter: its circle fills when tasks are showing. */
+.cal-filter[data-task] .cal-chip__dot {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
 .cal-filter[data-task][aria-pressed="true"] .cal-chip__dot {
-  background: var(--kind);
+  background: currentColor;
 }

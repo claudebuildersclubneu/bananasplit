@@ -75,5 +75,6 @@ export function itemLabel(item: CalendarItem, kindLabel: string, visibilityLabel
   if (item.task) return `Task: ${item.title}, due this day${item.task.done ? ", done" : ""}`;
   const when = item.allDay ? "all day" : timeRange(item);
   const where = item.location ? `, ${item.location}` : "";
-  return `${item.title}, ${when}${where}, ${kindLabel}, ${visibilityLabel}`;
+  const going = item.rsvp === "YES" ? ", you're going" : "";
+  return `${item.title}, ${when}${where}, ${kindLabel}, ${visibilityLabel}${going}`;
 }
