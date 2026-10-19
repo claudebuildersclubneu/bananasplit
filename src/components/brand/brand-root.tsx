@@ -3,22 +3,40 @@ import { getNonce } from "@/lib/security/nonce";
 import { cn } from "@/lib/utils";
 
 /**
- * Bananasplit's own pages (the home page, sign-in, sign-up, onboarding,
- * checkout, email confirmation, the 404): the fixed cream-and-banana palette
- * (src/app/brand.css), never a club's theme. The design has one light look,
- * so these pages are always light, whatever the device prefers.
+ * Bananasplit's own pages (the home page, sign-in, sign-up, password help,
+ * email confirmation, checkout, the 404): Moonstone, never a club's theme.
+ * They use the app's own tokens (globals.css), so a page here and a page
+ * in the app are built from the same colours, and they default to dark
+ * (redesign guide 17). A visitor's stored choice (the footer's switch, or
+ * the user menu in the app) still wins, and "system" follows the device.
+ * `.corona` lights the top of the page with the drifting banana glow.
+ *
+ * `look="cream"` keeps the older cream-and-banana look for a page that
+ * hasn't moved to Moonstone yet: always light, with the tokens pointed at
+ * the cream palette (src/app/brand.css).
  */
 export async function BrandRoot({
   children,
   className,
+  look = "moonstone",
 }: {
   children: React.ReactNode;
   className?: string;
+  look?: "moonstone" | "cream";
 }) {
   const nonce = await getNonce();
+  if (look === "cream") {
+    return (
+      <ThemeProvider forcedTheme="light" defaultTheme="light" nonce={nonce}>
+        <div data-look="cream" className={cn("brand flex min-h-svh flex-1 flex-col", className)}>
+          {children}
+        </div>
+      </ThemeProvider>
+    );
+  }
   return (
-    <ThemeProvider forcedTheme="light" defaultTheme="light" nonce={nonce}>
-      <div className={cn("brand flex min-h-svh flex-1 flex-col", className)}>{children}</div>
+    <ThemeProvider defaultTheme="dark" nonce={nonce}>
+      <div className={cn("brand corona flex min-h-svh flex-1 flex-col", className)}>{children}</div>
     </ThemeProvider>
   );
 }

@@ -11,8 +11,8 @@ export async function SignedInAs() {
   const session = await getSession();
   if (!session) return null;
   return (
-    <p className="text-ink-soft border-ink/8 m-0 mt-1 border-t pt-4 text-[13px] leading-normal">
-      Signed in as <span className="text-ink-muted font-semibold">{session.user.email}</span>.{" "}
+    <p className="text-muted-foreground m-0 mt-2 text-[13px] leading-[1.5]">
+      Signed in as <span className="text-foreground font-medium">{session.user.email}</span>.{" "}
       <SignOutLink>Not you? Sign out</SignOutLink>
     </p>
   );

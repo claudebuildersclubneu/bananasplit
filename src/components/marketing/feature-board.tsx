@@ -1,10 +1,21 @@
+import {
+  CalendarDays,
+  Check,
+  FolderOpen,
+  ListChecks,
+  Pin,
+  Plus,
+  Vote,
+  type LucideIcon,
+} from "lucide-react";
+
 import { ArrowRight } from "@/components/brand/arrows";
 import { CoreMark } from "@/components/brand/logo";
+import { pill } from "@/components/brand/pill";
 import { cn } from "@/lib/utils";
 
-import { type Avatar, AvatarStack } from "./avatar-stack";
-import { Screenshot } from "./screenshot";
-import { SectionIntro } from "./section-title";
+import { AvatarStack } from "./avatar-stack";
+import { CONTAINER, SectionIntro } from "./section-title";
 
 /** The apps a club board juggles today, crossed out on the way in. */
 const REPLACED_APPS = [
@@ -26,19 +37,6 @@ const CHAT_RESULTS = [
   "Task: Snacks → Jay",
 ] as const;
 
-const RSVPS: readonly Avatar[] = [
-  { tone: "bg-banana" },
-  { tone: "bg-wheat" },
-  { tone: "bg-spot" },
-  { tone: "bg-ink" },
-];
-
-const EDITORS: readonly Avatar[] = [
-  { tone: "bg-banana", initial: "A" },
-  { tone: "bg-wheat", initial: "M" },
-  { tone: "bg-ink text-cream", initial: "J" },
-];
-
 const DATA_SOURCES = [
   "Google Sheets",
   "Airtable",
@@ -49,15 +47,47 @@ const DATA_SOURCES = [
   "CSV import",
 ] as const;
 
-/** The club theme picker: the first swatch is the one chosen. */
-const THEME_SWATCHES = ["bg-banana", "bg-pine", "bg-brick", "bg-navy", "bg-ink"] as const;
+/** The home board's widgets, as a member might arrange them. */
+const WIDGETS: readonly { icon: LucideIcon; label: string; meta: string }[] = [
+  { icon: ListChecks, label: "My tasks", meta: "6 open, 1 due today" },
+  { icon: CalendarDays, label: "Up next", meta: "General meeting, Thu" },
+  { icon: Vote, label: "Open polls", meta: "2 waiting on you" },
+  { icon: Pin, label: "Pinned", meta: "Budget, GBM agenda" },
+  { icon: FolderOpen, label: "Files", meta: "Sponsor deck v2" },
+];
+
+/** Theme presets a club can start from: the first is the one chosen. */
+const THEME_SWATCHES = [
+  { name: "Moonstone", base: "bg-night", dot: "bg-banana" },
+  { name: "Banana cream", base: "bg-cream", dot: "bg-banana" },
+  { name: "Pine", base: "bg-pine", dot: "bg-cream" },
+  { name: "Brick", base: "bg-brick", dot: "bg-cream" },
+  { name: "Navy", base: "bg-navy", dot: "bg-cream" },
+] as const;
 
 const PINNED = ["Budget", "Showcase tasks", "Meeting notes"] as const;
 
 const TEAMS = ["Events", "Treasury"] as const;
 
-/** The white tiles: paper, a hairline and the soft card shadow. */
-const PAPER_TILE = "rounded-[28px] border border-ink/8 bg-paper shadow-card";
+/** A card tile: the surface, its top highlight and a hairline ring. */
+const CARD_TILE = "rounded-card bg-card text-card-foreground edge ring-1 ring-foreground/6";
+
+/**
+ * Block tiles: a block card's colours (globals.css block-*), each used for
+ * the one meaning it has in the app: answer for the main thing (Tasks),
+ * quiet for something running in the background (AI), goal for progress
+ * (handing over).
+ */
+const BLOCK_TILE = {
+  answer:
+    "rounded-card bg-block-answer text-block-answer-foreground [--meta:var(--block-answer-meta)] [--ring-bg:var(--block-answer)]",
+  quiet:
+    "rounded-card bg-block-quiet text-block-quiet-foreground ring-1 ring-inset ring-block-quiet-foreground/10 [--meta:var(--block-quiet-meta)] [--ring-bg:var(--block-quiet)]",
+  goal: "rounded-card bg-block-goal text-block-goal-foreground [--meta:var(--block-goal-meta)] [--ring-bg:var(--block-goal)]",
+} as const;
+
+/** A chip on a block: a tint of the block's own text colour. */
+const ON_BLOCK_CHIP = "bg-[color-mix(in_oklab,currentColor_14%,transparent)]";
 
 /**
  * On phones the tiles are one swipeable row instead of a long stack: each
@@ -67,39 +97,37 @@ const PAPER_TILE = "rounded-[28px] border border-ink/8 bg-paper shadow-card";
 const SLIDE = "max-sm:w-[86%] max-sm:flex-none max-sm:snap-start";
 
 /** A row of tiles; on phones its tiles join the one swipeable row. */
-const ROW = "flex flex-wrap gap-4 max-sm:contents";
+const ROW = "flex flex-wrap gap-4.5 max-sm:contents";
 
 /** The two-column tiles: copy beside a sample, stacked once two 260px columns don't fit. */
 const SPLIT_TILE =
-  "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-center gap-7 p-[clamp(24px,3vw,40px)] max-sm:content-start max-sm:gap-5";
+  "grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] items-center gap-7 p-[clamp(22px,3vw,36px)] max-sm:content-start max-sm:gap-5";
 
-/** Each tile surface's label colour. */
-const LABEL_TONES = {
-  paper: "text-ink-faint",
-  sand: "text-ink-soft",
-  banana: "text-honey-deep",
-  butter: "text-honey",
-  ink: "text-banana",
-} as const;
+/** A tile's headline: the display face. */
+const TILE_HEADLINE = "display-title tracking-[-0.03em] text-balance";
 
 /**
- * A tile's small label, with the app it replaces as a tag on the right of
- * the row (wrapping below it when the tile is narrow).
+ * A tile's small label, with the app it replaces as a chip on the right of
+ * the row (wrapping below it when the tile is narrow). On a block it takes
+ * the block's meta colour.
  */
 function TileTitle({
   children,
   replaces,
-  tone = "paper",
+  onBlock = false,
+  onMuted = false,
 }: {
   children: React.ReactNode;
   replaces?: string;
-  tone?: keyof typeof LABEL_TONES;
+  onBlock?: boolean;
+  /** On a muted tile, the chip takes the card colour so it still shows. */
+  onMuted?: boolean;
 }) {
   const label = (
     <span
       className={cn(
-        "relative inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.005em]",
-        LABEL_TONES[tone],
+        "relative text-[14px] font-semibold",
+        onBlock ? "text-(--meta)" : "text-muted-foreground",
       )}
     >
       {children}
@@ -111,8 +139,10 @@ function TileTitle({
       {label}
       <span
         className={cn(
-          "rounded-full px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap",
-          tone === "banana" ? "bg-paper/60 text-honey-dark" : "bg-ink/5 text-ink-soft",
+          "inline-flex h-6 items-center rounded-full px-2.5 text-[12px] font-semibold whitespace-nowrap",
+          onBlock
+            ? cn(ON_BLOCK_CHIP, "text-(--meta)")
+            : cn(onMuted ? "bg-card" : "bg-muted", "text-muted-foreground"),
         )}
       >
         Replaces {replaces}
@@ -123,15 +153,16 @@ function TileTitle({
 
 /**
  * "Every scoop your club needs.": the apps it replaces, then a bento of
- * features (a swipeable row on phones).
+ * features: cards, with block colours for the three loudest tiles (a
+ * swipeable row on phones).
  */
 export function FeatureBoard() {
   return (
     <section
       id="features"
-      className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 pt-20 pb-16 sm:gap-14 sm:pt-32 sm:pb-28"
+      className={cn(CONTAINER, "flex flex-col gap-10 pt-16 pb-16 sm:gap-14 sm:pt-20 sm:pb-28")}
     >
-      <SectionIntro title="Every scoop your club needs." className="max-w-[380px] text-pretty">
+      <SectionIntro title="Every scoop your club needs." className="max-w-[400px] text-pretty">
         Most clubs juggle seven apps, each with its own login and member list. Bananasplit puts
         events, money and data in one workspace with one member list and one bill.
       </SectionIntro>
@@ -140,24 +171,24 @@ export function FeatureBoard() {
         {REPLACED_APPS.map((app) => (
           <span
             key={app}
-            className="bg-sand text-ink-faint rounded-full px-2.5 py-1 text-[13px] line-through sm:px-3 sm:py-1.5 sm:text-[14px]"
+            className="bg-muted text-muted-foreground inline-flex h-7 items-center rounded-full px-3 text-[13px] line-through decoration-current/60 sm:h-8 sm:text-[14px]"
           >
             {app}
           </span>
         ))}
-        <span className="text-core flex px-1">
+        <span className="text-muted-foreground flex px-1">
           <ArrowRight />
         </span>
-        <span className="bg-ink text-cream inline-flex items-center gap-2 rounded-full py-1 pr-3 pl-1.5 text-[13px] font-bold sm:py-1.5 sm:pr-3.5 sm:pl-2 sm:text-[14px]">
-          <CoreMark size={18} />
+        <span className="bg-primary text-primary-foreground inline-flex h-7 items-center gap-2 rounded-full pr-3 pl-1.5 text-[13px] font-semibold sm:h-8 sm:pr-3.5 sm:text-[14px]">
+          <CoreMark size={20} />
           One workspace
         </span>
       </div>
 
-      <div className="flex flex-col gap-4 max-sm:-mx-6 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-6 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-6 max-sm:pb-1">
+      <div className="flex flex-col gap-4.5 max-sm:-mx-4 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-4 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-2">
         <div className={ROW}>
           <OverviewTile />
-          <div className="flex flex-[1_1_300px] flex-col gap-4 max-sm:contents">
+          <div className="flex flex-[1_1_300px] flex-col gap-4.5 max-sm:contents">
             <TasksTile />
             <CalendarTile />
           </div>
@@ -179,30 +210,52 @@ export function FeatureBoard() {
   );
 }
 
-/** The wide tile; its screenshot bleeds off the bottom-right corner. */
+/** The wide tile: a member's home board, five widgets and a free slot. */
 function OverviewTile() {
   return (
     <div
       className={cn(
-        PAPER_TILE,
+        CARD_TILE,
         SLIDE,
-        "flex flex-[2_1_520px] flex-col gap-4 overflow-hidden p-[clamp(24px,3vw,40px)]",
+        "flex flex-[2_1_520px] flex-col gap-4 p-[clamp(22px,3vw,36px)]",
       )}
     >
       <TileTitle>Overview</TileTitle>
-      <h3 className="font-heading max-w-[520px] text-[clamp(28px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
+      <h3
+        className={cn(TILE_HEADLINE, "max-w-[520px] text-[clamp(28px,3.4vw,44px)] leading-[1.04]")}
+      >
         Everyone opens to what matters to them.
       </h3>
-      <p className="text-ink-muted max-w-[460px] text-[15px] leading-[1.55] text-pretty sm:text-[16px]">
+      <p className="text-muted-foreground max-w-[460px] text-[15px] leading-[1.55] text-pretty sm:text-[16px]">
         Each member arranges a home board of widgets: tasks due this week, the next meeting, pinned
         notes, files and people.
       </p>
-      <Screenshot
-        src="/marketing/overview-widgets.webp"
-        alt="Overview widgets: my week at a glance, open polls and upcoming events"
-        sizes="(min-width: 1240px) 760px, (min-width: 640px) 60vw, 80vw"
-        className="border-ink/10 mt-auto -mr-[clamp(24px,3vw,40px)] -mb-[clamp(24px,3vw,40px)] ml-[clamp(12px,3vw,40px)] aspect-[16/8] rounded-tl-[14px] border-t border-l max-sm:aspect-[4/3]"
-      />
+      <div
+        aria-hidden="true"
+        className="mt-auto grid grid-cols-2 gap-2.5 pt-3 sm:grid-cols-3 sm:gap-3"
+      >
+        {WIDGETS.map(({ icon: Icon, label, meta }, i) => (
+          <div
+            key={label}
+            className={cn(
+              "bg-muted rounded-tile flex min-w-0 flex-col gap-3 p-3.5",
+              i > 3 && "max-sm:hidden",
+            )}
+          >
+            <span className="bg-card grid size-9 place-items-center rounded-full">
+              <Icon className="size-[18px]" />
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-[14px] font-semibold">{label}</span>
+              <span className="text-muted-foreground truncate text-[12px]">{meta}</span>
+            </span>
+          </div>
+        ))}
+        <div className="hatch bg-muted/50 rounded-tile text-muted-foreground hidden items-center justify-center gap-1.5 p-3.5 text-[13px] font-medium sm:flex">
+          <Plus className="size-4" />
+          Add a widget
+        </div>
+      </div>
     </div>
   );
 }
@@ -211,19 +264,16 @@ function TasksTile() {
   return (
     <div
       className={cn(
+        BLOCK_TILE.answer,
         SLIDE,
-        "bg-banana relative flex flex-[1_0_auto] flex-col gap-2 overflow-hidden rounded-[28px] p-6 sm:p-8",
+        "relative flex flex-[1_0_auto] flex-col gap-2 overflow-hidden p-6 sm:p-8",
       )}
     >
-      <span
-        aria-hidden="true"
-        className="bg-glow-cream absolute -top-10 -right-10 size-[180px] rounded-full"
-      />
-      <TileTitle tone="banana" replaces="Trello">
+      <TileTitle onBlock replaces="Trello">
         Tasks
       </TileTitle>
-      <div className="relative mt-auto flex items-end gap-3.5">
-        <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
+      <div className="relative mt-auto flex items-end gap-3.5 pt-4">
+        <span className="numeral text-[clamp(96px,9vw,124px)] leading-[0.78] tracking-[-0.05em]">
           {TASK_VIEWS.length}
         </span>
         <span className="pb-0.5 text-[19px] leading-[1.25] font-semibold">
@@ -232,14 +282,17 @@ function TasksTile() {
           the same work
         </span>
       </div>
-      <p className="text-bark relative mt-2.5 text-[15px] leading-[1.5]">
+      <p className="relative mt-2.5 text-[15px] leading-[1.5] text-(--meta)">
         Assign it once and nothing slips between meetings.
       </p>
-      <div className="relative mt-[18px] flex flex-wrap gap-1.5">
+      <div className="relative mt-4 flex flex-wrap gap-1.5">
         {TASK_VIEWS.map((view) => (
           <span
             key={view}
-            className="bg-paper/60 rounded-full px-[11px] py-[5px] text-[13px] font-semibold"
+            className={cn(
+              ON_BLOCK_CHIP,
+              "inline-flex h-7 items-center rounded-full px-3 text-[13px] font-semibold",
+            )}
           >
             {view}
           </span>
@@ -251,12 +304,14 @@ function TasksTile() {
 
 function CalendarTile() {
   return (
-    <div className={cn(PAPER_TILE, SLIDE, "flex flex-[1_0_auto] flex-col gap-2.5 p-6 sm:p-8")}>
+    <div className={cn(CARD_TILE, SLIDE, "flex flex-[1_0_auto] flex-col gap-2.5 p-6 sm:p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
-      <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
+      <div
+        className={cn(TILE_HEADLINE, "mt-auto pt-4 text-[clamp(26px,2.4vw,34px)] leading-[1.06]")}
+      >
         Find a time, then put it on everyone&apos;s calendar.
       </div>
-      <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
+      <p className="text-muted-foreground text-[15px] leading-[1.55] text-pretty">
         Availability polls pick the time, and every meeting syncs both ways with Google Calendar.
       </p>
     </div>
@@ -266,71 +321,79 @@ function CalendarTile() {
 /** RSVPs and events, with a sample event card. */
 function EventsTile() {
   return (
-    <div className={cn(PAPER_TILE, SPLIT_TILE, SLIDE, "flex-[1.6_1_460px]")}>
+    <div className={cn(CARD_TILE, SPLIT_TILE, SLIDE, "flex-[1.6_1_460px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle replaces="Luma">RSVPs and events</TileTitle>
-        <h3 className="font-heading text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.025em] text-balance">
+        <h3 className={cn(TILE_HEADLINE, "text-[clamp(30px,3.4vw,44px)] leading-[1.04]")}>
           You don&apos;t need Luma anymore.
         </h3>
-        <p className="text-ink-muted text-[16px] leading-[1.55] text-pretty">
+        <p className="text-muted-foreground text-[16px] leading-[1.55] text-pretty">
           Public event pages with RSVPs, waitlists, reminders and QR check-in. Every guest lands in
           your member list, so you can see who keeps coming back.
         </p>
       </div>
-      <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[20px] border p-[18px] max-sm:gap-3 max-sm:p-3.5">
-        <div className="bg-event-cover flex h-24 items-end rounded-xl p-3 max-sm:hidden">
-          <span className="bg-paper/85 rounded-md px-2 py-[3px] font-mono text-[11px] font-medium">
-            FRI · 7:00 PM
+      <div
+        aria-hidden="true"
+        className="bg-background rounded-block flex flex-col gap-3.5 p-4 max-sm:gap-3"
+      >
+        <div className="bg-block-quiet text-block-quiet-foreground glow-corner rounded-tile flex h-24 items-end p-3 max-sm:hidden">
+          <span className="bg-card/85 text-foreground rounded-full px-2.5 py-1 text-[12px] font-semibold">
+            Fri, 7:00 PM
           </span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[17px] font-bold">Spring Showcase</span>
-          <span className="text-ink-soft text-[13px]">Student Union, Room 204</span>
+          <span className="text-[17px] font-semibold">Spring Showcase</span>
+          <span className="text-muted-foreground text-[13px]">Student Union, Room 204</span>
         </div>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <AvatarStack avatars={RSVPS} itemClassName="border-cream size-6" overlap="-ml-2" />
+          <AvatarStack
+            names={["Maya Patel", "Jay Kim", "Sara Ruiz", "Tom Baker"]}
+            ring="ring-background"
+          />
           <span className="text-[13px] font-semibold whitespace-nowrap">86 going</span>
-          <span className="text-ink-soft text-[13px] whitespace-nowrap">· 12 on waitlist</span>
+          <span className="text-muted-foreground text-[13px] whitespace-nowrap">
+            · 12 on waitlist
+          </span>
         </div>
-        <span className="bg-ink text-cream rounded-full p-[11px] text-center text-[14px] font-semibold">
-          RSVP
-        </span>
+        <span className={cn(pill({ size: "md" }), "w-full cursor-default")}>RSVP</span>
       </div>
     </div>
   );
 }
 
-/** The dark tile: a typed request turned into an event and tasks. */
+/** A typed request turned into an event and tasks, on the quiet block. */
 function AiTile() {
   return (
     <div
       className={cn(
+        BLOCK_TILE.quiet,
         SLIDE,
-        "bg-ink text-cream relative flex flex-[1_1_320px] flex-col gap-3.5 overflow-hidden rounded-[28px] p-6 sm:p-8",
+        "glow-corner relative flex flex-[1_1_320px] flex-col gap-3.5 overflow-hidden p-6 sm:p-8",
       )}
     >
-      <span
-        aria-hidden="true"
-        className="bg-glow-banana absolute -top-20 -right-20 size-[280px] rounded-full"
-      />
-      <TileTitle tone="ink">AI built in</TileTitle>
-      <h3 className="font-heading relative text-[clamp(30px,3vw,40px)] leading-[1.05] tracking-[-0.025em] text-balance">
+      <TileTitle onBlock>AI built in</TileTitle>
+      <h3 className={cn(TILE_HEADLINE, "relative text-[clamp(30px,3vw,40px)] leading-[1.05]")}>
         Type it. It&apos;s sorted.
       </h3>
-      <div className="relative my-1.5 flex flex-col gap-2">
-        <span className="bg-banana text-ink max-w-[90%] self-end rounded-[16px_16px_4px_16px] px-3.5 py-2.5 text-[14px] leading-[1.45]">
+      <div aria-hidden="true" className="relative my-1.5 flex flex-col gap-2">
+        <span className="bg-brand-accent text-brand-accent-foreground max-w-[90%] self-end rounded-[18px_18px_6px_18px] px-3.5 py-2.5 text-[14px] leading-[1.45]">
           Showcase is April 12. Maya books the venue, Jay does snacks.
         </span>
-        <div className="border-cream/10 bg-cream/8 flex w-[90%] flex-col gap-1.5 self-start rounded-[16px_16px_16px_4px] border p-3">
+        <div
+          className={cn(
+            ON_BLOCK_CHIP,
+            "flex w-[90%] flex-col gap-1.5 self-start rounded-[18px_18px_18px_6px] p-3",
+          )}
+        >
           {CHAT_RESULTS.map((result) => (
             <span key={result} className="flex items-center gap-2 text-[13px]">
-              <span className="text-banana">✓</span>
+              <Check className="size-3.5 flex-none" strokeWidth={2.5} />
               {result}
             </span>
           ))}
         </div>
       </div>
-      <p className="text-dusk relative mt-auto text-[15px] leading-[1.55] text-pretty">
+      <p className="relative mt-auto text-[15px] leading-[1.55] text-pretty text-(--meta)">
         Create tasks and calendar events just by typing. AI also sorts your task lists, tidies
         databases and lays out the org chart. Connect the model you prefer with your own API key.
       </p>
@@ -342,22 +405,19 @@ function NotesTile() {
   return (
     <div
       className={cn(
-        PAPER_TILE,
+        CARD_TILE,
         SLIDE,
         "flex flex-[1_1_280px] flex-col gap-3 p-6 sm:min-h-80 sm:p-8",
       )}
     >
       <TileTitle replaces="Google Drive">Files and notes</TileTitle>
-      <AvatarStack
-        avatars={EDITORS}
-        itemClassName="border-paper grid size-[34px] place-items-center text-[13px] font-bold"
-        overlap="-ml-2.5"
-        className="mt-2"
-      />
-      <div className="font-heading mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
+      <AvatarStack names={["Ava Brooks", "Maya Patel", "Jay Kim"]} className="mt-2" />
+      <div
+        className={cn(TILE_HEADLINE, "mt-auto pt-4 text-[clamp(34px,3.6vw,48px)] leading-[0.98]")}
+      >
         Edit together, live.
       </div>
-      <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
+      <p className="text-muted-foreground text-[15px] leading-[1.55] text-pretty">
         Meeting notes, templates, uploads and club storage that stay put when officers graduate.
       </p>
     </div>
@@ -369,26 +429,28 @@ function DatabasesTile() {
     <div
       className={cn(
         SLIDE,
-        "bg-sand flex flex-[1.5_1_400px] flex-col gap-3.5 rounded-[28px] p-6 sm:p-8",
+        "bg-muted rounded-card flex flex-[1.5_1_400px] flex-col gap-3.5 p-6 sm:p-8",
       )}
     >
-      <TileTitle tone="sand" replaces="Airtable and spreadsheets">
+      <TileTitle onMuted replaces="Airtable and spreadsheets">
         Databases
       </TileTitle>
-      <h3 className="font-heading max-w-[460px] text-[clamp(26px,2.4vw,32px)] leading-[1.1] tracking-[-0.025em] text-balance">
+      <h3
+        className={cn(TILE_HEADLINE, "max-w-[460px] text-[clamp(26px,2.4vw,32px)] leading-[1.1]")}
+      >
         Attendance, sign-ups and ballots, connected to the data you already have.
       </h3>
-      <div className="mt-auto flex flex-wrap gap-2">
+      <div className="mt-auto flex flex-wrap gap-2 pt-2">
         {DATA_SOURCES.map((source) => (
           <span
             key={source}
-            className="bg-paper rounded-full px-3 py-[7px] text-[13px] font-semibold whitespace-nowrap"
+            className="bg-card inline-flex h-8 items-center rounded-full px-3 text-[13px] font-semibold whitespace-nowrap"
           >
             {source}
           </span>
         ))}
       </div>
-      <p className="text-ink-muted text-[15px] leading-[1.55]">
+      <p className="text-muted-foreground text-[15px] leading-[1.55]">
         Connect a source once and every member sees the same live list.
       </p>
     </div>
@@ -398,38 +460,46 @@ function DatabasesTile() {
 /** The club's theme, and what each member pins for themselves. */
 function CustomizationTile() {
   return (
-    <div className={cn(PAPER_TILE, SPLIT_TILE, SLIDE, "flex-[2_1_520px]")}>
+    <div className={cn(CARD_TILE, SPLIT_TILE, SLIDE, "flex-[2_1_520px]")}>
       <div className="flex flex-col gap-3.5">
         <TileTitle>Customization</TileTitle>
-        <h3 className="font-heading text-[clamp(30px,3.2vw,44px)] leading-[1.05] tracking-[-0.025em] text-balance">
+        <h3 className={cn(TILE_HEADLINE, "text-[clamp(30px,3.2vw,42px)] leading-[1.05]")}>
           Make it look like your club.
         </h3>
-        <p className="text-ink-muted text-[16px] leading-[1.55] text-pretty">
+        <p className="text-muted-foreground text-[16px] leading-[1.55] text-pretty">
           The club sets its colors, theme and pinned spaces for everyone. Each member then
           rearranges their own board, pins and views, so every person sees what&apos;s useful to
           them.
         </p>
       </div>
-      <div className="flex flex-col gap-3.5">
-        <div className="bg-cream flex flex-col gap-2 rounded-[18px] p-4">
-          <span className="text-ink-soft text-[12px] font-bold">Club theme</span>
-          <div className="flex gap-2">
+      <div aria-hidden="true" className="flex flex-col gap-3">
+        <div className="bg-muted rounded-tile flex flex-col gap-2.5 p-4">
+          <span className="text-muted-foreground text-[13px] font-medium">Club theme</span>
+          <div className="flex gap-2.5">
             {THEME_SWATCHES.map((swatch, i) => (
               <span
-                key={swatch}
-                className={cn("size-9 rounded-full", swatch, i === 0 && "shadow-ring-ink")}
-              />
+                key={swatch.name}
+                title={swatch.name}
+                className={cn(
+                  "ring-foreground/10 grid size-9 place-items-center rounded-full ring-1",
+                  swatch.base,
+                  i === 0 && "outline-foreground outline-2 outline-offset-2",
+                )}
+              >
+                <span className={cn("size-3 rounded-full", swatch.dot)} />
+              </span>
             ))}
           </div>
         </div>
-        <div className="bg-cream flex flex-col gap-2 rounded-[18px] p-4 max-sm:hidden">
-          <span className="text-ink-soft text-[12px] font-bold">Pinned for you</span>
+        <div className="bg-muted rounded-tile flex flex-col gap-2.5 p-4 max-sm:hidden">
+          <span className="text-muted-foreground text-[13px] font-medium">Pinned for you</span>
           <div className="flex flex-wrap gap-1.5">
             {PINNED.map((pin) => (
               <span
                 key={pin}
-                className="bg-paper rounded-full px-[11px] py-1.5 text-[13px] font-semibold whitespace-nowrap"
+                className="bg-card inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold whitespace-nowrap"
               >
+                <Pin className="text-muted-foreground size-3.5" />
                 {pin}
               </span>
             ))}
@@ -440,21 +510,22 @@ function CustomizationTile() {
   );
 }
 
-/** People, with a mini org chart: the president over two teams. */
+/** People, with a mini org chart: the president over two teams, on the goal block. */
 function PeopleTile() {
   return (
     <div
       className={cn(
+        BLOCK_TILE.goal,
         SLIDE,
-        "bg-butter flex flex-[1_1_260px] flex-col gap-3 rounded-[28px] p-6 sm:min-h-80 sm:p-8",
+        "flex flex-[1_1_260px] flex-col gap-3 p-6 sm:min-h-80 sm:p-8",
       )}
     >
-      <TileTitle tone="butter">People</TileTitle>
-      <div className="mt-5 flex flex-col items-center">
-        <span className="bg-ink text-cream rounded-full px-3 py-1.5 text-[13px] font-bold">
+      <TileTitle onBlock>People</TileTitle>
+      <div aria-hidden="true" className="mt-5 flex flex-col items-center">
+        <span className="bg-block-goal-foreground text-block-goal rounded-full px-3 py-1.5 text-[13px] font-semibold">
           President
         </span>
-        <span className="bg-ink/30 h-3.5 w-px" />
+        <span className="h-3.5 w-px bg-current/35" />
         {/* One column per team. Each draws half the crossbar, from its own
             centre toward the middle, so the bar always ends exactly over
             each team's line, however wide the names are. */}
@@ -463,22 +534,29 @@ function PeopleTile() {
             <span key={team} className="relative flex flex-col items-center pt-3">
               <span
                 className={cn(
-                  "bg-ink/30 absolute top-0 h-px",
+                  "absolute top-0 h-px bg-current/35",
                   i === 0 ? "right-0 left-1/2" : "right-1/2 left-0",
                 )}
               />
-              <span className="bg-ink/30 absolute top-0 left-1/2 h-3 w-px" />
-              <span className="bg-paper rounded-full px-2.5 py-[5px] text-[12px] font-semibold whitespace-nowrap">
+              <span className="absolute top-0 left-1/2 h-3 w-px bg-current/35" />
+              <span
+                className={cn(
+                  ON_BLOCK_CHIP,
+                  "rounded-full px-2.5 py-[5px] text-[12px] font-semibold whitespace-nowrap",
+                )}
+              >
                 {team}
               </span>
             </span>
           ))}
         </div>
       </div>
-      <div className="font-heading mt-auto text-[clamp(34px,3.4vw,46px)] leading-[1.02] tracking-[-0.03em]">
+      <div
+        className={cn(TILE_HEADLINE, "mt-auto pt-4 text-[clamp(32px,3.2vw,44px)] leading-[1.02]")}
+      >
         Hand over in one click.
       </div>
-      <p className="text-bark-soft text-[15px] leading-[1.55] text-pretty">
+      <p className="text-[15px] leading-[1.55] text-pretty text-(--meta)">
         Roles, profiles and saved org chart versions, so next year’s board starts with everything.
       </p>
     </div>

@@ -84,7 +84,7 @@ export default async function VerifyEmailPage({
   const session = await getSession();
 
   const continueLink = (
-    <Link href={session ? "/app" : "/sign-in"} className={cn(pill({ raised: true }), "w-full")}>
+    <Link href={session ? "/app" : "/sign-in"} className={cn(pill(), "w-full")}>
       {session ? "Continue" : "Log in"}
     </Link>
   );
@@ -127,7 +127,7 @@ export default async function VerifyEmailPage({
       >
         <Link
           href={signInPath(`/verify-email/${encodeURIComponent(token)}`)}
-          className={cn(pill({ raised: true }), "w-full")}
+          className={cn(pill(), "w-full")}
         >
           Log in
         </Link>
@@ -141,7 +141,7 @@ export default async function VerifyEmailPage({
       description="Confirm this address to finish setting up your Bananasplit account."
     >
       <form action={confirmEmailAction.bind(null, token)}>
-        <button type="submit" className={cn(pill({ raised: true }), "w-full")}>
+        <button type="submit" className={cn(pill(), "w-full")}>
           Confirm email
         </button>
       </form>

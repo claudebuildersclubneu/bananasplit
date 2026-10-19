@@ -28,9 +28,9 @@ export function GoogleSignInButton({ redirectTo }: { redirectTo?: string | null 
 }
 
 /**
- * The same sign-in on Bananasplit's own pages (src/components/brand): a 50px
- * outline pill with the design's monochrome "G" mark. `label` is "Continue
- * with Google" on /sign-in and "Sign up with Google" on /sign-up.
+ * The same sign-in on Bananasplit's own pages (src/components/brand): a 40px
+ * outline pill with a monochrome "G" mark in the text colour. `label` is
+ * "Continue with Google" on /sign-in and "Sign up with Google" on /sign-up.
  */
 export function BrandGoogleButton({
   redirectTo,
@@ -49,7 +49,7 @@ export function BrandGoogleButton({
       <button type="submit" className={cn(pill({ tone: "outline", size: "field" }), "w-full")}>
         <span
           aria-hidden="true"
-          className="border-ink grid size-5 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold"
+          className="grid size-5 place-items-center rounded-full border-[1.5px] border-current text-[11px] font-extrabold"
         >
           G
         </span>

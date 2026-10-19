@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { checkoutAvailable } from "@/app/checkout/availability";
 import { BrandRoot } from "@/components/brand/brand-root";
 import { Faq } from "@/components/marketing/faq";
 import { FeatureBoard } from "@/components/marketing/feature-board";
@@ -19,9 +20,10 @@ export const metadata: Metadata = {
 };
 
 /**
- * The marketing home page (the design handoff's "Bananasplit Home"). It is
- * the home page for everyone, signed in or not; signed-in visitors get an
- * "Open your club" way into the app (/app) instead of Log in.
+ * The marketing home page, in Moonstone (redesign guide 10.8): dark by
+ * default, the banana glow as the hero's light, block cards and a glass
+ * header. It is the home page for everyone, signed in or not; signed-in
+ * visitors get an "Open your club" way into the app (/app) instead of Log in.
  *
  * `overflow-x-clip` keeps wide decoration from scrolling the page sideways
  * without breaking the sticky header, as `hidden` would.
@@ -37,7 +39,7 @@ export default async function Home() {
         <FeatureBoard />
         <Ripeness />
         <Finance />
-        <Pricing signedIn={signedIn} />
+        <Pricing signedIn={signedIn} checkout={checkoutAvailable()} />
         <Faq />
         <FinalCta />
       </main>
