@@ -1,32 +1,30 @@
 import { formatDistanceToNow } from "date-fns";
-import {
-  Ban,
-  CalendarRange,
-  CalendarX2,
-  CheckCircle2,
-  FileText,
-  Lock,
-  Sun,
-  Vote,
-  type LucideIcon,
-} from "lucide-react";
+import { FileText, Lock, NotebookText } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 import { FILE_ICONS } from "@/components/notes/file-card";
-import { PIN_ICONS } from "@/components/shell/pin-icons";
+import { PIN_ICONS, PIN_KIND_LABELS } from "@/components/shell/pin-icons";
+import { TickMeter } from "@/components/ui/meters";
 import { UserAvatar, type UserAvatarUser } from "@/components/user-avatar";
 import { familyOf } from "@/lib/files/types";
+import { dayWordOfKey } from "@/lib/overview/format";
 import type { PinKind } from "@/lib/pins/pages";
 import { pollHref } from "@/lib/polls/paths";
 import { ago } from "@/lib/relative-time";
+import { localDateKey } from "@/lib/tasks/dates";
 import { cn } from "@/lib/utils";
+import type { PollStat } from "@/server/overview/queries";
+
+import { TileIcon, TileText, tileClass } from "./bits";
 
 /**
- * Bodies of the Overview widgets that are new with the customizable board
- * (the others reuse their cards in `bare` mode). Server components: the
- * board places them in its frames.
+ * Bodies of the Overview widgets (redesign guide 9.2), as server
+ * components: the board places them in its cards. Tiles carry an icon
+ * chip; lists are rows separated by space, a hairline at most.
  */
+
+const TILE_GRID = "grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(12.5rem,1fr))]";
 
 export function RecentList({
   items,
@@ -45,20 +43,19 @@ export function RecentList({
     );
   }
   return (
-    <ul className="divide-y">
+    <ul className={TILE_GRID}>
       {items.map((item) => {
         const Icon = PIN_ICONS[item.kind] ?? FileText;
         return (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              className="hover:bg-accent/50 -mx-2 flex items-center gap-2.5 rounded-md px-2 py-2"
-            >
-              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>
-              <span className="text-muted-foreground shrink-0 text-xs">
-                {ago(item.visitedAt, now)}
-              </span>
+          <li key={item.href} className="min-w-0">
+            <Link href={item.href} className={tileClass}>
+              <TileIcon>
+                <Icon />
+              </TileIcon>
+              <TileText
+                title={item.label}
+                sub={`${PIN_KIND_LABELS[item.kind] ?? "Page"} · ${ago(item.visitedAt, now)}`}
+              />
             </Link>
           </li>
         );
@@ -67,114 +64,87 @@ export function RecentList({
   );
 }
 
-export function TaskStats({
-  orgSlug,
-  stats,
-}: {
-  orgSlug: string;
-  stats: { open: number; today: number; overdue: number; blocked: number };
-}) {
-  const cells: { label: string; value: number; icon: LucideIcon; tone?: string; href: string }[] = [
-    {
-      label: "Open",
-      value: stats.open,
-      icon: CheckCircle2,
-      href: `/app/${orgSlug}/tasks?view=mine`,
-    },
-    {
-      label: "Due today",
-      value: stats.today,
-      icon: Sun,
-      tone: "text-warning",
-      href: `/app/${orgSlug}/tasks?view=mine`,
-    },
-    {
-      label: "Overdue",
-      value: stats.overdue,
-      icon: CalendarX2,
-      tone: "text-destructive",
-      href: `/app/${orgSlug}/tasks?view=mine`,
-    },
-    {
-      label: "Blocked",
-      value: stats.blocked,
-      icon: Ban,
-      tone: "text-destructive",
-      href: `/app/${orgSlug}/tasks?view=mine&status=BLOCKED`,
-    },
-  ];
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {cells.map((c) => {
-        const Icon = c.icon;
-        return (
-          <Link key={c.label} href={c.href} className="hover:bg-muted/50 rounded-lg border p-2.5">
-            <span className="eyebrow text-muted-foreground flex items-center gap-1.5">
-              <Icon className={cn("size-3.5 shrink-0", c.value > 0 && c.tone)} aria-hidden="true" />
-              {c.label}
-            </span>
-            <span className={cn("mt-1.5 block text-2xl font-semibold tabular-nums", c.value > 0 && c.tone)}>
-              {c.value}
-            </span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
 export interface WeekDay {
   key: string;
-  label: string;
+  /** "Mon". */
+  weekday: string;
+  /** "12". */
+  date: string;
   isToday: boolean;
   events: { id: string; title: string; time: string }[];
 }
 
+/** Seven day tiles, today in the accent. */
 export function WeekStrip({ orgSlug, days }: { orgSlug: string; days: WeekDay[] }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
       {days.map((d) => (
-        <div
+        <li
           key={d.key}
+          aria-current={d.isToday ? "date" : undefined}
           className={cn(
-            "min-h-24 rounded-lg border p-2",
-            d.isToday && "border-primary/50 bg-primary/5",
+            "rounded-tile flex min-h-28 min-w-0 flex-col gap-2 p-3",
+            d.isToday
+              ? "bg-brand-accent text-brand-accent-foreground glow-halo"
+              : "bg-muted/60",
           )}
         >
-          <p className={cn("eyebrow", d.isToday ? "text-primary" : "text-muted-foreground")}>
-            {d.label}
+          <p className="flex items-baseline gap-1.5">
+            <span className={cn("text-[13px] font-medium", !d.isToday && "text-muted-foreground")}>
+              {d.isToday ? "Today" : d.weekday}
+            </span>
+            <span className="numeral text-[22px]">{d.date}</span>
           </p>
-          <ul className="mt-1.5 space-y-1">
+          <ul className="space-y-1.5">
             {d.events.length === 0 && (
-              <li className="text-muted-foreground/60 text-[11px]">Free</li>
+              <li className={cn("text-[12px]", d.isToday ? "opacity-70" : "text-muted-foreground")}>
+                Free
+              </li>
             )}
-            {d.events.map((e) => (
+            {d.events.slice(0, 3).map((e) => (
               <li key={e.id}>
                 <Link
                   href={`/app/${orgSlug}/calendar/${e.id}`}
-                  className="bg-chart-1/10 hover:bg-chart-1/20 block rounded px-1.5 py-1 text-[11px] leading-tight"
+                  className={cn(
+                    "block rounded-[10px] px-2 py-1.5 text-[12px] leading-tight",
+                    d.isToday ? "bg-black/10 hover:bg-black/15" : "bg-card hover:bg-background",
+                  )}
                 >
-                  <span className="text-muted-foreground block">{e.time}</span>
-                  <span className="line-clamp-2 font-medium">{e.title}</span>
+                  <span className={cn("block", d.isToday ? "opacity-80" : "text-muted-foreground")}>
+                    {e.time}
+                  </span>
+                  <span className="line-clamp-2 font-semibold">{e.title}</span>
                 </Link>
               </li>
             ))}
+            {d.events.length > 3 && (
+              <li className="text-[12px] font-medium opacity-80">+{d.events.length - 3} more</li>
+            )}
           </ul>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
+const TICK_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-3)", "var(--chart-5)"];
+
+/** "today" and "tomorrow" read lower-case mid-sentence; day names keep their capital. */
+function closesWord(word: string): string {
+  return word === "Today" || word === "Tomorrow" ? word.toLowerCase() : word;
+}
+
+/** Open polls, one tick per member who can vote. */
 export function PollList({
   orgSlug,
   polls,
   now,
+  timeZone,
 }: {
   orgSlug: string;
-  /** Open polls of both kinds: questions to vote on, and find-a-time polls. */
-  polls: { id: string; title: string; closesAt: Date | null; kind: "question" | "availability" }[];
+  polls: readonly PollStat[];
   now: Date;
+  timeZone: string;
 }) {
   if (polls.length === 0) {
     return (
@@ -183,41 +153,45 @@ export function PollList({
         title="No open polls"
         description="Questions to vote on and times to find show here."
         action={
-          <Link
-            href={`/app/${orgSlug}/calendar/polls`}
-            className="text-primary text-sm hover:underline"
-          >
+          <Link href={`/app/${orgSlug}/calendar/polls`} className="text-sm font-semibold underline underline-offset-4">
             Start a poll
           </Link>
         }
       />
     );
   }
+  const todayKey = localDateKey(now, timeZone);
   return (
-    <ul className="divide-y">
-      {polls.map((p) => {
-        const Icon = p.kind === "question" ? Vote : CalendarRange;
-        return (
-          <li key={p.id}>
-            <Link
-              href={pollHref(`/app/${orgSlug}`, p.kind, p.id)}
-              className="hover:bg-accent/50 -mx-2 flex items-start gap-2.5 rounded-md px-2 py-2"
-            >
-              <Icon className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{p.title}</span>
-                <span className="text-muted-foreground block text-xs">
-                  {p.kind === "question" ? "Question" : "Find a time"} ·{" "}
-                  {p.closesAt
-                    ? `Closes ${formatDistanceToNow(p.closesAt, { addSuffix: true })}`
-                    : "Open"}
-                  {p.closesAt && p.closesAt < now ? " (closed)" : ""}
-                </span>
+    <ul className="space-y-4">
+      {polls.map((p, i) => (
+        <li key={p.id}>
+          <Link href={pollHref(`/app/${orgSlug}`, p.kind, p.id)} className="group/poll block">
+            <span className="flex items-baseline justify-between gap-2.5">
+              <span className="min-w-0 truncate text-[15px] font-semibold group-hover/poll:underline">
+                {p.title}
               </span>
-            </Link>
-          </li>
-        );
-      })}
+              <span className="shrink-0 text-[13px] font-semibold tabular-nums">
+                {p.voters}/{p.eligible}
+              </span>
+            </span>
+            <TickMeter
+              total={p.eligible}
+              filled={p.voters}
+              height={20}
+              color={TICK_COLORS[i % TICK_COLORS.length]}
+              label={`${p.voters} of ${p.eligible} ${p.kind === "question" ? "voted" : "answered"}`}
+              className="mt-2"
+            />
+            <span className="text-muted-foreground mt-1.5 block text-[13px]">
+              {p.kind === "question" ? "Question" : "Find a time"} ·{" "}
+              {p.closesAt
+                ? `closes ${closesWord(dayWordOfKey(localDateKey(p.closesAt, timeZone), todayKey))}`
+                : "Open"}
+              {p.mine ? " · You answered" : ""}
+            </span>
+          </Link>
+        </li>
+      ))}
     </ul>
   );
 }
@@ -241,7 +215,7 @@ export function NoteList({
         size="compact"
         title="No notes yet"
         action={
-          <Link href={`/app/${orgSlug}/notes`} className="text-primary text-sm hover:underline">
+          <Link href={`/app/${orgSlug}/notes`} className="text-sm font-semibold underline underline-offset-4">
             Write the first one
           </Link>
         }
@@ -249,23 +223,15 @@ export function NoteList({
     );
   }
   return (
-    <ul className="divide-y">
+    <ul className={TILE_GRID}>
       {notes.map((n) => (
-        <li key={n.id}>
-          <Link
-            href={`/app/${orgSlug}/notes/${n.id}`}
-            className="hover:bg-accent/50 -mx-2 block rounded-md px-2 py-2"
-          >
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              {n.visibility === "PRIVATE" && (
-                <Lock className="text-muted-foreground size-3" aria-label="Private" />
-              )}
-              <span className="truncate">{n.title || "Untitled note"}</span>
-            </span>
-            <span className="text-muted-foreground text-xs">
-              {n.updatedBy?.name ?? "Someone"} ·{" "}
-              {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
-            </span>
+        <li key={n.id} className="min-w-0">
+          <Link href={`/app/${orgSlug}/notes/${n.id}`} className={tileClass}>
+            <TileIcon>{n.visibility === "PRIVATE" ? <Lock aria-label="Private" /> : <NotebookText />}</TileIcon>
+            <TileText
+              title={n.title || "Untitled note"}
+              sub={`${n.updatedBy?.name ?? "Someone"} · ${formatDistanceToNow(n.updatedAt, { addSuffix: true })}`}
+            />
           </Link>
         </li>
       ))}
@@ -290,20 +256,16 @@ export function FileList({
     );
   }
   return (
-    <ul className="divide-y">
+    <ul className={TILE_GRID}>
       {files.map((f) => {
         const Icon = FILE_ICONS[familyOf(f.contentType)];
         return (
-          <li key={f.id}>
-            <Link
-              href={`/app/${orgSlug}/notes/files/${f.id}`}
-              className="hover:bg-accent/50 -mx-2 flex items-center gap-2.5 rounded-md px-2 py-2"
-            >
-              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-sm">{f.name}</span>
-              <span className="text-muted-foreground shrink-0 text-xs">
-                {formatDistanceToNow(f.createdAt, { addSuffix: true })}
-              </span>
+          <li key={f.id} className="min-w-0">
+            <Link href={`/app/${orgSlug}/notes/files/${f.id}`} className={tileClass}>
+              <TileIcon>
+                <Icon />
+              </TileIcon>
+              <TileText title={f.name} sub={formatDistanceToNow(f.createdAt, { addSuffix: true })} />
             </Link>
           </li>
         );
@@ -312,6 +274,7 @@ export function FileList({
   );
 }
 
+/** People as an avatar grid with the count. */
 export function PeopleList({
   orgSlug,
   people,
@@ -326,20 +289,22 @@ export function PeopleList({
   total: number;
 }) {
   return (
-    <div className="space-y-2">
-      <ul className="space-y-1.5">
+    <div className="space-y-3">
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-x-2 gap-y-3">
         {people.map((p) => (
           <li key={p.userId}>
             <Link
               href={`/app/${orgSlug}/people/${p.userId}`}
-              className="hover:bg-accent/50 -mx-2 flex items-center gap-2 rounded-md px-2 py-1"
+              title={p.title ? `${p.user.name ?? "Member"}, ${p.title}` : (p.user.name ?? "Member")}
+              className="group/person flex flex-col items-center gap-1.5 text-center"
             >
-              <UserAvatar user={p.user} size="sm" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm">{p.user.name ?? "Member"}</span>
-                {p.title && (
-                  <span className="text-muted-foreground block truncate text-xs">{p.title}</span>
-                )}
+              <UserAvatar
+                user={p.user}
+                size="lg"
+                className="transition-transform duration-200 group-hover/person:-translate-y-0.5"
+              />
+              <span className="w-full truncate text-[12px] font-medium">
+                {p.user.name?.split(/\s+/)[0] ?? "Member"}
               </span>
             </Link>
           </li>
@@ -347,26 +312,10 @@ export function PeopleList({
       </ul>
       <Link
         href={`/app/${orgSlug}/people`}
-        className="text-muted-foreground block text-xs hover:underline"
+        className="text-muted-foreground hover:text-foreground block text-[13px] font-medium"
       >
         All {total} member{total === 1 ? "" : "s"}
       </Link>
-    </div>
-  );
-}
-
-export function Shortcuts({ links }: { links: { id: string; label: string; href: string }[] }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {links.map((l) => (
-        <Link
-          key={l.id}
-          href={l.href}
-          className="hover:bg-muted rounded-md border px-2.5 py-1 text-sm"
-        >
-          {l.label}
-        </Link>
-      ))}
     </div>
   );
 }

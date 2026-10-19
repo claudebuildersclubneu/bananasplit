@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   ArrowLeftRight,
   CalendarDays,
   CalendarRange,
@@ -28,6 +29,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Target,
+  Ticket,
   Timer,
   TrendingDown,
   Users,
@@ -60,6 +62,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const BOARD_ICONS: Record<string, LucideIcon> = {
+  Activity,
   ArrowLeftRight,
   CalendarDays,
   CalendarRange,
@@ -81,6 +84,7 @@ export const BOARD_ICONS: Record<string, LucideIcon> = {
   ReceiptText,
   Rocket,
   Target,
+  Ticket,
   Timer,
   TrendingDown,
   Users,
@@ -126,6 +130,8 @@ export function WidgetBoard({
   onSave,
   intro,
   notice,
+  headerActions,
+  belowIntro,
 }: {
   types: readonly WidgetMeta[];
   initialLayout: BoardWidget[];
@@ -139,6 +145,13 @@ export function WidgetBoard({
   intro?: ReactNode;
   /** Something to say above the widgets (a setup prompt), under the title row. */
   notice?: ReactNode;
+  /**
+   * A card's header controls by widget type (a count chip, ••• and ↗, in
+   * that order after the title), shown while not customizing.
+   */
+  headerActions?: Readonly<Record<string, ReactNode>>;
+  /** A full-width line under the title row (the Overview's stat strip). */
+  belowIntro?: ReactNode;
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState(initialLayout);
@@ -204,13 +217,12 @@ export function WidgetBoard({
   const body = (type: string) => (bodies ? bodies[type] : renderBody?.(type)) ?? null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[18px]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">{intro}</div>
         {!editing && (
           <Button
             type="button"
-            size="sm"
             variant="outline"
             disabled={pending}
             onClick={() => setEditing(true)}
@@ -220,6 +232,7 @@ export function WidgetBoard({
           </Button>
         )}
       </div>
+      {belowIntro && <div className="pt-2 pb-3">{belowIntro}</div>}
 
       {editing && (
         <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
@@ -291,7 +304,7 @@ export function WidgetBoard({
         </div>
       ) : (
         <div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-4"
           onDragOver={(e) => {
             if (dragId) e.preventDefault();
           }}
@@ -307,17 +320,24 @@ export function WidgetBoard({
             const m = meta.get(w.type);
             if (!m) return null;
             const Icon = BOARD_ICONS[m.icon] ?? ChartColumn;
+            const bare = m.frame === "bare";
+            const actions = !editing ? headerActions?.[w.type] : null;
             return (
               <section
                 key={w.id}
                 aria-label={m.title}
                 data-dragging={dragId === w.id || undefined}
+                data-frame={bare ? "bare" : "card"}
                 className={cn(
                   SPAN[w.w] ?? SPAN[1],
-                  "bg-card text-card-foreground relative flex min-w-0 flex-col overflow-hidden rounded-xl border transition-colors",
+                  "relative flex min-w-0 flex-col transition-colors",
+                  bare
+                    ? "rounded-block"
+                    : "bg-card text-card-foreground edge ring-foreground/6 rounded-card overflow-hidden ring-1",
                   // Part-width widgets stop at a common height so rows line up.
-                  !w.h && w.w < BOARD_COLUMNS && "lg:max-h-96",
-                  editing && "border-dashed",
+                  !bare && !w.h && w.w < BOARD_COLUMNS && "lg:max-h-[30rem]",
+                  editing && "border-border border border-dashed",
+                  editing && bare && "bg-muted/40 p-2",
                   dragId === w.id && "opacity-40",
                   overId === w.id && dragId !== w.id && "border-primary border-solid",
                 )}
@@ -337,8 +357,18 @@ export function WidgetBoard({
                   setOverId(null);
                 }}
               >
-                {/* While editing, a narrow widget's controls wrap below its title. */}
-                <header className="flex min-h-11 flex-wrap items-center gap-2 border-b px-4 py-2">
+                {/* While editing, a narrow widget's controls wrap below its title. A
+                    bare widget has no header until then: its body is its own surface. */}
+                <header
+                  className={cn(
+                    "flex flex-wrap items-center gap-2",
+                    bare
+                      ? editing
+                        ? "mb-2 min-h-10 px-2"
+                        : "sr-only"
+                      : "min-h-14 px-[18px] pt-4 pb-1 sm:px-6 sm:pt-5",
+                  )}
+                >
                   {editing && (
                     <span
                       draggable
@@ -368,10 +398,15 @@ export function WidgetBoard({
                       <GripVertical className="size-4" aria-hidden="true" />
                     </span>
                   )}
-                  <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <h2 title={m.title} className="heading min-w-0 truncate text-sm">
+                  {editing && (
+                    <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <h2 title={m.title} className="heading min-w-0 truncate text-[17px]">
                     {m.title}
                   </h2>
+                  {actions && (
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">{actions}</div>
+                  )}
                   {editing && (
                     <div className="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
                       <Segmented
@@ -404,7 +439,14 @@ export function WidgetBoard({
                     </div>
                   )}
                 </header>
-                <div className="min-h-0 flex-1 overflow-auto p-4">{body(w.type)}</div>
+                <div
+                  className={cn(
+                    "min-h-0 flex-1",
+                    bare ? "flex flex-col" : "overflow-auto px-[18px] pt-3 pb-5 sm:px-6 sm:pb-6",
+                  )}
+                >
+                  {body(w.type)}
+                </div>
               </section>
             );
           })}
