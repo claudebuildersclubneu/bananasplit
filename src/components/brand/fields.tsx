@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 import { pill } from "./pill";
 
 /*
- * Form controls for Bananasplit's own pages (sign-in, sign-up, joining a
- * club): 12px-radius inputs with the banana focus ring, and the submit pill.
+ * Form controls for Bananasplit's own pages (sign-in, sign-up, password
+ * help, joining a club): Moonstone's 40px fields (44 on touch screens) with
+ * 14px corners and the glow focus ring, and the submit pill. 16px type on
+ * phones, so iOS doesn't zoom into a field.
  */
 
 export const brandInputClass =
-  "bg-paper border-ink/16 focus-banana h-[50px] w-full rounded-xl border px-4 text-[15px] outline-none transition-shadow aria-invalid:border-destructive";
+  "bg-card text-foreground border-input focus-banana rounded-field h-10 w-full min-w-0 border px-3.5 text-base outline-none transition-[border-color,box-shadow] aria-invalid:border-destructive sm:text-[15px] pointer-coarse:h-11";
 
 /** A labelled field. `aside` sits on the right of the label row (Forgot?). */
 export function BrandField({
@@ -28,7 +30,7 @@ export function BrandField({
 }) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex justify-between text-[14px] font-semibold">
+      <div className="flex items-baseline justify-between gap-3 text-[14px] font-medium">
         <label htmlFor={id}>{label}</label>
         {aside}
       </div>
@@ -41,23 +43,23 @@ export function BrandInput({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(brandInputClass, className)} {...props} />;
 }
 
-/** A form's submit: the 52px ink pill with its shadow. */
+/** A form's submit: the 40px primary pill, full width. */
 export function PrimaryButton({ className, ...props }: ComponentProps<"button">) {
-  return <button className={cn(pill({ raised: true }), className)} {...props} />;
+  return <button className={cn(pill(), "w-full", className)} {...props} />;
 }
 
 /** The "or" between the Google button and the email form. */
 export function OrDivider() {
   return (
-    <div className="text-ink-faint flex items-center gap-3.5 text-[13px]">
-      <span className="bg-ink/12 h-px flex-1" />
+    <div className="text-muted-foreground flex items-center gap-3.5 text-[13px]">
+      <span className="bg-border h-px flex-1" />
       or
-      <span className="bg-ink/12 h-px flex-1" />
+      <span className="bg-border h-px flex-1" />
     </div>
   );
 }
 
-/** A form-level message (a refused sign-in, a taken email). */
+/** A form-level message: an error (a refused sign-in, a taken email) or a note (a changed password). */
 export function FormMessage({
   children,
   tone = "error",
@@ -69,8 +71,10 @@ export function FormMessage({
     <p
       role={tone === "error" ? "alert" : "status"}
       className={cn(
-        "m-0 rounded-xl px-3.5 py-2.5 text-[14px] leading-normal",
-        tone === "error" ? "bg-destructive/8 text-destructive" : "bg-oat text-ink-muted",
+        "rounded-field m-0 px-3.5 py-2.5 text-[14px] leading-[1.45]",
+        tone === "error"
+          ? "bg-tint-danger text-tint-danger-foreground"
+          : "bg-tint-info text-tint-info-foreground",
       )}
     >
       {children}

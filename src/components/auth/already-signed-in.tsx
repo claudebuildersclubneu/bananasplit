@@ -28,11 +28,11 @@ export function AlreadySignedIn({
         title="You're already signed in."
         description={
           <>
-            As <span className="text-ink font-semibold">{email}</span>.
+            As <span className="text-foreground font-semibold">{email}</span>.
           </>
         }
       />
-      <Link href={continueTo} className={cn(pill({ raised: true }), "w-full")}>
+      <Link href={continueTo} className={cn(pill(), "w-full")}>
         Continue{first ? ` as ${first}` : ""}
       </Link>
       <SignOutLink className={cn(pill({ tone: "outline" }), "w-full")}>

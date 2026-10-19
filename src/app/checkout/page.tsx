@@ -8,7 +8,8 @@ import { formatSemesterDate, nextSemesterStart } from "@/lib/billing/semester";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOnboardingProfile } from "@/server/onboarding/profile";
 
-import { CheckoutForm } from "./checkout-form";
+import { checkoutAvailable } from "./availability";
+import { CheckoutForm, type CheckoutPlan } from "./checkout-form";
 
 export const metadata: Metadata = { title: "Subscribe · Bananasplit" };
 
@@ -22,21 +23,39 @@ function renewal() {
 }
 
 /**
- * Checkout (the design's "04 · Checkout (Stripe)"): subscribe a club to the
- * Club or Society plan. ?plan=club|society (Society otherwise), ?org=<slug>.
- * The club is that org when the user belongs to it, else their first club;
- * the seats start at its member count. Billing isn't connected yet: the form
- * never submits (see CheckoutForm).
+ * Checkout (the design's "04 · Checkout (Stripe)"), in Moonstone: subscribe a
+ * club to Team (?plan=club) or Team Advanced (?plan=society, the default),
+ * or yourself to Personal Plus (?plan=plus). The query values are the old
+ * plan names, kept so existing links work. ?org=<slug> picks the club when
+ * the user belongs to it, else their first club; the seats start at its
+ * member count. Billing isn't connected yet: the form never submits (see
+ * CheckoutForm).
  */
 export default async function CheckoutPage({ searchParams }: PageProps<"/checkout">) {
   // The card fields are a visual stand-in for Stripe's Payment Element. On
   // the production deployment the page doesn't exist until billing is
   // connected, so nobody types a real card number into our own inputs.
-  if (process.env.VERCEL_ENV === "production" && process.env.BILLING_ENABLED !== "true") notFound();
+  if (!checkoutAvailable()) notFound();
   const user = await requireUser();
   const params = await searchParams;
-  const plan = isClubPlanId(params.plan) ? params.plan : "society";
+  const plan: CheckoutPlan =
+    params.plan === "plus" ? "plus" : isClubPlanId(params.plan) ? params.plan : "society";
   const orgParam = typeof params.org === "string" ? params.org : null;
+
+  // Personal Plus is for the person, not a club: no seats to count.
+  if (plan === "plus") {
+    return (
+      <CheckoutForm
+        plan={plan}
+        clubName=""
+        initialMembers={1}
+        email={user.email}
+        backHref="/#pricing"
+        backLabel="Bananasplit, back to pricing"
+        {...renewal()}
+      />
+    );
+  }
 
   // Only the user's own orgs: a slug they don't belong to falls back to
   // their first club rather than a 404.

@@ -5,7 +5,6 @@ import { ClubPreview } from "@/app/onboarding/join/club-preview";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { VerifyEmailNotice } from "@/components/auth/verify-email-notice";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { signInPath } from "@/lib/auth/callback-url";
 import { getUserIdentity } from "@/lib/auth/email-verification";
 import { googleSignInEnabled } from "@/lib/auth/google-sign-in";
@@ -24,6 +23,7 @@ function roleName(role: string): string {
   return /^[aeiou]/.test(name) ? `an ${name}` : `a ${name}`;
 }
 
+/** The invite's card (Moonstone): a display title, the line under it, then the actions. */
 function InviteCard({
   title,
   description,
@@ -34,15 +34,15 @@ function InviteCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        {children && <CardContent>{children}</CardContent>}
-      </Card>
-    </div>
+    <main className="flex flex-1 items-center justify-center px-4 py-10 sm:p-6">
+      <div className="bg-card text-card-foreground edge ring-foreground/6 rounded-card flex w-full max-w-md flex-col gap-6 p-6 ring-1 sm:p-8">
+        <div className="flex flex-col gap-2">
+          <h1 className="display-title m-0 text-[30px] tracking-[-0.03em]">{title}</h1>
+          <p className="text-muted-foreground m-0 text-[15px] leading-[1.55]">{description}</p>
+        </div>
+        {children}
+      </div>
+    </main>
   );
 }
 
@@ -80,13 +80,19 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
         {googleSignInEnabled() ? (
           <>
             <GoogleSignInButton redirectTo={here} />
-            <p className="text-muted-foreground mt-3 text-center text-sm">
+            <p className="text-muted-foreground mt-3 text-center text-sm leading-[1.5]">
               Or{" "}
-              <Link href={signInPath(here)} className="underline underline-offset-4">
+              <Link
+                href={signInPath(here)}
+                className="text-foreground font-medium underline underline-offset-4"
+              >
                 sign in
               </Link>{" "}
               or{" "}
-              <Link href={signUpHref} className="underline underline-offset-4">
+              <Link
+                href={signUpHref}
+                className="text-foreground font-medium underline underline-offset-4"
+              >
                 create an account
               </Link>{" "}
               with {invitation.email}. You&apos;ll come back here.
@@ -98,9 +104,12 @@ export default async function InvitePage({ params }: PageProps<"/invite/[token]"
             <Button asChild className="w-full">
               <Link href={signInPath(here)}>Sign in</Link>
             </Button>
-            <p className="text-muted-foreground mt-3 text-center text-sm">
+            <p className="text-muted-foreground mt-3 text-center text-sm leading-[1.5]">
               New here?{" "}
-              <Link href={signUpHref} className="underline underline-offset-4">
+              <Link
+                href={signUpHref}
+                className="text-foreground font-medium underline underline-offset-4"
+              >
                 Create an account
               </Link>{" "}
               with {invitation.email}. You&apos;ll come back here.
