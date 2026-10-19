@@ -6,26 +6,19 @@
  * controls.
  *
  * Full edit rights: the creator, the owner, an assignee ("also involved"),
- * OWNER/ADMIN, a chart manager of the owner (the owner is in the actor's
- * reporting subtree), and, on an intake request, its triage user.
+ * OWNER/ADMIN, and a chart manager of the owner (the owner is in the actor's
+ * reporting subtree).
  *
  * Self-assign carve-out ("Anyone can assign to themselves"): any member may
  * add or remove THEMSELVES as an assignee on any task, and take ownership of
  * a task that has no owner. Nothing else: no title, status or due-date
  * edits, and never removing another owner.
- *
- * Intake projects (Design Requests): anyone files requests, but only the
- * triage user or OWNER/ADMIN sets the priority or the owner, including
- * taking ownership through the carve-out.
  */
 
 export interface TaskAccessSubject {
   createdById: string;
   ownerId: string | null;
   assigneeIds: readonly string[];
-  /** The task's project is an intake queue. */
-  isIntake: boolean;
-  triageUserId: string | null;
 }
 
 export interface TaskActor {
@@ -46,20 +39,7 @@ export function canEditTask(actor: TaskActor, task: TaskAccessSubject): boolean 
     task.createdById === actor.userId ||
     task.ownerId === actor.userId ||
     task.assigneeIds.includes(actor.userId) ||
-    isChartManagerOf(actor, task.ownerId) ||
-    (task.isIntake && task.triageUserId !== null && task.triageUserId === actor.userId)
-  );
-}
-
-/** Priority and owner of an intake request: the triage user or OWNER/ADMIN. */
-export function canTriage(
-  actor: TaskActor,
-  task: Pick<TaskAccessSubject, "isIntake" | "triageUserId">,
-): boolean {
-  return (
-    !task.isIntake ||
-    actor.isAdmin ||
-    (task.triageUserId !== null && task.triageUserId === actor.userId)
+    isChartManagerOf(actor, task.ownerId)
   );
 }
 
@@ -73,7 +53,6 @@ export interface AssignmentChange {
 export type AccessCheck = { ok: true; selfAssignOnly: boolean } | { ok: false; reason: string };
 
 const DENY_EDIT = "You can only add or remove yourself on this task.";
-const DENY_TRIAGE = "Only the request's triage owner or an admin sets its owner and priority.";
 
 /**
  * Whether `actor` may make `change`. Without full edit rights only the
@@ -85,7 +64,6 @@ export function checkAssignmentChange(
   change: AssignmentChange,
 ): AccessCheck {
   const ownerChanges = change.ownerId !== undefined && change.ownerId !== task.ownerId;
-  if (ownerChanges && !canTriage(actor, task)) return { ok: false, reason: DENY_TRIAGE };
 
   if (canEditTask(actor, task)) return { ok: true, selfAssignOnly: false };
 
@@ -104,13 +82,8 @@ export function checkAssignmentChange(
 }
 
 /** Plain field edits (title, description, status, due date, labels, project...). */
-export function checkFieldEdit(
-  actor: TaskActor,
-  task: TaskAccessSubject,
-  fields: { priority?: boolean },
-): AccessCheck {
+export function checkFieldEdit(actor: TaskActor, task: TaskAccessSubject): AccessCheck {
   if (!canEditTask(actor, task)) return { ok: false, reason: "You can't edit this task." };
-  if (fields.priority && !canTriage(actor, task)) return { ok: false, reason: DENY_TRIAGE };
   return { ok: true, selfAssignOnly: false };
 }
 

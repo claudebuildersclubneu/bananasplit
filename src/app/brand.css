@@ -1,14 +1,17 @@
 /*
- * Bananasplit's own look: the marketing site, sign-in and sign-up, joining a
- * club, checkout and onboarding (the design handoff, "Bananasplit marketing
- * site + auth, checkout and onboarding screens"). These pages belong to no
- * club, so they never take an org theme: the palette below is fixed, the
- * way the brand mark's colours are.
+ * Bananasplit's own pages: the marketing site, sign-in and sign-up, password
+ * help, email confirmation, checkout and the 404 (BrandRoot,
+ * src/components/brand/brand-root.tsx). Since the Moonstone redesign they
+ * wear the app's own tokens (globals.css: Moonstone, dark first, lit by the
+ * banana glow), so this file only adds what those pages need on top: the
+ * logo's fixed colours, a few glow utilities, and the `.brand` scope.
  *
- * Components use these as Tailwind colours (bg-ink, text-ink-muted,
- * border-ink/10, bg-banana ...), never raw values. `.brand` (BrandRoot) also
- * points the app's own tokens at the palette, so shared components (Input,
- * Button, Select) inside these pages print in ink on cream.
+ * The palette below is the older cream-and-banana look ("Banana cream").
+ * Components outside these pages still use it as Tailwind colours (bg-ink,
+ * text-ink-muted, bg-banana ...): the public RSVP pages, onboarding and the
+ * theme preview. `<BrandRoot look="cream">` points the app's tokens at it
+ * (the `.brand[data-look="cream"]` block at the end), for a page that keeps
+ * the cream look until it moves to Moonstone.
  *
  * Inside a club the yellow names (banana, banana-ink, lemon, gold, ripe,
  * butter, slice, honey*, core, bark*) are re-pointed at the club's accent
@@ -35,7 +38,6 @@
   --color-sand: #efe6d0;
   --color-oat: #f4eedf;
   --color-stripe: #f1eada;
-  --color-chrome: #e4dac2;
   --color-wheat: #e8d6a8;
   --color-straw: #e3d6b4;
   --color-fog: #e2dccd;
@@ -46,6 +48,9 @@
   --color-logo-flesh: #f7ebc4;
   --color-logo-seed: #b58a00;
   --color-logo-ink: #1c1810;
+  /* The wordmark on dark surfaces: the dark lockup's cream type
+     (public/brand/bananasplit-logo-dark.svg). */
+  --color-logo-cream: #f7f2e6;
   /* The wordmark's face: Young Serif, always (titles moved to Bricolage). */
   --font-logo: var(--font-young-serif), Georgia, serif;
   /* Bananas, from soft to ripe. */
@@ -61,7 +66,7 @@
   --color-stem: #6b4a1e;
   --color-spot: #8a5a34;
   --color-freckle: #7a5826;
-  /* Ripeness stages (the growth section). */
+  /* Ripeness stages. */
   --color-stage-1: #8fa344;
   --color-stage-2: #bebe45;
   --color-stage-3: #e6c93a;
@@ -90,149 +95,88 @@
 
   --shadow-card: 0 1px 2px rgb(28 24 16 / 0.04), 0 24px 48px -32px rgb(28 24 16 / 0.25);
   --shadow-float: 0 1px 2px rgb(28 24 16 / 0.06), 0 24px 40px -20px rgb(28 24 16 / 0.35);
-  --shadow-cta: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 12px 24px -12px rgb(28 24 16 / 0.5);
-  --shadow-cta-soft: 0 12px 24px -12px rgb(28 24 16 / 0.5);
-  --shadow-featured:
-    0 0 0 4px color-mix(in oklab, var(--color-banana) 25%, transparent),
-    0 30px 60px -30px rgb(28 24 16 / 0.35);
   --shadow-frame: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.35);
-  --shadow-frame-soft: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.3);
-  --shadow-segment: 0 1px 2px rgb(28 24 16 / 0.12);
   --shadow-tile: 0 1px 2px rgb(28 24 16 / 0.06);
-  --shadow-phone: 0 40px 60px -24px rgb(28 24 16 / 0.55);
-  --shadow-browser: 0 -30px 80px -30px rgb(160 110 0 / 0.35), 0 0 0 6px rgb(255 253 247 / 0.5);
-  --shadow-widget: 0 30px 60px -30px rgb(0 0 0 / 0.6);
-  --shadow-field: 0 1px 1px rgb(28 24 16 / 0.04);
-  --shadow-ring-ink: 0 0 0 2px var(--color-cream), 0 0 0 4px var(--color-ink);
-  --shadow-divider-left: -1px 0 0 rgb(28 24 16 / 0.06);
 }
 
-/* The focus ring on inputs and code boxes: an ink border and a banana halo. */
+/*
+ * The focus ring on fields and code boxes: a text-colour border and a glow
+ * halo (Moonstone's focus-glow, for inputs that draw their own border).
+ */
 @utility focus-banana {
   &:focus,
   &:focus-visible {
     outline: none;
-    border-color: var(--color-ink);
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-banana) 35%, transparent);
+    border-color: var(--foreground);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--glow) 45%, transparent);
   }
 }
 
-/* The same ring on a field group (a prefix and its input). */
+/* The same ring on a field group (a prefix and its input, the card fields). */
 @utility focus-within-banana {
   &:focus-within {
-    border-color: var(--color-ink);
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-banana) 35%, transparent);
+    border-color: var(--foreground);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--glow) 45%, transparent);
   }
 }
 
-/* The checkout's tighter halo (Stripe-style fields). */
-@utility focus-banana-sm {
-  &:focus,
-  &:focus-visible {
-    outline: none;
-    border-color: var(--color-ink);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-banana) 35%, transparent);
+/*
+ * The wordmark's colour: the standard lockup's ink on light, the dark
+ * lockup's cream on dark (redesign guide 4.2). The Logo inherits it.
+ */
+@utility logo-lockup {
+  color: var(--color-logo-ink);
+  :where(.dark) & {
+    color: var(--color-logo-cream);
   }
 }
 
-/* A receipt's ruled lines. */
-@utility bg-receipt {
-  background: repeating-linear-gradient(
-    180deg,
-    var(--color-stripe) 0 4px,
-    var(--color-paper) 4px 8px
-  );
+/*
+ * The banana glow as light behind the hero: the corona's brighter, wider
+ * sibling, scrolling with the page, plus the faint haze from the right.
+ * Strengths follow the mode (globals.css --glow-strength, 16% dark, 24% light).
+ */
+@utility hero-light {
+  background:
+    radial-gradient(
+      38% 62% at 50% 0%,
+      color-mix(in oklab, var(--glow) calc(var(--glow-strength) * 1.7), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      34% 48% at 92% 6%,
+      color-mix(in oklab, var(--haze) var(--haze-strength), transparent),
+      transparent 70%
+    );
 }
 
-/* The hero: cream into banana. */
-@utility bg-hero {
-  background: linear-gradient(
-    180deg,
-    var(--color-cream) 0%,
-    var(--color-cream) 40%,
-    var(--color-butter) 72%,
-    var(--color-banana) 100%
-  );
-}
-
-/* The hero's 80px grid, fading out by 55%. */
-@utility bg-hero-grid {
-  background-image:
-    linear-gradient(rgb(28 24 16 / 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(28 24 16 / 0.05) 1px, transparent 1px);
-  background-size: 80px 80px;
-  mask-image: linear-gradient(180deg, #000 0%, transparent 55%);
-}
-
-/* The yellow panel on the auth cards. */
-@utility bg-peel {
-  background: radial-gradient(
-    120% 90% at 30% 0%,
-    var(--color-lemon) 0%,
-    var(--color-banana) 50%,
-    var(--color-gold) 100%
-  );
-}
-
-/* The final call to action: the same yellow, lit from the top centre. */
-@utility bg-peel-center {
-  background-color: var(--color-banana);
+/* A surface lit by the glow from its top-right corner (panels, the pricing callout). */
+@utility glow-corner {
   background-image: radial-gradient(
-    120% 90% at 50% 0%,
-    var(--color-lemon) 0%,
-    var(--color-banana) 50%,
-    var(--color-gold) 100%
-  );
-}
-
-/* The event card's cover. */
-@utility bg-event-cover {
-  background: linear-gradient(135deg, var(--color-banana), var(--color-ripe));
-}
-
-/* Soft glows. */
-@utility bg-glow-cream {
-  background: radial-gradient(circle, rgb(255 240 180 / 0.7), transparent 70%);
-}
-@utility bg-glow-banana {
-  background: radial-gradient(
-    circle,
-    color-mix(in oklab, var(--color-banana) 26%, transparent),
+    70% 80% at 100% 0%,
+    color-mix(in oklab, var(--glow) calc(var(--glow-strength) * 1.3), transparent),
     transparent 70%
   );
 }
-@utility bg-glow-banana-22 {
-  background: radial-gradient(
-    circle,
-    color-mix(in oklab, var(--color-banana) 22%, transparent),
-    transparent 65%
-  );
-}
-@utility bg-glow-banana-20 {
-  background: radial-gradient(
-    circle,
-    color-mix(in oklab, var(--color-banana) 20%, transparent),
-    transparent 65%
-  );
-}
-@utility bg-glow-banana-10 {
-  background: radial-gradient(
-    circle,
-    color-mix(in oklab, var(--color-banana) 10%, transparent),
-    transparent 65%
+
+/* A surface lit from below, the glow rising (the closing call to action). */
+@utility glow-rise {
+  background-image: radial-gradient(
+    60% 90% at 50% 120%,
+    color-mix(in oklab, var(--glow) calc(var(--glow-strength) * 2), transparent),
+    transparent 72%
   );
 }
 
-/* Ripeness swatches with their brown spots. */
-@utility bg-stage-4 {
-  background-color: var(--color-banana);
-  background-image: radial-gradient(circle at 30% 50%, var(--color-freckle) 2px, transparent 2.5px);
+/* Type in the glow colour, with a soft halo: a hero's full stop. Decoration only. */
+@utility glow-text {
+  color: var(--glow);
+  text-shadow: 0 0 36px color-mix(in oklab, var(--glow) 55%, transparent);
 }
-@utility bg-stage-5 {
-  background-color: var(--color-ripe);
-  background-image:
-    radial-gradient(circle at 25% 45%, var(--color-stem) 2px, transparent 2.5px),
-    radial-gradient(circle at 65% 60%, var(--color-stem) 2.5px, transparent 3px);
+
+/* A receipt's ruled lines, in the surface colours. */
+@utility bg-receipt {
+  background: repeating-linear-gradient(180deg, var(--muted) 0 4px, var(--card) 4px 8px);
 }
 
 /* The Mastercard chip: two halves. */
@@ -245,12 +189,45 @@
 }
 
 /*
- * The brand scope (BrandRoot): ink on cream, and the app's tokens pointed at
- * the palette for the shared components inside. In the
- * base layer, so any utility on an element (a link's own colour) wins.
+ * The brand scope (BrandRoot): the app's Moonstone tokens as they are, so
+ * nothing here re-points a colour. In the base layer, so any utility on an
+ * element wins. BrandRoot also adds `.corona` (the drifting glow, globals.css);
+ * `isolation` keeps the corona's fixed light inside this box's stacking
+ * context, above its background, as it is on <body> in the app.
  */
 @layer base {
   .brand {
+    isolation: isolate;
+    /* The design leaves line height to the browser, not Tailwind's 1.5. */
+    line-height: normal;
+    color: var(--foreground);
+    background-color: var(--background);
+    -webkit-font-smoothing: antialiased;
+
+    & a {
+      color: inherit;
+      text-decoration: none;
+    }
+    & ::placeholder {
+      color: var(--muted-foreground);
+    }
+    & :focus-visible {
+      outline: 2px solid var(--foreground);
+      outline-offset: 3px;
+    }
+    & [id] {
+      scroll-margin-top: 96px;
+    }
+  }
+
+  /*
+   * The cream look (`<BrandRoot look="cream">`): ink on cream, with the
+   * app's tokens pointed at the palette above so token-based components
+   * (Input, the pill buttons, the brand fields) print in ink on cream.
+   * Always light.
+   */
+  .brand[data-look="cream"] {
+    color-scheme: light;
     --background: var(--color-cream);
     --foreground: var(--color-ink);
     --card: var(--color-paper);
@@ -263,6 +240,7 @@
     --secondary: var(--color-sand);
     --secondary-foreground: var(--color-ink);
     --muted: var(--color-oat);
+    --muted-strong: var(--color-sand);
     --muted-foreground: var(--color-ink-muted);
     --accent: var(--color-oat);
     --accent-foreground: var(--color-ink);
@@ -273,15 +251,11 @@
     --brand-accent-foreground: var(--color-ink);
     --success: var(--color-leaf-ink);
     --warning: var(--color-honey);
-    /* The design leaves line height to the browser, not Tailwind's 1.5. */
-    line-height: normal;
     color: var(--color-ink);
     background-color: var(--color-cream);
-    -webkit-font-smoothing: antialiased;
 
     & a {
       color: var(--color-ink);
-      text-decoration: none;
     }
     & a:not([data-plain]):hover {
       color: var(--color-honey-hover);
@@ -290,11 +264,7 @@
       color: var(--color-ink-ghost);
     }
     & :focus-visible {
-      outline: 2px solid var(--color-ink);
-      outline-offset: 3px;
-    }
-    & [id] {
-      scroll-margin-top: 80px;
+      outline-color: var(--color-ink);
     }
   }
 }

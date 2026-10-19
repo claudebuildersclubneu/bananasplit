@@ -78,6 +78,17 @@ export function isShortcutSheetKey(
   return event.key === "/" || event.code === "Slash";
 }
 
+/**
+ * ⌘\ or Ctrl \ on any platform (Ctrl works on a Mac too): collapse the
+ * sidebar to its rail, or dock it again. Works in fields too, like ⌘/.
+ */
+export function isSidebarToggleKey(
+  event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey">,
+): boolean {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+  return event.key === "\\" || event.code === "Backslash";
+}
+
 /** A menu, popover or dialog is open: single keys belong to it. */
 export function overlayOpen(): boolean {
   return (
@@ -120,6 +131,7 @@ export function shortcutGroups(input: ShortcutSheetInput): ShortcutGroup[] {
   const anywhere: ShortcutRow[] = [
     { keys: [[mod, "K"]], label: "Search everything" },
     { keys: [[mod, "/"], ["?"]], label: "Show keyboard shortcuts" },
+    { keys: [[mod, "\\"]], label: "Collapse or expand the sidebar" },
   ];
   if (has("tasks")) anywhere.push({ keys: [[upper(TASK_KEYS.newTask)]], label: "New task" });
 

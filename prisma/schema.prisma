@@ -90,7 +90,8 @@ model User {
   chartPositions         OrgChartPosition[]   @relation("OrgChartPositionUser")
   contacts               Contact[]            @relation("ContactUser")
   ownedTasks             Task[]               @relation("TaskOwner")
-  triageProjects         Project[]            @relation("ProjectTriageUser")
+  ledProjects            Project[]            @relation("ProjectLead")
+  createdLabels          Label[]              @relation("LabelCreatedBy")
   assignmentsMade        TaskAssignee[]       @relation("TaskAssignedBy")
   taskComments           TaskComment[]        @relation("TaskCommentAuthor")
   taskMentions           TaskMention[]        @relation("TaskMentionedUser")
@@ -107,6 +108,12 @@ model User {
   noteFolders            NoteFolder[]         @relation("NoteFolderCreatedBy")
   noteShares             NoteShare[]          @relation("NoteShareUser")
   noteSharesCreated      NoteShare[]          @relation("NoteShareCreatedBy")
+  noteComments           NoteComment[]        @relation("NoteCommentAuthor")
+  noteCommentsResolved   NoteComment[]        @relation("NoteCommentResolvedBy")
+  noteVersions           NoteVersion[]        @relation("NoteVersionCreatedBy")
+
+  /// People search: trigram matching on the name (pg_trgm, GIN).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// When a user can't meet (profile setup A5, the profile page). Its own
@@ -338,14 +345,21 @@ model Organization {
   kind                    OrgKind   @default(CLUB)
   /// PERSONAL only: whose space it is (one each).
   personalOwnerId         String?   @unique
-  /// FREE for Personal; TRIAL, CLUB or SOCIETY for a club
+  /// FREE or PERSONAL_PLUS for Personal; TRIAL, CLUB or SOCIETY for a club
   /// (src/lib/billing/space.ts says what each includes). OWNER-only
-  /// (app.organization_guard); Admin panel > Plan.
+  /// (app.organization_guard); Admin panel > Plan. A Personal space moves
+  /// only between FREE and PERSONAL_PLUS, a club never onto either
+  /// (app.organization_space_guard).
   plan                    OrgPlan   @default(TRIAL)
   /// TRIAL: when the trial ends (30 days after the club was started); the
   /// club is paused after it until the owner picks a plan. Never changed by
   /// the app roles.
   trialEndsAt             DateTime?
+  /// Bytes stored by the space: OrgFile (trashed files count until they are
+  /// deleted for good), Receipt and NoteVersion sizes. Kept by the
+  /// app.storage_used_track triggers; the app roles never write it (no
+  /// UPDATE grant on the column, app.organization_storage_guard).
+  storageUsedBytes        BigInt    @default(0)
   createdAt               DateTime  @default(now())
 
   personalOwner User? @relation("PersonalSpace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
@@ -390,6 +404,7 @@ model Organization {
   memberPrefs       MemberPrefs[]
   files             OrgFile[]
   noteFolders       NoteFolder[]
+  pulseIssues       PulseIssue[]
 }
 
 /// CLUB or PERSONAL (docs/features/personal-and-clubs.md).
@@ -398,11 +413,13 @@ enum OrgKind {
   PERSONAL
 }
 
-/// FREE: Personal (and only Personal). TRIAL: a new club's 30 days of
-/// everything. CLUB and SOCIETY: the paid club plans
+/// FREE ("Personal Free") and PERSONAL_PLUS ("Personal Plus"): Personal
+/// (and only Personal). TRIAL: a new club's 30 days of everything. CLUB
+/// ("Team") and SOCIETY ("Team Advanced"): the paid club plans
 /// (src/components/marketing/pricing.tsx).
 enum OrgPlan {
   FREE
+  PERSONAL_PLUS
   TRIAL
   CLUB
   SOCIETY
@@ -431,6 +448,8 @@ enum NotificationType {
   TASK_OVERDUE
   // A note shared with someone (src/server/notes/sharing.ts)
   NOTE_SHARED
+  // The club's weekly pulse (PulseIssue), in-app when OrgSettings.pulseInApp
+  WEEKLY_PULSE
 }
 
 model Notification {
@@ -479,6 +498,8 @@ model Membership {
 
   @@unique([userId, organizationId])
   @@index([organizationId])
+  /// People search: trigram matching on the title (pg_trgm, GIN).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Invitation {
@@ -548,33 +569,57 @@ enum TaskPriority {
   HIGH
 }
 
+/// Where a project stands (Project.status).
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  DONE
+}
+
+/// OWNER/ADMIN create projects, and so does every member while
+/// OrgSettings.memberCanCreateProjects is on (RLS); any member edits one
+/// (the departing member clears their own lead, untieDepartingMember);
+/// OWNER/ADMIN delete.
 model Project {
-  id                String    @id @default(cuid())
-  organizationId    String
-  name              String
-  description       String?
-  archivedAt        DateTime?
-  createdAt         DateTime  @default(now())
-  // Intake queue (Phase 6), e.g. Design Requests: anyone files tasks; only
-  // the triage user or OWNER/ADMIN sets priority or owner.
-  isIntake          Boolean   @default(false)
-  triageUserId      String?
-  /// Default due date for new intake tasks (days from creation).
-  defaultDueInDays  Int?
-  /// Org-chart position key whose holder triages (6b), e.g. "vp-growth".
-  triagePositionKey String?
+  id             String        @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  /// Strict "#rrggbb" (check constraint), or NULL for the default colour.
+  color          String?
+  /// The member who leads it (app.assert_org_member); NULL when nobody does.
+  leadId         String?
+  status         ProjectStatus @default(ACTIVE)
+  /// Calendar dates (no time of day).
+  startDate      DateTime?     @db.Date
+  targetDate     DateTime?     @db.Date
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  triageUser   User?        @relation("ProjectTriageUser", fields: [triageUserId], references: [id], onDelete: SetNull)
+  lead         User?        @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   tasks        Task[]
 
   @@index([organizationId])
+}
+
+/// The task hierarchy (app.task_hierarchy_guard): an EPIC is always
+/// top-level; a STORY sits at the top or under an EPIC; a TASK at the top,
+/// under an EPIC or under a STORY. A task with subtasks is at least a STORY.
+enum TaskType {
+  EPIC
+  STORY
+  TASK
 }
 
 model Task {
   id                String              @id @default(cuid())
   organizationId    String
   projectId         String?
+  /// EPIC, STORY or TASK; which parent it may have is enforced by
+  /// app.task_hierarchy_guard (see TaskType).
+  type              TaskType            @default(TASK)
   title             String
   description       String?
   status            TaskStatus          @default(NOT_STARTED)
@@ -663,13 +708,22 @@ model TaskAssignee {
   @@index([organizationId, userId])
 }
 
+/// A tag ("label" in the schema). OWNER/ADMIN create, rename and delete
+/// them; every member may also create one (inline, recording themselves as
+/// createdById) while OrgSettings.memberCanCreateTags is on (RLS). Names
+/// are unique per org ignoring case by the app, not by an index: existing
+/// data may hold case duplicates.
 model Label {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   name           String
   color          String
+  /// Who made it, when made inline; NULL for older and admin-made tags.
+  /// Immutable for the app roles.
+  createdById    String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("LabelCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   tasks        TaskLabel[]
 
   @@unique([organizationId, id])
@@ -767,6 +821,35 @@ model WeeklyUpdate {
   @@index([organizationId, weekStart])
 }
 
+/// Who receives the weekly pulse (OrgSettings.pulseAudience).
+enum PulseAudience {
+  EVERYONE
+  OFFICERS
+}
+
+/// One week's pulse for a club: what got done, events, new members, poll
+/// results and next week, compiled by the pulse job (service path) on
+/// OrgSettings.pulseDay at pulseHourLocal. Members read it; OWNER/ADMIN may
+/// only add or change the note (a column grant); the service path writes
+/// the rest. data's shape: PulseIssueData in prisma/seed.ts (version 1).
+model PulseIssue {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// The first of the seven org-local days the issue covers, which end on
+  /// OrgSettings.pulseDay (updateWeekStartOfKey, src/lib/tasks/dates.ts).
+  weekStart      DateTime  @db.Date
+  data           Json
+  /// An admin's note shown at the top (at most 1000 characters).
+  note           String?
+  /// When it went out (email and in-app), or NULL while it hasn't.
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, weekStart])
+}
+
 // --- Notes ---
 
 enum NoteVisibility {
@@ -778,6 +861,18 @@ enum NoteVisibility {
 enum NoteShareRole {
   VIEWER
   EDITOR
+}
+
+/// How a note is laid out: a free page, or a paged document (paperSize).
+enum NoteLayout {
+  PAGE
+  DOCUMENT
+}
+
+/// The paper a DOCUMENT note is laid out on.
+enum PaperSize {
+  LETTER
+  A4
 }
 
 model Note {
@@ -799,25 +894,41 @@ model Note {
   updatedAt      DateTime                 @updatedAt
   /// Generated column (see migration SQL): to_tsvector('english', title || contentText).
   /// Prisma has no native tsvector type, so this is queried via $queryRaw, never the client API.
-  searchVector   Unsupported("tsvector")?
+  searchVector   Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, ((COALESCE(title, ''::text) || ' '::text) || COALESCE(\"contentText\", ''::text)))"))
   /// Live collaboration (docs/features/collaboration.md): the Yjs document the
   /// body is edited in, NULL until a note is first saved live. contentJson and
   /// contentText stay in step with it and remain what search, the list and the
   /// autosave editor read. Internal storage: omit it from list reads and exports.
   yjsState       Bytes?
+  /// Nested pages: the note this one sits inside, in the same org (composite
+  /// foreign key; deleting the parent sets only this column to NULL). Never
+  /// its own ancestor, and for app_user always a note the caller can see
+  /// (app.note_parent_guard). Changed by whoever may edit the note.
+  parentId       String?
+  /// An emoji or icon name shown with the title (at most 32 characters).
+  icon           String?
+  layout         NoteLayout               @default(PAGE)
+  /// DOCUMENT layout only (kept for PAGE so switching back keeps it).
+  paperSize      PaperSize                @default(LETTER)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  author       User         @relation("NoteAuthor", fields: [authorId], references: [id])
-  updatedBy    User         @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
-  event        Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  folder       NoteFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  author       User          @relation("NoteAuthor", fields: [authorId], references: [id])
+  updatedBy    User          @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
+  event        Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  folder       NoteFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  parent       Note?         @relation("NoteChildren", fields: [organizationId, parentId], references: [organizationId, id], onDelete: SetNull)
+  children     Note[]        @relation("NoteChildren")
   shares       NoteShare[]
+  comments     NoteComment[]
+  versions     NoteVersion[]
 
-  /// For NoteShare's composite foreign key (a share stays in its note's org).
+  /// For the composite foreign keys of NoteShare, NoteComment, NoteVersion
+  /// and child notes (they stay in their note's org).
   @@unique([organizationId, id])
   // Phase 9: the notes list filters on deletedAt and orders by updatedAt.
   @@index([organizationId, deletedAt, updatedAt])
   @@index([searchVector], type: Gin)
+  @@index([organizationId, parentId])
 }
 
 /// A member a note is shared with, as a viewer or an editor, on top of its
@@ -839,6 +950,69 @@ model NoteShare {
 
   @@id([noteId, userId])
   @@index([organizationId, userId])
+}
+
+/// A comment on a note: a thread root (threadId NULL), or a reply to one
+/// (threadId = the root, on the same note). Whoever can see the note reads
+/// and adds comments (as themselves). The author edits the body; whoever
+/// may edit the note resolves and reopens a thread (non-authors change
+/// only resolvedAt and resolvedById: app.note_comment_guard). The author,
+/// or whoever may share the note (app.can_share_note), deletes; deleting a
+/// root deletes its replies. noteId, authorId and threadId never change.
+model NoteComment {
+  id             String    @id @default(cuid())
+  organizationId String
+  noteId         String
+  /// NULL once the author's account is deleted.
+  authorId       String?
+  /// The thread's root comment (same note), or NULL for a root.
+  threadId       String?
+  /// 1 to 5000 characters (check constraint).
+  body           String
+  /// The text the comment was anchored to, as quoted when it was made.
+  anchorText     String?
+  /// Where it is anchored in the live document: Yjs relative positions
+  /// ({ from, to }, encoded by the editor). NULL for a note-level comment.
+  anchor         Json?
+  resolvedAt     DateTime?
+  resolvedById   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  note       Note          @relation(fields: [organizationId, noteId], references: [organizationId, id], onDelete: Cascade)
+  author     User?         @relation("NoteCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  resolvedBy User?         @relation("NoteCommentResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  thread     NoteComment?  @relation("NoteCommentThread", fields: [noteId, threadId], references: [noteId, id], onDelete: Cascade)
+  replies    NoteComment[] @relation("NoteCommentThread")
+
+  /// For the thread's composite foreign key (a reply stays on its note).
+  @@unique([noteId, id])
+  @@index([organizationId, noteId, createdAt])
+  @@index([noteId, threadId])
+}
+
+/// A saved copy of a note's body: autosave snapshots (the service path,
+/// which also prunes them) and named versions. Whoever can see the note
+/// reads them; whoever may edit it saves one (as themselves) and renames it
+/// (name is the only column app_user may update); whoever may share it
+/// deletes. sizeBytes is computed by the database from contentJson and
+/// yjsState (app.note_version_size) and counts toward the org's storage.
+model NoteVersion {
+  id             String   @id @default(cuid())
+  organizationId String
+  noteId         String
+  /// Set for a named version; NULL for an autosave snapshot.
+  name           String?
+  createdById    String?
+  contentJson    Json
+  yjsState       Bytes?
+  sizeBytes      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  note      Note  @relation(fields: [organizationId, noteId], references: [organizationId, id], onDelete: Cascade)
+  createdBy User? @relation("NoteVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, noteId, createdAt])
 }
 
 // --- Calendar and scheduling ---
@@ -1692,6 +1866,18 @@ model OrgSettings {
   /// The sidebar for everyone in the org: [{ id, hidden?, label? }] in order
   /// (src/lib/nav/sidebar.ts). NULL: the default sidebar. OWNER/ADMIN edit it.
   sidebar                       Json?
+  // The weekly pulse (PulseIssue)
+  pulseEnabled                  Boolean          @default(true)
+  /// The day it goes out, 0 Sunday … 6 Saturday (as weeklyUpdateDay).
+  pulseDay                      Int              @default(5)
+  /// The hour it goes out, 0-23, in Organization.timezone.
+  pulseHourLocal                Int              @default(17)
+  pulseAudience                 PulseAudience    @default(EVERYONE)
+  pulseEmail                    Boolean          @default(true)
+  pulseInApp                    Boolean          @default(true)
+  // What members (not only OWNER/ADMIN) may create; RLS reads these.
+  memberCanCreateProjects       Boolean          @default(true)
+  memberCanCreateTags           Boolean          @default(true)
   updatedById                   String?
   updatedAt                     DateTime         @default(now()) @updatedAt
 
@@ -1987,6 +2173,8 @@ model DatabaseField {
   database DatabaseDefinition @relation(fields: [organizationId, databaseId], references: [organizationId, id], onDelete: Cascade)
 
   @@unique([organizationId, id])
+  /// Exactly one primary field per database (20261012170000_club_databases).
+  @@unique([databaseId], map: "DatabaseField_one_primary", where: raw("\"isPrimary\""))
   @@index([organizationId, databaseId, sortOrder])
 }
 
@@ -2012,6 +2200,8 @@ model DatabaseRecord {
 
   @@unique([organizationId, id])
   @@index([organizationId, databaseId, deletedAt, createdAt])
+  /// Filtering on cell values (20261012170000_club_databases).
+  @@index([values(ops: JsonbPathOps)], map: "DatabaseRecord_values_gin", type: Gin)
 }
 
 enum DatabaseFieldType {

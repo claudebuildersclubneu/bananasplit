@@ -387,7 +387,7 @@ export function PollResponder({
   // On a phone the read-out floats over the grid's bottom edge, so it only
   // appears once a time is picked, and can be put away.
   const mobileDetails = activeSlot ? (
-    <div className="sticky bottom-3 z-40 lg:hidden">
+    <div className="sticky bottom-[calc(var(--shell-bottom,0px)+0.75rem)] z-40 lg:hidden">
       {details("shadow-md pr-9")}
       <Button
         type="button"

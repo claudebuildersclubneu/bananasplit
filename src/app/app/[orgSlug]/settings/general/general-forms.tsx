@@ -290,10 +290,10 @@ export function SlugForm({
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle>Change the organization URL</DialogTitle>
+                  <DialogTitle>Change the club URL</DialogTitle>
                   <DialogDescription>
                     Old links keep working: the current URL redirects to the new one. The old URL is
-                    reserved for this organization forever, so no one else can take it.
+                    reserved for this club forever, so no one else can take it.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-1.5">
@@ -444,7 +444,7 @@ export function LogoForm({
   return (
     <SettingsCard
       title="Club picture"
-      description="Your club's profile picture: the sidebar, the organization switcher, and the page people see when they join."
+      description="Your club's profile picture: the sidebar, the club switcher, and the page people see when they join."
       status={status && <StatusLine status={status} />}
     >
       <div className="flex flex-wrap items-center gap-4">

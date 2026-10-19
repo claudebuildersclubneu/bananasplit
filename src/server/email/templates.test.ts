@@ -1,15 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  emailConfigProblems,
-  emailDelivery,
-  fromMatchesAppDomain,
-} from "./config";
+import { emailConfigProblems, emailDelivery, fromMatchesAppDomain } from "./config";
 import { displayName, escapeHtml, safeHref, subjectLine } from "./escape";
 import {
+  EMAIL_COLORS,
   invitationEmail,
   notificationEmail,
+  passwordResetEmail,
   reimbursementStatusEmail,
+  testEmail,
   treasurerDigestEmail,
   verifyEmailEmail,
 } from "./templates";
@@ -50,10 +49,16 @@ describe("templates", () => {
         pending: [{ description: XSS, amountFormatted: "$1.00", submitterName: XSS }],
         url: "https://p.org/app/x",
       }),
-      verifyEmailEmail({ name: XSS, verifyUrl: "https://p.org/verify-email/tok", expiresHours: 24 }),
+      verifyEmailEmail({
+        name: XSS,
+        verifyUrl: "https://p.org/verify-email/tok",
+        expiresHours: 24,
+      }),
     ];
     for (const email of rendered) {
-      expect(email.html).not.toContain("<img");
+      // The only image is the logo; the hostile one only ever appears escaped.
+      expect(email.html.match(/<img /g)).toHaveLength(1);
+      expect(email.html).not.toContain("<img src=x");
       expect(email.html).toContain("&lt;img");
       expect(email.subject).not.toMatch(/[\r\n]/);
       expect(email.text.length).toBeGreaterThan(0);
@@ -90,6 +95,59 @@ describe("templates", () => {
   });
 });
 
+describe("layout (Moonstone light)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("puts the logo above a white card on a grey page, with an ink pill", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://portal.example.org");
+    const email = passwordResetEmail({
+      name: "Maya",
+      resetUrl: "https://portal.example.org/reset-password/tok",
+      expiresMinutes: 60,
+    });
+    expect(email.html).toContain(
+      '<img src="https://portal.example.org/brand/bananasplit-logo.png" width="140" height="28" alt="Bananasplit"',
+    );
+    expect(email.html).toContain(`background:${EMAIL_COLORS.page}`);
+    expect(email.html).toContain(`background:${EMAIL_COLORS.card}`);
+    expect(email.html).toContain(`background:${EMAIL_COLORS.ink};color:${EMAIL_COLORS.onInk}`);
+    expect(email.html).toContain('<meta name="color-scheme" content="light only">');
+    // Sentence case and no uppercase labels anywhere.
+    expect(email.html).not.toMatch(/text-transform|letter-spacing/);
+  });
+
+  it("keeps the plain-text copy in step with the HTML", () => {
+    const email = notificationEmail({
+      orgName: "Riverside Robotics",
+      title: "Venue booked",
+      body: "Maya booked Engineering Hall 112.",
+      url: "https://p.org/app/riverside",
+    });
+    expect(email.text).toBe(
+      [
+        "Riverside Robotics",
+        "Venue booked\n\nMaya booked Engineering Hall 112.",
+        "Open in Bananasplit: https://p.org/app/riverside",
+        "Change which notifications email you on your profile.",
+      ].join("\n\n"),
+    );
+    for (const line of ["Riverside Robotics", "Venue booked", "Open in Bananasplit"]) {
+      expect(email.html).toContain(line);
+    }
+  });
+
+  it("leaves the logo out when there is no app URL, and still renders", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+    const email = testEmail({ orgName: "Riverside Robotics", senderLabel: "Resend" });
+    expect(email.html).not.toContain("<img");
+    expect(email.text).toContain("If you received it, the sender works.");
+  });
+});
+
 describe("email configuration", () => {
   it("chooses live, sink or off", () => {
     expect(emailDelivery({})).toBe("sink");
@@ -98,21 +156,32 @@ describe("email configuration", () => {
     expect(emailDelivery({ EMAIL_SINK: "log", RESEND_API_KEY: "re_x" })).toBe("sink");
     expect(emailDelivery({ EMAIL_DELIVERY: "off" })).toBe("off");
     // Previews never deliver, whatever they are configured with.
-    expect(emailDelivery({ VERCEL_ENV: "preview", RESEND_API_KEY: "re_x", EMAIL_DELIVERY: "live" })).toBe(
-      "sink",
-    );
+    expect(
+      emailDelivery({ VERCEL_ENV: "preview", RESEND_API_KEY: "re_x", EMAIL_DELIVERY: "live" }),
+    ).toBe("sink");
     // Production without a key must fail loudly, not fall back to the sink.
     expect(emailDelivery({ VERCEL_ENV: "production" })).toBe("live");
   });
 
   it("checks the production sender against the app domain", () => {
-    expect(fromMatchesAppDomain("CBC <no-reply@mail.claudeneu.com>", "https://portal.claudeneu.com")).toBe(true);
-    expect(fromMatchesAppDomain("CBC <no-reply@claudeneu.com>", "https://portal.claudeneu.com")).toBe(true);
-    expect(fromMatchesAppDomain("CBC <no-reply@gmail.com>", "https://portal.claudeneu.com")).toBe(false);
-    expect(fromMatchesAppDomain("no-reply@portal.claudeneu.com", "https://portal.claudeneu.com")).toBe(true);
+    expect(
+      fromMatchesAppDomain("CBC <no-reply@mail.claudeneu.com>", "https://portal.claudeneu.com"),
+    ).toBe(true);
+    expect(
+      fromMatchesAppDomain("CBC <no-reply@claudeneu.com>", "https://portal.claudeneu.com"),
+    ).toBe(true);
+    expect(fromMatchesAppDomain("CBC <no-reply@gmail.com>", "https://portal.claudeneu.com")).toBe(
+      false,
+    );
+    expect(
+      fromMatchesAppDomain("no-reply@portal.claudeneu.com", "https://portal.claudeneu.com"),
+    ).toBe(true);
     expect(fromMatchesAppDomain("CBC <no-reply@example.com>", "https://example.com")).toBe(false);
     expect(
-      emailConfigProblems({ VERCEL_ENV: "production", NEXT_PUBLIC_APP_URL: "https://portal.claudeneu.com" }),
+      emailConfigProblems({
+        VERCEL_ENV: "production",
+        NEXT_PUBLIC_APP_URL: "https://portal.claudeneu.com",
+      }),
     ).toEqual(["RESEND_API_KEY is not set", "EMAIL_FROM is not set"]);
     expect(
       emailConfigProblems({

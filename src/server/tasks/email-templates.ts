@@ -111,25 +111,6 @@ export function taskBulkAssignedEmail(input: {
   });
 }
 
-/** A new request in an intake queue, to its triage owner. */
-export function taskRequestFiledEmail(input: {
-  orgName: string;
-  actorName: string;
-  task: TaskFacts;
-  url: string;
-}): RenderedEmail {
-  const queue = input.task.projectName ?? "the intake queue";
-  const lead = `${input.actorName} filed a request in ${queue}. Set its priority and owner.`;
-  return layout({
-    subject: `New request: ${input.task.title}`,
-    eyebrow: input.orgName,
-    bodyHtml: paragraph(lead) + factsHtml(input.task),
-    bodyText: [lead, factsText(input.task)].join("\n\n"),
-    cta: { label: "Triage request", url: input.url },
-    footer: FOOTER,
-  });
-}
-
 export function taskMentionedEmail(input: {
   orgName: string;
   actorName: string;

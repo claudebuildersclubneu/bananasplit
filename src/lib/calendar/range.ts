@@ -10,6 +10,8 @@ import { addDaysToKey, parseDateKey, safeTimeZone, zonedDateKey, zonedMidnight }
  *   &kind=WORKSHOP,SOCIAL            optional filters
  *   &vis=PUBLIC|INTERNAL
  *   &tasks=0                         hide tasks (their due dates show by default)
+ *   &new=rsvp                        open New event with "Take RSVPs" on (the
+ *                                    RSVPs page's button), then dropped
  *
  * Days are read in the org timezone; the window is padded by a day on each
  * side so viewers in other timezones never miss an edge event. A missing or
@@ -97,6 +99,13 @@ export function parseCalendarRange(params: Params, timeZoneRaw: string, now: Dat
     visibility,
     tasks: first(params.tasks) !== "0",
   };
+}
+
+/** ?new=rsvp: the calendar opens New event with its RSVP page switched on. */
+export const NEW_EVENT_PARAM = "new";
+
+export function newRsvpEventHref(orgSlug: string): string {
+  return `/app/${orgSlug}/calendar?${NEW_EVENT_PARAM}=rsvp`;
 }
 
 /** The query string for a window and filters (stable key order). */

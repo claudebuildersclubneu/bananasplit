@@ -11,7 +11,7 @@ export function cleanCode(text: string): string {
 }
 
 /**
- * One box per character of a club code (design: App screens, 03). Accepts
+ * One box per character of an invite code (design: App screens, 03). Accepts
  * A-Z and 0-9 only and upper-cases them; typing moves on to the next box;
  * Backspace in an empty box clears the one before and moves back; the arrow
  * keys move between boxes; focusing a box selects it; a paste anywhere fills
@@ -25,7 +25,7 @@ export function CodeBoxes({
   onChange,
   invalid = false,
   autoFocus = false,
-  label = "Club code",
+  label = "Invite code",
 }: {
   value: string[];
   onChange: (next: string[]) => void;
@@ -65,7 +65,11 @@ export function CodeBoxes({
       {value.map((char, i) => [
         // Eight characters read as two groups of four, like the code itself.
         length === JOIN_CODE_LENGTH && i === 4 && (
-          <span key="dash" aria-hidden="true" className="text-ink-faint self-center text-[26px]">
+          <span
+            key="dash"
+            aria-hidden="true"
+            className="text-muted-foreground self-center text-[26px]"
+          >
             -
           </span>
         ),
@@ -116,9 +120,9 @@ export function CodeBoxes({
             }
           }}
           className={cn(
-            "font-heading focus-banana caret-ripe h-[68px] max-w-[58px] min-w-0 flex-1 basis-0 rounded-[14px] border-[1.5px] text-center text-[30px] uppercase transition-[border-color,box-shadow,background-color] outline-none",
-            length > 6 && "max-w-[46px] text-[26px]",
-            char ? "border-ink bg-paper" : "border-ink/16 bg-cream",
+            "focus-banana rounded-field text-foreground h-[64px] max-w-[56px] min-w-0 flex-1 basis-0 border text-center font-mono text-[28px] font-medium uppercase caret-(--glow) transition-[border-color,box-shadow,background-color] outline-none",
+            length > 6 && "max-w-[46px] text-[24px]",
+            char ? "border-foreground/40 bg-card" : "border-input bg-muted",
             invalid && "border-destructive",
           )}
         />,

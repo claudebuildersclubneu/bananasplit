@@ -6,13 +6,13 @@ import {
   Prisma,
   TaskPriority,
   TaskStatus,
+  TaskType,
   TaskVisibility,
 } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/permissions";
 import {
   canAcknowledgeFlag,
   canEditTask,
-  canTriage,
   checkAssignmentChange,
   checkFieldEdit,
   type AssignmentChange,
@@ -20,14 +20,7 @@ import {
   type TaskActor,
 } from "@/lib/tasks/access";
 import type { ViewerChart } from "@/lib/tasks/assignment";
-import {
-  addDaysToKey,
-  dueDateKey,
-  formatDueKey,
-  fromDateKey,
-  isDateKey,
-  localDateKey,
-} from "@/lib/tasks/dates";
+import { dueDateKey, formatDueKey, fromDateKey, isDateKey, localDateKey } from "@/lib/tasks/dates";
 import {
   diffMentions,
   mentionsToNotify,
@@ -70,7 +63,7 @@ import { scheduleTaskReminders, type ReminderOrg } from "./reminders";
  *    ViewerChart (hand-down classification and chart-manager rights), the
  *    org's task defaults and the member set;
  * 2. authorizes with the pure rules in src/lib/tasks/access.ts
- *    (assertCanEditTask, the self-assign carve-out, intake triage);
+ *    (assertCanEditTask, the self-assign carve-out);
  * 3. classifies every new owner and collaborator (src/lib/tasks/assignment.ts),
  *    asks for confirmation of an above-level assignment (nothing is written
  *    until the actor confirms), and stores the relation and the flag;
@@ -242,6 +235,7 @@ const subjectSelect = {
   priority: true,
   dueDate: true,
   projectId: true,
+  type: true,
   parentTaskId: true,
   createdById: true,
   ownerId: true,
@@ -253,7 +247,6 @@ const subjectSelect = {
   rank: true,
   deletedAt: true,
   assignees: { select: { userId: true, flagged: true, flagAcknowledgedAt: true } },
-  project: { select: { isIntake: true, triageUserId: true, defaultDueInDays: true } },
 } satisfies Prisma.TaskSelect;
 
 type Subject = Prisma.TaskGetPayload<{ select: typeof subjectSelect }>;
@@ -276,8 +269,6 @@ function accessOf(s: Subject): TaskAccessSubject {
     createdById: s.createdById,
     ownerId: s.ownerId,
     assigneeIds: s.assignees.map((a) => a.userId),
-    isIntake: s.project?.isIntake ?? false,
-    triageUserId: s.project?.triageUserId ?? null,
   };
 }
 
@@ -336,9 +327,9 @@ function isEmptyChange(change: AssignmentChange): boolean {
 /**
  * Authorizes and classifies an assignment change. Every assignment path
  * (create, update, self-assign, bulk, subtask) calls this: membership of
- * every new person, assertCanEditTask or the self-assign carve-out, intake
- * triage, and the hand-down classification of each new owner and
- * collaborator against the published chart.
+ * every new person, assertCanEditTask or the self-assign carve-out, and the
+ * hand-down classification of each new owner and collaborator against the
+ * published chart.
  */
 export function planAssignment(
   env: Pick<TaskEnv, "actor" | "chart" | "memberIds">,
@@ -640,7 +631,7 @@ async function syncMentions(
 async function loadProject(env: TaskEnv, projectId: string) {
   const project = await env.ctx.db.project.findFirst({
     where: { id: projectId, organizationId: env.ctx.organizationId, archivedAt: null },
-    select: { id: true, isIntake: true, triageUserId: true, defaultDueInDays: true },
+    select: { id: true },
   });
   if (!project) throw new TaskError("That project doesn't exist in this organization.");
   return project;
@@ -655,7 +646,12 @@ async function assertLabels(env: TaskEnv, labelIds: readonly string[]): Promise<
     throw new TaskError("One or more labels don't belong to this organization.");
 }
 
-/** One level of nesting: the parent must be top-level and editable by the actor. */
+/**
+ * One level of nesting: the parent must be top-level and editable by the
+ * actor. The database's task types (app.task_hierarchy_guard) allow more
+ * (a TASK under a STORY under an EPIC); breaking a task down still goes one
+ * level here, with makeParentable and asSubtaskType keeping the types right.
+ */
 async function loadParent(env: TaskEnv, parentTaskId: string, childId?: string): Promise<Subject> {
   const parent = await loadSubject(env, parentTaskId).catch(() => {
     throw new TaskError("That parent task doesn't exist.");
@@ -673,6 +669,28 @@ async function loadParent(env: TaskEnv, parentTaskId: string, childId?: string):
       throw new TaskError("This task has subtasks of its own and can't become a subtask.");
   }
   return parent;
+}
+
+/**
+ * A TASK can't have subtasks (app.task_hierarchy_guard): breaking one down
+ * makes it a STORY. Call it once nothing can refuse the write any more
+ * (after the confirmation return), so a refusal leaves the parent as it was.
+ */
+async function makeParentable(env: TaskEnv, parent: Subject): Promise<void> {
+  if (parent.type !== TaskType.TASK) return;
+  await env.ctx.db.task.updateMany({
+    where: { id: parent.id, organizationId: env.ctx.organizationId, type: TaskType.TASK },
+    data: { type: TaskType.STORY },
+  });
+}
+
+/**
+ * What a task becomes when it moves under a parent: a TASK (the only type
+ * that sits under a STORY; loadParent has made sure it has no live subtasks
+ * of its own). Undefined when it already is one.
+ */
+function asSubtaskType(type: TaskType): TaskType | undefined {
+  return type === TaskType.TASK ? undefined : TaskType.TASK;
 }
 
 async function nextRankForStatus(env: TaskEnv, status: TaskStatus): Promise<string> {
@@ -702,25 +720,15 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
 
   const project = d.projectId ? await loadProject(env, d.projectId) : null;
   const parent = d.parentTaskId ? await loadParent(env, d.parentTaskId) : null;
-  const isIntake = project?.isIntake ?? false;
   const subject: TaskAccessSubject = {
     createdById: env.actor.userId,
     ownerId: null,
     assigneeIds: [],
-    isIntake,
-    triageUserId: project?.triageUserId ?? null,
   };
-  const triage = canTriage(env.actor, subject);
-  if (isIntake && !triage && d.priority && d.priority !== TaskPriority.MEDIUM) {
-    throw new TaskError("Only the request's triage owner or an admin sets its priority.");
-  }
 
-  let dueKey = d.dueDate ?? null;
-  if (!dueKey && isIntake && project?.defaultDueInDays) {
-    dueKey = addDaysToKey(localDateKey(env.now, env.org.timezone), project.defaultDueInDays);
-  }
+  const dueKey = d.dueDate ?? null;
   if (!parent) {
-    if (env.org.taskRequireOwner && !isIntake && !d.ownerId) {
+    if (env.org.taskRequireOwner && !d.ownerId) {
       throw new TaskError("Every task needs an owner.");
     }
     if (env.org.taskRequireDueDate && !dueKey) throw new TaskError("Every task needs a due date.");
@@ -746,17 +754,13 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   const rank = parent
     ? await nextSubtaskRank(env, parent.id)
     : await nextRankForStatus(env, status);
-  const priority = isIntake && !triage ? TaskPriority.MEDIUM : (d.priority ?? TaskPriority.MEDIUM);
+  const priority = d.priority ?? TaskPriority.MEDIUM;
   const oc = plan.ownerChange;
   // C4: a subtask takes its parent's visibility (the database trigger
-  // enforces it too); a request filed into an intake queue is always open,
-  // because a queue nobody can see is not a queue.
-  const visibility = parent
-    ? parent.visibility
-    : isIntake
-      ? TaskVisibility.ORG
-      : (d.visibility ?? TaskVisibility.ORG);
+  // enforces it too).
+  const visibility = parent ? parent.visibility : (d.visibility ?? TaskVisibility.ORG);
 
+  if (parent) await makeParentable(env, parent);
   const task = await db.task.create({
     data: {
       organizationId,
@@ -804,7 +808,6 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
       diffJson: {
         title: task.title,
         ...(parent ? { parentTaskId: parent.id } : {}),
-        ...(isIntake ? { intake: true } : {}),
       },
     },
     ...(status === TaskStatus.BLOCKED
@@ -817,23 +820,6 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   ]);
   const mentions = await syncMentions(env, { ...task, ...created }, "desc", d.description ?? null);
   await notifyAssignment(env, task, plan);
-  if (
-    isIntake &&
-    !plan.ownerChange?.ownerId &&
-    subject.triageUserId &&
-    subject.triageUserId !== env.actor.userId
-  ) {
-    // A new request lands in the triage owner's queue.
-    await notifyUsers(db, organizationId, [subject.triageUserId], {
-      type: NotificationType.TASK_ASSIGNED,
-      title: `${actorName(env)} filed a request: ${quoted(task.title)}`,
-      body: "Set its priority and owner in the intake queue.",
-      linkUrl: taskPath(env.org.slug, task.id),
-      taskId: task.id,
-      actorId: env.actor.userId,
-      dedupeKey: `intake:${task.id}`,
-    });
-  }
   await scheduleTaskReminders(
     db,
     env.org,
@@ -873,7 +859,6 @@ async function applyUpdate(
   const data: Prisma.TaskUncheckedUpdateManyInput = {};
   const activity: ActivityRow[] = [];
   let fieldEdit = false;
-  let priorityEdit = false;
 
   if (d.title !== undefined && d.title !== s.title) {
     data.title = d.title;
@@ -889,7 +874,6 @@ async function applyUpdate(
   if (d.priority !== undefined && d.priority !== s.priority) {
     data.priority = d.priority;
     fieldEdit = true;
-    priorityEdit = true;
   }
 
   // C4: visibility is not an ordinary field edit. A collaborator may edit a
@@ -940,17 +924,20 @@ async function applyUpdate(
       activity.push({ type: "BLOCKED", diffJson: { reason: sf.blockedReason } });
   }
 
-  let nextProject = s.project;
   if (d.projectId !== undefined && d.projectId !== s.projectId) {
-    nextProject = d.projectId ? await loadProject(env, d.projectId) : null;
+    if (d.projectId) await loadProject(env, d.projectId);
     data.projectId = d.projectId;
     fieldEdit = true;
   }
 
   let nextParentId = s.parentTaskId;
+  let newParent: Subject | null = null;
   if (d.parentTaskId !== undefined && d.parentTaskId !== s.parentTaskId) {
     if (d.parentTaskId) {
       const parent = await loadParent(env, d.parentTaskId, s.id);
+      newParent = parent;
+      const type = asSubtaskType(s.type);
+      if (type) data.type = type;
       data.rank = await nextSubtaskRank(env, parent.id);
       // The trigger would do this anyway; setting it here keeps the mention
       // audience below in step with what is about to be written.
@@ -980,7 +967,7 @@ async function applyUpdate(
   }
 
   if (fieldEdit) {
-    const check = checkFieldEdit(env.actor, access, { priority: priorityEdit });
+    const check = checkFieldEdit(env.actor, access);
     if (!check.ok) throw new TaskError(check.reason);
   }
 
@@ -996,14 +983,7 @@ async function applyUpdate(
   if (flagged.length > 0 && !d.confirmFlagged) return confirmationFor(env, flagged);
 
   const topLevel = nextParentId === null;
-  const intake = nextProject?.isIntake ?? false;
-  if (
-    topLevel &&
-    env.org.taskRequireOwner &&
-    !intake &&
-    plan?.ownerChange &&
-    !plan.ownerChange.ownerId
-  ) {
+  if (topLevel && env.org.taskRequireOwner && plan?.ownerChange && !plan.ownerChange.ownerId) {
     throw new TaskError("Every task needs an owner.");
   }
   if (topLevel && env.org.taskRequireDueDate && dueChanged && !d.dueDate) {
@@ -1012,6 +992,7 @@ async function applyUpdate(
 
   if (!fieldEdit && !plan) return { taskId: s.id, version: s.version };
 
+  if (newParent) await makeParentable(env, newParent);
   const res = await db.task.updateMany({
     where: {
       id: s.id,
@@ -1173,7 +1154,7 @@ export async function reorderTask(env: TaskEnv, input: unknown): Promise<TaskAct
   const { db, organizationId } = env.ctx;
   const s = await loadSubject(env, d.taskId);
   if (s.parentTaskId) throw new TaskError("Subtasks move with their parent.");
-  const check = checkFieldEdit(env.actor, accessOf(s), {});
+  const check = checkFieldEdit(env.actor, accessOf(s));
   if (!check.ok) throw new TaskError(check.reason);
 
   // Client-supplied neighbours: only this org's live top-level tasks in the target column.

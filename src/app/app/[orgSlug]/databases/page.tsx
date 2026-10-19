@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { can } from "@/lib/auth/permissions";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { fmtDateTime } from "@/server/databases/format";
 import { listDatabases } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -104,7 +105,7 @@ export default async function DatabasesPage({
   const planLock = await planGate(orgSlug, "databases");
   if (planLock) return planLock;
   const sp = await searchParams;
-  const { organization, role, user } = await getOrgContextBySlug(orgSlug);
+  const { organization, role, user, settings } = await getOrgContextBySlug(orgSlug);
   const isAdmin = can({ role }, "databases.write");
   const canConnect = can({ role }, "integrations.write");
   const showReports = Boolean(reportTier(role)) && can({ role }, "reports.view");
@@ -254,7 +255,7 @@ export default async function DatabasesPage({
   return (
     <div className="space-y-7.5">
       <PageHeader
-        title="Databases"
+        title={sectionLabel(settings?.sidebar, "databases")}
         description={summary}
         actions={isAdmin && <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} />}
         tabs={<DatabasesTabs orgSlug={orgSlug} showReports={showReports} />}

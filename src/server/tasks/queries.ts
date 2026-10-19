@@ -67,7 +67,7 @@ export const taskListSelect = {
     },
     orderBy: { rank: "asc" },
   },
-  project: { select: { id: true, name: true, isIntake: true, triageUserId: true } },
+  project: { select: { id: true, name: true } },
   parentTask: { select: { id: true, title: true } },
   _count: { select: { comments: { where: { deletedAt: null } } } },
 } satisfies Prisma.TaskSelect;
@@ -419,14 +419,7 @@ export function getOrgLabels(db: TxClient, organizationId: string) {
 export function getOrgProjects(db: TxClient, organizationId: string, includeArchived = false) {
   return db.project.findMany({
     where: { organizationId, ...(includeArchived ? {} : { archivedAt: null }) },
-    select: {
-      id: true,
-      name: true,
-      isIntake: true,
-      triageUserId: true,
-      defaultDueInDays: true,
-      archivedAt: true,
-    },
+    select: { id: true, name: true, archivedAt: true },
     orderBy: { name: "asc" },
   });
 }

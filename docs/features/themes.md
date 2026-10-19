@@ -9,9 +9,17 @@ pages wear the same theme and logo.
 
 1. Open **Settings > Theme**.
 2. **Palette.** Pick a preset, or **Custom** to choose the five colours yourself:
-   - **Bananasplit** (the Default, id `default`): cream paper, ink type and an
-     ink primary with a banana highlighter; in dark mode, ink-dark paper with a
-     banana primary.
+   - **Moonstone** (the Default, id `default`): graphite and pearl with no fill
+     colour of its own, lit by a banana glow (the light behind the page top, the
+     halo on create buttons, the active item and focus). Dark first: an org with
+     no theme opens in dark mode. Primary and accent are one colour (pearl in
+     dark, ink in light).
+   - **Banana night** (id `night`): graphite greys with banana as the accent.
+   - **Banana cream** (id `cream`): the look before the redesign: cream paper,
+     ink type and an ink primary with a banana highlighter; in dark mode,
+     ink-dark paper with a banana primary. A row saved as `default` with the
+     cream (or the earlier raspberry) palette follows the brand onto Moonstone
+     (`isFormerDefault`, `presets.ts`).
    - **Paper & Coral** (id `cbc`): warm paper, ink text, terracotta links and a
      coral highlighter, from the Claude Builders Club website's design system. In
      dark mode the coral becomes the primary with an ink label.
@@ -111,65 +119,107 @@ In production an admin picks it on the Theme page.
 
 ## The look (developers)
 
-The type, motion and logo on top of the tokens follow the design handoff. The
-look lives in `src/app/globals.css` (after the token blocks) and never names a
-colour, so any theme an org picks or builds restyles it, the scoped previews on
-Settings > Theme included. Surfaces are flat: no grain on the page.
+The Moonstone redesign (the working contract is docs/design/moonstone.md).
+The look lives in `src/app/globals.css` (after the token blocks) and never
+names a colour, so any theme an org picks or builds restyles it, the scoped
+previews on Settings > Theme included. No grain on the page.
 
-- **Type** (`src/app/layout.tsx`, loaded once for every page): **Young Serif**
-  (`font-heading`) for page titles and big figures, **Hanken Grotesk**
-  (`font-sans`) for everything you read and click, **JetBrains Mono**
-  (`font-mono`), sparingly, for labels, dates and money.
-- **Utilities.** `page-title` (every page's `<h1>`, the serif set tight),
-  `heading` (card, dialog and sheet titles: the grotesk, bold), `eyebrow`
-  (mono caps labels), `numeral` (big figures in the serif) and `figure` (mono
-  tabular money in text).
+- **The glow.** Look and feel's Glow (`ThemeStyle.glow`), else the preset's own
+  (`ThemePreset.glow`, Moonstone's banana), else each mode's accent. It is
+  only ever light: the corona behind the page top (`.corona`), halos
+  (`glow-halo`), the focus ring (`focus-glow`), gauges and selection.
+- **Derived layer** (`derive.ts`): `glow`, `haze`, `raised`, `muted-strong`,
+  `thumb`, `chrome` (+foreground, the glass rail, toasts and tab bar), the four
+  block cards (`block-quiet|alert|answer|goal` with `-foreground` and `-meta`;
+  alert and goal hold fixed red and green hue families), chip tints
+  (`tint-danger|accent|success|info` with inks) and avatar tints
+  (`avatar-1..5`). Every label is nudged to 4.6:1; the contrast checker covers
+  the chrome, block and chip pairs. Charts take the first coloured role
+  (primary, accent, glow) as slot 1; monochrome themes try quiet slots first.
+- **Type** (`src/app/layout.tsx`, loaded once for every page): **Bricolage
+  Grotesque** (`font-heading`, via `--font-display`) for page titles, block
+  titles and big figures; **Hanken Grotesk** (`font-sans`) for everything you
+  read and click; **JetBrains Mono** (`font-mono`) only for codes and `kbd`.
+  Young Serif stays loaded for the logo's wordmark (`font-logo`) and the
+  "Serif" heading choice. A stored heading font of `serif` predates the
+  choice and reads as Bricolage; `young-serif` is the deliberate pick.
+- **Shape and depth.** `rounded-shell|card|block|tile|field` (32/28/24/18/14px
+  times `--radius-scale`, which Corner roundness sets: round 1, the default;
+  soft 0.7; sharp 0.4), `shadow-e1|e2|e3`, `edge` (card shadow plus a top
+  highlight), `glass` and `glass-light` (floating chrome only; Chromium also
+  refracts through `#lg-refract` when <html> has `.has-refract`; solid under
+  "Reduce transparency"), `hatch` ("not yet").
+- **Utilities.** `page-title` (every page's `<h1>`), `display-title`,
+  `heading` (card, dialog and sheet titles: the grotesk, semibold), `eyebrow`
+  (a small muted label in sentence case), `numeral` (big figures) and
+  `figure` (tabular numbers in text).
 - **Motion.** The app's `<main>` has `reveal-page`, which staggers the blocks
   of whatever page is inside it in on mount: a zero-specificity base style (an
   `animate-*` utility on a block wins) that switches off under
   `prefers-reduced-motion`.
-- **Default palette.** The "Bananasplit" preset (`DEFAULT_PRESET`) is the
-  brand's own: ink `#1c1810` primary and text, banana `#f2c230` highlighter,
-  cream `#f7f2e6` background, paper `#fffdf7` surfaces; dark mode is ink-dark
-  paper with a banana primary. A row saved with the earlier raspberry
-  Bananasplit (`LEGACY_DEFAULT_LIGHT`) resolves to today's palettes.
-- **Logo.** "The Core", a banana cut across: a banana ring, cream flesh and
-  three seeds. `src/components/brand/logo.tsx` (`CoreMark`, `Logo`) draws it in
-  fixed brand colours, and `src/components/bananasplit-mark.tsx` wraps it for
+- **Default palette.** Moonstone (`DEFAULT_PRESET`): dark `#0c0d10` page,
+  `#15161b` cards, pearl `#eef0f4` primary, accent and text; light `#eff1f4`
+  page, white cards, ink `#111318`; glow banana `#f2c230`. Rows saved with a
+  former default (the raspberry or the cream Bananasplit) resolve to it.
+- **Logo.** Unchanged by the redesign. "The Core", a banana cut across: a
+  banana ring, cream flesh and three seeds. `src/components/brand/logo.tsx`
+  (`CoreMark`, `Logo`) draws it in fixed logo colours (`--color-logo-*` in
+  brand.css, never re-pointed at a club's accent) with the Young Serif
+  wordmark, and `src/components/bananasplit-mark.tsx` wraps it for
   the app shell. The files are in `public/brand/` (the mark, the app icon, and
   the lockup for light and dark backgrounds with Young Serif embedded).
   `src/app/icon.svg`, `apple-icon.png` and `favicon.ico` are built from them.
 
 ## Bananasplit's own pages (developers)
 
-The home page, sign-in, sign-up, password help, joining a club, checkout,
-onboarding, email confirmation and the 404 page follow the design handoff, not
-an org theme. They mount `BrandRoot` (`src/components/brand/brand-root.tsx`):
-always light, the brand faces (Young Serif, Hanken Grotesk, JetBrains Mono,
-loaded only there) and the fixed palette in `src/app/brand.css` as Tailwind
-colours (`bg-ink`, `text-ink-muted`, `bg-banana`, `border-ink/10` ...), with
-shadows (`shadow-card`, `shadow-frame` ...) and gradients (`bg-peel`,
-`bg-hero` ...) as utilities. `.brand` also points the app tokens at the
-palette, so shared components inside (Input, Switch, Checkbox) print in ink on
-cream. Type sizes there are plain pixels (`text-[14px]`): Tailwind's
-`text-sm` and friends also set a line height, and the design uses the
-browser's `normal`.
+The home page, sign-in, sign-up, password help, email confirmation, checkout
+and the 404 page belong to no club, so they never take an org theme. They
+mount `BrandRoot` (`src/components/brand/brand-root.tsx`), which since the
+Moonstone redesign uses the app's own tokens as they are (globals.css): the
+same Moonstone colours, type and components as the app, **dark by default**
+(redesign guide 17). A visitor's stored choice wins (the footer's Light / Dark
+/ System switch, `src/components/brand/theme-switch.tsx`, stores the same
+choice as the user menu in the app), and "System" follows the device.
+`BrandRoot` also puts `.corona` (the drifting banana glow) on its box.
+
+`src/app/brand.css` adds only what these pages need on top of the tokens:
+the logo's fixed colours (`--color-logo-*`, plus `logo-lockup`: ink type on
+light, the dark lockup's cream on dark), glow utilities built from tokens
+(`hero-light` behind the hero, `glow-corner` and `glow-rise` on panels,
+`glow-text`), and the `focus-banana` field ring (a text-colour border and a
+glow halo). Pages here build from Moonstone pieces: cards (`bg-card edge`),
+block colours, the glass-light header, 40px fields (`brandInputClass`) and
+pill buttons (`pill()`: `ink` is the primary, `glow` the one create action,
+`outline`).
+
+The older cream-and-banana palette stays in brand.css as Tailwind colours
+(`bg-ink`, `bg-cream`, `bg-banana` ...) for the pages that still use it (the
+public RSVP pages, onboarding, the theme preview). `<BrandRoot look="cream">`
+gives a page that look whole: always light, with the tokens pointed at the
+cream palette, so token-based components (the pill buttons, the brand
+fields, Input) print in ink on cream.
+
+Emails (`src/server/email/templates.ts`) can't read CSS variables, so the
+layout spells out Moonstone's light palette (`EMAIL_COLORS`): a white card on
+a soft grey page, ink text and an ink pill, with the standard lockup on top
+(`public/brand/bananasplit-logo.png`, the SVG rendered as is, since Gmail
+and Outlook don't show SVG images).
 
 ## Converted colours
 
 The sites that other sections left hard-coded now use tokens:
 
-| Was                                                          | Now                                                        | Where                                                                    |
-| ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Was                                                          | Now                                                        | Where                                                                                                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `border-amber-500/40 bg-amber-500/10` callouts               | `border-warning/40 bg-warning/10`                          | databases definitions, org-chart import, calendar detail and form, profile feed, CSV import, data table, detail panels, position editor |
-| `text-amber-600`, `text-amber-700 dark:text-amber-400`       | `text-warning`                                             | the same callouts, member picker, prompts, task editor, due label        |
-| `bg-amber-100 ... dark:bg-amber-900/40` flag badge           | `bg-warning/15 text-warning`                               | `tasks/task-badges.tsx`                                                  |
-| `text-emerald-600`, `text-emerald-700 dark:text-emerald-300` | `text-success`                                             | finance transactions, org-chart draft editor, databases cell and forms   |
-| `bg-emerald-500`, `bg-amber-500`, `bg-rose-500` poll brushes | `bg-success`, `bg-warning`, `bg-destructive`               | `calendar/poll-responder.tsx`                                            |
-| `rgba(16, 185, 129, a)` heat map                             | `color-mix(in oklab, var(--success) N%, transparent)`      | `calendar/poll-responder.tsx`                                            |
-| `bg-red-500` / `bg-amber-400` / `bg-slate-300` priority dots | `bg-destructive` / `bg-warning` / `bg-muted-foreground/40` | `tasks/task-badges.tsx`                                                  |
-| `bg-amber-500` outline warning dot                           | `bg-warning`                                               | `org-chart/editor/outline-tree.tsx`                                      |
-| `bg-emerald-500/15`, `bg-amber-500/15` badge tones           | `bg-success/15`, `bg-warning/15`                           | `databases/cell.tsx`                                                     |
+| `text-amber-600`, `text-amber-700 dark:text-amber-400`       | `text-warning`                                             | the same callouts, member picker, prompts, task editor, due label                                                                       |
+| `bg-amber-100 ... dark:bg-amber-900/40` flag badge           | `bg-warning/15 text-warning`                               | `tasks/task-badges.tsx`                                                                                                                 |
+| `text-emerald-600`, `text-emerald-700 dark:text-emerald-300` | `text-success`                                             | finance transactions, org-chart draft editor, databases cell and forms                                                                  |
+| `bg-emerald-500`, `bg-amber-500`, `bg-rose-500` poll brushes | `bg-success`, `bg-warning`, `bg-destructive`               | `calendar/poll-responder.tsx`                                                                                                           |
+| `rgba(16, 185, 129, a)` heat map                             | `color-mix(in oklab, var(--success) N%, transparent)`      | `calendar/poll-responder.tsx`                                                                                                           |
+| `bg-red-500` / `bg-amber-400` / `bg-slate-300` priority dots | `bg-destructive` / `bg-warning` / `bg-muted-foreground/40` | `tasks/task-badges.tsx`                                                                                                                 |
+| `bg-amber-500` outline warning dot                           | `bg-warning`                                               | `org-chart/editor/outline-tree.tsx`                                                                                                     |
+| `bg-emerald-500/15`, `bg-amber-500/15` badge tones           | `bg-success/15`, `bg-warning/15`                           | `databases/cell.tsx`                                                                                                                    |
 
 Not converted on purpose: `google-icon.tsx` (Google's brand colours), email HTML
 in `src/server/email/**` (mail clients have no CSS variables), label colours

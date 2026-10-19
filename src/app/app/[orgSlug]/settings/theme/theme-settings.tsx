@@ -493,7 +493,7 @@ export function ThemeSettings({
       </section>
 
       {/* The one commit for the whole page: a floating bar that stays in reach. */}
-      <div className="glass-light text-foreground sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-[1.75rem] p-2 sm:rounded-full">
+      <div className="glass-light text-foreground sticky bottom-[calc(var(--shell-bottom,0px)+1rem)] z-10 flex flex-wrap items-center gap-2 rounded-[1.75rem] p-2 sm:rounded-full">
         <Button onClick={save} disabled={isPending || !dirty}>
           {isPending ? "Saving…" : "Save theme"}
         </Button>

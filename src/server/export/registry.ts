@@ -51,6 +51,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "TaskMention", key: ID },
   { model: "TaskActivity", key: ID },
   { model: "WeeklyUpdate", key: ID },
+  { model: "PulseIssue", key: ID },
   // yjsState: the live editor's binary copy of the body contentJson carries.
   // Shared with the club only: a private note or file is its author's alone,
   // owners included (the Note and OrgFile row policies), and stays so here.
@@ -67,6 +68,14 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
     where: { visibility: "ORGANIZATION", deletedAt: null },
   },
   { model: "NoteFolder", key: ID },
+  // Comments on the club's notes only (as Note above); anchor is the live
+  // editor's encoding of where a comment sits (anchorText quotes it).
+  {
+    model: "NoteComment",
+    key: ID,
+    omit: ["anchor"],
+    where: { note: { visibility: "ORGANIZATION", deletedAt: null } },
+  },
   { model: "Event", key: ID },
   { model: "EventAttendee", key: ["eventId", "userId"] },
   // RSVP page sign-ups; the export is OWNER-only, who see them in the suite too.
@@ -124,6 +133,8 @@ export const EXPORT_EXCLUDED: Readonly<Record<string, string>> = {
   MemberPrefs: "Each member's own display settings; the service role cannot read them.",
   NoteShare:
     "Who a note is shared with by name: mostly private notes, which the export leaves out, and access settings rather than club data.",
+  NoteVersion:
+    "Saved copies of note bodies (autosave snapshots and named versions); the export carries each club note's current body.",
 };
 
 /** The Prisma client property for a model name ("OrgChartPosition" -> "orgChartPosition"). */

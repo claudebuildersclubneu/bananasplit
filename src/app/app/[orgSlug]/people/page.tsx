@@ -10,6 +10,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { UserAvatar } from "@/components/user-avatar";
 import { PinToggle } from "@/components/pins/pins-context";
 import { can } from "@/lib/auth/permissions";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { peopleHref, personHref } from "@/lib/profile/href";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { listOrgPeople, parsePageParam, parseSearchParam } from "@/server/profiles/queries";
@@ -31,7 +32,7 @@ export default async function PeoplePage({
   const planLock = await planGate(orgSlug, "people");
   if (planLock) return planLock;
   const query = await searchParams;
-  const { organization, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization, user, role, settings } = await getOrgContextBySlug(orgSlug);
 
   const q = parseSearchParam(query.q);
   const { people, total, page, pageCount } = await listOrgPeople(organization.id, {
@@ -42,7 +43,7 @@ export default async function PeoplePage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="People"
+        title={sectionLabel(settings?.sidebar, "people")}
         description={
           q
             ? `${total} ${total === 1 ? "match" : "matches"} for “${q}”`

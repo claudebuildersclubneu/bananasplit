@@ -217,7 +217,7 @@ describe("setMemberTitle", () => {
 });
 
 describe("removeMember", () => {
-  it("unties the member in the same transaction (assignments, events, task ownership, triage, chart), audits before the delete, then cleans notifications after commit", async () => {
+  it("unties the member in the same transaction (assignments, events, task ownership, project lead, chart), audits before the delete, then cleans notifications after commit", async () => {
     locked = [
       { userId: "owner", role: Role.OWNER },
       { userId: "target", role: Role.MEMBER },
@@ -239,8 +239,8 @@ describe("removeMember", () => {
       data: { ownerId: null, ownerRelation: null, ownerFlagged: false, ownerAssignedById: null },
     });
     expect(fake.db.project.updateMany).toHaveBeenCalledWith({
-      where: { organizationId: "org_1", triageUserId: "target" },
-      data: { triageUserId: null },
+      where: { organizationId: "org_1", leadId: "target" },
+      data: { leadId: null },
     });
     expect(fake.db.orgChartPosition.updateMany).toHaveBeenCalledWith({
       where,
@@ -290,7 +290,7 @@ describe("removeMember", () => {
 
   it("rejects removing yourself", async () => {
     const result = await removeMember("org_1", "actor");
-    expect(result.error).toMatch(/leave organization/i);
+    expect(result.error).toMatch(/leave club/i);
     expect(fake.db.membership.delete).not.toHaveBeenCalled();
   });
 });
