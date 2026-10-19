@@ -23,8 +23,6 @@
   /* The tile edge: the card ring every surface card wears. */
   --cal-ring: color-mix(in oklab, var(--foreground) 6%, transparent);
   --cal-ease: var(--ease-ink);
-  /* Ink for a solid pill: black or white, whichever reads on the kind. */
-  --cal-solid-ink: oklch(from var(--kind) clamp(0, (0.66 - l) * 1000, 1) 0 0);
 }
 
 /* ---------------------------------------------------------------- header */
@@ -294,7 +292,8 @@
   background: var(--kind);
   border-color: transparent;
   color: var(--foreground);
-  color: var(--cal-solid-ink);
+  /* Black or white, whichever reads on the kind (declared here: --kind is per element). */
+  color: oklch(from var(--kind) clamp(0, (0.6 - l) * 1000, 1) 0 0);
 }
 
 .cal-chip[data-rsvp="yes"]:hover,
@@ -749,7 +748,8 @@
   background: var(--kind);
   border-color: transparent;
   color: var(--foreground);
-  color: var(--cal-solid-ink);
+  /* Black or white, whichever reads on the kind (declared here: --kind is per element). */
+  color: oklch(from var(--kind) clamp(0, (0.6 - l) * 1000, 1) 0 0);
 }
 
 .cal-slot[data-rsvp="yes"]:hover,

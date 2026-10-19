@@ -170,7 +170,9 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
         <main className="mx-auto grid w-full max-w-[1000px] flex-1 gap-8 px-5 pt-2 pb-16 sm:px-8 md:grid-cols-[300px_minmax(0,1fr)] md:gap-12 md:pt-6">
           <aside className="flex flex-col gap-8">
             <Cover page={page} />
-            <Capacity page={page} />
+            <div className="hidden md:block">
+              <Capacity page={page} />
+            </div>
             <div className="hidden flex-col gap-8 md:flex">{hostedAndGuests}</div>
           </aside>
 
@@ -254,6 +256,11 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                   />
                 )}
               </div>
+            </div>
+
+            {/* On a phone the goal block sits by the form, not above the title. */}
+            <div className="md:hidden">
+              <Capacity page={page} />
             </div>
 
             <RegistrationCard
