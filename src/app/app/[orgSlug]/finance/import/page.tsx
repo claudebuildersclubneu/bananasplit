@@ -27,8 +27,8 @@ export default async function FinanceImportPage({
   }).catch(handleAuthErrorInPage);
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="space-y-4.5">
+      <div className="space-y-1">
         <h2 className="heading text-lg">Import past records</h2>
         <p className="text-muted-foreground max-w-2xl text-sm">
           Bring in last year&apos;s spreadsheet, a bank, card or Venmo export, receipts or an old

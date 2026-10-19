@@ -48,7 +48,7 @@ export function FinanceActions({
 
   return (
     <>
-      <Button type="button" size="sm" onClick={() => setOpen(primary)}>
+      <Button type="button" variant="create" onClick={() => setOpen(primary)}>
         <PrimaryIcon className="size-4" aria-hidden="true" />
         {CREATE[primary].label}
       </Button>

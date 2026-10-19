@@ -6,10 +6,11 @@ import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 
-import { getCategoriesForPeriods, getOrgPeriods } from "./queries";
+import { countAwaitingApproval, getCategoriesForPeriods, getOrgPeriods } from "./queries";
 
 /**
- * Every finance page's header: the title; Add transaction (Request a
+ * Every finance page's header: the title and a live line (the budget year,
+ * and how many requests wait for review); Add transaction (Request a
  * reimbursement for a member) with Import and the setup guide in its "…"
  * menu; and, for owners and treasurers, the pages they use day to day as
  * tabs. A member only has My reimbursements, so they get no tabs.
@@ -25,16 +26,31 @@ export default async function FinanceLayout({
   if (!spaceIncludes(org, "finance")) return children;
   const isFinance = can({ role }, "finance.manage");
   // For the header's new-entry dialog (which period, which category).
-  const { periods, categories } = await withOrgTx(org.id, async ({ db }) => {
+  const { periods, categories, toReview } = await withOrgTx(org.id, async ({ db }) => {
     const periods = await getOrgPeriods(db, org.id);
-    return { periods, categories: await getCategoriesForPeriods(db, org.id, periods) };
+    return {
+      periods,
+      categories: await getCategoriesForPeriods(db, org.id, periods),
+      // The header's live line: requests waiting on an owner or treasurer.
+      toReview: isFinance ? await countAwaitingApproval(db, org.id) : 0,
+    };
   }).catch(handleAuthErrorInPage);
   const base = `/app/${orgSlug}/finance`;
+  const active = periods.find((p) => p.isActive);
+  const summary = isFinance
+    ? [
+        active?.label ?? "No budget year yet",
+        toReview > 0
+          ? `${toReview} ${toReview === 1 ? "request" : "requests"} to review`
+          : "nothing to review",
+      ].join(" · ")
+    : "Your expenses, and what the club owes you";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7.5">
       <PageHeader
         title="Finance"
+        description={summary}
         actions={
           <FinanceActions
             orgId={org.id}
