@@ -294,7 +294,7 @@ export const removeMember = withOrgAction(
       throw new ForbiddenError("Only owners and admins can manage members.");
     }
     if (targetUserId === ctx.userId) {
-      return { error: "You can't remove yourself. Use Leave organization instead." };
+      return { error: "You can't remove yourself. Use Leave club instead." };
     }
 
     const locked = await lockOwnersAnd(ctx, [targetUserId]);

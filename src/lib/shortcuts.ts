@@ -54,9 +54,6 @@ export const SCOPE_KEYS: Partial<Record<"mine" | "team" | "all", string>> = {
 /** `c` anywhere else opens Tasks with a new task started (?new=1). */
 export const NEW_TASK_PARAM = "new";
 
-/** The create menu's "New event" opens the Calendar with the form open (?new=1). */
-export const NEW_EVENT_PARAM = "new";
-
 /** Asks the shell to open the shortcut sheet (the ⌘K palette's entry fires it). */
 export const OPEN_SHORTCUTS_EVENT = "bananasplit:shortcuts";
 

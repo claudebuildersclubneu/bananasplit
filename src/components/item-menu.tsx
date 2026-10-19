@@ -70,8 +70,8 @@ export function ItemMenu({
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
           className={cn(
-            "text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring/50 data-[state=open]:bg-muted data-[state=open]:text-foreground grid shrink-0 place-items-center rounded-lg outline-none focus-visible:ring-3",
-            size === "sm" ? "size-7" : "size-6",
+            "text-muted-foreground hover:text-foreground hover:bg-muted data-[state=open]:bg-muted data-[state=open]:text-foreground focus-glow grid shrink-0 place-items-center rounded-full border border-transparent transition-[background-color,transform] outline-none active:scale-[0.94]",
+            size === "sm" ? "size-8" : "size-7",
             className,
           )}
         >

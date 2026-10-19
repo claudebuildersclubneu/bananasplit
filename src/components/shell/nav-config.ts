@@ -1,6 +1,7 @@
 import { spaceIncludes, type SpaceInfo } from "@/lib/billing/space";
+import { NEW_EVENT_PARAM } from "@/lib/calendar/range";
 import { SECTION_FEATURES, type ResolvedGroup } from "@/lib/nav/sidebar";
-import { NEW_EVENT_PARAM, NEW_TASK_PARAM } from "@/lib/shortcuts";
+import { NEW_TASK_PARAM } from "@/lib/shortcuts";
 
 /**
  * The sidebar's links for one space: a club's sections (in the club's

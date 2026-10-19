@@ -347,6 +347,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code's local worktrees (each a full checkout with its own lint).
+    ".claude/**",
   ]),
 ]);
 

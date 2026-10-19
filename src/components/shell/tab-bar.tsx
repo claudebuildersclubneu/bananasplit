@@ -14,6 +14,7 @@ import {
   tabBarLinks,
 } from "@/components/shell/nav-config";
 import { ICON_STROKE, NAV_ICONS } from "@/components/shell/sidebar-nav";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const tabClass = cn(
@@ -92,17 +93,15 @@ export function TabBar({
           align="center"
         >
           {({ pending, icon }) => (
-            <button
-              type="button"
+            <Button
+              variant="create"
+              size="icon"
               aria-label="Create"
               aria-busy={pending || undefined}
-              className={cn(
-                "focus-glow bg-brand-accent text-brand-accent-foreground glow-halo mx-1 grid size-12 shrink-0 place-items-center rounded-full outline-none",
-                "transition-[scale] duration-150 active:scale-[0.94] motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:size-6",
-              )}
+              className="mx-1 size-12 motion-reduce:transition-none motion-reduce:active:scale-100 [&_svg]:size-6"
             >
               {icon}
-            </button>
+            </Button>
           )}
         </CreateMenu>
       )}
@@ -112,7 +111,7 @@ export function TabBar({
         onClick={onMore}
         aria-haspopup="dialog"
         aria-expanded={moreOpen}
-        className={tabClass}
+        className={cn(tabClass, "aria-expanded:bg-chrome-foreground/12 aria-expanded:text-chrome-foreground")}
       >
         <Ellipsis className="size-[21px] shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
         More

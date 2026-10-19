@@ -13,7 +13,7 @@ import { JoinForm } from "./join-form";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Enter your club code · Bananasplit" };
+export const metadata = { title: "Enter your invite code · Bananasplit" };
 
 const WHERE = [
   "Check the invite email from your club.",
@@ -72,7 +72,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
     >
       <AuthTitle
         eyebrow="Join a club"
-        title="Enter your club code."
+        title="Enter your invite code."
         description="Paste it or type it in. You'll see the club before you join."
       />
       {profile.emailVerified ? (

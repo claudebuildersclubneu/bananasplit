@@ -21,11 +21,7 @@ function describe(item: TaskActivityItem, nameOf: (id: unknown) => string): stri
   const role = d.role === "owner" ? "owner" : "collaborator";
   switch (item.type) {
     case "CREATED":
-      return d.intake
-        ? "filed this request"
-        : d.parentTaskId
-          ? "created this subtask"
-          : "created this task";
+      return d.parentTaskId ? "created this subtask" : "created this task";
     case "ASSIGNED": {
       const rel =
         typeof d.relation === "string"

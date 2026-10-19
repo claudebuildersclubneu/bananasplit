@@ -40,8 +40,7 @@ import {
   weekWindowFor,
   windowDays,
 } from "@/lib/calendar/grid";
-import { calendarSearch, type CalendarView } from "@/lib/calendar/range";
-import { NEW_EVENT_PARAM } from "@/lib/shortcuts";
+import { calendarSearch, NEW_EVENT_PARAM, type CalendarView } from "@/lib/calendar/range";
 import { cn } from "@/lib/utils";
 
 import { AgendaList } from "./agenda-list";
@@ -130,39 +129,44 @@ export function EventCalendar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // ?new=1 (the create menu's "New event") and ?new=rsvp (the RSVPs page's
+  // "New event with RSVPs", its RSVP page switched on) arrive with New event
+  // open. The state is adjusted while rendering, not in an effect, so it
+  // also works when the calendar is already on screen.
+  const asked = canManage ? searchParams.get(NEW_EVENT_PARAM) : null;
+  const askedNew = asked === "1" || asked === "rsvp" ? asked : null;
   const [peek, setPeek] = useState<PeekAnchor | null>(null);
   const [dialog, setDialog] = useState<
-    | { mode: "create"; start: Date | null; allDay: boolean }
+    | { mode: "create"; start: Date | null; allDay: boolean; rsvp?: boolean }
     | { mode: "edit"; event: EventFormEvent }
     | null
-  >(null);
-  const [moveError, setMoveError] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
-  const [shotOpen, setShotOpen] = useState(false);
-
-  // The create menu's "New event" lands here with ?new=1: open the form
-  // once (state adjusted while rendering, not in an effect), then drop the
-  // param so a reload or Back doesn't open another.
-  const searchParams = useSearchParams();
-  const askedNew = canManage && searchParams.get(NEW_EVENT_PARAM) === "1";
-  const [openedNew, setOpenedNew] = useState(false);
+  >(() =>
+    askedNew ? { mode: "create", start: null, allDay: false, rsvp: askedNew === "rsvp" } : null,
+  );
+  const [openedNew, setOpenedNew] = useState(askedNew);
   if (askedNew !== openedNew) {
     setOpenedNew(askedNew);
     if (askedNew) {
       setPeek(null);
-      setDialog({ mode: "create", start: null, allDay: false });
+      setDialog({ mode: "create", start: null, allDay: false, rsvp: askedNew === "rsvp" });
     }
   }
+
+  // Then drop the param, so a reload or Back doesn't open another.
   useEffect(() => {
     if (!askedNew) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete(NEW_EVENT_PARAM);
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [askedNew, pathname, router, searchParams]);
+    const search = params.toString();
+    router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+  }, [askedNew, searchParams, router, pathname]);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
+  const [shotOpen, setShotOpen] = useState(false);
 
   // Today is read in the org timezone on the server so the first paint
   // matches, then swapped for the viewer's own day on hydration.
@@ -633,6 +637,7 @@ export function EventCalendar({
           event={null}
           defaultStart={dialog.start}
           defaultAllDay={dialog.allDay}
+          defaultRsvpPage={dialog.rsvp}
           members={members}
           onSaved={() => setDialog(null)}
         />

@@ -38,13 +38,13 @@ export function LeaveOrgCard({
         <p className="text-muted-foreground text-xs">
           {isLastOwner
             ? "You're the only owner. Transfer ownership to another member first."
-            : "You lose access to this organization. An admin can invite you again."}
+            : "You lose access to this club. An admin can invite you again."}
         </p>
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" disabled={isLastOwner}>
-            Leave organization
+            Leave club
           </Button>
         </DialogTrigger>
         <DialogContent>
