@@ -1,3 +1,4 @@
+import { NotFoundError } from "@/lib/auth/errors";
 import { can } from "@/lib/auth/permissions";
 import { PLAN_NAMES } from "@/lib/billing/features";
 import { spaceLimits } from "@/lib/billing/space";
@@ -10,6 +11,7 @@ import {
   storageState,
   uploadRefusal,
   type StorageSpace,
+  type StorageState,
   type UploadCheckOptions,
   type UploadRefusal,
 } from "@/lib/billing/storage";
@@ -98,21 +100,46 @@ export function canManageStorage(role: Role | null): boolean {
   return can({ role }, "settings.view");
 }
 
+export interface UploadGate {
+  /** null: the upload may start. */
+  refusal: UploadRefusal | null;
+  space: StorageRow;
+  state: StorageState;
+  canManagePlan: boolean;
+}
+
 /**
  * Step 1: may the session user start an upload of `sizeBytes` to `orgId`?
- * null when they may; the refusal (with the numbers) otherwise. Throws
- * NotFoundError for a non-member, as every org route does.
+ * `refusal` is null when they may; otherwise the 4xx (with the numbers).
+ * Pass 0 before the size is known (the space and its feature only), then
+ * the real size. Throws NotFoundError for a non-member, as every org route
+ * does.
  */
+export async function gateUpload(
+  orgId: string,
+  sizeBytes: number,
+  options: Omit<UploadCheckOptions, "canManagePlan">,
+): Promise<UploadGate> {
+  return withOrgTx(orgId, async ({ db, role }) => {
+    const space = await readStorageSpace(db, orgId);
+    if (!space) throw new NotFoundError();
+    const canManagePlan = canManageStorage(role);
+    return {
+      refusal: uploadRefusal(space, sizeBytes, { ...options, canManagePlan }),
+      space,
+      state: storageState(space),
+      canManagePlan,
+    };
+  });
+}
+
+/** gateUpload() for its refusal alone: null when the upload may start. */
 export async function checkUpload(
   orgId: string,
   sizeBytes: number,
   options: Omit<UploadCheckOptions, "canManagePlan">,
 ): Promise<UploadRefusal | null> {
-  return withOrgTx(orgId, async ({ db, role }) => {
-    const space = await readStorageSpace(db, orgId);
-    if (!space) return null;
-    return uploadRefusal(space, sizeBytes, { ...options, canManagePlan: canManageStorage(role) });
-  });
+  return (await gateUpload(orgId, sizeBytes, options)).refusal;
 }
 
 export interface FitResult {
