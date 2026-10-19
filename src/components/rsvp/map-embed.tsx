@@ -16,7 +16,7 @@ export function MapEmbed({ src, title }: { src: string; title: string }) {
 
   if (shown) {
     return (
-      <div className="border-ink/10 overflow-hidden rounded-2xl border bg-(--rsvp-tile)">
+      <div className="border-ink/10 rounded-tile overflow-hidden border bg-(--rsvp-tile)">
         <iframe
           title={title}
           src={src}
@@ -27,7 +27,7 @@ export function MapEmbed({ src, title }: { src: string; title: string }) {
     );
   }
   return (
-    <div className="flex h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-(--rsvp-tile-line) bg-(--rsvp-tile)">
+    <div className="rounded-tile flex h-[120px] flex-col items-center justify-center gap-2 border border-(--rsvp-tile-line) bg-(--rsvp-tile)">
       <MapPin className="size-5 text-(--rsvp-soft)" aria-hidden="true" />
       <button
         type="button"

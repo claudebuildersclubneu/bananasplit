@@ -105,9 +105,7 @@ export default async function FlyerPage({ params }: PageProps<"/e/[slug]/flyer">
 
           <div className="relative flex min-h-0 flex-1 flex-col gap-[0.2in] overflow-hidden px-[0.6in] pt-[0.45in]">
             <div className="flex items-center justify-between">
-              <span className="text-[13pt] font-bold tracking-[0.14em] uppercase">
-                You&apos;re invited
-              </span>
+              <span className="text-[15pt] font-semibold">You&apos;re invited</span>
               {page.cover && (
                 // eslint-disable-next-line @next/next/no-img-element -- a stored WebP variant
                 <img

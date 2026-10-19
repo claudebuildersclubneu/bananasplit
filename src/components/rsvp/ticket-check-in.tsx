@@ -83,14 +83,14 @@ export function TicketCheckIn({
       </div>
 
       {checkedIn && (
-        <p className="bg-leaf text-leaf-ink m-0 flex items-center gap-2 rounded-xl px-4 py-3 text-[15px] font-semibold">
+        <p className="bg-leaf text-leaf-ink rounded-field m-0 flex items-center gap-2 px-4 py-3 text-[15px] font-semibold">
           <Check className="size-5 flex-none" strokeWidth={2.6} aria-hidden="true" />
           Checked in at {checkedInAt}
         </p>
       )}
 
       {cost && status === "GOING" && (
-        <div className="border-ink/10 flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+        <div className="border-ink/10 rounded-field flex items-center justify-between gap-3 border px-4 py-3">
           <span className="text-[15px]">
             {cost.confirmed
               ? `Paid ${formatCents(cost.paidCents ?? cost.owes)}`

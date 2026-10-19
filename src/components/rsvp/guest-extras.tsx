@@ -198,7 +198,7 @@ export function TicketStub({
       <div className="flex items-center gap-4">
         <a
           href={ticketUrl}
-          className="border-ink/10 block size-[92px] flex-none overflow-hidden rounded-xl border bg-white p-1"
+          className="border-ink/10 rounded-field block size-[92px] flex-none overflow-hidden border bg-white p-1"
           aria-label="Open your ticket full screen"
         >
           {qr}
@@ -330,7 +330,7 @@ export function BringList({
             <li
               key={item.id}
               className={cn(
-                "flex items-center gap-3 rounded-2xl border px-4 py-3",
+                "rounded-tile flex items-center gap-3 border px-4 py-3",
                 item.mine
                   ? "border-ink/20 bg-butter text-ink"
                   : "border-(--rsvp-tile-line) bg-(--rsvp-tile)",

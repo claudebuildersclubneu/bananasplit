@@ -19,12 +19,10 @@ export function HostYourOwn() {
       className="mx-auto w-full max-w-[1000px] px-5 pb-10 sm:px-8"
       style={accentScaleStyle(BRAND_ACCENT_SCALE)}
     >
-      <div className="bg-ink text-cream relative overflow-hidden rounded-[26px] px-6 py-7 sm:px-9 sm:py-8">
+      <div className="bg-ink text-cream rounded-block relative overflow-hidden px-6 py-7 sm:px-9 sm:py-8">
         <div className="relative grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
           <div className="flex flex-col gap-2">
-            <p className="text-banana m-0 text-[12px] font-bold tracking-[0.08em] uppercase">
-              Hosting something?
-            </p>
+            <p className="text-banana m-0 text-[14px] font-semibold">Hosting something?</p>
             <h2 className="font-heading m-0 text-[clamp(24px,3.4vw,32px)] leading-[1.08] tracking-[-0.02em]">
               Make a page like this one.
             </h2>

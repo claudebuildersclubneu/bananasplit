@@ -49,7 +49,7 @@ export default async function TicketPage({ params }: PageProps<"/e/[slug]/t/[cod
         </span>
       </header>
       <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-4 px-5 pb-12">
-        <section className="border-ink/10 bg-paper flex flex-col gap-5 rounded-[22px] border p-5 sm:p-6">
+        <section className="border-ink/10 bg-paper rounded-block flex flex-col gap-5 border p-5 sm:p-6">
           <div className="border-ink/10 flex flex-col gap-0.5 border-b pb-4">
             <h1 className="m-0 text-[17px] leading-[1.3] font-bold text-balance">{e.title}</h1>
             <p className="text-ink-muted m-0 text-[14px]">{when}</p>
@@ -92,7 +92,7 @@ function GuestTicket({
   const name = displayName(ticket.name);
   return (
     <div className="flex flex-col items-center gap-4 text-center">
-      <div className="w-full max-w-[300px] rounded-2xl bg-white p-3">
+      <div className="rounded-tile w-full max-w-[300px] bg-white p-3">
         <QrCode value={ticketUrl} label={`Ticket for ${name}`} className="size-full" />
       </div>
       <div className="flex flex-col gap-1">
@@ -108,7 +108,7 @@ function GuestTicket({
         </span>
       </div>
       {ticket.cost && going && !ticket.cost.confirmed && (
-        <p className="bg-oat text-ink m-0 w-full rounded-xl px-4 py-3 text-[14px]">
+        <p className="bg-oat text-ink rounded-field m-0 w-full px-4 py-3 text-[14px]">
           {ticket.cost.claimed
             ? `You said you paid ${formatCents(ticket.cost.paidCents ?? ticket.cost.owes)}.`
             : `You still owe the host ${formatCents(ticket.cost.owes)}.`}

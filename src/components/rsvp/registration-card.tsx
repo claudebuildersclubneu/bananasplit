@@ -50,7 +50,7 @@ export function RegistrationCard(props: RegistrationCardProps) {
   return (
     <section
       aria-label="Registration"
-      className="border-ink/8 bg-paper text-ink shadow-card rounded-[24px] border p-5 sm:p-6"
+      className="border-ink/8 bg-paper text-ink shadow-card rounded-block border p-5 sm:p-6"
     >
       {props.viewer ? (
         <Signed {...props} viewer={props.viewer} />
@@ -66,9 +66,7 @@ export function RegistrationCard(props: RegistrationCardProps) {
 function CardHeader({ badge }: { badge?: React.ReactNode }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
-      <h2 className="text-ink-soft text-[13px] font-bold tracking-[0.06em] uppercase">
-        Registration
-      </h2>
+      <h2 className="text-ink-soft text-[15px] font-semibold">Registration</h2>
       {badge}
     </div>
   );
@@ -79,7 +77,7 @@ function Closed({ reason }: { reason: ClosedReason }) {
   return (
     <>
       <CardHeader />
-      <div className="bg-oat flex items-start gap-3 rounded-2xl p-4">
+      <div className="bg-oat rounded-tile flex items-start gap-3 p-4">
         <span className="bg-sand text-ink-muted grid size-9 flex-none place-items-center rounded-full">
           <Lock className="size-4" aria-hidden="true" />
         </span>
@@ -180,7 +178,7 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCa
           : "Save your spot below. You'll get a confirmation by email."}
       </p>
       {cost && !waitlistOnly && (
-        <p className="bg-oat text-ink -mt-2 mb-5 rounded-2xl px-4 py-3 text-[14px] leading-[1.5]">
+        <p className="bg-oat text-ink rounded-tile -mt-2 mb-5 px-4 py-3 text-[14px] leading-[1.5]">
           <span className="font-bold">
             {cost.mode === "SPLIT" ? "About " : ""}
             {formatCents(cost.shareIfJoining)} to chip in

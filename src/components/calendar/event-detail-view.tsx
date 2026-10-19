@@ -365,7 +365,7 @@ export function EventDetailView({
                 href={`/app/${orgSlug}/calendar/${event.id}/rsvp`}
                 figure={rsvp.going}
                 figureLabel={`of ${rsvp.capacity} spots${rsvp.waitlist > 0 ? ` · ${rsvp.waitlist} waitlisted` : ""}`}
-                aside={<Gauge value={capacityPct} size={104} />}
+                aside={<Gauge value={capacityPct} size={132} />}
                 className="min-h-0"
               />
             ) : (
