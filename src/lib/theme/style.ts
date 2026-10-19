@@ -21,7 +21,11 @@ export type RadiusOption = (typeof RADIUS_OPTIONS)[number];
 export const TEXT_SIZE_OPTIONS = ["small", "default", "large"] as const;
 export type TextSizeOption = (typeof TEXT_SIZE_OPTIONS)[number];
 
-export const HEADING_FONT_OPTIONS = ["serif", "sans"] as const;
+// "display" (Bricolage Grotesque) is the redesign's heading face. "serif" is
+// kept for rows saved before it, when the serif was the default and so said
+// nothing about a choice: it reads as "display". "young-serif" is the
+// deliberate choice of Young Serif from now on.
+export const HEADING_FONT_OPTIONS = ["display", "young-serif", "sans"] as const;
 export type HeadingFontOption = (typeof HEADING_FONT_OPTIONS)[number];
 
 export const BODY_FONT_OPTIONS = ["grotesk", "system"] as const;
@@ -30,6 +34,8 @@ export type BodyFontOption = (typeof BODY_FONT_OPTIONS)[number];
 export interface ThemeStyle {
   /** Replaces the palette's accent in both modes; null keeps the palette's own. */
   accent: string | null;
+  /** The glow (the light behind the page, halos on create and focus); null keeps the preset's, else the accent. */
+  glow: string | null;
   radius: RadiusOption;
   textSize: TextSizeOption;
   headingFont: HeadingFontOption;
@@ -38,17 +44,28 @@ export interface ThemeStyle {
 
 export const DEFAULT_THEME_STYLE: ThemeStyle = {
   accent: null,
-  radius: "soft",
+  glow: null,
+  radius: "round",
   textSize: "default",
-  headingFont: "serif",
+  headingFont: "display",
   bodyFont: "grotesk",
 };
 
-/** --radius per option (globals.css scales every rounded-* from it). "soft" is the default. */
+/**
+ * --radius per option (globals.css scales the shadcn rounded-* utilities from
+ * it) and --radius-scale (the redesign's corner scale: 32 shell, 28 card,
+ * 24 block, 18 tile, 14 field, times this). "round" is the default.
+ */
 export const RADIUS_VALUES: Record<RadiusOption, string> = {
-  sharp: "0.125rem",
-  soft: "0.4375rem",
-  round: "0.8125rem",
+  sharp: "0.25rem",
+  soft: "0.5rem",
+  round: "0.875rem",
+};
+
+export const RADIUS_SCALES: Record<RadiusOption, string> = {
+  sharp: "0.4",
+  soft: "0.7",
+  round: "1",
 };
 
 /** The root font size: every rem (text and spacing) scales with it, so it doubles as density. */
@@ -67,8 +84,11 @@ export const TEXT_SIZE_ZOOM: Record<TextSizeOption, number> = {
 
 export const RADIUS_LABELS: Record<RadiusOption, { label: string; hint: string }> = {
   sharp: { label: "Sharp", hint: "Nearly square corners. Crisp and formal." },
-  soft: { label: "Soft", hint: "Gently rounded, the Bananasplit default." },
-  round: { label: "Round", hint: "Generous curves on cards, buttons and fields." },
+  soft: { label: "Soft", hint: "Gently rounded corners." },
+  round: {
+    label: "Round",
+    hint: "Generous curves on cards and fields, pill buttons. The default.",
+  },
 };
 
 export const TEXT_SIZE_LABELS: Record<TextSizeOption, { label: string; hint: string }> = {
@@ -78,7 +98,11 @@ export const TEXT_SIZE_LABELS: Record<TextSizeOption, { label: string; hint: str
 };
 
 export const HEADING_FONT_LABELS: Record<HeadingFontOption, { label: string; hint: string }> = {
-  serif: { label: "Serif", hint: "Young Serif for page titles and big numbers." },
+  display: {
+    label: "Bricolage",
+    hint: "Bricolage Grotesque for page titles and big numbers. The default.",
+  },
+  "young-serif": { label: "Serif", hint: "Young Serif for page titles and big numbers." },
   sans: { label: "Sans", hint: "Hanken Grotesk, bold, for a plainer look." },
 };
 
@@ -104,9 +128,15 @@ export function parseThemeStyle(value: unknown): ThemeStyle {
   const d = DEFAULT_THEME_STYLE;
   return {
     accent: normalizeHex(record.accent),
+    glow: normalizeHex(record.glow),
     radius: pick(RADIUS_OPTIONS, record.radius, d.radius),
     textSize: pick(TEXT_SIZE_OPTIONS, record.textSize, d.textSize),
-    headingFont: pick(HEADING_FONT_OPTIONS, record.headingFont, d.headingFont),
+    // A stored "serif" predates the choice (it was the default): Bricolage.
+    headingFont: pick(
+      HEADING_FONT_OPTIONS,
+      record.headingFont === "serif" ? "display" : record.headingFont,
+      d.headingFont,
+    ),
     bodyFont: pick(BODY_FONT_OPTIONS, record.bodyFont, d.bodyFont),
   };
 }
@@ -114,6 +144,7 @@ export function parseThemeStyle(value: unknown): ThemeStyle {
 export function sameStyle(a: ThemeStyle, b: ThemeStyle): boolean {
   return (
     a.accent === b.accent &&
+    a.glow === b.glow &&
     a.radius === b.radius &&
     a.textSize === b.textSize &&
     a.headingFont === b.headingFont &&
@@ -135,13 +166,20 @@ export function isDefaultStyle(style: ThemeStyle): boolean {
  */
 export function styleDeclarations(style: ThemeStyle): Record<string, string> {
   const out: Record<string, string> = {};
-  if (style.radius !== DEFAULT_THEME_STYLE.radius) out["--radius"] = RADIUS_VALUES[style.radius];
+  if (style.radius !== DEFAULT_THEME_STYLE.radius) {
+    out["--radius"] = RADIUS_VALUES[style.radius];
+    out["--radius-scale"] = RADIUS_SCALES[style.radius];
+  }
   if (style.bodyFont === "system") {
     out["--font-hanken"] =
       'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   }
+  if (style.headingFont === "young-serif") {
+    out["--font-display"] = "var(--font-young-serif)";
+    out["--heading-weight"] = "400";
+  }
   if (style.headingFont === "sans") {
-    out["--font-young-serif"] =
+    out["--font-display"] =
       style.bodyFont === "system"
         ? 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
         : "var(--font-hanken)";

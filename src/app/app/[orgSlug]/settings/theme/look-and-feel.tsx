@@ -37,6 +37,7 @@ export function LookAndFeel({
   groupId,
   style,
   paletteAccent,
+  paletteGlow,
   tokens,
   onChange,
 }: {
@@ -44,6 +45,8 @@ export function LookAndFeel({
   style: ThemeStyle;
   /** The palette's own (light) accent, shown for "From the palette". */
   paletteAccent: string;
+  /** The preset's own glow, else the accent, shown for "From the palette". */
+  paletteGlow: string;
   /** The draft's derived tokens, with the accent applied. */
   tokens: DerivedTheme;
   onChange: (style: ThemeStyle) => void;
@@ -63,6 +66,18 @@ export function LookAndFeel({
           paletteAccent={paletteAccent}
           tokens={tokens}
           onChange={(accent) => set({ accent })}
+        />
+      </Row>
+      <Row
+        id={`${groupId}-glow`}
+        title="Glow"
+        hint="The light behind the top of the page, and the soft halo on create buttons, the selected item and focus."
+      >
+        <GlowField
+          group={`${groupId}-glow-mode`}
+          value={style.glow}
+          paletteGlow={paletteGlow}
+          onChange={(glow) => set({ glow })}
         />
       </Row>
       <Row id={`${groupId}-radius`} title="Corners" hint="Cards, buttons, fields and menus.">
@@ -117,8 +132,15 @@ export function LookAndFeel({
               aria-hidden="true"
               className={cn(
                 "w-5 shrink-0 text-center text-base leading-none",
-                value === "serif" ? "font-heading" : "font-sans font-bold",
+                value === "sans" ? "font-sans font-bold" : "font-medium",
               )}
+              style={
+                value === "display"
+                  ? { fontFamily: "var(--font-bricolage)" }
+                  : value === "young-serif"
+                    ? { fontFamily: "var(--font-young-serif)", fontWeight: 400 }
+                    : undefined
+              }
             >
               Aa
             </span>
@@ -373,5 +395,99 @@ function AccentContrast({ tokens }: { tokens: DerivedTheme }) {
         );
       })}
     </ul>
+  );
+}
+
+/** The glow: the palette's own (the preset's, else its accent), or any colour. */
+function GlowField({
+  group,
+  value,
+  paletteGlow,
+  onChange,
+}: {
+  group: string;
+  value: string | null;
+  paletteGlow: string;
+  onChange: (glow: string | null) => void;
+}) {
+  const id = useId();
+  const custom = value !== null;
+  const current = value ?? paletteGlow;
+  const [text, setText] = useState(current);
+  const [seen, setSeen] = useState(current);
+  if (current !== seen) {
+    setSeen(current);
+    setText(current);
+  }
+  const invalid = !HEX_RE.test(text);
+
+  return (
+    <div className="space-y-3">
+      <div role="radiogroup" aria-label="Glow" className="grid gap-2 sm:grid-cols-2">
+        {[
+          {
+            custom: false,
+            label: "From the palette",
+            hint: "The preset's own glow, or its accent.",
+          },
+          { custom: true, label: "Custom", hint: "Any colour. It only ever shows as light." },
+        ].map((option) => (
+          <label
+            key={option.label}
+            className={cn(
+              "has-focus-visible:ring-ring/50 rounded-tile flex cursor-pointer items-start gap-2.5 border p-3 text-sm has-focus-visible:ring-3",
+              custom === option.custom && "border-primary ring-primary ring-1",
+            )}
+          >
+            <input
+              type="radio"
+              name={group}
+              checked={custom === option.custom}
+              onChange={() => onChange(option.custom ? current : null)}
+              className="sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className="size-5 shrink-0 rounded-full border"
+              style={{
+                backgroundColor: option.custom ? current : paletteGlow,
+                boxShadow: `0 0 10px 2px ${option.custom ? current : paletteGlow}`,
+              }}
+            />
+            <span className="space-y-0.5">
+              <span className="block font-medium">{option.label}</span>
+              <span className="text-muted-foreground block text-xs">{option.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {custom && (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="color"
+            aria-label="Glow colour picker"
+            value={HEX_RE.test(current) ? current : paletteGlow}
+            onChange={(event) => onChange(event.target.value.toLowerCase())}
+            className="border-input size-9 shrink-0 cursor-pointer rounded-full border bg-transparent p-0.5"
+          />
+          <Label htmlFor={`${id}-hex`} className="sr-only">
+            Glow colour hex
+          </Label>
+          <Input
+            id={`${id}-hex`}
+            value={text}
+            onChange={(event) => {
+              const next = event.target.value.trim();
+              setText(next);
+              if (HEX_RE.test(next)) onChange(next.toLowerCase());
+            }}
+            aria-invalid={invalid}
+            className="w-32 font-mono"
+            spellCheck={false}
+          />
+          {invalid && <p className="text-destructive text-xs">Use a six-digit hex like #f2c230.</p>}
+        </div>
+      )}
+    </div>
   );
 }

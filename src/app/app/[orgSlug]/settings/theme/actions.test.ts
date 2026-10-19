@@ -179,7 +179,7 @@ describe("saveOrgTheme: Look and feel", () => {
     };
     // The preset's palettes are stored as picked; the accent lives in style.
     expect(args[0].create.light).toEqual(CBC_PRESET.light);
-    expect(tokens.style).toEqual({ ...style, accent: "#2e8b57" });
+    expect(tokens.style).toEqual({ ...style, accent: "#2e8b57", glow: null });
     expect(tokens.light["brand-accent"]).toBe("#2e8b57");
     expect(tokens.dark["brand-accent"]).not.toBe(CBC_PRESET.dark.accent);
   });

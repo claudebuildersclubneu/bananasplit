@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { deriveDarkRoles, deriveTheme } from "./derive";
-import { CUSTOM_PRESET_ID, DEFAULT_PRESET_ID, findPreset } from "./presets";
+import { CUSTOM_PRESET_ID, DEFAULT_PRESET_ID, findPreset, presetGlow } from "./presets";
 import type { ResolvedTheme } from "./resolve";
 import type { ThemeRoles } from "./types";
 import { parseRoles, rolesSchema } from "./validate";
@@ -88,8 +88,9 @@ export function applyPersonalTheme(
     light: palettes.light,
     dark: palettes.dark,
     effectiveDark: palettes.dark,
-    style: { ...org.style, accent: null },
-    tokens: deriveTheme(palettes.light, palettes.dark),
+    style: { ...org.style, accent: null, glow: null },
+    glow: presetGlow(personal.preset),
+    tokens: deriveTheme(palettes.light, palettes.dark, presetGlow(personal.preset)),
     // The default preset is exactly globals.css: nothing to inject.
     isDefault: personal.preset === DEFAULT_PRESET_ID,
   };

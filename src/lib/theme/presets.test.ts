@@ -9,7 +9,10 @@ import { contrastRatio, hexToOklch } from "./color";
 import { deriveTokens, TOKEN_NAMES } from "./derive";
 import {
   CBC_PRESET,
+  BANANA_CREAM_PRESET,
+  BANANA_NIGHT_PRESET,
   DEFAULT_PRESET,
+  isFormerDefault,
   findPreset,
   GRAPHITE_PRESET,
   matchPreset,
@@ -68,23 +71,23 @@ describe("presets", () => {
     expect(GRAPHITE_PRESET.dark).toMatchObject({ background: "#0a0a0a", primary: "#e5e5e5" });
   });
 
-  it("keep the Bananasplit highlighter a fill and its primary clear of the destructive red", () => {
+  it("keep the Banana cream highlighter a fill and its primary clear of the destructive red", () => {
     // Banana on cream is a highlighter, never text; the ink primary reads as text.
     expect(
-      contrastRatio(DEFAULT_PRESET.light.accent, DEFAULT_PRESET.light.background),
+      contrastRatio(BANANA_CREAM_PRESET.light.accent, BANANA_CREAM_PRESET.light.background),
     ).toBeLessThan(3);
     expect(
-      contrastRatio(DEFAULT_PRESET.light.primary, DEFAULT_PRESET.light.background),
+      contrastRatio(BANANA_CREAM_PRESET.light.primary, BANANA_CREAM_PRESET.light.background),
     ).toBeGreaterThan(4.5);
-    const light = deriveTokens(DEFAULT_PRESET.light);
+    const light = deriveTokens(BANANA_CREAM_PRESET.light);
     const hue = (hex: string) => hexToOklch(hex).h;
     const gap = Math.abs(((hue(light.primary) - hue(light.destructive) + 540) % 360) - 180);
     expect(gap).toBeGreaterThan(20);
   });
 
-  it("give Bananasplit the brand palette: ink on cream with a banana highlighter", () => {
-    expect(DEFAULT_PRESET.name).toBe("Bananasplit");
-    expect(DEFAULT_PRESET.light).toEqual({
+  it("keep the cream look as Banana cream: ink on cream with a banana highlighter", () => {
+    expect(BANANA_CREAM_PRESET.name).toBe("Banana cream");
+    expect(BANANA_CREAM_PRESET.light).toEqual({
       primary: "#1c1810",
       accent: "#f2c230",
       background: "#f7f2e6",
@@ -92,7 +95,33 @@ describe("presets", () => {
       text: "#1c1810",
     });
     // Dark: banana primary with an ink label.
-    expect(deriveTokens(DEFAULT_PRESET.dark)["primary-foreground"]).toBe("#17140e");
+    expect(deriveTokens(BANANA_CREAM_PRESET.dark)["primary-foreground"]).toBe("#17140e");
+  });
+
+  it("make Moonstone the default: monochrome, lit by a banana glow", () => {
+    expect(DEFAULT_PRESET.name).toBe("Moonstone");
+    expect(DEFAULT_PRESET.glow).toBe("#f2c230");
+    // Primary and accent are one colour per mode, with no hue of their own.
+    for (const roles of [DEFAULT_PRESET.light, DEFAULT_PRESET.dark]) {
+      expect(roles.accent).toBe(roles.primary);
+      expect(hexToOklch(roles.primary).C).toBeLessThan(0.05);
+    }
+    const dark = deriveTokens(DEFAULT_PRESET.dark, { glow: DEFAULT_PRESET.glow });
+    expect(dark.glow).toBe("#f2c230");
+    // Charts take the glow's hue as their brand slot (snapped into the dark
+    // band); the block cards stay apart.
+    const hueGap = Math.abs(
+      ((hexToOklch(dark["chart-1"]).h - hexToOklch("#f2c230").h + 540) % 360) - 180,
+    );
+    expect(hueGap).toBeLessThan(15);
+    expect(contrastRatio(dark["block-quiet"], dark["block-answer"])).toBeGreaterThan(1.6);
+    expect(findPreset("night")).toBe(BANANA_NIGHT_PRESET);
+    expect(findPreset("cream")).toBe(BANANA_CREAM_PRESET);
+  });
+
+  it("move a saved former default (raspberry or cream) onto today's default", () => {
+    expect(isFormerDefault(BANANA_CREAM_PRESET.light)).toBe(true);
+    expect(isFormerDefault(DEFAULT_PRESET.light)).toBe(false);
   });
 
   it("match a palette back to its preset", () => {
@@ -116,8 +145,8 @@ describe("globals.css", () => {
   it("ships the Default preset's derived tokens as its defaults, in both modes", () => {
     const root = block(":root");
     const dark = block(".dark");
-    const light = deriveTokens(DEFAULT_PRESET.light);
-    const darkTokens = deriveTokens(DEFAULT_PRESET.dark);
+    const light = deriveTokens(DEFAULT_PRESET.light, { glow: DEFAULT_PRESET.glow });
+    const darkTokens = deriveTokens(DEFAULT_PRESET.dark, { glow: DEFAULT_PRESET.glow });
     for (const name of TOKEN_NAMES) {
       expect(root[name], `:root --${name}`).toBe(light[name]);
       expect(dark[name], `.dark --${name}`).toBe(darkTokens[name]);
