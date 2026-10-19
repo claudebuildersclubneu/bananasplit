@@ -6,14 +6,21 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
-import { addDaysToKey, allDaySpan, safeTimeZone, zonedDateKey } from "@/lib/calendar/dates";
+import {
+  addDaysToKey,
+  allDaySpan,
+  safeTimeZone,
+  zonedDateKey,
+  zonedMidnight,
+} from "@/lib/calendar/dates";
+import { weekWindowFor } from "@/lib/calendar/grid";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { getCalendarTasks } from "@/server/tasks/queries";
 
-import { getEventsInRange, getViewerRsvps } from "./queries";
+import { getEventsInRange, getViewerRsvps, rangeWhere } from "./queries";
 
 /**
  * The org calendar. The server reads only the visible window (the view puts
@@ -37,7 +44,13 @@ export default async function CalendarPage({
   // The Tasks layer is one of the task views; Google sync a data connection.
   const tasksLayer = spaceIncludes(org, "taskViews");
 
-  const { events, rsvps, tasks } = await withOrgTx(org.id, async ({ db }) => {
+  // The header's live line counts this week (Sunday first, in the club's
+  // zone), whatever window the grid is showing.
+  const zone = safeTimeZone(org.timezone);
+  const todayKey = zonedDateKey(new Date(), zone);
+  const week = weekWindowFor(todayKey);
+
+  const { events, rsvps, tasks, thisWeek } = await withOrgTx(org.id, async ({ db }) => {
     const found = await getEventsInRange(db, org.id, {
       from: range.from,
       to: range.to,
@@ -60,6 +73,12 @@ export default async function CalendarPage({
               dueTo: fromDateKey(addDaysToKey(range.toKey, -1)),
             })
           : [],
+      thisWeek: await db.event.count({
+        where: rangeWhere(org.id, {
+          from: zonedMidnight(week.fromKey, zone),
+          to: zonedMidnight(week.toKey, zone),
+        }),
+      }),
     };
   });
   const members = canManage ? await getOrgMembersForPicker(org.id) : [];
@@ -106,14 +125,19 @@ export default async function CalendarPage({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-7">
       <PageHeader
         title="Calendar"
+        description={
+          thisWeek === 0
+            ? "Nothing scheduled this week"
+            : `${thisWeek} ${thisWeek === 1 ? "event" : "events"} this week`
+        }
         actions={
           <>
             {/* Planning a meeting starts here as often as from the sidebar. */}
             {spaceIncludes(org, "polls") && (
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" asChild>
                 <Link href={`/app/${orgSlug}/calendar/find-a-time/new`}>
                   <CalendarClock aria-hidden="true" />
                   Find a time
@@ -121,7 +145,7 @@ export default async function CalendarPage({
               </Button>
             )}
             {can({ role }, "events.write") && (
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" asChild>
                 <Link href={`/app/${orgSlug}/calendar/rsvp`}>
                   <Ticket aria-hidden="true" />
                   RSVPs
@@ -129,13 +153,13 @@ export default async function CalendarPage({
               </Button>
             )}
             {can({ role }, "integrations.view") && spaceIncludes(org, "integrations") && (
-              <Button variant="ghost" size="icon-sm" asChild>
+              <Button variant="outline" size="icon" asChild>
                 <Link
                   href={`/app/${orgSlug}/calendar/sync`}
                   aria-label="Google Calendar sync and website feed"
                   title="Google Calendar sync and website feed"
                 >
-                  <CalendarSync className="size-4" aria-hidden="true" />
+                  <CalendarSync className="size-[18px]" aria-hidden="true" />
                 </Link>
               </Button>
             )}
@@ -155,7 +179,7 @@ export default async function CalendarPage({
           title: m.title,
         }))}
         canManage={canManage}
-        orgTodayKey={zonedDateKey(new Date(), safeTimeZone(org.timezone))}
+        orgTodayKey={todayKey}
         window={{
           fromKey: range.fromKey,
           toKey: range.toKey,
