@@ -19,8 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { ContactSearch, type ContactOption } from "./contact-search";
+import { nativeSelectClass, notice } from "./styles";
 
-const selectClass = "border-input bg-background h-8 rounded-lg border px-2 text-sm";
+const selectClass = nativeSelectClass;
 
 /** Manual check-in (ADMIN+): a suite-native row that can later be edited or deleted. */
 export function AddAttendanceDialog({
@@ -57,7 +58,7 @@ export function AddAttendanceDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button variant="create">
           <Plus aria-hidden="true" />
           Add check-in
         </Button>
@@ -69,8 +70,8 @@ export function AddAttendanceDialog({
             For someone who attended but did not check in on the website.
           </DialogDescription>
         </DialogHeader>
-        <form action={submit} className="grid gap-3">
-          <div className="grid gap-1">
+        <form action={submit} className="grid gap-4">
+          <div className="grid gap-1.5">
             <Label htmlFor="att-session">Session</Label>
             <select id="att-session" name="eventId" required className={selectClass}>
               {sessions.map((s) => (
@@ -80,15 +81,15 @@ export function AddAttendanceDialog({
               ))}
             </select>
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label>Person</Label>
             {person ? (
-              <div className="flex items-center justify-between rounded-lg border px-2 py-1 text-sm">
+              <div className="bg-muted/60 rounded-field flex h-10 items-center justify-between gap-2 ps-3.5 pe-1 text-sm">
                 <span>
                   {person.displayName ?? "Unnamed"}{" "}
                   <span className="text-muted-foreground">{person.emailMasked}</span>
                 </span>
-                <Button type="button" size="xs" variant="ghost" onClick={() => setPerson(null)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setPerson(null)}>
                   Change
                 </Button>
               </div>
@@ -99,7 +100,7 @@ export function AddAttendanceDialog({
                   onPick={setPerson}
                   placeholder="Find someone already on file…"
                 />
-                <p className="text-muted-foreground text-xs">…or add someone new:</p>
+                <p className="text-muted-foreground text-[13px]">…or add someone new:</p>
                 <Input
                   name="name"
                   placeholder="Name"
@@ -115,7 +116,7 @@ export function AddAttendanceDialog({
               </>
             )}
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="att-method">Method</Label>
             <select id="att-method" name="method" defaultValue="MANUAL" className={selectClass}>
               <option value="MANUAL">Manual</option>
@@ -124,11 +125,14 @@ export function AddAttendanceDialog({
             </select>
           </div>
           {error && (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className={notice.error}>
               {error}
             </p>
           )}
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={pending || sessions.length === 0}>
               {pending ? "Adding…" : "Add check-in"}
             </Button>
@@ -170,7 +174,7 @@ export function AddSignupDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button variant="create">
           <Plus aria-hidden="true" />
           Add signup
         </Button>
@@ -182,16 +186,16 @@ export function AddSignupDialog({
             For interest collected in person. The term comes from today&apos;s date.
           </DialogDescription>
         </DialogHeader>
-        <form action={submit} className="grid gap-3">
-          <div className="grid gap-1">
+        <form action={submit} className="grid gap-4">
+          <div className="grid gap-1.5">
             <Label htmlFor="sg-name">Name</Label>
             <Input id="sg-name" name="name" required maxLength={120} />
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="sg-email">Email</Label>
             <Input id="sg-email" name="email" type="email" />
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="sg-year">Year</Label>
             <select id="sg-year" name="classYear" className={selectClass}>
               <option value="">Not given</option>
@@ -203,11 +207,14 @@ export function AddSignupDialog({
             </select>
           </div>
           {error && (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className={notice.error}>
               {error}
             </p>
           )}
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={pending}>
               {pending ? "Adding…" : "Add signup"}
             </Button>

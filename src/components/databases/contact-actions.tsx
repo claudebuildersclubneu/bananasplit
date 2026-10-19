@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 import { ContactSearch, type ContactOption } from "./contact-search";
+import { nativeSelectClass, notice as noticeClass } from "./styles";
 
 /**
  * Admin tools for the person behind a row: rename, link to a member
@@ -54,13 +55,12 @@ export function ContactActions({
   };
 
   return (
-    <div className="space-y-4 rounded-xl border p-3 text-sm">
-      <h3 className="text-sm font-semibold">Manage this person</h3>
+    <div className="bg-muted/60 rounded-tile space-y-4 p-4 text-sm">
+      <h3 className="heading text-[15px]">Manage this person</h3>
       <div className="flex gap-2">
         <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Display name" />
         <Button
           variant="outline"
-          size="sm"
           disabled={pending || !name.trim() || name === contact.displayName}
           onClick={() =>
             go(() => renameContactAction(organizationId, contact.id, name), "Renamed.")
@@ -73,7 +73,7 @@ export function ContactActions({
         <select
           aria-label="Linked member"
           defaultValue={contact.userId ?? ""}
-          className="border-input bg-background h-8 flex-1 rounded-lg border px-2"
+          className={nativeSelectClass}
           onChange={(e) =>
             go(
               () => linkContactAction(organizationId, contact.id, e.target.value || null),
@@ -91,7 +91,7 @@ export function ContactActions({
         </select>
       </div>
       <div className="space-y-2">
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-[13px]">
           Merge a duplicate into this person: their check-ins, signups and addresses move here.
         </p>
         {merge ? (
@@ -111,7 +111,7 @@ export function ContactActions({
                 }, "Merged.")
               }
             >
-              Merge
+              Merge person
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setMerge(null)}>
               Cancel
@@ -128,17 +128,17 @@ export function ContactActions({
       </div>
       {contact.emails.length > 1 && (
         <div className="space-y-1">
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-[13px]">
             Split an address off into its own person (unmerge):
           </p>
           {contact.emails.map((e) => (
             <div key={e.id} className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs">
+              <span className="font-mono text-xs break-all">
                 {e.emailNormalized}
                 {e.isPrimary ? " (primary)" : ""}
               </span>
               <Button
-                size="xs"
+                size="sm"
                 variant="ghost"
                 disabled={pending}
                 onClick={() =>
@@ -152,11 +152,11 @@ export function ContactActions({
         </div>
       )}
       {error && (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className={noticeClass.error}>
           {error}
         </p>
       )}
-      {notice && <p className="text-success text-xs">{notice}</p>}
+      {notice && <p className={noticeClass.success}>{notice}</p>}
     </div>
   );
 }

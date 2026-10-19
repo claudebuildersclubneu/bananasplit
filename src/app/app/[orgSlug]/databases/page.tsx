@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Database,
   FileSpreadsheet,
+  Globe,
   Handshake,
   Lightbulb,
   Lock,
@@ -27,6 +28,7 @@ import { SyncPanel } from "@/components/databases/sync-panel";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { can } from "@/lib/auth/permissions";
 import { fmtDateTime } from "@/server/databases/format";
 import { listDatabases } from "@/server/databases/views";
@@ -65,6 +67,26 @@ const DESCRIPTIONS: Record<string, string> = {
   PEOPLE: "One row per person per term: how often they came, and who stopped coming.",
   CUSTOM: "A database your club made.",
 };
+
+/**
+ * The 36px icon chip (ui/stat's IconChip, size sm), drawn here: IconChip is
+ * a client component, and a server page can't hand it an icon component.
+ */
+function IconChip({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1",
+        className,
+      )}
+    >
+      <Icon className="size-[18px]" aria-hidden="true" />
+    </span>
+  );
+}
+
+/** The database cards: 18px apart, three across on a wide screen. */
+const GRID = "grid gap-4.5 sm:grid-cols-2 lg:grid-cols-3";
 
 const VISIBILITY_COPY: Record<string, string> = {
   MEMBERS: "All members",
@@ -151,9 +173,13 @@ export default async function DatabasesPage({
   const needsSetup = withData.length === 0 && custom.length === 0 && !connected && !showAll;
   const importable = databases.filter((d) => d.kind === "ATTENDANCE" || d.kind === "SIGNUPS");
 
+  const unitOf = (d: (typeof databases)[number], n: number) => {
+    const unit = d.kind === "BALLOTS" ? "polls" : d.kind === "PEOPLE" ? "people" : "rows";
+    return n === 1 ? (unit === "people" ? "person" : unit.replace(/s$/, "")) : unit;
+  };
+
   const card = (d: (typeof databases)[number], muted = false) => {
     const Icon = (d.icon && ICONS[d.icon]) || Database;
-    const unit = d.kind === "BALLOTS" ? "polls" : d.kind === "PEOPLE" ? "people" : "rows";
     const count = counts[d.key] ?? 0;
     const href = `/app/${orgSlug}/databases/${d.key}`;
     return (
@@ -162,70 +188,94 @@ export default async function DatabasesPage({
           href={href}
           label={d.name}
           className={cn(
-            "absolute right-3 bottom-3 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",
+            "absolute right-5 bottom-5 z-10 size-8 rounded-full opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100",
             pinned.has(href) && "opacity-100",
           )}
         />
         <Link
           href={href}
           className={cn(
-            "hover:bg-muted/50 focus-visible:ring-ring flex h-full flex-col gap-2 rounded-xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none",
-            muted && "border-dashed",
+            "bg-card text-card-foreground ring-foreground/6 rounded-card flex h-full min-h-44 flex-col p-6 ring-1 outline-none",
+            "focus-visible:outline-foreground transition-[transform,box-shadow] duration-200 ease-(--ease-ink) focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transform-none",
+            muted ? "hover:bg-muted/40" : "edge hover:shadow-e2 hover:-translate-y-0.5",
           )}
         >
-          <span className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2.5 font-medium">
-              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-              {d.name}
-            </span>
+          <span className="flex items-start justify-between gap-2">
+            <IconChip icon={Icon} className={cn(muted && "text-muted-foreground")} />
             {d.memberVisibility !== "MEMBERS" && (
-              <Badge variant="outline" className="gap-1">
-                <Lock className="size-3" aria-hidden="true" />
+              <Badge variant="secondary">
+                <Lock aria-hidden="true" />
                 {VISIBILITY_COPY[d.memberVisibility]}
               </Badge>
             )}
           </span>
-          <span className="text-muted-foreground line-clamp-2 text-sm">
+          <span className="heading mt-4 text-[17px]">{d.name}</span>
+          <span className="text-muted-foreground mt-1 line-clamp-2 text-sm">
             {d.description ?? DESCRIPTIONS[d.kind] ?? ""}
           </span>
-          <span className={cn("mt-auto text-sm tabular-nums", muted && "text-muted-foreground")}>
-            {muted
-              ? "Empty"
-              : `${count.toLocaleString()} ${count === 1 ? unit.replace(/s$/, "") : unit}`}
+          <span className="mt-auto flex items-baseline gap-1.5 pt-4">
+            {muted ? (
+              <span className="text-muted-foreground text-sm">Empty</span>
+            ) : (
+              <>
+                <span className="numeral text-[23px]">{count.toLocaleString()}</span>
+                <span className="text-muted-foreground text-sm">{unitOf(d, count)}</span>
+              </>
+            )}
           </span>
         </Link>
       </li>
     );
   };
 
+  // The live summary under the title: what's here, from the counts above.
+  // Polls aren't rows (a poll's rows are its ballots), so they're said apart.
+  const rowTotal = databases
+    .filter((d) => d.kind !== "BALLOTS")
+    .reduce((sum, d) => sum + (counts[d.key] ?? 0), 0);
+  const polls = databases
+    .filter((d) => d.kind === "BALLOTS")
+    .reduce((sum, d) => sum + (counts[d.key] ?? 0), 0);
+  const summary =
+    databases.length === 0
+      ? "None visible to you"
+      : [
+          `${databases.length.toLocaleString()} ${databases.length === 1 ? "database" : "databases"}`,
+          rowTotal === 0
+            ? "no rows yet"
+            : `${rowTotal.toLocaleString()} ${rowTotal === 1 ? "row" : "rows"}`,
+          polls > 0 && `${polls.toLocaleString()} ${polls === 1 ? "poll" : "polls"}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+  const setupRow = "flex flex-wrap items-center gap-x-6 gap-y-3 py-4 first:pt-0 last:pb-0";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-7.5">
       <PageHeader
         title="Databases"
-        description={
-          <>
-            {organization.name}&apos;s data, kept safe in Bananasplit: your own databases, plus
-            events, check-ins, sign-ups and polls.
-          </>
-        }
+        description={summary}
         actions={isAdmin && <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} />}
         tabs={<DatabasesTabs orgSlug={orgSlug} showReports={showReports} />}
       />
 
       {databases.length === 0 ? (
         <EmptyState
+          icon={Database}
           title="No databases are visible to you"
           description="Your club's owners decide who sees which data, in Admin panel › Privacy."
         />
       ) : needsSetup && !isAdmin ? (
         <EmptyState
+          icon={Database}
           title="No data yet"
           description="When your club's admins make a database or import a spreadsheet, it shows up here."
         />
       ) : needsSetup ? (
-        <section aria-labelledby="db-setup" className="space-y-4">
-          <div className="space-y-1">
-            <h2 id="db-setup" className="heading text-lg">
+        <section aria-labelledby="db-setup" className="space-y-4.5">
+          <div className="space-y-1.5">
+            <h2 id="db-setup" className="heading text-[17px]">
               Add your club&apos;s data
             </h2>
             <p className="text-muted-foreground flex items-start gap-2 text-sm">
@@ -235,134 +285,140 @@ export default async function DatabasesPage({
             </p>
           </div>
 
-          <ul className="divide-y rounded-xl border">
-            <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="font-medium">Make a database</p>
-                <p className="text-muted-foreground text-sm">
-                  A member roster, equipment, merch orders, sponsors: start from a template or from
-                  scratch, with the fields you choose.
-                </p>
-              </div>
-              <NewDatabaseDialog
-                orgId={organization.id}
-                orgSlug={orgSlug}
-                trigger={
-                  <Button size="sm">
-                    <Plus aria-hidden="true" />
-                    New database
+          <Card>
+            <CardContent>
+              <ul className="divide-border/70 divide-y">
+                <li className={setupRow}>
+                  <IconChip icon={Table2} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="font-semibold">Make a database</p>
+                    <p className="text-muted-foreground text-sm">
+                      A member roster, equipment, merch orders, sponsors: start from a template or
+                      from scratch, with the fields you choose.
+                    </p>
+                  </div>
+                  <NewDatabaseDialog
+                    orgId={organization.id}
+                    orgSlug={orgSlug}
+                    trigger={
+                      <Button variant="outline">
+                        <Plus aria-hidden="true" />
+                        New database
+                      </Button>
+                    }
+                  />
+                </li>
+                <li className={setupRow}>
+                  <IconChip icon={Sheet} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="font-semibold">Start a spreadsheet</p>
+                    <p className="text-muted-foreground text-sm">
+                      A blank grid of rows and columns to type straight into. Rename the columns, or
+                      turn one into numbers, dates or choices, whenever you like.
+                    </p>
+                  </div>
+                  <NewDatabaseDialog
+                    orgId={organization.id}
+                    orgSlug={orgSlug}
+                    defaultTemplateId="spreadsheet"
+                    trigger={
+                      <Button variant="outline">
+                        <Sheet aria-hidden="true" />
+                        New spreadsheet
+                      </Button>
+                    }
+                  />
+                </li>
+                <li className={setupRow}>
+                  <IconChip icon={Upload} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="font-semibold">Import a spreadsheet</p>
+                    <p className="text-muted-foreground text-sm">
+                      Bring in an Excel workbook (.xlsx), a CSV or a TSV, from Excel, Google Sheets
+                      or Numbers; it becomes a database with a field per column.{" "}
+                      {importable.length > 0 && (
+                        <>
+                          Sign-in sheets and interest forms can go straight into{" "}
+                          {importable.map((d, i) => (
+                            <span key={d.id}>
+                              {i > 0 && " or "}
+                              <Link
+                                href={`/app/${orgSlug}/databases/${d.key}/import`}
+                                className="hover:text-foreground underline underline-offset-2"
+                              >
+                                {d.name}
+                              </Link>
+                            </span>
+                          ))}
+                          .
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <NewDatabaseDialog
+                    orgId={organization.id}
+                    orgSlug={orgSlug}
+                    defaultMode="import"
+                    trigger={
+                      <Button variant="outline">
+                        <Upload aria-hidden="true" />
+                        Import a spreadsheet
+                      </Button>
+                    }
+                  />
+                </li>
+                <li className={setupRow}>
+                  <IconChip icon={CalendarDays} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="font-semibold">Start from the calendar</p>
+                    <p className="text-muted-foreground text-sm">
+                      No website? Every event you add to the calendar becomes a session here, ready
+                      for check-ins.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline">
+                    <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
                   </Button>
-                }
-              />
-            </li>
-            <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="font-medium">Start a spreadsheet</p>
-                <p className="text-muted-foreground text-sm">
-                  A blank grid of rows and columns to type straight into. Rename the columns, or
-                  turn one into numbers, dates or choices, whenever you like.
-                </p>
-              </div>
-              <NewDatabaseDialog
-                orgId={organization.id}
-                orgSlug={orgSlug}
-                defaultTemplateId="spreadsheet"
-                trigger={
-                  <Button size="sm" variant="outline">
-                    <Sheet aria-hidden="true" />
-                    New spreadsheet
+                </li>
+                <li className={setupRow}>
+                  <IconChip icon={Globe} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="font-semibold">
+                      Already have a club website database?{" "}
+                      <span className="text-muted-foreground font-normal">Optional</span>
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      If your site keeps check-ins, sign-ups and votes in Supabase, connect it and
+                      they sync in. You don&apos;t need one to use Databases.
+                    </p>
+                  </div>
+                  <Button asChild variant={connecting ? "secondary" : "ghost"}>
+                    <Link
+                      href={`/app/${orgSlug}/databases?connect=1#connect`}
+                      scroll={false}
+                      aria-current={connecting ? "step" : undefined}
+                    >
+                      Connect
+                    </Link>
                   </Button>
-                }
-              />
-            </li>
-            <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="font-medium">Import a spreadsheet</p>
-                <p className="text-muted-foreground text-sm">
-                  Bring in an Excel workbook (.xlsx), a CSV or a TSV, from Excel, Google Sheets or
-                  Numbers; it becomes a database with a field per column.{" "}
-                  {importable.length > 0 && (
-                    <>
-                      Sign-in sheets and interest forms can go straight into{" "}
-                      {importable.map((d, i) => (
-                        <span key={d.id}>
-                          {i > 0 && " or "}
-                          <Link
-                            href={`/app/${orgSlug}/databases/${d.key}/import`}
-                            className="hover:text-foreground underline underline-offset-2"
-                          >
-                            {d.name}
-                          </Link>
-                        </span>
-                      ))}
-                      .
-                    </>
-                  )}
-                </p>
-              </div>
-              <NewDatabaseDialog
-                orgId={organization.id}
-                orgSlug={orgSlug}
-                defaultMode="import"
-                trigger={
-                  <Button size="sm" variant="outline">
-                    <Upload aria-hidden="true" />
-                    Import a spreadsheet
-                  </Button>
-                }
-              />
-            </li>
-            <li className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="font-medium">Start from the calendar</p>
-                <p className="text-muted-foreground text-sm">
-                  No website? Every event you add to the calendar becomes a session here, ready for
-                  check-ins.
-                </p>
-              </div>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
-              </Button>
-            </li>
-            <li
-              className={cn(
-                "flex flex-wrap items-center gap-x-6 gap-y-3 p-4",
-                connecting && "bg-muted/40",
-              )}
-            >
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="font-medium">
-                  Already have a club website database?{" "}
-                  <span className="text-muted-foreground font-normal">Optional</span>
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  If your site keeps check-ins, sign-ups and votes in Supabase, connect it and they
-                  sync in. You don&apos;t need one to use Databases.
-                </p>
-              </div>
-              <Button asChild size="sm" variant={connecting ? "default" : "ghost"}>
-                <Link
-                  href={`/app/${orgSlug}/databases?connect=1#connect`}
-                  scroll={false}
-                  aria-current={connecting ? "step" : undefined}
-                >
-                  Connect
-                </Link>
-              </Button>
-            </li>
-          </ul>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
 
           {connecting && dataStep && (
-            <div id="connect" className="scroll-mt-20 rounded-xl border p-5">
-              <StepPanel
-                orgId={organization.id}
-                orgSlug={orgSlug}
-                view={dataStep}
-                nextStep={null}
-                googleConfigured={false}
-                embedded
-              />
-            </div>
+            <Card id="connect" className="scroll-mt-20">
+              <CardContent>
+                <StepPanel
+                  orgId={organization.id}
+                  orgSlug={orgSlug}
+                  view={dataStep}
+                  nextStep={null}
+                  googleConfigured={false}
+                  embedded
+                />
+              </CardContent>
+            </Card>
           )}
           {connecting && !dataStep && (
             <p className="text-muted-foreground text-sm">
@@ -379,17 +435,17 @@ export default async function DatabasesPage({
       ) : (
         <>
           {(custom.length > 0 || isAdmin) && (
-            <section aria-labelledby="db-own" className="space-y-3">
+            <section aria-labelledby="db-own" className="space-y-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id="db-own" className="heading text-sm">
+                <h2 id="db-own" className="heading text-[17px]">
                   Your databases
                 </h2>
-                <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
                   <ShieldCheck className="size-3.5" aria-hidden="true" />
                   Saved as you type. Only your club can see them.
                 </span>
               </div>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className={GRID}>
                 {custom.map((d) => card(d))}
                 {isAdmin && (
                   <li>
@@ -399,15 +455,19 @@ export default async function DatabasesPage({
                       trigger={
                         <button
                           type="button"
-                          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex h-full min-h-28 w-full flex-col items-start justify-center gap-1.5 rounded-xl border border-dashed p-4 text-left"
+                          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground border-border rounded-card focus-visible:outline-foreground flex h-full min-h-44 w-full flex-col items-start justify-center gap-3 border-[1.5px] border-dashed p-6 text-left transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
                         >
-                          <span className="flex items-center gap-2 text-sm font-medium">
-                            <Plus className="size-4" aria-hidden="true" />
-                            New database
+                          <span className="border-input grid size-9 place-items-center rounded-full border-[1.5px] border-dashed">
+                            <Plus className="size-[18px]" aria-hidden="true" />
                           </span>
-                          <span className="flex items-center gap-2 text-xs">
-                            <FileSpreadsheet className="size-3.5" aria-hidden="true" />
-                            From a template or a spreadsheet
+                          <span className="space-y-1">
+                            <span className="text-foreground heading block text-[15px]">
+                              New database
+                            </span>
+                            <span className="flex items-center gap-1.5 text-[13px]">
+                              <FileSpreadsheet className="size-3.5" aria-hidden="true" />
+                              From a template or a spreadsheet
+                            </span>
                           </span>
                         </button>
                       }
@@ -417,34 +477,36 @@ export default async function DatabasesPage({
               </ul>
             </section>
           )}
-          {(withData.length > 0 || empty.length > 0) && custom.length > 0 && (
-            <h2 className="heading text-sm">Built in</h2>
+          {(withData.length > 0 || empty.length > 0) && (
+            <section aria-labelledby="db-built-in" className="space-y-4">
+              {custom.length > 0 || isAdmin ? (
+                <h2 id="db-built-in" className="heading text-[17px]">
+                  Built in
+                </h2>
+              ) : (
+                <h2 id="db-built-in" className="sr-only">
+                  Built in
+                </h2>
+              )}
+              {withData.length > 0 && <ul className={GRID}>{withData.map((d) => card(d))}</ul>}
+              {empty.length > 0 &&
+                (withData.length === 0 || showAll ? (
+                  <ul className={GRID}>{empty.map((d) => card(d, true))}</ul>
+                ) : (
+                  <details className="group">
+                    <summary className="text-muted-foreground hover:text-foreground bg-muted/60 rounded-tile focus-visible:outline-foreground flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm outline-none focus-visible:outline-2 [&::-webkit-details-marker]:hidden">
+                      <ChevronRight
+                        className="size-4 transition-transform group-open:rotate-90"
+                        aria-hidden="true"
+                      />
+                      {empty.length} empty database{empty.length === 1 ? "" : "s"}:{" "}
+                      {empty.map((d) => d.name).join(", ")}
+                    </summary>
+                    <ul className={cn(GRID, "pt-4.5")}>{empty.map((d) => card(d, true))}</ul>
+                  </details>
+                ))}
+            </section>
           )}
-          {withData.length > 0 && (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {withData.map((d) => card(d))}
-            </ul>
-          )}
-          {empty.length > 0 &&
-            (withData.length === 0 || showAll ? (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {empty.map((d) => card(d, true))}
-              </ul>
-            ) : (
-              <details className="group rounded-xl border border-dashed">
-                <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
-                  <ChevronRight
-                    className="size-4 transition-transform group-open:rotate-90"
-                    aria-hidden="true"
-                  />
-                  {empty.length} empty database{empty.length === 1 ? "" : "s"}:{" "}
-                  {empty.map((d) => d.name).join(", ")}
-                </summary>
-                <ul className="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-3">
-                  {empty.map((d) => card(d, true))}
-                </ul>
-              </details>
-            ))}
         </>
       )}
 
@@ -480,16 +542,18 @@ export default async function DatabasesPage({
         </p>
       )}
       {showAll && connecting && dataStep && !needsSetup && (
-        <div id="connect" className="scroll-mt-20 rounded-xl border p-5">
-          <StepPanel
-            orgId={organization.id}
-            orgSlug={orgSlug}
-            view={dataStep}
-            nextStep={null}
-            googleConfigured={false}
-            embedded
-          />
-        </div>
+        <Card id="connect" className="scroll-mt-20">
+          <CardContent>
+            <StepPanel
+              orgId={organization.id}
+              orgSlug={orgSlug}
+              view={dataStep}
+              nextStep={null}
+              googleConfigured={false}
+              embedded
+            />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

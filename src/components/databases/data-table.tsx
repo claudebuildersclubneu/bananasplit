@@ -6,13 +6,16 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   Columns3,
+  Database,
   Filter,
   Loader2,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -45,6 +48,7 @@ import { cn } from "@/lib/utils";
 
 import { CellView } from "./cell";
 import type { ColumnView, RowView } from "./column-config";
+import { TableFrame } from "./table-frame";
 import { addToList, removeFromList, useViewParams, withoutFilter } from "./view-params";
 
 /**
@@ -93,6 +97,10 @@ const OP_LABELS: Record<string, string> = {
   in: "is any of",
   isnull: "is empty",
 };
+
+/** The date range's two inputs: 40px pills like the rest of the toolbar. */
+const DATE_INPUT =
+  "w-40 rounded-full px-4 tabular-nums [&::-webkit-calendar-picker-indicator]:opacity-60";
 
 const SHORT_OPS: Record<string, string> = {
   eq: "=",
@@ -147,7 +155,7 @@ function FilterChip({
       <button
         type="button"
         onClick={onRemove}
-        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 grid size-5 place-items-center rounded-md"
+        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 grid size-6 place-items-center rounded-full"
         aria-label={`Remove filter ${column?.label ?? filter.col}`}
       >
         <X className="size-3" aria-hidden="true" />
@@ -194,14 +202,14 @@ function FilterBuilder({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline">
           <Filter aria-hidden="true" />
           Filter
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium" htmlFor="db-filter-col">
+      <PopoverContent align="start" className="w-80 space-y-3.5 p-4">
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium" htmlFor="db-filter-col">
             Column
           </label>
           <Select value={col} onValueChange={pickColumn}>
@@ -217,8 +225,8 @@ function FilterBuilder({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium" htmlFor="db-filter-op">
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium" htmlFor="db-filter-op">
             Condition
           </label>
           <Select value={op} onValueChange={setOp}>
@@ -234,8 +242,8 @@ function FilterBuilder({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium" htmlFor="db-filter-value">
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium" htmlFor="db-filter-value">
             Value
           </label>
           {isBool ? (
@@ -262,7 +270,7 @@ function FilterBuilder({
               </SelectContent>
             </Select>
           ) : hasOptions && op === "in" ? (
-            <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border p-2">
+            <div className="bg-muted/60 rounded-field max-h-44 space-y-1.5 overflow-y-auto p-3">
               {column?.options?.map((o) => {
                 const list = value.split(",").filter(Boolean);
                 const checked = list.includes(o.value);
@@ -297,7 +305,7 @@ function FilterBuilder({
             />
           )}
         </div>
-        <Button size="sm" className="w-full" onClick={submit}>
+        <Button className="w-full" onClick={submit}>
           Add filter
         </Button>
       </PopoverContent>
@@ -308,7 +316,12 @@ function FilterBuilder({
 function SortIcon({ dir }: { dir: "asc" | "desc" | null }) {
   if (dir === "asc") return <ArrowUp className="size-3.5" aria-hidden="true" />;
   if (dir === "desc") return <ArrowDown className="size-3.5" aria-hidden="true" />;
-  return <ArrowUpDown className="size-3.5 opacity-40" aria-hidden="true" />;
+  return (
+    <ArrowUpDown
+      className="size-3.5 opacity-0 transition-opacity group-hover/sort:opacity-60 group-focus-visible/sort:opacity-60"
+      aria-hidden="true"
+    />
+  );
 }
 
 export function DataTable(props: DataTableProps) {
@@ -371,8 +384,20 @@ export function DataTable(props: DataTableProps) {
   const first = total === 0 ? 0 : (page - 1) * size + 1;
   const last = Math.min(total, page * size);
 
+  const filtered = filters.some((f) => !f.isDefault) || Boolean(props.q || props.from || props.to);
+  const clearAll = () =>
+    view.update((p) => {
+      p.delete("f");
+      p.delete("q");
+      p.delete("from");
+      p.delete("to");
+      setSearch("");
+    });
+  const openRow = (id: string) =>
+    view.update((p) => p.set("row", id), { keepPage: true, push: true });
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SearchField
           value={search}
@@ -394,9 +419,9 @@ export function DataTable(props: DataTableProps) {
           <div
             role="group"
             aria-label={`${props.dateLabel} range`}
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
-            <span className="text-muted-foreground text-xs">{props.dateLabel}</span>
+            <span className="text-muted-foreground text-[13px]">{props.dateLabel}</span>
             <Input
               type="date"
               aria-label={`${props.dateLabel} from`}
@@ -408,7 +433,7 @@ export function DataTable(props: DataTableProps) {
                   e.target.value ? p.set("from", e.target.value) : p.delete("from"),
                 )
               }
-              className="h-7 w-36 text-sm"
+              className={DATE_INPUT}
             />
             <span className="text-muted-foreground text-sm" aria-hidden="true">
               –
@@ -422,13 +447,13 @@ export function DataTable(props: DataTableProps) {
               onChange={(e) =>
                 view.update((p) => (e.target.value ? p.set("to", e.target.value) : p.delete("to")))
               }
-              className="h-7 w-36 text-sm"
+              className={DATE_INPUT}
             />
           </div>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline">
               <Columns3 aria-hidden="true" />
               Columns
             </Button>
@@ -464,20 +489,8 @@ export function DataTable(props: DataTableProps) {
               onRemove={() => removeFilter(f)}
             />
           ))}
-          {(filters.some((f) => !f.isDefault) || props.q || props.from || props.to) && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() =>
-                view.update((p) => {
-                  p.delete("f");
-                  p.delete("q");
-                  p.delete("from");
-                  p.delete("to");
-                  setSearch("");
-                })
-              }
-            >
+          {filtered && (
+            <Button variant="ghost" size="sm" onClick={clearAll}>
               Clear all
             </Button>
           )}
@@ -485,48 +498,63 @@ export function DataTable(props: DataTableProps) {
       )}
 
       {rejected.length > 0 && (
-        <p
-          role="status"
-          className="border-warning/40 bg-warning/10 rounded-xl border px-3 py-2 text-xs"
-        >
-          Ignored: {rejected.map((r) => `${r.part} (${r.reason})`).join("; ")}
+        <p role="status" className="bg-muted/60 rounded-tile flex items-start gap-2 p-3 text-sm">
+          <CircleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>Ignored: {rejected.map((r) => `${r.part} (${r.reason})`).join("; ")}</span>
         </p>
       )}
 
-      <div className="rounded-xl border">
+      <TableFrame>
         <Table>
           <TableHeader>
             <TableRow>
-              {visible.map((c) => (
-                <TableHead key={c.key} className={cn(c.align === "right" && "text-right")}>
-                  {c.sortable ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(c.key)}
-                      className={cn(
-                        "hover:text-foreground inline-flex items-center gap-1",
-                        c.align === "right" && "flex-row-reverse",
-                      )}
-                      aria-label={`Sort by ${c.label}`}
-                    >
-                      {c.label}
-                      <SortIcon dir={sort.col === c.key ? sort.dir : null} />
-                    </button>
-                  ) : (
-                    c.label
-                  )}
-                </TableHead>
-              ))}
+              {visible.map((c) => {
+                const right = c.align === "right";
+                const sorted = sort.col === c.key;
+                return (
+                  <TableHead key={c.key} className={cn(right && "text-right tabular-nums")}>
+                    {c.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(c.key)}
+                        className={cn(
+                          "group/sort hover:text-foreground focus-visible:outline-foreground inline-flex items-center gap-1 rounded-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
+                          right && "flex-row-reverse",
+                          sorted && "text-foreground",
+                        )}
+                        aria-label={`Sort by ${c.label}`}
+                      >
+                        {c.label}
+                        <SortIcon dir={sorted ? sort.dir : null} />
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={visible.length}
-                  className="text-muted-foreground h-24 text-center"
-                >
-                  {props.emptyTitle ?? "No rows match this view."}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={visible.length} className="whitespace-normal">
+                  <EmptyState
+                    icon={Database}
+                    title={props.emptyTitle ?? "No rows match this view"}
+                    description={
+                      filtered
+                        ? "Try another search or date range, or clear the filters."
+                        : "Rows show up here as they're added."
+                    }
+                    action={
+                      filtered ? (
+                        <Button variant="outline" onClick={clearAll}>
+                          Clear all
+                        </Button>
+                      ) : undefined
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -534,25 +562,28 @@ export function DataTable(props: DataTableProps) {
                 <TableRow
                   key={r.id}
                   data-state={props.selectedRowId === r.id ? "selected" : undefined}
-                  className={cn("cursor-pointer", r.dim && "opacity-60")}
-                  onClick={() =>
-                    view.update((p) => p.set("row", r.id), { keepPage: true, push: true })
-                  }
+                  className={cn(
+                    "focus-visible:outline-foreground cursor-pointer outline-none focus-visible:outline-2 focus-visible:-outline-offset-2",
+                    r.dim && "opacity-60",
+                  )}
+                  onClick={() => openRow(r.id)}
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter")
-                      view.update((p) => p.set("row", r.id), { keepPage: true, push: true });
+                    if (e.key === "Enter") openRow(r.id);
                   }}
                 >
                   {visible.map((c) => (
                     <TableCell
                       key={c.key}
                       className={cn(
-                        "max-w-72 align-top whitespace-normal",
-                        c.align === "right" && "text-right",
-                        (c.type === "datetime" || c.type === "date") && "whitespace-nowrap",
+                        "max-w-72 whitespace-normal",
+                        c.align === "right" && "text-right tabular-nums",
+                        (c.type === "datetime" || c.type === "date") &&
+                          "whitespace-nowrap tabular-nums",
                         (c.type === "text" || c.type === "person" || c.type === "relation") &&
                           "min-w-36",
+                        // Room for a few chips side by side, so rows stay one line tall.
+                        c.type === "multiselect" && "min-w-60",
                       )}
                     >
                       <CellView cell={r.cells[c.key] ?? null} />
@@ -563,10 +594,10 @@ export function DataTable(props: DataTableProps) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </TableFrame>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
+        <span className="text-muted-foreground tabular-nums">
           {total === 0
             ? "No rows"
             : `${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()}`}
@@ -578,7 +609,7 @@ export function DataTable(props: DataTableProps) {
               view.update((p) => (v === "50" ? p.delete("size") : p.set("size", v)))
             }
           >
-            <SelectTrigger size="sm" className="w-28" aria-label="Rows per page">
+            <SelectTrigger size="sm" className="w-28 rounded-full" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -603,7 +634,7 @@ export function DataTable(props: DataTableProps) {
           >
             <ChevronLeft />
           </Button>
-          <span className="tabular-nums">
+          <span className="min-w-12 text-center tabular-nums">
             {page} / {pages}
           </span>
           <Button
