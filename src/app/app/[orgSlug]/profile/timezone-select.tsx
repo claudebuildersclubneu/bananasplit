@@ -60,7 +60,7 @@ export function TimezoneSelect({
           role="combobox"
           aria-expanded={open}
           aria-invalid={invalid || undefined}
-          className="w-full justify-between font-normal"
+          className="rounded-field bg-card hover:bg-muted/60 aria-expanded:bg-card w-full justify-between pr-3 pl-3.5 font-normal active:scale-100"
         >
           <span className="min-w-0 truncate">
             {value
@@ -79,13 +79,19 @@ export function TimezoneSelect({
             <CommandEmpty>No timezone found.</CommandEmpty>
             <CommandGroup>
               {orgTimezone && (
-                <CommandItem value={`${FOLLOW_ORG} organization default`} onSelect={() => choose(null)}>
+                <CommandItem
+                  value={`${FOLLOW_ORG} organization default`}
+                  onSelect={() => choose(null)}
+                >
                   <Check className={cn("size-4", value === null ? "opacity-100" : "opacity-0")} />
                   Organization&apos;s timezone ({timeZoneLabel(orgTimezone)})
                 </CommandItem>
               )}
               {detected && detected !== value && (
-                <CommandItem value={`__detected__ ${detected} this device`} onSelect={() => choose(detected)}>
+                <CommandItem
+                  value={`__detected__ ${detected} this device`}
+                  onSelect={() => choose(detected)}
+                >
                   <LocateFixed className="size-4" aria-hidden="true" />
                   This device ({timeZoneLabel(detected)})
                 </CommandItem>

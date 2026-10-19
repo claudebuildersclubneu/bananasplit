@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import { parseNotificationPreferences } from "@/lib/notifications/preferences";
 import { personHref, type ProfileSection } from "@/lib/profile/href";
@@ -12,6 +12,8 @@ import { parsePersonalTheme } from "@/lib/theme/personal";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { getOwnProfile } from "@/server/profiles/queries";
 
+import { ChipLink } from "../settings/chip-link";
+import { SettingsCard } from "../settings/settings-card";
 import { AvailabilityForm } from "./availability-form";
 import { AvatarEditor } from "./avatar-editor";
 import { CalendarFeedCard } from "./calendar-feed-card";
@@ -43,175 +45,134 @@ function roleLabel(role: string): string {
 export default async function ProfilePage({ params }: PageProps<"/app/[orgSlug]/profile">) {
   const { orgSlug } = await params;
   const { user, organization, theme: orgTheme } = await getOrgContextBySlug(orgSlug);
-  const clubMode = orgTheme?.mode === "LIGHT" ? "light" : orgTheme?.mode === "DARK" ? "dark" : "system";
+  const clubMode =
+    orgTheme?.mode === "LIGHT" ? "light" : orgTheme?.mode === "DARK" ? "dark" : "system";
   const profile = await getOwnProfile(user.id);
   if (!profile) notFound();
 
   const preferences = parseNotificationPreferences(profile.emailPreferences);
   const zone = effectiveTimezone(profile, organization);
   const titledOrgs = profile.memberships;
+  const summary = [
+    profile.name,
+    profile.pronouns,
+    [profile.major, profile.gradYear ? `’${String(profile.gradYear).slice(-2)}` : null]
+      .filter(Boolean)
+      .join(" "),
+    `${titledOrgs.length} organization${titledOrgs.length === 1 ? "" : "s"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+    <div className="mx-auto w-full max-w-3xl space-y-7.5">
+      <div className="space-y-5">
+        <header className="flex flex-wrap items-center gap-x-5 gap-y-4">
           <UserAvatar user={profile} size="xl" className="shrink-0" />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-56">
             <h1 className="page-title">Your profile</h1>
-            <p className="text-muted-foreground text-sm">
-              Members of your organizations see your name, picture, pronouns, major, bio and links.
-              Your email is not shown on people pages.
-            </p>
+            <p className="text-muted-foreground mt-2 text-[15px]">{summary}</p>
           </div>
-        </div>
-        <Link
-          href={personHref(orgSlug, profile.id)}
-          className="text-primary inline-flex shrink-0 items-center gap-1 self-start text-sm font-medium underline-offset-4 hover:underline sm:self-center"
-        >
-          View as others see it
-          <ArrowUpRight className="size-4" aria-hidden="true" />
-        </Link>
-      </header>
+          <Button asChild variant="outline">
+            <Link href={personHref(orgSlug, profile.id)}>
+              View as others see it
+              <ArrowUpRight data-icon="inline-end" aria-hidden="true" />
+            </Link>
+          </Button>
+        </header>
+        <p className="text-muted-foreground max-w-prose text-sm">
+          Members of your organizations see your name, picture, pronouns, major, bio and links. Your
+          email is not shown on people pages.
+        </p>
 
-      <nav aria-label="Profile sections" className="-mx-1 flex flex-wrap gap-1">
-        {SECTIONS.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring rounded-md px-2.5 py-1 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        <nav aria-label="Profile sections" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <ul className="flex min-w-max gap-2 sm:flex-wrap">
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <ChipLink href={`#${s.id}`}>{s.label}</ChipLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+
+      <div className="space-y-4.5">
+        <section id="details" className="scroll-mt-24 space-y-4.5">
+          <DetailsForm
+            orgTimezone={organization.timezone}
+            initial={{
+              name: profile.name ?? "",
+              pronouns: profile.pronouns ?? "",
+              major: profile.major ?? "",
+              gradYear: profile.gradYear ? String(profile.gradYear) : "",
+              bio: profile.bio ?? "",
+              timezone: profile.timezone,
+            }}
+          />
+          <SettingsCard
+            title="Your titles"
+            description="Each organization's admins set your title there, separately from your role."
           >
-            {s.label}
-          </a>
-        ))}
-      </nav>
-
-      <section id="details" aria-labelledby="details-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="details-title">Details</CardTitle>
-            <CardDescription>Your name and a little about you. The same in every organization.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <DetailsForm
-              orgTimezone={organization.timezone}
-              initial={{
-                name: profile.name ?? "",
-                pronouns: profile.pronouns ?? "",
-                major: profile.major ?? "",
-                gradYear: profile.gradYear ? String(profile.gradYear) : "",
-                bio: profile.bio ?? "",
-                timezone: profile.timezone,
-              }}
-            />
-            <div className="space-y-2 border-t pt-4">
-              <h3 className="text-sm font-medium">Your titles</h3>
-              <p className="text-muted-foreground text-xs">
-                Each organization&apos;s admins set your title there, separately from your role.
-              </p>
-              <ul className="divide-y rounded-md border">
-                {titledOrgs.map((m) => (
-                  <li key={m.organizationId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-                    <span className="font-medium">{m.orgName}</span>
-                    <span className="flex items-center gap-2">
-                      <span className={m.title ? "" : "text-muted-foreground"}>{m.title ?? "No title"}</span>
-                      <Badge variant="secondary">{roleLabel(m.role)}</Badge>
+            <ul className="divide-border/70 divide-y">
+              {titledOrgs.map((m) => (
+                <li
+                  key={m.organizationId}
+                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm first:pt-0 last:pb-0"
+                >
+                  <span className="font-semibold">{m.orgName}</span>
+                  <span className="flex items-center gap-2.5">
+                    <span className={m.title ? "" : "text-muted-foreground"}>
+                      {m.title ?? "No title"}
                     </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+                    <Badge variant={m.role === "OWNER" ? "accent" : "secondary"}>
+                      {roleLabel(m.role)}
+                    </Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </SettingsCard>
+        </section>
 
-      <section id="photo" aria-labelledby="photo-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="photo-title">Profile picture</CardTitle>
-            <CardDescription>
-              Shown in the org chart, on tasks, in database rows and on your people page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AvatarEditor
-              user={{ name: profile.name, email: profile.email, image: profile.image, avatar: profile.avatar }}
-            />
-          </CardContent>
-        </Card>
-      </section>
+        <SettingsCard
+          id="photo"
+          title="Profile picture"
+          description="Shown in the org chart, on tasks, in database rows and on your people page."
+        >
+          <AvatarEditor
+            user={{
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+              avatar: profile.avatar,
+            }}
+          />
+        </SettingsCard>
 
-      <section id="links" aria-labelledby="links-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="links-title">Links</CardTitle>
-            <CardDescription>LinkedIn, GitHub, your website and so on. Up to 8.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <LinksForm initial={profile.links} />
-          </CardContent>
-        </Card>
-      </section>
+        <section id="links" className="scroll-mt-24">
+          <LinksForm initial={profile.links} />
+        </section>
 
-      <section id="theme" aria-labelledby="theme-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="theme-title">Theme</CardTitle>
-            <CardDescription>
-              Only changes your view, in every organization. An organization that locks light or dark keeps its lock.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ThemeForm initial={parsePersonalTheme(profile.themePreference)} clubMode={clubMode} />
-          </CardContent>
-        </Card>
-      </section>
+        <section id="theme" className="scroll-mt-24">
+          <ThemeForm initial={parsePersonalTheme(profile.themePreference)} clubMode={clubMode} />
+        </section>
 
-      <section id="availability" aria-labelledby="availability-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="availability-title">When you can&apos;t meet</CardTitle>
-            <CardDescription>
-              Click or drag to block hours in a typical week, or add rules. Teammates see &ldquo;busy,&rdquo; never
-              the reason.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AvailabilityForm initial={profile.availability} />
-          </CardContent>
-        </Card>
-      </section>
+        <section id="availability" className="scroll-mt-24">
+          <AvailabilityForm initial={profile.availability} />
+        </section>
 
-      <section id="notifications" aria-labelledby="notifications-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="notifications-title">Email notifications</CardTitle>
-            <CardDescription>For every organization you belong to.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <NotificationPreferencesForm
-              initial={preferences}
-              effectiveTimezone={zone}
-              followsOrg={profile.timezone === null}
-            />
-          </CardContent>
-        </Card>
-      </section>
+        <section id="notifications" className="scroll-mt-24">
+          <NotificationPreferencesForm
+            initial={preferences}
+            effectiveTimezone={zone}
+            followsOrg={profile.timezone === null}
+          />
+        </section>
 
-      <section id="calendar" aria-labelledby="calendar-title" className="scroll-mt-20">
-        <Card>
-          <CardHeader>
-            <CardTitle id="calendar-title">Calendar feed</CardTitle>
-            <CardDescription>
-              Subscribe from Google Calendar, Apple Calendar or Outlook to see the events you&apos;re
-              invited to. Those apps refresh on their own schedule, often hours apart, so treat it as
-              a mirror rather than a live view.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CalendarFeedCard activeSince={profile.icsActiveSince?.toISOString() ?? null} />
-          </CardContent>
-        </Card>
-      </section>
+        <section id="calendar" className="scroll-mt-24">
+          <CalendarFeedCard activeSince={profile.icsActiveSince?.toISOString() ?? null} />
+        </section>
+      </div>
     </div>
   );
 }

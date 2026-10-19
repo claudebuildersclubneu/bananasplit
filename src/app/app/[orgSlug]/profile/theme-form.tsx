@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import type { PersonalTheme } from "@/lib/theme/personal";
 
+import { SettingsCard } from "../settings/settings-card";
+
 /**
  * Profile > Theme: the personal theme from onboarding A4, editable. "Match
  * my club" saves NULL, so the org's theme (Settings > Theme) shows again.
@@ -49,21 +51,24 @@ export function ThemeForm({
   }
 
   return (
-    <div className="space-y-4">
-      <ThemePicker value={choice} onChange={setChoice} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => save(toPersonalTheme(choice))} disabled={pending}>
-          {pending ? "Saving…" : "Save theme"}
-        </Button>
+    <SettingsCard
+      title="Theme"
+      description="Only changes your view, in every organization. An organization that locks light or dark keeps its lock."
+      status={
         <span
           aria-live="polite"
-          className={
-            status?.ok === false ? "text-destructive text-sm" : "text-muted-foreground text-sm"
-          }
+          className={status?.ok === false ? "text-destructive" : "text-success"}
         >
           {status?.text}
         </span>
-      </div>
-    </div>
+      }
+      footer={
+        <Button type="button" onClick={() => save(toPersonalTheme(choice))} disabled={pending}>
+          {pending ? "Saving…" : "Save theme"}
+        </Button>
+      }
+    >
+      <ThemePicker value={choice} onChange={setChoice} />
+    </SettingsCard>
   );
 }

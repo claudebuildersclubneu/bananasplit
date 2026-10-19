@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import type { NotificationType } from "@/generated/prisma/enums";
 import {
@@ -24,6 +23,7 @@ import {
 } from "@/lib/notifications/preferences";
 import { timeZoneLabel } from "@/lib/profile/timezone";
 
+import { SettingsCard } from "../settings/settings-card";
 import { saveNotificationPreferences } from "./actions";
 
 const LEAD_OPTIONS = [0, 1, 2, 3, 5, 7, 14];
@@ -44,7 +44,12 @@ function leadLabel(days: number): string {
 const GROUPS: NotificationGroup[] = ["tasks", "events", "org"];
 const TYPES_BY_GROUP = GROUPS.map((group) => ({
   group,
-  types: (Object.entries(NOTIFICATION_TYPE_META) as [NotificationType, (typeof NOTIFICATION_TYPE_META)[keyof typeof NOTIFICATION_TYPE_META]][])
+  types: (
+    Object.entries(NOTIFICATION_TYPE_META) as [
+      NotificationType,
+      (typeof NOTIFICATION_TYPE_META)[keyof typeof NOTIFICATION_TYPE_META],
+    ][]
+  )
     .filter(([, meta]) => meta.group === group)
     .map(([type, meta]) => ({ type, ...meta })),
 }));
@@ -101,106 +106,115 @@ export function NotificationPreferencesForm({
     : [...LEAD_OPTIONS, prefs.reminderLeadDays].sort((a, b) => a - b);
 
   return (
-    <div className="space-y-6">
-      <p className="text-muted-foreground text-sm">
-        These choose what is also emailed to you. Everything still shows in the notification bell.
-      </p>
-
-      {TYPES_BY_GROUP.map(({ group, types }) => (
-        <fieldset key={group} className="space-y-3">
-          <legend className="mb-2 text-sm font-medium">{NOTIFICATION_GROUP_LABELS[group]}</legend>
-          {types.map(({ type, label, audience }) => (
-            <div key={type} className="flex items-center justify-between gap-4">
-              <Label htmlFor={`pref-${type}`} className="flex flex-col items-start gap-0.5 font-normal">
-                <span>{label}</span>
-                {audience && <span className="text-muted-foreground text-xs">{audience}</span>}
-              </Label>
-              <Switch
-                id={`pref-${type}`}
-                checked={prefs.types[type] !== false}
-                onCheckedChange={(checked) => save({ types: { [type]: checked } })}
-              />
+    <SettingsCard
+      title="Email notifications"
+      description="For every organization you belong to. These choose what is also emailed to you; everything still shows in the notification bell. Changes save as you make them."
+      status={
+        <p aria-live="polite" className="min-h-5">
+          {error ? (
+            <span className="text-destructive">{error}</span>
+          ) : saving > 0 ? (
+            <span className="text-muted-foreground">Saving…</span>
+          ) : null}
+        </p>
+      }
+    >
+      <div className="space-y-6">
+        {TYPES_BY_GROUP.map(({ group, types }) => (
+          <fieldset key={group}>
+            <legend className="heading mb-1 text-[15px]">{NOTIFICATION_GROUP_LABELS[group]}</legend>
+            <div className="divide-border/70 divide-y">
+              {types.map(({ type, label, audience }) => (
+                <div key={type} className="flex items-center justify-between gap-4 py-3">
+                  <Label
+                    htmlFor={`pref-${type}`}
+                    className="flex flex-col items-start gap-0.5 font-normal"
+                  >
+                    <span className="font-medium">{label}</span>
+                    {audience && (
+                      <span className="text-muted-foreground text-[13px]">{audience}</span>
+                    )}
+                  </Label>
+                  <Switch
+                    id={`pref-${type}`}
+                    checked={prefs.types[type] !== false}
+                    onCheckedChange={(checked) => save({ types: { [type]: checked } })}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </fieldset>
-      ))}
+          </fieldset>
+        ))}
 
-      <Separator />
+        <fieldset className="space-y-4">
+          <legend className="heading mb-1 text-[15px]">Daily digest and reminders</legend>
 
-      <fieldset className="space-y-4">
-        <legend className="mb-2 text-sm font-medium">Daily digest and reminders</legend>
-
-        <div className="flex items-center justify-between gap-4">
-          <Label htmlFor="pref-digest" className="flex flex-col items-start gap-0.5 font-normal">
-            <span>Email me a daily digest of my tasks</span>
-            <span className="text-muted-foreground text-xs">
-              Overdue, due today, due this week, newly assigned and blocked.
-            </span>
-          </Label>
-          <Switch
-            id="pref-digest"
-            checked={prefs.digest.enabled}
-            onCheckedChange={(checked) => save({ digest: { enabled: checked } })}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="pref-digest-hour">Send the digest at</Label>
-            <Select
-              value={String(prefs.digest.hourLocal)}
-              onValueChange={(v) => save({ digest: { hourLocal: Number(v) } })}
-              disabled={!prefs.digest.enabled}
-            >
-              <SelectTrigger id="pref-digest-hour" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 24 }, (_, hour) => (
-                  <SelectItem key={hour} value={String(hour)}>
-                    {hourLabel(hour)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <Label htmlFor="pref-digest" className="flex flex-col items-start gap-0.5 font-normal">
+              <span className="font-medium">Email me a daily digest of my tasks</span>
+              <span className="text-muted-foreground text-[13px]">
+                Overdue, due today, due this week, newly assigned and blocked.
+              </span>
+            </Label>
+            <Switch
+              id="pref-digest"
+              checked={prefs.digest.enabled}
+              onCheckedChange={(checked) => save({ digest: { enabled: checked } })}
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pref-lead">Due-date reminder</Label>
-            <Select
-              value={String(prefs.reminderLeadDays)}
-              onValueChange={(v) => save({ reminderLeadDays: Number(v) })}
-            >
-              <SelectTrigger id="pref-lead" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {leadOptions
-                  .filter((d) => d >= 0 && d <= REMINDER_LEAD_DAYS_MAX)
-                  .map((days) => (
-                    <SelectItem key={days} value={String(days)}>
-                      {leadLabel(days)}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="pref-digest-hour">Send the digest at</Label>
+              <Select
+                value={String(prefs.digest.hourLocal)}
+                onValueChange={(v) => save({ digest: { hourLocal: Number(v) } })}
+                disabled={!prefs.digest.enabled}
+              >
+                <SelectTrigger id="pref-digest-hour" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, hour) => (
+                    <SelectItem key={hour} value={String(hour)}>
+                      {hourLabel(hour)}
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pref-lead">Due-date reminder</Label>
+              <Select
+                value={String(prefs.reminderLeadDays)}
+                onValueChange={(v) => save({ reminderLeadDays: Number(v) })}
+              >
+                <SelectTrigger id="pref-lead" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {leadOptions
+                    .filter((d) => d >= 0 && d <= REMINDER_LEAD_DAYS_MAX)
+                    .map((days) => (
+                      <SelectItem key={days} value={String(days)}>
+                        {leadLabel(days)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
 
-        <p className="text-muted-foreground text-xs">
-          Times are in {timeZoneLabel(effectiveTimezone)}
-          {followsOrg ? " (your organization's timezone; change yours under Details)" : " (your timezone)"}
-          .
-        </p>
-      </fieldset>
-
-      <p aria-live="polite" className="min-h-5 text-sm">
-        {error ? (
-          <span className="text-destructive">{error}</span>
-        ) : saving > 0 ? (
-          <span className="text-muted-foreground">Saving…</span>
-        ) : null}
-      </p>
-    </div>
+          <p className="text-muted-foreground text-[13px]">
+            Times are in {timeZoneLabel(effectiveTimezone)}
+            {followsOrg
+              ? " (your organization's timezone; change yours under Details)"
+              : " (your timezone)"}
+            .
+          </p>
+        </fieldset>
+      </div>
+    </SettingsCard>
   );
 }
