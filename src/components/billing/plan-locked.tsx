@@ -6,6 +6,8 @@ import type { OrgKind, OrgPlan } from "@/generated/prisma/enums";
 import {
   FEATURE_LABELS,
   FEATURE_PITCH,
+  isPluralFeature,
+  personalPlanFor,
   PLAN_NAMES,
   planFor,
   type PlanFeature,
@@ -14,10 +16,12 @@ import {
 /**
  * What a page shows when the space doesn't include it (planGate, on the
  * server, so typing the URL shows this too):
- * - Personal: the feature is for clubs; start one or join one. No price.
+ * - Personal, a Personal Plus feature (themes, calendar sync, AI): what it
+ *   does and the way to Personal Plus (Settings › Plan and storage).
+ * - Personal, a club feature: it is for clubs; start one or join one. No price.
  * - A club: the feature, one line on what it does, the plan that has it,
- *   and the way there (Admin panel > Plan for the owner and admins; a word
- *   to ask the owner for everyone else, who never sees a price).
+ *   and the way there (Settings › Plan and storage for the owner and admins;
+ *   a word to ask the owner for everyone else, who never sees a price).
  */
 export function PlanLocked({
   feature,
@@ -30,22 +34,46 @@ export function PlanLocked({
   feature: PlanFeature;
   orgSlug: string;
   kind?: OrgKind;
-  /** The club's current plan. */
+  /** The space's current plan. */
   plan: OrgPlan;
-  /** Owners and admins: a link to Admin panel > Plan. */
+  /** Owners and admins (and the Personal owner): a link to the plan page. */
   canSeePlans: boolean;
   /** The page's own title, when it differs from the feature's name. */
   title?: string;
 }) {
   const base = `/app/${orgSlug}`;
-  const plural = feature === "taskViews" || feature === "teamwork";
+  const plural = isPluralFeature(feature);
+  const card = "bg-card edge rounded-card space-y-3 p-6";
+
+  if (kind === "PERSONAL" && personalPlanFor(feature) === "PERSONAL_PLUS") {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <h1 className="page-title">{title ?? FEATURE_LABELS[feature]}</h1>
+        <div className={card}>
+          <p className="eyebrow flex items-center gap-1.5">
+            <Lock className="size-3.5" aria-hidden="true" />
+            {PLAN_NAMES.PERSONAL_PLUS}
+          </p>
+          <p className="heading">
+            {FEATURE_LABELS[feature]} {plural ? "come" : "comes"} with {PLAN_NAMES.PERSONAL_PLUS}.
+          </p>
+          <p className="text-muted-foreground max-w-prose text-sm">{FEATURE_PITCH[feature]}</p>
+          <div className="flex flex-wrap items-center gap-2 pt-1.5">
+            <Button asChild size="sm">
+              <Link href={`${base}/settings/plan`}>See plans</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (kind === "PERSONAL") {
     return (
       <div className="max-w-2xl space-y-6">
         <h1 className="page-title">{title ?? FEATURE_LABELS[feature]}</h1>
-        <div className="bg-card space-y-3 rounded-xl border p-6">
-          <p className="heading text-base">
+        <div className={card}>
+          <p className="heading">
             {FEATURE_LABELS[feature]} {plural ? "are" : "is"} for clubs.
           </p>
           <p className="text-muted-foreground max-w-prose text-sm">{FEATURE_PITCH[feature]}</p>
@@ -69,12 +97,12 @@ export function PlanLocked({
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="page-title">{title ?? FEATURE_LABELS[feature]}</h1>
-      <div className="bg-card space-y-3 rounded-xl border p-6">
-        <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
+      <div className={card}>
+        <p className="eyebrow flex items-center gap-1.5">
           <Lock className="size-3.5" aria-hidden="true" />
           {needs} plan
         </p>
-        <p className="heading text-base">
+        <p className="heading">
           {FEATURE_LABELS[feature]} {plural ? "come" : "comes"} with the {needs} plan.
         </p>
         <p className="text-muted-foreground max-w-prose text-sm">{FEATURE_PITCH[feature]}</p>
