@@ -5,6 +5,7 @@ import { NotesNewMenu } from "@/components/notes/notes-new-menu";
 import { PageHeader } from "@/components/page-header";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
+import { sectionLabel } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
 import { listFolders } from "@/server/notes/folders";
@@ -39,7 +40,7 @@ export default async function NotesPage({
   const planLock = await planGate(orgSlug, "files");
   if (planLock) return planLock;
   const query = await searchParams;
-  const { organization: org, user, role } = await getOrgContextBySlug(orgSlug);
+  const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   // `tab` narrows the list to one kind; without it, notes and files show together.
   const kind = query.tab === "files" || query.tab === "notes" ? query.tab : "all";
   const isAdmin = can({ role }, "settings.view");
@@ -118,7 +119,7 @@ export default async function NotesPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Files"
+        title={sectionLabel(settings?.sidebar, "notes")}
         actions={
           <NotesNewMenu
             orgId={org.id}

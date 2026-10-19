@@ -13,8 +13,6 @@ const task: TaskAccessSubject = {
   createdById: "creator",
   ownerId: "owner",
   assigneeIds: ["collab"],
-  isIntake: false,
-  triageUserId: null,
 };
 
 const member = (userId: string, extra: Partial<TaskActor> = {}): TaskActor => ({
@@ -33,13 +31,13 @@ describe("assertCanEditTask matrix", () => {
     ["a chart manager of the owner", member("vp", { subtree: ["owner", "other"] })],
   ])("allows %s", (_label, actor) => {
     expect(canEditTask(actor, task)).toBe(true);
-    expect(checkFieldEdit(actor, task, {}).ok).toBe(true);
+    expect(checkFieldEdit(actor, task).ok).toBe(true);
   });
 
   it("refuses an unrelated member, and a manager of someone else", () => {
     expect(canEditTask(member("stranger"), task)).toBe(false);
     expect(canEditTask(member("vp", { subtree: ["collab"] }), task)).toBe(false);
-    expect(checkFieldEdit(member("stranger"), task, {})).toMatchObject({ ok: false });
+    expect(checkFieldEdit(member("stranger"), task)).toMatchObject({ ok: false });
   });
 });
 
@@ -80,47 +78,7 @@ describe("the self-assign carve-out", () => {
   });
 
   it("refuses title, status and due-date edits", () => {
-    expect(checkFieldEdit(stranger, task, {}).ok).toBe(false);
-  });
-});
-
-describe("intake triage", () => {
-  const intake: TaskAccessSubject = {
-    createdById: "kristine",
-    ownerId: null,
-    assigneeIds: [],
-    isIntake: true,
-    triageUserId: "lucas",
-  };
-
-  it("only the triage user or OWNER/ADMIN can claim or set the owner", () => {
-    expect(checkAssignmentChange(member("kristine"), intake, { ownerId: "designer" }).ok).toBe(
-      false,
-    );
-    expect(checkAssignmentChange(member("designer"), intake, { ownerId: "designer" }).ok).toBe(
-      false,
-    );
-    expect(checkAssignmentChange(member("lucas"), intake, { ownerId: "designer" }).ok).toBe(true);
-    expect(
-      checkAssignmentChange(member("jackson", { isAdmin: true }), intake, { ownerId: "designer" })
-        .ok,
-    ).toBe(true);
-  });
-
-  it("only the triage user or OWNER/ADMIN can set the priority", () => {
-    expect(checkFieldEdit(member("kristine"), intake, { priority: true }).ok).toBe(false);
-    expect(checkFieldEdit(member("kristine"), intake, {}).ok).toBe(true);
-    expect(checkFieldEdit(member("lucas"), intake, { priority: true }).ok).toBe(true);
-    expect(canEditTask(member("lucas"), intake)).toBe(true); // the triage user manages the queue
-    expect(checkFieldEdit(member("admin", { isAdmin: true }), intake, { priority: true }).ok).toBe(
-      true,
-    );
-  });
-
-  it("still lets anyone join a request as a collaborator", () => {
-    expect(checkAssignmentChange(member("smyan"), intake, { addAssigneeIds: ["smyan"] }).ok).toBe(
-      true,
-    );
+    expect(checkFieldEdit(stranger, task).ok).toBe(false);
   });
 });
 

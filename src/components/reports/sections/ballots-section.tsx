@@ -117,7 +117,7 @@ export async function BallotsSection({ ctx }: { ctx: ReportViewContext }) {
         <ReportEmpty>
           <span className="inline-flex items-center gap-2">
             <EyeOff className="size-4" aria-hidden="true" />
-            Ballot results are not shared with members in this organization.
+            Ballot results are not shared with members in this club.
           </span>
         </ReportEmpty>
       ) : r.ballots.length === 0 ? (
