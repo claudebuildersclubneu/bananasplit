@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveRestore, Trash2 } from "lucide-react";
+import { ArchiveRestore, Lock, ReceiptText, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -9,7 +9,11 @@ import {
   deleteTransaction,
   restoreTransaction,
 } from "@/app/app/[orgSlug]/finance/transactions-actions";
+import { TableFrame } from "@/components/databases/table-frame";
 import { ItemMenu } from "@/components/item-menu";
+import { seriesColor } from "@/components/reports/charts/chart-kit";
+import { Badge } from "@/components/ui/badge";
+import { TagChip } from "@/components/ui/chip";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import {
@@ -52,6 +56,14 @@ export function TransactionTable({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmEl, confirm] = useConfirm();
   const selected = transactions.find((t) => t.id === openId) ?? null;
+  // A category keeps its chart slot (its place in its budget) here too.
+  const slot = new Map<string, string>();
+  const seen = new Map<string, number>();
+  for (const c of categories) {
+    const i = seen.get(c.budgetPeriodId) ?? 0;
+    slot.set(c.id, seriesColor(i));
+    seen.set(c.budgetPeriodId, i + 1);
+  }
 
   const canDelete = (t: TransactionWithRelations) =>
     !t.voidedAt &&
@@ -96,77 +108,115 @@ export function TransactionTable({
   }
 
   if (transactions.length === 0) {
-    return <EmptyState title="No transactions here" description={emptyDescription} />;
+    return (
+      <EmptyState icon={ReceiptText} title="No transactions here" description={emptyDescription} />
+    );
   }
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Submitted by</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="w-10">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.map((t) => (
-            <TableRow
-              key={t.id}
-              className={cn("cursor-pointer", t.voidedAt && "opacity-50")}
-              onClick={() => {
-                setOpenId(t.id);
-                setDialogOpen(true);
-              }}
-            >
-              <TableCell className="whitespace-nowrap">{formatFinanceDate(t.occurredAt)}</TableCell>
-              <TableCell className={cn(t.voidedAt && "line-through")}>{t.description}</TableCell>
-              <TableCell>{t.category?.name ?? "—"}</TableCell>
-              <TableCell>{t.submittedBy.name ?? t.submittedBy.email}</TableCell>
-              <TableCell>
-                {isDeletedTransaction(t) ? (
-                  <span className="text-destructive text-xs font-medium">Deleted</span>
-                ) : (
-                  <TransactionStatusBadge status={t.status} />
-                )}
-                {t.reconciledAt && (
-                  <span className="text-muted-foreground ml-1.5 text-xs">locked</span>
-                )}
-              </TableCell>
-              <TableCell className={cn("text-right", t.direction === "IN" && "text-success")}>
-                {t.direction === "IN" ? "+" : "-"}
-                {formatCents(t.amountCents)}
-              </TableCell>
-              <TableCell className="w-10 py-1 text-right">
-                {/* Opening it is the row click; the menu holds the rest. */}
-                <ItemMenu
-                  label={`Actions for ${t.description}`}
-                  items={[
-                    t.voidedAt &&
-                      isFinance && {
-                        label: "Restore",
-                        icon: ArchiveRestore,
-                        onSelect: () => void restore(t),
-                      },
-                    canDelete(t) && {
-                      label: "Delete",
-                      icon: Trash2,
-                      destructive: true,
-                      onSelect: () => void remove(t),
-                    },
-                  ]}
-                />
-              </TableCell>
+      <TableFrame>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Submitted by</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right tabular-nums">Amount</TableHead>
+              <TableHead className="w-10">
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {transactions.map((t) => (
+              <TableRow
+                key={t.id}
+                data-state={dialogOpen && openId === t.id ? "selected" : undefined}
+                className={cn("cursor-pointer", t.voidedAt && "opacity-50")}
+                onClick={() => {
+                  setOpenId(t.id);
+                  setDialogOpen(true);
+                }}
+              >
+                <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
+                  {formatFinanceDate(t.occurredAt)}
+                </TableCell>
+                <TableCell
+                  className={cn("max-w-80 truncate font-medium", t.voidedAt && "line-through")}
+                >
+                  {t.description}
+                </TableCell>
+                <TableCell>
+                  {t.category ? (
+                    <TagChip color={slot.get(t.category.id) ?? "var(--muted-foreground)"}>
+                      {t.category.name}
+                    </TagChip>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {t.submittedBy.name ?? t.submittedBy.email}
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5">
+                    {isDeletedTransaction(t) ? (
+                      <Badge variant="destructive">Deleted</Badge>
+                    ) : t.status === "NOT_APPLICABLE" ? (
+                      <span className="text-muted-foreground" title="Not an expense">
+                        —
+                      </span>
+                    ) : (
+                      <TransactionStatusBadge status={t.status} />
+                    )}
+                    {t.reconciledAt && (
+                      <span
+                        className="text-muted-foreground inline-flex items-center gap-1 text-xs"
+                        title="Reconciled: locked"
+                      >
+                        <Lock className="size-3.5" aria-hidden="true" />
+                        Locked
+                      </span>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "text-right font-semibold tabular-nums",
+                    t.direction === "IN" && "text-success",
+                  )}
+                >
+                  {t.direction === "IN" ? "+" : "−"}
+                  {formatCents(t.amountCents)}
+                </TableCell>
+                <TableCell className="w-10 py-1 text-right">
+                  {/* Opening it is the row click; the menu holds the rest. */}
+                  <ItemMenu
+                    label={`Actions for ${t.description}`}
+                    items={[
+                      t.voidedAt &&
+                        isFinance && {
+                          label: "Restore",
+                          icon: ArchiveRestore,
+                          onSelect: () => void restore(t),
+                        },
+                      canDelete(t) && {
+                        label: "Delete",
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () => void remove(t),
+                      },
+                    ]}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableFrame>
 
       <TransactionDialog
         orgId={orgId}

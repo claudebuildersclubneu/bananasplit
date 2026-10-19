@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { createEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { createTasksFromImport, type ImportedTaskResult } from "@/app/app/[orgSlug]/tasks/actions";
 import { ConnectionPicker, useAiConnections } from "@/components/ai/connection-picker";
+import { StepPills } from "@/components/databases/step-pills";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -71,7 +72,8 @@ const PLACEHOLDER = `- Sam: book the room for the fall social by Friday
 - Exec meeting Thursday 6pm in the student center
 - Someone order T-shirts before 10/20`;
 
-const selectClass = "border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm";
+const selectClass =
+  "border-input bg-card rounded-field focus-visible:border-foreground h-8 w-full border px-2.5 text-sm outline-none";
 
 const PRIORITY_LABEL: Record<ImportPriority, string> = {
   LOW: "Low",
@@ -285,6 +287,11 @@ export function ActionItemsImport({
                 : `Read by ${read?.readBy}. Uncheck anything you don't want, and fix what it got wrong.`}
           </DialogDescription>
         </DialogHeader>
+        <StepPills
+          steps={["Read", "Check", "Add"]}
+          current={phase === "input" ? 0 : phase === "done" ? 3 : phase === "creating" ? 2 : 1}
+          label="Import steps"
+        />
 
         {phase === "input" && (
           <div className="min-h-0 space-y-3 overflow-y-auto">
@@ -312,7 +319,10 @@ export function ActionItemsImport({
               sendsRoster
             />
             {error && (
-              <p role="alert" className="text-destructive flex items-start gap-1.5 text-sm">
+              <p
+                role="alert"
+                className="bg-tint-danger text-tint-danger-foreground rounded-tile flex items-start gap-2 p-3 text-sm"
+              >
                 <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 {error}
               </p>
@@ -323,9 +333,12 @@ export function ActionItemsImport({
         {(phase === "review" || phase === "creating") && read && (
           <div className="min-h-0 space-y-3 overflow-y-auto pe-1">
             {read.notes.length > 0 && (
-              <div className="border-warning/40 bg-warning/10 rounded-lg border p-3 text-sm">
-                <p className="font-medium">Worth a look</p>
-                <ul className="text-muted-foreground mt-1 list-disc space-y-0.5 ps-5 text-xs">
+              <div className="bg-muted/60 rounded-tile p-3 text-sm">
+                <p className="flex items-center gap-2 font-semibold">
+                  <CircleAlert className="text-warning size-4 shrink-0" aria-hidden="true" />
+                  Worth a look
+                </p>
+                <ul className="text-muted-foreground mt-1 list-disc space-y-0.5 ps-11 text-[13px]">
                   {read.notes.map((n, i) => (
                     <li key={i}>{n}</li>
                   ))}
@@ -465,9 +478,9 @@ function ItemRow({
   return (
     <li
       className={cn(
-        "bg-card space-y-2.5 rounded-xl border p-3 transition-opacity",
+        "rounded-tile bg-muted/50 space-y-2.5 p-3.5 transition-opacity",
         !row.include && "opacity-55",
-        problem && "border-destructive/50",
+        problem && "ring-destructive/60 ring-1",
       )}
     >
       <div className="flex items-center gap-2">
@@ -477,7 +490,7 @@ function ItemRow({
           aria-label={`Keep “${row.title}”`}
         />
         <div
-          className="bg-muted flex shrink-0 rounded-md p-0.5 text-xs"
+          className="bg-muted flex shrink-0 rounded-full p-0.5 text-xs"
           role="group"
           aria-label="Task or event"
         >
@@ -507,8 +520,10 @@ function ItemRow({
                 }
               }}
               className={cn(
-                "inline-flex items-center gap-1 rounded px-2 py-1 font-medium disabled:opacity-40",
-                row.kind === k ? "bg-background text-foreground" : "text-muted-foreground",
+                "inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-semibold transition-colors disabled:opacity-40",
+                row.kind === k
+                  ? "bg-thumb text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.14),var(--edge-highlight)]"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {k === "task" ? (
@@ -564,14 +579,14 @@ function ItemRow({
             {helpers.map((m) => (
               <span
                 key={m.id}
-                className="bg-muted inline-flex items-center gap-1 rounded-md py-0.5 ps-2 pe-1 text-xs"
+                className="bg-card ring-foreground/6 inline-flex h-6 items-center gap-1 rounded-full ps-2.5 pe-1 text-xs font-semibold ring-1"
               >
                 {m.name}
                 <button
                   type="button"
                   aria-label={`Remove ${m.name}`}
                   onClick={() => onChange({ helperIds: row.helperIds.filter((id) => id !== m.id) })}
-                  className="hover:bg-background rounded-md p-0.5"
+                  className="hover:bg-muted grid size-5 place-items-center rounded-full"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -579,7 +594,7 @@ function ItemRow({
             ))}
             {addable.length > 0 && (
               <select
-                className="border-input bg-background h-7 max-w-36 rounded-lg border px-1.5 text-xs"
+                className="border-input bg-card h-8 max-w-36 rounded-full border px-2.5 text-xs font-medium"
                 value=""
                 aria-label="Add someone"
                 onChange={(e) =>
@@ -697,7 +712,7 @@ function ItemRow({
           {row.description}
         </p>
       )}
-      <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+      <p className="text-muted-foreground flex items-start gap-1.5 text-[13px]">
         <Quote className="mt-px size-3 shrink-0 opacity-60" aria-hidden="true" />
         <span className="line-clamp-2 italic">{row.sourceText}</span>
       </p>
@@ -742,19 +757,21 @@ function Summary({
   ];
   return (
     <div className="min-h-0 space-y-3 overflow-y-auto">
-      <div className="flex items-start gap-3 rounded-xl border p-4">
-        <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
+      <div className="rounded-tile bg-muted/60 flex items-start gap-3 p-4">
+        <span className="bg-block-goal text-block-goal-foreground grid size-7 shrink-0 place-items-center rounded-full">
+          <CheckCircle2 className="size-4" aria-hidden="true" />
+        </span>
         <div className="space-y-1 text-sm">
-          <p className="font-medium">{addedLabel(madeTasks.length, madeEvents.length)}</p>
-          <p className="text-muted-foreground text-xs">
+          <p className="font-semibold">{addedLabel(madeTasks.length, madeEvents.length)}</p>
+          <p className="text-muted-foreground text-[13px]">
             Owners and helpers were notified like any assignment; tasks with a due date show on
             everyone&apos;s week and the Tasks calendar.
           </p>
-          <div className="flex flex-wrap gap-3 pt-1 text-xs">
+          <div className="flex flex-wrap gap-3 pt-1 text-[13px]">
             {madeTasks.length > 0 && (
               <Link
                 href={`/app/${orgSlug}/tasks`}
-                className="text-primary underline underline-offset-2"
+                className="text-foreground font-medium underline underline-offset-4"
               >
                 Open Tasks
               </Link>
@@ -762,7 +779,7 @@ function Summary({
             {madeEvents.length > 0 && (
               <Link
                 href={`/app/${orgSlug}/calendar`}
-                className="text-primary underline underline-offset-2"
+                className="text-foreground font-medium underline underline-offset-4"
               >
                 Open the calendar
               </Link>
@@ -771,28 +788,36 @@ function Summary({
         </div>
       </div>
       {flagged.length > 0 && (
-        <div className="border-warning/40 bg-warning/10 space-y-2 rounded-xl border p-4 text-sm">
-          <p className="font-medium">
-            {flagged.length} task{flagged.length === 1 ? "" : "s"} assign
-            {flagged.length === 1 ? "s" : ""} work above your level ({flaggedNames.join(", ")}).
+        <div className="bg-muted/60 rounded-tile space-y-2 p-4 text-sm">
+          <p className="flex items-start gap-2 font-semibold">
+            <CircleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              {flagged.length} task{flagged.length === 1 ? "" : "s"} assign
+              {flagged.length === 1 ? "s" : ""} work above your level ({flaggedNames.join(", ")}).
+            </span>
           </p>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground ps-6 text-[13px]">
             Nothing was added for {flagged.length === 1 ? "it" : "them"} yet.
           </p>
-          <Button size="sm" onClick={onConfirm} disabled={confirming}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ms-6"
+            onClick={onConfirm}
+            disabled={confirming}
+          >
             {confirming && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             Assign anyway
           </Button>
         </div>
       )}
       {failed.length > 0 && (
-        <div className="border-destructive/30 space-y-1 rounded-xl border p-4 text-sm">
-          <p className="font-medium">Not added</p>
-          <ul className="space-y-1 text-xs">
+        <div className="bg-tint-danger text-tint-danger-foreground rounded-tile space-y-1 p-4 text-sm">
+          <p className="font-semibold">Not added</p>
+          <ul className="space-y-1 text-[13px]">
             {failed.map((f, i) => (
               <li key={i}>
-                <span className="font-medium">{f.title}</span>:{" "}
-                <span className="text-muted-foreground">{f.error}</span>
+                <span className="font-semibold">{f.title}</span>: <span>{f.error}</span>
               </li>
             ))}
           </ul>

@@ -1,13 +1,16 @@
+import { Plug } from "lucide-react";
 import Link from "next/link";
 
+import { BackLink } from "@/components/back-link";
 import { EmptyState } from "@/components/empty-state";
-import { ProgressBar } from "@/components/setup/setup-ui";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { isGoogleConfigured } from "@/server/integrations/google";
 import { clampRefreshSeconds, getReport } from "@/server/reports/cache";
 import { reportTier } from "@/server/reports/tier";
-import { SETUP_STEPS, SETUP_TOTAL_MINUTES, isSetupStepId } from "@/server/setup/catalog";
+import { SETUP_STEPS, isSetupStepId } from "@/server/setup/catalog";
 import { loadSetupState } from "@/server/setup/progress";
 import { loadDataSummary } from "@/server/setup/summary";
 import type { AttendanceReport } from "@/server/reports/types";
@@ -51,12 +54,13 @@ export default async function SetupPage({
     return (
       <div className="mx-auto max-w-lg py-10">
         <EmptyState
+          icon={Plug}
           title="Setup is for owners and admins"
           description="Connecting a club's accounts means handling its credentials, so it is limited to owners and admins. Ask one of them to run it."
           action={
-            <Link href={`/app/${orgSlug}`} className="text-sm underline underline-offset-4">
-              Back to the overview
-            </Link>
+            <Button asChild variant="outline">
+              <Link href={`/app/${orgSlug}`}>Back to the overview</Link>
+            </Button>
           }
         />
       </div>
@@ -142,40 +146,42 @@ export default async function SetupPage({
       ? ` · ${state.attention.length} need${state.attention.length === 1 ? "s" : ""} attention`
       : ""
   }`;
+  // The live summary under the title: what is connected, and what is left
+  // in minutes (the steps that still do not work, skipped ones included).
+  const minutesLeft = state.steps
+    .filter((s) => s.status !== "connected")
+    .reduce((n, s) => n + s.step.minutes, 0);
+  const headerSummary =
+    minutesLeft === 0
+      ? `All ${state.totalCount} connected and tested`
+      : `${progressLabel} · about ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"} left`;
 
   return (
-    <div className="space-y-8">
-      {from && (
-        <Link href={from} className="text-primary text-sm underline-offset-4 hover:underline">
-          ← Back to club setup
-        </Link>
-      )}
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="page-title">Connect tools</h1>
-          <p className="text-muted-foreground max-w-xl text-sm">
-            Three optional connections, one at a time. About {SETUP_TOTAL_MINUTES} minutes end to
-            end if you have the credentials in front of you — and you can stop after any step and
-            pick it up later.
-          </p>
-        </div>
-        <Link
-          href={`/app/${orgSlug}/setup/status`}
-          className="text-sm underline-offset-4 hover:underline"
-        >
-          Connection status
-        </Link>
-      </header>
-
-      <div className="max-w-md">
-        <ProgressBar done={state.connectedCount} total={state.totalCount} label={progressLabel} />
+    <div className="space-y-7.5">
+      <div className="space-y-4">
+        {from && <BackLink href={from} label="Club setup" />}
+        <PageHeader
+          title="Connect tools"
+          description={headerSummary}
+          actions={
+            <Button asChild variant="outline">
+              <Link href={`/app/${orgSlug}/setup/status`}>Connection status</Link>
+            </Button>
+          }
+        />
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
-        <SetupSpine orgSlug={orgSlug} steps={steps} active={activeId} finishActive={finishActive} />
+      <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
+        <SetupSpine
+          orgSlug={orgSlug}
+          steps={steps}
+          active={activeId}
+          finishActive={finishActive}
+          progress={{ done: state.connectedCount, total: state.totalCount, label: progressLabel }}
+        />
 
         {/* Not <main>: the app shell already owns the main landmark. */}
-        <div className="max-w-2xl min-w-0">
+        <div className="max-w-3xl min-w-0">
           {active === null ? (
             <FinishPanel
               orgId={organization.id}

@@ -34,8 +34,10 @@ export function FinanceBoard({
       types={FINANCE_WIDGETS}
       initialLayout={initialLayout}
       customized={customized}
-      intro={data.period ? `Your board · ${data.period.label}` : "Your board"}
-      renderBody={(type) => <WidgetBody type={type as WidgetTypeId} data={data} orgSlug={orgSlug} setup={setup} />}
+      intro={<h2 className="heading text-[17px]">Your board</h2>}
+      renderBody={(type) => (
+        <WidgetBody type={type as WidgetTypeId} data={data} orgSlug={orgSlug} setup={setup} />
+      )}
       onSave={(layout) => saveBoardAction(orgId, "finance", layout)}
     />
   );

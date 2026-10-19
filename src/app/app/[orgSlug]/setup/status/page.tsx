@@ -1,10 +1,12 @@
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Plug } from "lucide-react";
 import Link from "next/link";
 
 import { SyncPanel } from "@/components/databases/sync-panel";
 import { EmptyState } from "@/components/empty-state";
-import { ProgressBar, StatusWord, StepMarker } from "@/components/setup/setup-ui";
+import { PageHeader } from "@/components/page-header";
+import { StatusBadge, StepMarker } from "@/components/setup/setup-ui";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { can } from "@/lib/auth/permissions";
 import { fmtDateTime } from "@/server/databases/format";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -61,12 +63,13 @@ export default async function SetupStatusPage({
     return (
       <div className="mx-auto max-w-lg py-10">
         <EmptyState
+          icon={Plug}
           title="Connection status is for owners and admins"
           description="It shows credentials and the errors services return, so it is limited to owners and admins."
           action={
-            <Link href={`/app/${orgSlug}`} className="text-sm underline underline-offset-4">
-              Back to the overview
-            </Link>
+            <Button asChild variant="outline">
+              <Link href={`/app/${orgSlug}`}>Back to the overview</Link>
+            </Button>
           }
         />
       </div>
@@ -88,37 +91,37 @@ export default async function SetupStatusPage({
     .map((s) => ({ s, note: staleNote(s, summary.syncedAt, now, tz) }))
     .filter((x): x is { s: SetupStepState; note: string } => x.note !== null);
 
-  return (
-    <div className="max-w-3xl space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="page-title">Connection status</h1>
-          <p className="text-muted-foreground text-sm">
-            What {organization.name} is connected to, and what to do when one of them stops.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href={`/app/${orgSlug}/setup`}>Connect tools</Link>
-        </Button>
-      </header>
+  const summaryLine = [
+    `${state.connectedCount} of ${state.totalCount} connected`,
+    broken.length > 0 ? `${broken.length} not working` : null,
+    stale.length > 0 ? `${stale.length} behind` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-      <div className="max-w-md">
-        <ProgressBar
-          done={state.connectedCount}
-          total={state.totalCount}
-          label={`${state.connectedCount} of ${state.totalCount} connected`}
+  return (
+    <div className="max-w-3xl space-y-7.5">
+      <div className="space-y-3">
+        <PageHeader
+          title="Connection status"
+          description={summaryLine}
+          actions={
+            <Button asChild variant="outline">
+              <Link href={`/app/${orgSlug}/setup`}>Connect tools</Link>
+            </Button>
+          }
         />
+        <p className="text-muted-foreground max-w-prose text-sm">
+          What {organization.name} is connected to, and what to do when one of them stops.
+        </p>
       </div>
 
       {broken.length > 0 ? (
         <section
           aria-labelledby="needs-attention"
-          className="border-destructive/40 bg-destructive/5 space-y-4 rounded-lg border p-4"
+          className="bg-tint-danger text-tint-danger-foreground rounded-card space-y-4 p-5 sm:p-6"
         >
-          <h2
-            id="needs-attention"
-            className="text-destructive flex items-center gap-2 text-sm font-semibold"
-          >
+          <h2 id="needs-attention" className="heading flex items-center gap-2 text-[15px]">
             <AlertTriangle className="size-4" aria-hidden="true" />
             {broken.length} {broken.length === 1 ? "connection is" : "connections are"} not working
           </h2>
@@ -127,9 +130,9 @@ export default async function SetupStatusPage({
               const d = s.lastError ? diagnose(s.step.id, s.lastError) : null;
               return (
                 <li key={s.step.id} className="space-y-2">
-                  <p className="text-sm font-medium">{s.step.title}</p>
+                  <p className="text-sm font-semibold">{s.step.title}</p>
                   {d ? <p className="text-sm">{d.reason}</p> : null}
-                  {d?.fix ? <p className="text-muted-foreground text-sm">{d.fix}</p> : null}
+                  {d?.fix ? <p className="text-sm opacity-85">{d.fix}</p> : null}
                   <div className="flex flex-wrap items-center gap-3">
                     <Button asChild size="sm">
                       <Link href={`/app/${orgSlug}/setup?step=${s.step.id}&edit=1`}>
@@ -146,42 +149,43 @@ export default async function SetupStatusPage({
       ) : null}
 
       {stale.length > 0 ? (
-        <section
-          aria-labelledby="stale"
-          className="border-warning/40 bg-warning/10 space-y-2 rounded-lg border p-4"
-        >
-          <h2 id="stale" className="flex items-center gap-2 text-sm font-semibold">
-            <Clock className="size-4" aria-hidden="true" />
+        <section aria-labelledby="stale" className="bg-muted/60 rounded-tile space-y-2 p-4">
+          <h2 id="stale" className="heading flex items-center gap-2 text-[15px]">
+            <Clock className="text-warning size-4" aria-hidden="true" />
             Working, but behind
           </h2>
           <ul className="space-y-1.5">
             {stale.map(({ s, note }) => (
               <li key={s.step.id} className="text-sm">
-                <span className="font-medium">{s.step.title}:</span> {note}
+                <span className="font-semibold">{s.step.title}:</span> {note}
               </li>
             ))}
           </ul>
         </section>
       ) : null}
 
-      <section aria-label="Connections">
-        <ul className="divide-y rounded-lg border">
+      <Card aria-label="Connections" role="region" className="gap-0 px-3 py-3">
+        <ul className="divide-border/70 divide-y">
           {state.steps.map((s, i) => {
             const step = setupStep(s.step.id);
             return (
-              <li key={s.step.id} className="space-y-3 p-4">
+              <li key={s.step.id} className="space-y-3 px-3 py-4">
                 <div className="flex flex-wrap items-start gap-3">
                   <StepMarker status={s.status} ordinal={i + 1} active={false} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{step.title}</p>
-                    <p className="text-muted-foreground text-xs">{step.summary}</p>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <p className="text-sm font-semibold">{step.title}</p>
+                    <p className="text-muted-foreground mt-0.5 text-[13px]">{step.summary}</p>
                   </div>
-                  <StatusWord status={s.status} className="mt-1" />
+                  <StatusBadge status={s.status} className="mt-0.5" />
                 </div>
 
-                <dl className="text-muted-foreground grid gap-x-6 gap-y-1 pl-9 text-xs sm:grid-cols-[9rem_1fr]">
+                <dl className="text-muted-foreground grid gap-x-6 gap-y-1 pl-10 text-[13px] sm:grid-cols-[9rem_1fr]">
                   <dt>Credential</dt>
-                  <dd className="text-foreground font-mono">
+                  <dd
+                    className={
+                      s.hasSecret && s.last4 ? "text-foreground font-mono" : "text-foreground"
+                    }
+                  >
                     {s.hasSecret ? (s.last4 ? `•••• ${s.last4}` : "Saved") : "None stored"}
                   </dd>
                   <dt>Last checked</dt>
@@ -223,7 +227,7 @@ export default async function SetupStatusPage({
                 </dl>
 
                 {canWrite ? (
-                  <div className="flex flex-wrap items-center gap-2 pl-9">
+                  <div className="flex flex-wrap items-center gap-2 pl-10">
                     {s.hasSecret ? (
                       <TestButton
                         orgId={organization.id}
@@ -251,7 +255,7 @@ export default async function SetupStatusPage({
                     ) : null}
                     <Link
                       href={`/app/${orgSlug}/settings/integrations/${step.settingsSegment}`}
-                      className="text-muted-foreground ml-auto self-center text-xs underline-offset-4 hover:underline"
+                      className="text-muted-foreground hover:text-foreground focus-glow ml-auto self-center rounded-full text-[13px] font-medium underline-offset-4 hover:underline"
                     >
                       Settings
                     </Link>
@@ -261,7 +265,7 @@ export default async function SetupStatusPage({
             );
           })}
         </ul>
-      </section>
+      </Card>
 
       {summary.sync ? (
         <SyncPanel

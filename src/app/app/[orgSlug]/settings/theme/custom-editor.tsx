@@ -62,7 +62,7 @@ export default function CustomThemeEditor({
         ))}
       </TabsContent>
       <TabsContent value="dark" className="space-y-3">
-        <div className="flex items-start gap-3 rounded-lg border p-3">
+        <div className="bg-muted/40 rounded-tile flex items-start gap-3 p-3.5">
           <Switch
             id="derive-dark"
             checked={dark === null}
@@ -129,7 +129,7 @@ function RoleField({
           value={HEX_RE.test(value) ? value : DEFAULT_PRESET[mode][role]}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value.toLowerCase())}
-          className="border-input size-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-input size-10 shrink-0 cursor-pointer rounded-full border bg-transparent p-1 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Input
           id={`${id}-hex`}

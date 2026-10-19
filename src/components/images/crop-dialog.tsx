@@ -64,7 +64,7 @@ export default function CropDialog({
         </DialogHeader>
 
         {/* Square, and never taller than about half the screen (landscape phones). */}
-        <div className="bg-muted relative mx-auto aspect-square w-full max-w-[max(12rem,min(100%,50dvh))] overflow-hidden rounded-lg">
+        <div className="bg-muted rounded-tile relative mx-auto aspect-square w-full max-w-[max(12rem,min(100%,50dvh))] overflow-hidden">
           <Cropper
             image={imageSrc}
             crop={crop}
@@ -98,7 +98,10 @@ export default function CropDialog({
         </div>
 
         {error && (
-          <p className="text-destructive text-sm" role="alert">
+          <p
+            className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+            role="alert"
+          >
             {error}
           </p>
         )}

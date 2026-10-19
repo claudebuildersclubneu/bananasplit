@@ -3,17 +3,14 @@
 import { Check, ExternalLink, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { TagChip } from "@/components/ui/chip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  CHOICE_COLOR_CLASS,
-  parseCell,
-  type Choice,
-  type FieldDef,
-  type StoredValue,
-} from "@/lib/databases/fields";
+import { parseCell, type Choice, type FieldDef, type StoredValue } from "@/lib/databases/fields";
 import { formatPhone } from "@/lib/rsvp/format";
 import { cn } from "@/lib/utils";
+
+import { choiceColor } from "../styles";
 
 /**
  * One cell of a club-made database, editable in place. Every editor saves
@@ -42,21 +39,26 @@ export interface CellProps {
 
 const SAVE_AFTER_MS = 600;
 
+/**
+ * A cell's editor: no box of its own (the grid has no cell lines), a soft
+ * tile on hover and the glow ring while you type in it. 40px, so a row with
+ * its 4px inset is the table's 48.
+ */
 const base =
-  "h-9 w-full min-w-0 rounded-sm bg-transparent px-2 text-sm outline-none transition-colors focus:bg-background focus:ring-2 focus:ring-ring/40";
+  "h-10 w-full min-w-0 rounded-field bg-transparent px-2.5 text-sm outline-none transition-[background-color,box-shadow] hover:bg-muted/60 focus:bg-card focus:shadow-[0_0_0_2px_color-mix(in_oklab,var(--glow)_60%,transparent)]";
 
+/** A field option ("Checked out", "M") as a chip in the option's own colour. */
 export function ChoicePill({ choice }: { choice: Choice }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex max-w-full items-center truncate rounded-md px-1.5 py-0.5 text-xs font-medium",
-        CHOICE_COLOR_CLASS[choice.color],
-      )}
-    >
-      {choice.label}
-    </span>
-  );
+  return <TagChip color={choiceColor(choice.color)}>{choice.label}</TagChip>;
 }
+
+/** The small input inside a cell's menu (find someone, add a choice). */
+const menuInput =
+  "border-input bg-card rounded-field h-8 min-w-0 border px-2.5 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[0_0_0_3px_color-mix(in_oklab,var(--glow)_45%,transparent)]";
+
+/** One option row in a cell's menu. */
+const menuOption =
+  "hover:bg-muted rounded-field flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left";
 
 /** A value as the grid shows it when not editing. */
 export function formatValue(field: FieldDef, value: unknown, members: readonly Member[]): string {
@@ -94,7 +96,7 @@ export function CellEditor(props: CellProps) {
   switch (field.type) {
     case "CHECKBOX":
       return (
-        <div className="flex h-9 items-center justify-center">
+        <div className="flex h-10 items-center justify-center">
           <Checkbox
             checked={props.value === true}
             disabled={!props.canEdit}
@@ -245,7 +247,7 @@ function ReadOnly({ field, value, shown }: { field: FieldDef; value: unknown; sh
     );
   return (
     <div
-      className={cn("flex h-9 items-center px-2 text-sm", numeric && "justify-end tabular-nums")}
+      className={cn("flex h-10 items-center px-2.5 text-sm", numeric && "justify-end tabular-nums")}
     >
       {inner}
     </div>
@@ -273,7 +275,7 @@ function DateCell({ field, value, members, canEdit, onSave, label }: CellProps) 
   }
   if (!canEdit) {
     return (
-      <div className="flex h-9 items-center px-2 text-sm tabular-nums">
+      <div className="flex h-10 items-center px-2.5 text-sm tabular-nums">
         <span className="truncate">{shown}</span>
       </div>
     );
@@ -334,7 +336,7 @@ function LongTextCell({ field, value, canEdit, onSave, label }: CellProps) {
 
   if (!canEdit) {
     return (
-      <div className="flex h-9 items-center px-2 text-sm" title={raw}>
+      <div className="flex h-10 items-center px-2.5 text-sm" title={raw}>
         <span className="truncate">{raw.split("\n")[0]}</span>
       </div>
     );
@@ -370,7 +372,7 @@ function LongTextCell({ field, value, canEdit, onSave, label }: CellProps) {
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(() => commit(text), SAVE_AFTER_MS);
           }}
-          className="focus:ring-ring/40 w-full resize-y rounded-md border bg-transparent p-2 text-sm leading-relaxed outline-none focus:ring-2"
+          className="border-input bg-card rounded-field focus-visible:border-foreground w-full resize-y border p-3 text-sm leading-relaxed outline-none"
         />
         <p className="text-muted-foreground px-1 pt-1 text-xs">Saves as you type.</p>
       </PopoverContent>
@@ -431,7 +433,7 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
     </span>
   );
 
-  if (!canEdit) return <div className="flex h-9 items-center px-2">{pills}</div>;
+  if (!canEdit) return <div className="flex h-10 items-center px-2.5">{pills}</div>;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -458,7 +460,7 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
                 role="option"
                 aria-selected={selected.has(c.id)}
                 onClick={() => toggle(c)}
-                className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left"
+                className={menuOption}
               >
                 <ChoicePill choice={c} />
                 {selected.has(c.id) && <Check className="size-4 shrink-0" aria-hidden="true" />}
@@ -476,7 +478,7 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
               onSave(null);
               setOpen(false);
             }}
-            className="text-muted-foreground hover:bg-muted hover:text-foreground mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-field mt-1 flex w-full items-center gap-2 px-2.5 py-2 text-[13px]"
           >
             <X className="size-3.5" aria-hidden="true" />
             Clear
@@ -484,7 +486,7 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
         )}
         {canManage && onAddChoice && (
           <form
-            className="mt-1 flex gap-1 border-t pt-1.5"
+            className="border-border/70 mt-1.5 flex gap-1.5 border-t pt-2"
             onSubmit={(e) => {
               e.preventDefault();
               void add();
@@ -496,13 +498,13 @@ function ChoiceCell({ field, value, canEdit, canManage, onSave, onAddChoice, lab
               placeholder="Add a choice"
               maxLength={80}
               aria-label={`Add a choice to ${field.name}`}
-              className="focus:ring-ring/40 h-7 min-w-0 flex-1 rounded-md border bg-transparent px-2 text-xs outline-none focus:ring-2"
+              className={cn(menuInput, "flex-1")}
             />
             <button
               type="submit"
               disabled={!newLabel.trim() || adding}
               aria-label="Add choice"
-              className="hover:bg-muted grid size-7 place-items-center rounded-md border disabled:opacity-50"
+              className="border-input hover:bg-muted grid size-8 shrink-0 place-items-center rounded-full border disabled:opacity-50"
             >
               <Plus className="size-3.5" aria-hidden="true" />
             </button>
@@ -524,7 +526,7 @@ function MemberCell({ value, members, canEdit, onSave, label }: CellProps) {
 
   if (!canEdit) {
     return (
-      <div className="flex h-9 items-center px-2 text-sm">
+      <div className="flex h-10 items-center px-2.5 text-sm">
         <span className="truncate">{shown}</span>
       </div>
     );
@@ -544,7 +546,7 @@ function MemberCell({ value, members, canEdit, onSave, label }: CellProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find someone"
           aria-label="Find a member"
-          className="focus:ring-ring/40 mb-1 h-8 w-full rounded-md border bg-transparent px-2 text-sm outline-none focus:ring-2"
+          className={cn(menuInput, "mb-1.5 w-full")}
         />
         <ul role="listbox" aria-label="Members" className="max-h-60 overflow-y-auto">
           {matches.map((m) => (
@@ -557,7 +559,7 @@ function MemberCell({ value, members, canEdit, onSave, label }: CellProps) {
                   onSave(m.id === value ? null : m.id);
                   setOpen(false);
                 }}
-                className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                className={cn(menuOption, "text-sm")}
               >
                 <span className="truncate">{m.name}</span>
                 {m.id === value && <Check className="size-4 shrink-0" aria-hidden="true" />}

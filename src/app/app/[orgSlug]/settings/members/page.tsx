@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { TableFrame } from "@/components/databases/table-frame";
+import { JoinCodeCard } from "@/components/onboarding/join-code-card";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -9,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { JoinCodeCard } from "@/components/onboarding/join-code-card";
 import { UserAvatar } from "@/components/user-avatar";
 import { Role } from "@/generated/prisma/enums";
 import { absoluteAppUrl } from "@/lib/app-url";
@@ -19,6 +21,7 @@ import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { userPublicSelect } from "@/server/members";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
 
+import { SettingsCard } from "../settings-card";
 import { InviteForm } from "./invite-form";
 import { LeaveOrgCard } from "./leave-org-card";
 import { MemberRowActions } from "./member-row-actions";
@@ -100,60 +103,23 @@ export default async function MembersPage({
   }));
   const ownerCount = members.filter((m) => m.role === Role.OWNER).length;
   const selfRole = role;
+  const pendingCount = inviteRows.filter((i) => !i.expired).length;
+  const expiredCount = inviteRows.length - pendingCount;
+  const summary = [
+    `${members.length} member${members.length === 1 ? "" : "s"}`,
+    canInvite && pendingCount > 0
+      ? `${pendingCount} invite${pendingCount === 1 ? "" : "s"} pending`
+      : null,
+    canInvite && expiredCount > 0 ? `${expiredCount} expired` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="page-title">Members</h1>
-        <p className="text-muted-foreground text-sm">
-          {members.length} member{members.length === 1 ? "" : "s"}
-          {canInvite && inviteRows.length > 0
-            ? ` · ${inviteRows.length} invite${inviteRows.length === 1 ? "" : "s"} pending`
-            : ""}
-        </p>
-      </div>
+    <div className="space-y-7.5">
+      <PageHeader title="Members" description={summary} />
 
-      {canInvite && (
-        <section className="space-y-3 rounded-lg border p-4" aria-labelledby="invite-heading">
-          <div>
-            <h2 id="invite-heading" className="text-sm font-medium">
-              Invite people
-            </h2>
-            <p className="text-muted-foreground text-xs">
-              They get an email link that is valid for 7 days. They must sign in with the invited
-              address, and verify it, to join.
-            </p>
-          </div>
-          <InviteForm orgId={orgId} />
-          <PendingInvites orgId={orgId} invites={inviteRows} />
-        </section>
-      )}
-
-      {joinCode && (
-        <section className="space-y-3 rounded-lg border p-4" aria-labelledby="join-code-heading">
-          <div>
-            <h2 id="join-code-heading" className="text-sm font-medium">
-              Invite code
-            </h2>
-            <p className="text-muted-foreground text-xs">
-              Share it with your members instead of emailing each one. They enter it after setting
-              up their profile, and see {organization.name}&apos;s name before they join.
-            </p>
-          </div>
-          <JoinCodeCard
-            orgId={orgId}
-            joinUrlBase={absoluteAppUrl("/onboarding/join")}
-            initial={{
-              code: joinCode.code,
-              enabled: joinCode.enabled,
-              allowedDomain: joinCode.allowedDomain,
-              useCount: joinCode.useCount,
-            }}
-          />
-        </section>
-      )}
-
-      <div className="rounded-md border">
+      <TableFrame maxHeight="none">
         <Table>
           <TableHeader>
             <TableRow>
@@ -161,7 +127,11 @@ export default async function MembersPage({
               <TableHead>Title</TableHead>
               <TableHead>Role</TableHead>
               <TableHead className="hidden sm:table-cell">Joined</TableHead>
-              {canManage && <TableHead className="text-right">Actions</TableHead>}
+              {canManage && (
+                <TableHead className="text-right">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -176,29 +146,29 @@ export default async function MembersPage({
                     <div className="flex items-center gap-3">
                       <UserAvatar user={{ ...m.user, email }} size="md" />
                       <div className="min-w-0">
-                        <div className="truncate font-medium">
+                        <div className="truncate font-semibold">
                           {displayName}
                           {isSelf && (
-                            <span className="text-muted-foreground ml-2 text-xs font-normal">
+                            <span className="text-muted-foreground ml-1.5 text-[13px] font-normal">
                               (you)
                             </span>
                           )}
                         </div>
                         {email && (
-                          <div className="text-muted-foreground truncate text-xs">{email}</div>
+                          <div className="text-muted-foreground truncate text-[13px]">{email}</div>
                         )}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell>
                     {m.title ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={m.role === Role.OWNER ? "default" : "secondary"}>
+                    <Badge variant={m.role === Role.OWNER ? "accent" : "secondary"}>
                       {roleLabel(m.role)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
                     {dateFormat.format(m.joinedAt)}
                   </TableCell>
                   {canManage && (
@@ -223,7 +193,32 @@ export default async function MembersPage({
             })}
           </TableBody>
         </Table>
-      </div>
+      </TableFrame>
+
+      {canInvite && (
+        <div className="grid items-start gap-4.5 xl:grid-cols-2">
+          <InviteForm orgId={orgId} />
+          <PendingInvites orgId={orgId} invites={inviteRows} />
+        </div>
+      )}
+
+      {joinCode && (
+        <SettingsCard
+          title="Invite code"
+          description={`Share it with your members instead of emailing each one. They enter it after setting up their profile, and see ${organization.name}'s name before they join.`}
+        >
+          <JoinCodeCard
+            orgId={orgId}
+            joinUrlBase={absoluteAppUrl("/onboarding/join")}
+            initial={{
+              code: joinCode.code,
+              enabled: joinCode.enabled,
+              allowedDomain: joinCode.allowedDomain,
+              useCount: joinCode.useCount,
+            }}
+          />
+        </SettingsCard>
+      )}
 
       <LeaveOrgCard
         orgId={orgId}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -7,6 +8,7 @@ import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import { SettingsCard, SettingsStatus } from "../settings-card";
 import { requestExportAction } from "./actions";
 
 export interface ExportRow {
@@ -28,6 +30,14 @@ const STATUS: Record<string, string> = {
   EXPIRED: "Expired",
 };
 
+const STATUS_VARIANT: Record<string, "success" | "destructive" | "info" | "secondary"> = {
+  PENDING: "secondary",
+  RUNNING: "info",
+  READY: "success",
+  FAILED: "destructive",
+  EXPIRED: "secondary",
+};
+
 export function ExportCard({
   orgId,
   orgSlug,
@@ -47,81 +57,69 @@ export function ExportCard({
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   return (
-    <section className="space-y-3 rounded-lg border p-4" aria-labelledby="export-heading">
-      <div>
-        <h2 id="export-heading" className="font-medium">
-          Export all data
-        </h2>
-        {personal ? (
-          <p className="text-muted-foreground text-sm">
-            A zip of your Personal tasks, calendar, polls and event pages, with their RSVPs and
-            answers (JSON lines and CSV). It is prepared in the background and you get a
-            notification when it is ready. Only you can download it, for {expiryDays} days. One
-            export per day.
-          </p>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            A zip of every table (JSON lines and CSV), uploaded receipts and org chart files. It is
-            prepared in the background and you get a notification when it is ready. Only a signed-in
-            owner can download it, for {expiryDays} days. Integration keys are never included. One
-            export per day.
-          </p>
-        )}
-      </div>
-      <Button
-        variant="outline"
-        disabled={isPending}
-        onClick={() =>
-          startTransition(async () => {
-            setMessage(null);
-            const result = await requestExportAction(orgId);
-            if (result.error) setMessage({ tone: "error", text: result.error });
-            else {
-              setMessage({
-                tone: "ok",
-                text: "Export requested. You'll be notified when it's ready.",
-              });
-              router.refresh();
-            }
-          })
-        }
-      >
-        {isPending ? "Requesting…" : "Export all data"}
-      </Button>
-      {message && (
-        <p
-          role="status"
-          className={message.tone === "error" ? "text-destructive text-sm" : "text-sm"}
+    <SettingsCard
+      title="Export all data"
+      description={
+        personal
+          ? `A zip of your Personal tasks, calendar, polls and event pages, with their RSVPs and answers (JSON lines and CSV). It is prepared in the background and you get a notification when it is ready. Only you can download it, for ${expiryDays} days. One export per day.`
+          : `A zip of every table (JSON lines and CSV), uploaded receipts and org chart files. It is prepared in the background and you get a notification when it is ready. Only a signed-in owner can download it, for ${expiryDays} days. Integration keys are never included. One export per day.`
+      }
+      status={message && <SettingsStatus status={message} />}
+      footer={
+        <Button
+          disabled={isPending}
+          onClick={() =>
+            startTransition(async () => {
+              setMessage(null);
+              const result = await requestExportAction(orgId);
+              if (result.error) setMessage({ tone: "error", text: result.error });
+              else {
+                setMessage({
+                  tone: "ok",
+                  text: "Export requested. You'll be notified when it's ready.",
+                });
+                router.refresh();
+              }
+            })
+          }
         >
-          {message.text}
-        </p>
-      )}
+          {isPending ? "Requesting…" : "Export all data"}
+        </Button>
+      }
+    >
       {exports.length > 0 && (
-        <ul className="divide-y rounded-md border text-sm">
+        <ul className="divide-border/70 divide-y text-sm">
           {exports.map((e) => (
-            <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
-              <span>
-                {fmt.format(new Date(e.createdAt))}
-                {e.requestedByName ? ` · ${e.requestedByName}` : ""}
-                {e.downloadCount > 0 ? ` · downloaded ${e.downloadCount}×` : ""}
+            <li
+              key={e.id}
+              className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0"
+            >
+              <span className="min-w-0">
+                <span className="font-semibold tabular-nums">
+                  {fmt.format(new Date(e.createdAt))}
+                </span>
+                <span className="text-muted-foreground">
+                  {e.requestedByName ? ` · ${e.requestedByName}` : ""}
+                  {e.downloadCount > 0 ? ` · downloaded ${e.downloadCount}×` : ""}
+                </span>
               </span>
               <span className="flex items-center gap-2">
-                <Badge variant={e.status === "READY" ? "default" : "secondary"}>
+                <Badge variant={STATUS_VARIANT[e.status] ?? "secondary"}>
                   {STATUS[e.status] ?? e.status}
                 </Badge>
                 {e.status === "READY" && (
-                  <Link
-                    className="underline underline-offset-4"
-                    href={`/app/${orgSlug}/settings/danger/exports/${e.id}`}
-                  >
-                    Download
-                  </Link>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/app/${orgSlug}/settings/danger/exports/${e.id}`}>
+                      <Download data-icon="inline-start" aria-hidden="true" />
+                      Download
+                    </Link>
+                  </Button>
                 )}
               </span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </SettingsCard>
   );
 }

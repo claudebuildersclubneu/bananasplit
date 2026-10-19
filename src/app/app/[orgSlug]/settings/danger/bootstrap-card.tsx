@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 
+import { nativeSelectClass, SettingsCard, SettingsStatus } from "../settings-card";
 import { bootstrapCbcAction } from "./actions";
 
 export interface BootstrapPerson {
@@ -32,31 +33,46 @@ export function BootstrapCard({
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   return (
-    <section className="space-y-3 rounded-lg border p-4" aria-labelledby="bootstrap-heading">
-      <div>
-        <h2 id="bootstrap-heading" className="font-medium">
-          Bootstrap CBC workspace
-        </h2>
-        <p className="text-muted-foreground text-sm">
+    <SettingsCard
+      title="Bootstrap CBC workspace"
+      description={
+        <>
           Sets up the Claude Builders Club structure: the task defaults (one owner and a due date
-          per task), the &ldquo;Needs President&rdquo; and &ldquo;Design&rdquo; labels, the Design
+          per task), the &ldquo;Needs President&rdquo; and &ldquo;Design&rdquo; tags, the Design
           Requests project, the published org chart (9 positions), member titles and the CBC theme.
           It adds no members. Running it again publishes a fresh chart version.
-        </p>
-        {bootstrappedAt && (
-          <p className="mt-1 text-sm">
-            Last run {new Date(bootstrappedAt).toLocaleString("en-US", { dateStyle: "medium" })}.
-          </p>
-        )}
-      </div>
+          {bootstrappedAt &&
+            ` Last run ${new Date(bootstrappedAt).toLocaleString("en-US", { dateStyle: "medium" })}.`}
+        </>
+      }
+      status={message && <SettingsStatus status={message} />}
+      footer={
+        <Button
+          disabled={isPending}
+          onClick={() =>
+            startTransition(async () => {
+              setMessage(null);
+              const result = await bootstrapCbcAction(orgId, mapping);
+              if (result.error) setMessage({ tone: "error", text: result.error });
+              else {
+                setMessage({ tone: "ok", text: "The CBC workspace is set up." });
+                router.refresh();
+              }
+            })
+          }
+        >
+          {isPending ? "Setting up…" : "Bootstrap CBC workspace"}
+        </Button>
+      }
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         {people.map((p) => (
-          <label key={p.key} className="grid gap-1 text-sm">
-            <span>
-              {p.name} <span className="text-muted-foreground">· {p.title}</span>
+          <label key={p.key} className="grid gap-1.5 text-sm">
+            <span className="font-medium">
+              {p.name} <span className="text-muted-foreground font-normal">· {p.title}</span>
             </span>
             <select
-              className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
+              className={nativeSelectClass}
               value={mapping[p.key] ?? ""}
               onChange={(e) => setMapping((m) => ({ ...m, [p.key]: e.target.value }))}
             >
@@ -70,31 +86,6 @@ export function BootstrapCard({
           </label>
         ))}
       </div>
-      <Button
-        variant="outline"
-        disabled={isPending}
-        onClick={() =>
-          startTransition(async () => {
-            setMessage(null);
-            const result = await bootstrapCbcAction(orgId, mapping);
-            if (result.error) setMessage({ tone: "error", text: result.error });
-            else {
-              setMessage({ tone: "ok", text: "The CBC workspace is set up." });
-              router.refresh();
-            }
-          })
-        }
-      >
-        {isPending ? "Setting up…" : "Bootstrap CBC workspace"}
-      </Button>
-      {message && (
-        <p
-          role="status"
-          className={message.tone === "error" ? "text-destructive text-sm" : "text-sm"}
-        >
-          {message.text}
-        </p>
-      )}
-    </section>
+    </SettingsCard>
   );
 }
