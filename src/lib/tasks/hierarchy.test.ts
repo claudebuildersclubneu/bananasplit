@@ -109,9 +109,7 @@ describe("checkTypeChange and allowedTypes", () => {
   });
 
   it("won't make a plain task of something with subtasks", () => {
-    expect(checkTypeChange("TASK", { parentType: null, childTypes: ["TASK"] })).toBe(
-      E.hasSubtasks,
-    );
+    expect(checkTypeChange("TASK", { parentType: null, childTypes: ["TASK"] })).toBe(E.hasSubtasks);
   });
 
   it("lists what a task may become where it stands", () => {

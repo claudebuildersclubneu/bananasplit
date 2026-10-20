@@ -329,11 +329,18 @@ describe.skipIf(!seeded)("tasks against the local database (seeded CBC)", () => 
       ownerId: p.oliver.id,
       dueDate: due(30),
     });
-    const story = await create({ title: "Moonstone test: story", parentTaskId: epic, type: "STORY" });
+    const story = await create({
+      title: "Moonstone test: story",
+      parentTaskId: epic,
+      type: "STORY",
+    });
     const step = await create({ title: "Moonstone test: step", parentTaskId: story });
     const plain = await create({ title: "Moonstone test: plain", parentTaskId: epic });
     const types = await read(({ db }) =>
-      db.task.findMany({ where: { id: { in: [epic, story, step, plain] } }, select: { id: true, type: true } }),
+      db.task.findMany({
+        where: { id: { in: [epic, story, step, plain] } },
+        select: { id: true, type: true },
+      }),
     );
     expect(Object.fromEntries(types.map((t) => [t.id, t.type]))).toEqual({
       [epic]: "EPIC",
@@ -343,9 +350,9 @@ describe.skipIf(!seeded)("tasks against the local database (seeded CBC)", () => 
     });
 
     // A task under a story can't be broken down, and an epic can't go inside anything.
-    await expect(
-      act(svc.createTask)(s.cbcId, { title: "x", parentTaskId: step }),
-    ).rejects.toThrow("A task inside a story can't be broken down any further.");
+    await expect(act(svc.createTask)(s.cbcId, { title: "x", parentTaskId: step })).rejects.toThrow(
+      "A task inside a story can't be broken down any further.",
+    );
     await expect(act(svc.updateTask)(s.cbcId, story, { type: "TASK" })).rejects.toThrow(
       "It has subtasks (some may be deleted), so it can't be a plain task.",
     );

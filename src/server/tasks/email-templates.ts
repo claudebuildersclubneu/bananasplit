@@ -173,7 +173,9 @@ export function taskReminderEmail(input: {
     ? `${which.charAt(0).toUpperCase()}${which.slice(1)} is overdue.`
     : `Reminder: ${which} is due ${input.when}.`;
   return layout({
-    subject: input.overdue ? `Overdue: ${input.task.title}` : `Due ${input.when}: ${input.task.title}`,
+    subject: input.overdue
+      ? `Overdue: ${input.task.title}`
+      : `Due ${input.when}: ${input.task.title}`,
     eyebrow: input.orgName,
     bodyHtml: paragraph(lead) + factsHtml(input.task),
     bodyText: [lead, factsText(input.task)].join("\n\n"),

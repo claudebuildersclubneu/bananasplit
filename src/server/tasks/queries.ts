@@ -118,7 +118,9 @@ export function getBoardTasks(
       }
     : {};
   return db.task.findMany({
-    where: { AND: [taskFilterWhere(organizationId, filters, opts.today), BOARD_ITEM, openOrRecent] },
+    where: {
+      AND: [taskFilterWhere(organizationId, filters, opts.today), BOARD_ITEM, openOrRecent],
+    },
     select: taskListSelect,
     // Rank is a fractional-index sequence per status column: group by status first.
     orderBy: [{ status: "asc" }, { rank: "asc" }],
@@ -509,3 +511,106 @@ export async function getProjectsOverview(db: TxClient, organizationId: string) 
 }
 
 export type ProjectOverviewItem = Awaited<ReturnType<typeof getProjectsOverview>>[number];
+
+/**
+ * The Roadmap: the club's epics (filtered like every layout) with what the
+ * timeline needs. Task has no start date, so a bar starts when the epic was
+ * made or at its earliest dated piece of work, whichever is first, and ends
+ * at its due date or its latest dated piece of work.
+ */
+export async function getRoadmapEpics(
+  db: TxClient,
+  organizationId: string,
+  filters: TaskFilters,
+  today?: Date,
+) {
+  const epics = await db.task.findMany({
+    where: { AND: [taskFilterWhere(organizationId, filters, today), { type: TaskType.EPIC }] },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      dueDate: true,
+      createdAt: true,
+      completedAt: true,
+      project: { select: { id: true, name: true, color: true } },
+      owner: { select: userPublicSelect },
+      subtasks: {
+        where: { deletedAt: null },
+        select: {
+          status: true,
+          dueDate: true,
+          subtasks: { where: { deletedAt: null }, select: { status: true, dueDate: true } },
+        },
+      },
+    },
+    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+    take: 200,
+  });
+  return epics.map((e) => {
+    const dated = e.subtasks.flatMap((s) => [s.dueDate, ...s.subtasks.map((g) => g.dueDate)]);
+    const keys = dated
+      .filter((d): d is Date => d !== null)
+      .map((d) => d.toISOString().slice(0, 10));
+    const created = e.createdAt.toISOString().slice(0, 10);
+    const due = e.dueDate ? e.dueDate.toISOString().slice(0, 10) : null;
+    const start = [created, ...keys].sort()[0]!;
+    const end = due ?? (keys.length > 0 ? keys.sort()[keys.length - 1]! : null);
+    let done = 0;
+    let total = 0;
+    for (const s of e.subtasks) {
+      total += 1 + s.subtasks.length;
+      done +=
+        (s.status === TaskStatus.COMPLETED ? 1 : 0) +
+        s.subtasks.filter((g) => g.status === TaskStatus.COMPLETED).length;
+    }
+    return {
+      id: e.id,
+      title: e.title,
+      status: e.status,
+      project: e.project,
+      owner: e.owner,
+      start: end && end < start ? end : start,
+      end,
+      done,
+      total,
+    };
+  });
+}
+
+export type RoadmapEpic = Awaited<ReturnType<typeof getRoadmapEpics>>[number];
+
+/**
+ * The stat strip over every layout: open, due this week (today to Sunday),
+ * overdue and done this week (since Monday), for the toolbar's question
+ * without its status filter. Epics are left out: their work is counted.
+ */
+export async function getTaskStats(
+  db: TxClient,
+  organizationId: string,
+  filters: TaskFilters,
+  opts: { today: Date; weekEnd: Date; weekStart: Date },
+) {
+  const base: Prisma.TaskWhereInput = {
+    AND: [
+      taskFilterWhere(organizationId, { ...filters, status: undefined }, opts.today),
+      { type: { not: TaskType.EPIC } },
+    ],
+  };
+  const open = { status: { in: [...OPEN_STATUSES] } };
+  const [openCount, dueThisWeek, overdue, doneThisWeek] = [
+    await db.task.count({ where: { AND: [base, open] } }),
+    await db.task.count({
+      where: { AND: [base, open, { dueDate: { gte: opts.today, lte: opts.weekEnd } }] },
+    }),
+    await db.task.count({ where: { AND: [base, open, { dueDate: { lt: opts.today } }] } }),
+    await db.task.count({
+      where: {
+        AND: [base, { status: TaskStatus.COMPLETED, completedAt: { gte: opts.weekStart } }],
+      },
+    }),
+  ];
+  return { open: openCount, dueThisWeek, overdue, doneThisWeek };
+}
+
+export type TaskStats = Awaited<ReturnType<typeof getTaskStats>>;

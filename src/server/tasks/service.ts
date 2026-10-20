@@ -754,7 +754,11 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   const parent = d.parentTaskId ? await loadParent(env, d.parentTaskId) : null;
   // Its type: what was asked for (TASK by default), fitted to the parent.
   const nesting = parent
-    ? nest(parent, { type: d.type ?? TaskType.TASK, explicit: d.type !== undefined, childTypes: [] })
+    ? nest(parent, {
+        type: d.type ?? TaskType.TASK,
+        explicit: d.type !== undefined,
+        childTypes: [],
+      })
     : { childType: d.type ?? TaskType.TASK, promoteParent: false };
   const subject: TaskAccessSubject = {
     createdById: env.actor.userId,

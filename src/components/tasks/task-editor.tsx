@@ -385,11 +385,7 @@ export function TaskEditor({
           onClick={() => void save()}
           disabled={isPending || !title.trim()}
         >
-          {isPending
-            ? "Saving…"
-            : isNew
-              ? `Create ${typeLabel(type).toLowerCase()}`
-              : "Save"}
+          {isPending ? "Saving…" : isNew ? `Create ${typeLabel(type).toLowerCase()}` : "Save"}
           <span aria-hidden="true" className="hidden gap-0.5 sm:inline-flex">
             <kbd className="bg-primary-foreground/15 inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] px-1 font-mono text-[11px] font-semibold">
               {mod}

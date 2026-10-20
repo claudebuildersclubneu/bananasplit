@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  CalendarDays,
   Check,
+  GanttChart,
+  ListTree,
   ChevronDown,
   Columns3,
   FolderKanban,
   Gauge,
-  ListChecks,
   Lock,
   SlidersHorizontal,
   Table2,
@@ -56,7 +58,9 @@ import { useTasks, useWorkspace } from "./tasks-context";
 
 const LAYOUT_ICONS = {
   board: Columns3,
-  week: ListChecks,
+  week: CalendarDays,
+  list: ListTree,
+  roadmap: GanttChart,
   table: Table2,
   dashboard: Gauge,
 } as const;
@@ -362,7 +366,11 @@ function TagFilter() {
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 gap-px p-1.5">
-        <div role="listbox" aria-label="Tag" className="flex max-h-72 flex-col gap-px overflow-y-auto">
+        <div
+          role="listbox"
+          aria-label="Tag"
+          className="flex max-h-72 flex-col gap-px overflow-y-auto"
+        >
           <button
             type="button"
             role="option"
@@ -578,14 +586,14 @@ function FilterPill({
   onClear: () => void;
 }) {
   return (
-    <span className="bg-muted text-foreground inline-flex h-7 items-center gap-1.5 rounded-md ps-2.5 pe-1 text-xs font-medium">
+    <span className="bg-muted text-foreground inline-flex h-8 items-center gap-1.5 rounded-full ps-3.5 pe-1 text-[13px] font-medium">
       {icon}
       {label}
       <button
         type="button"
         aria-label={`Remove filter ${label}`}
         onClick={onClear}
-        className="text-muted-foreground hover:text-foreground hover:bg-background rounded-md p-0.5 transition-colors"
+        className="text-muted-foreground hover:text-foreground hover:bg-background grid size-6 place-items-center rounded-full transition-colors"
       >
         <X className="size-3" />
       </button>

@@ -1,7 +1,7 @@
 import { Ban, CalendarClock, Lock, TriangleAlert } from "lucide-react";
 
 import { TaskVisibility } from "@/generated/prisma/enums";
-import { dueDateKey, formatDueKey } from "@/lib/tasks/dates";
+import { addDaysToKey, dueDateKey, formatDueKey } from "@/lib/tasks/dates";
 import { cn } from "@/lib/utils";
 
 import type { TaskItem } from "./types";
@@ -104,17 +104,20 @@ export function DueLabel({
   const key = dueDateKey(dueDate);
   const overdue = !done && key < todayKey;
   const today = !done && key === todayKey;
+  const tomorrow = !done && key === addDaysToKey(todayKey, 1);
+  // Moonstone dates: Today and overdue in the danger tint, Tomorrow bold,
+  // later dates quiet.
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 whitespace-nowrap",
-        overdue && "text-destructive font-medium",
-        today && "text-warning font-medium",
+        (overdue || today) && "text-tint-danger-foreground font-semibold",
+        tomorrow && "text-foreground font-semibold",
         className,
       )}
     >
       <CalendarClock className="size-3.5" aria-hidden="true" />
-      {today ? "Today" : formatDueKey(key, todayKey)}
+      {today ? "Today" : tomorrow ? "Tomorrow" : formatDueKey(key, todayKey)}
     </span>
   );
 }

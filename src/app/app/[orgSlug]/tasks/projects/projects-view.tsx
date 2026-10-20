@@ -231,9 +231,7 @@ function ProjectListRow({
   const archived = Boolean(p.archivedAt);
 
   async function setArchived(next: boolean) {
-    const result = next
-      ? await archiveProject(org.id, p.id)
-      : await unarchiveProject(org.id, p.id);
+    const result = next ? await archiveProject(org.id, p.id) : await unarchiveProject(org.id, p.id);
     if (result.error) {
       toast({ title: result.error, tone: "error" });
       return;
@@ -268,16 +266,19 @@ function ProjectListRow({
   }
 
   return (
-    <li className="group hover:bg-muted/60 relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-tile px-3 py-3 transition-colors sm:flex-nowrap [&+&]:before:bg-border [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
+    <li className="group hover:bg-muted/60 rounded-tile [&+&]:before:bg-border relative flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors sm:flex-nowrap [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
       <span
         aria-hidden="true"
         className="size-2.5 shrink-0 rounded-full"
-        style={{ background: color, boxShadow: `0 0 0 3px color-mix(in oklab, ${color} 24%, transparent)` }}
+        style={{
+          background: color,
+          boxShadow: `0 0 0 3px color-mix(in oklab, ${color} 24%, transparent)`,
+        }}
       />
       <div className="min-w-0 flex-1 basis-48">
         <Link
           href={`/app/${org.slug}/tasks?view=board&project=${p.id}`}
-          className="hover:underline-offset-4 block truncate text-[15px] font-semibold hover:underline"
+          className="block truncate text-[15px] font-semibold hover:underline hover:underline-offset-4"
         >
           {p.name}
         </Link>
@@ -306,7 +307,10 @@ function ProjectListRow({
           role="img"
           aria-label={`${p.done} of ${total} done`}
         >
-          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+          <span
+            className="block h-full rounded-full"
+            style={{ width: `${pct}%`, background: color }}
+          />
         </span>
         <span className="text-muted-foreground w-12 text-right">
           {p.done}/{total}

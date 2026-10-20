@@ -89,7 +89,7 @@ export function TagList({
       {suggestions.map((group) => (
         <div
           key={group.map((t) => t.id).join("-")}
-          className="bg-tint-info text-tint-info-foreground flex flex-wrap items-center gap-2 rounded-tile px-4 py-3 text-sm"
+          className="bg-tint-info text-tint-info-foreground rounded-tile flex flex-wrap items-center gap-2 px-4 py-3 text-sm"
         >
           <span className="flex flex-wrap items-center gap-1.5">
             {group.map((t) => (
@@ -99,7 +99,12 @@ export function TagList({
             ))}
           </span>
           <span className="min-w-0 flex-1">look like the same tag.</span>
-          <Button size="sm" variant="secondary" disabled={isPending} onClick={() => mergeGroup(group)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => mergeGroup(group)}
+          >
             <Combine className="size-4" aria-hidden="true" />
             Merge them
           </Button>
@@ -175,7 +180,7 @@ function TagListRow({
   }
 
   return (
-    <li className="hover:bg-muted/60 relative rounded-tile px-3 py-2.5 transition-colors [&+&]:before:bg-border [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
+    <li className="hover:bg-muted/60 rounded-tile [&+&]:before:bg-border relative px-3 py-2.5 transition-colors [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
       <div className="flex min-h-9 items-center gap-3">
         {mode === "rename" ? (
           <form
@@ -229,7 +234,11 @@ function TagListRow({
         )}
       </div>
       {mode === "color" && (
-        <div className="flex flex-wrap items-center gap-2 pt-2 pb-1" role="group" aria-label="Colour">
+        <div
+          className="flex flex-wrap items-center gap-2 pt-2 pb-1"
+          role="group"
+          aria-label="Colour"
+        >
           {colors.map((c) => (
             <button
               key={c}

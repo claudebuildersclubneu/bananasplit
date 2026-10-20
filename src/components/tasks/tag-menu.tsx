@@ -55,9 +55,7 @@ export function TagMenu({
   const [isPending, startTransition] = useTransition();
   const typed = cleanTagName(query);
   const needle = typed.toLocaleLowerCase();
-  const shown = needle
-    ? labels.filter((l) => l.name.toLocaleLowerCase().includes(needle))
-    : labels;
+  const shown = needle ? labels.filter((l) => l.name.toLocaleLowerCase().includes(needle)) : labels;
   const exact = typed ? findTag(labels, typed) : null;
   const offerCreate = Boolean(typed) && !exact && can.createTags;
 

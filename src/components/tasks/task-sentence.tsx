@@ -121,9 +121,7 @@ export function TaskSentence({
         </Slot>
         , for{" "}
         <Slot label="Project" text={project?.name ?? "any project"} empty={!project}>
-          {(close) => (
-            <ProjectMenu value={projectId} onPick={(id) => (onProject(id), close())} />
-          )}
+          {(close) => <ProjectMenu value={projectId} onPick={(id) => (onProject(id), close())} />}
         </Slot>
         . It&apos;s{" "}
         <Slot label="Priority" text={PRIORITY_LABEL[priority].toLowerCase()}>

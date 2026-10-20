@@ -37,9 +37,7 @@ export function ProjectMenu({
   const [isPending, startTransition] = useTransition();
   const typed = query.trim();
   const needle = typed.toLowerCase();
-  const shown = needle
-    ? projects.filter((p) => p.name.toLowerCase().includes(needle))
-    : projects;
+  const shown = needle ? projects.filter((p) => p.name.toLowerCase().includes(needle)) : projects;
   const exact = projects.find((p) => p.name.toLowerCase() === needle);
   const offerCreate = Boolean(typed) && !exact && can.createProjects;
 
@@ -79,7 +77,11 @@ export function ProjectMenu({
           className="placeholder:text-muted-foreground/80 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
         />
       </div>
-      <div role="listbox" aria-label="Project" className="flex max-h-64 flex-col gap-px overflow-y-auto">
+      <div
+        role="listbox"
+        aria-label="Project"
+        className="flex max-h-64 flex-col gap-px overflow-y-auto"
+      >
         {showNone && !needle && (
           <button
             type="button"

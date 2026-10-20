@@ -28,14 +28,20 @@ function makeDb(opts: { membersCanCreate?: boolean | null; leadId?: string | nul
       ),
     },
     project: {
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...PROJECT, ...data })),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        ...PROJECT,
+        ...data,
+      })),
       findMany: vi.fn(async () => []),
       findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
         where.id === "missing"
           ? null
           : { id: where.id, leadId: opts.leadId ?? null, startDate: null, targetDate: null },
       ),
-      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...PROJECT, ...data })),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        ...PROJECT,
+        ...data,
+      })),
       updateMany: vi.fn(async () => ({ count: 1 })),
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },

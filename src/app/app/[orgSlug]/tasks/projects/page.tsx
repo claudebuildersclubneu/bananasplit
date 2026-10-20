@@ -17,9 +17,7 @@ import { ProjectsView } from "./projects-view";
  * club's "Who can create projects" switch; archiving is for owners, admins
  * and the project's lead (src/lib/tasks/projects.ts).
  */
-export default async function ProjectsPage({
-  params,
-}: PageProps<"/app/[orgSlug]/tasks/projects">) {
+export default async function ProjectsPage({ params }: PageProps<"/app/[orgSlug]/tasks/projects">) {
   const { orgSlug } = await params;
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   const isAdmin = can({ role }, "tasks.manageAll");

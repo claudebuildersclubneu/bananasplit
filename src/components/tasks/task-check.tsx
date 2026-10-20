@@ -6,8 +6,7 @@ import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 const reducedMotion = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Three seeds pop out of the circle in the glow colour (the banana's three
@@ -76,11 +75,11 @@ export function TaskCheck({
       style={{ width: size, height: size }}
       className={cn(
         "group/check relative grid shrink-0 place-items-center rounded-full border-[1.5px] transition-[background-color,border-color,transform] duration-200 outline-none",
-        "ease-(--ease-spring) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground motion-reduce:transition-none",
+        "focus-visible:outline-foreground ease-(--ease-spring) focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none",
         "disabled:cursor-default disabled:opacity-60",
         done
           ? "bg-block-goal border-block-goal text-block-goal-foreground scale-[1.08]"
-          : "border-muted-foreground hover:border-foreground text-transparent hover:text-muted-foreground",
+          : "border-muted-foreground hover:border-foreground hover:text-muted-foreground text-transparent",
         className,
       )}
     >

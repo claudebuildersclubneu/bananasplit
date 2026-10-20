@@ -13,7 +13,9 @@ export async function chartPalette(db: TxClient, organizationId: string): Promis
   const row = await db.orgTheme.findUnique({ where: { organizationId } });
   const theme = resolveTheme(row);
   const tokens = theme.mode === "LIGHT" ? theme.tokens.light : theme.tokens.dark;
-  const slots = [1, 2, 3, 4, 5].map((i) => normalizeHex(tokens[`chart-${i}` as keyof typeof tokens]));
+  const slots = [1, 2, 3, 4, 5].map((i) =>
+    normalizeHex(tokens[`chart-${i}` as keyof typeof tokens]),
+  );
   return slots.filter((c): c is string => c !== null);
 }
 

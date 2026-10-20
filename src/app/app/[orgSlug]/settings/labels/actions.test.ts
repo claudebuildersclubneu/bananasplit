@@ -10,7 +10,9 @@ const { Role } = await import("@/generated/prisma/enums");
 const { createTag, updateLabel, mergeLabels, deleteLabel, setCreationRules } =
   await import("./actions");
 
-function makeDb(opts: { membersCanCreate?: boolean; existing?: { id: string; name: string } } = {}) {
+function makeDb(
+  opts: { membersCanCreate?: boolean; existing?: { id: string; name: string } } = {},
+) {
   return {
     $queryRaw: vi.fn(async () => [{ id: "audit_1" }]),
     orgSettings: {
@@ -20,8 +22,7 @@ function makeDb(opts: { membersCanCreate?: boolean; existing?: { id: string; nam
     orgTheme: { findUnique: vi.fn(async () => null) },
     label: {
       findFirst: vi.fn(async ({ where }: { where: { name: { equals: string } } }) =>
-        opts.existing &&
-        opts.existing.name.toLowerCase() === where.name.equals.toLowerCase()
+        opts.existing && opts.existing.name.toLowerCase() === where.name.equals.toLowerCase()
           ? { ...opts.existing, color: "#123456" }
           : null,
       ),
@@ -29,7 +30,10 @@ function makeDb(opts: { membersCanCreate?: boolean; existing?: { id: string; nam
         { id: "a", name: "Design", color: "#111111" },
         { id: "b", name: "designs", color: "#222222" },
       ]),
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "tag_1", ...data })),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: "tag_1",
+        ...data,
+      })),
       updateMany: vi.fn(async () => ({ count: 1 })),
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },
@@ -190,7 +194,11 @@ describe("setCreationRules", () => {
     ).toEqual({});
     expect(fake.db.orgSettings.upsert).toHaveBeenCalledWith({
       where: { organizationId: "org_1" },
-      create: { organizationId: "org_1", memberCanCreateTags: false, memberCanCreateProjects: true },
+      create: {
+        organizationId: "org_1",
+        memberCanCreateTags: false,
+        memberCanCreateProjects: true,
+      },
       update: { memberCanCreateTags: false, memberCanCreateProjects: true },
     });
   });

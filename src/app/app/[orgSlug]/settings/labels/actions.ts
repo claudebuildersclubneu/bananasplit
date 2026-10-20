@@ -134,7 +134,8 @@ export const updateLabel = tagsAction(
     const { name, color } = parsed.data;
     if (name) {
       const clash = await sameName(ctx, name, id.data);
-      if (clash) return { error: `There's already a tag called “${clash.name}”. Merge them instead.` };
+      if (clash)
+        return { error: `There's already a tag called “${clash.name}”. Merge them instead.` };
     }
     const { count } = await ctx.db.label.updateMany({
       where: { id: id.data, organizationId: ctx.organizationId },
@@ -187,7 +188,9 @@ export const mergeLabels = tagsAction(
     await ctx.db.taskLabel.deleteMany({
       where: { organizationId: ctx.organizationId, labelId: source.data },
     });
-    await ctx.db.label.deleteMany({ where: { id: source.data, organizationId: ctx.organizationId } });
+    await ctx.db.label.deleteMany({
+      where: { id: source.data, organizationId: ctx.organizationId },
+    });
     await writeOrgAuditLog(ctx.db, {
       organizationId: ctx.organizationId,
       action: "label.merged",
@@ -199,28 +202,26 @@ export const mergeLabels = tagsAction(
   },
 );
 
-export const deleteLabel = tagsAction(
-  async (ctx, labelId: string): Promise<{ error?: string }> => {
-    if (!isAdmin(ctx)) return { error: DENIED };
-    const id = idSchema.safeParse(labelId);
-    if (!id.success) return { error: "Tag not found." };
-    await ctx.db.taskLabel.deleteMany({
-      where: { labelId: id.data, organizationId: ctx.organizationId },
+export const deleteLabel = tagsAction(async (ctx, labelId: string): Promise<{ error?: string }> => {
+  if (!isAdmin(ctx)) return { error: DENIED };
+  const id = idSchema.safeParse(labelId);
+  if (!id.success) return { error: "Tag not found." };
+  await ctx.db.taskLabel.deleteMany({
+    where: { labelId: id.data, organizationId: ctx.organizationId },
+  });
+  const { count } = await ctx.db.label.deleteMany({
+    where: { id: id.data, organizationId: ctx.organizationId },
+  });
+  if (count > 0) {
+    await writeOrgAuditLog(ctx.db, {
+      organizationId: ctx.organizationId,
+      action: "label.deleted",
+      targetType: "Label",
+      targetId: id.data,
     });
-    const { count } = await ctx.db.label.deleteMany({
-      where: { id: id.data, organizationId: ctx.organizationId },
-    });
-    if (count > 0) {
-      await writeOrgAuditLog(ctx.db, {
-        organizationId: ctx.organizationId,
-        action: "label.deleted",
-        targetType: "Label",
-        targetId: id.data,
-      });
-    }
-    return {};
-  },
-);
+  }
+  return {};
+});
 
 const rulesSchema = z.object({
   memberCanCreateTags: z.boolean().optional(),

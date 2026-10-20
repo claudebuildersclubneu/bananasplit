@@ -163,7 +163,8 @@ export function useCompleteTask() {
         return false;
       }
       if (next === TaskStatus.COMPLETED) {
-        const previous = task.status === TaskStatus.COMPLETED ? TaskStatus.NOT_STARTED : task.status;
+        const previous =
+          task.status === TaskStatus.COMPLETED ? TaskStatus.NOT_STARTED : task.status;
         toast({
           title: `Done: ${task.title}`,
           tone: "success",

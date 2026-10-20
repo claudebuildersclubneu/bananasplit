@@ -105,7 +105,13 @@ export function Subtasks({
   }
 
   const heading = epic ? "Stories and tasks" : "Tasks";
-  const noun = epic ? (childType === "STORY" ? "story" : "task") : parentType === "TASK" ? "subtask" : "task";
+  const noun = epic
+    ? childType === "STORY"
+      ? "story"
+      : "task"
+    : parentType === "TASK"
+      ? "subtask"
+      : "task";
 
   return (
     <section className="space-y-3" aria-label={heading}>
@@ -131,7 +137,7 @@ export function Subtasks({
             return (
               <li
                 key={s.id}
-                className="hover:bg-muted/60 relative flex min-h-11 items-center gap-2.5 rounded-field px-2 py-1.5 text-sm transition-colors [&+&]:before:bg-border [&+&]:before:absolute [&+&]:before:start-10 [&+&]:before:end-2 [&+&]:before:top-0 [&+&]:before:h-px"
+                className="hover:bg-muted/60 rounded-field [&+&]:before:bg-border relative flex min-h-11 items-center gap-2.5 px-2 py-1.5 text-sm transition-colors [&+&]:before:absolute [&+&]:before:start-10 [&+&]:before:end-2 [&+&]:before:top-0 [&+&]:before:h-px"
               >
                 {story ? (
                   <TaskTypeChip type="STORY" iconOnly />

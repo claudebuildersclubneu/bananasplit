@@ -41,11 +41,7 @@ const id = z
   .max(100)
   .regex(/^[A-Za-z0-9_-]+$/);
 
-const dateKey = z
-  .string()
-  .refine(isDateKey, "Pick a valid date.")
-  .nullable()
-  .optional();
+const dateKey = z.string().refine(isDateKey, "Pick a valid date.").nullable().optional();
 
 const fields = {
   name: z.string().trim().min(1, "Name is required").max(100, "Keep the name under 100 characters"),

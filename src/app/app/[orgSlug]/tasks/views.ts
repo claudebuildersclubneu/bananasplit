@@ -43,7 +43,9 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
 export const TASK_LAYOUTS = [
   { value: "board", label: "Board", hint: "Move work along" },
   { value: "week", label: "Week", hint: "What is due, by when" },
+  { value: "list", label: "List", hint: "Grouped by epic" },
   { value: "table", label: "Table", hint: "Filter and bulk-edit" },
+  { value: "roadmap", label: "Roadmap", hint: "Epics on a timeline" },
   { value: "dashboard", label: "Dashboard", hint: "Where things stand" },
 ] as const;
 

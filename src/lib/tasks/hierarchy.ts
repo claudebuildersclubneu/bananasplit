@@ -49,8 +49,7 @@ export interface NestingChild {
 }
 
 export type NestingPlan =
-  | { ok: true; childType: TaskTypeValue; promoteParent: boolean }
-  | { ok: false; error: string };
+  { ok: true; childType: TaskTypeValue; promoteParent: boolean } | { ok: false; error: string };
 
 export const HIERARCHY_ERRORS = {
   taskInStory: "A task inside a story can't be broken down any further.",

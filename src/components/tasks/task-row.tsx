@@ -1,49 +1,54 @@
 "use client";
 
-import { ListChecks, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 import { PinToggle } from "@/components/pins/pins-context";
 import { Badge } from "@/components/ui/badge";
+import { TagChip } from "@/components/ui/chip";
 import { UserAvatar } from "@/components/user-avatar";
 import { canEditTask } from "@/lib/tasks/access";
+import { rollUp } from "@/lib/tasks/hierarchy";
+import { projectColor } from "@/lib/tasks/project-color";
 import { cn } from "@/lib/utils";
 
-import { QuickDone, QuickStatus } from "./quick-controls";
+import { QuickDone } from "./quick-controls";
 import {
   BlockedNote,
   DueLabel,
   FlagBadge,
-  PriorityDot,
   PrivateMark,
   isTaskFlagged,
   isTaskPrivate,
 } from "./task-badges";
-import { accessSubjectOf, useTasks } from "./tasks-context";
 import { TaskItemMenu } from "./task-item-menu";
+import { ProgressBar, TaskTypeChip } from "./task-type";
+import { accessSubjectOf, useTasks } from "./tasks-context";
 import type { TaskItem } from "./types";
-import { labelTextColor } from "@/lib/label-colors";
 
 /**
- * One task as a list row — the Week, the List and Personal home all use
- * this, so a task reads the same wherever you meet it.
- *
- * Labels and the above-level flag sit immediately after the title, because
- * they describe the task and the eye is already there; only the things you
- * scan DOWN a column for — due date, owner, status — are pushed to the right
- * edge where they line up. On a phone the due date moves into the meta line
- * rather than disappearing: it is the one fact you came for.
+ * One task as a list row (Moonstone 7.11) — the Week, the List and
+ * Personal home all use it, so a task reads the same wherever you meet it.
+ * The circle, the title, a meta row (project chip, due date, tags, progress,
+ * comments), then the priority chip, the owner and the ••• on the right.
+ * Rows become a soft tile on hover; the hairline between rows starts past
+ * the circle. `depth` indents a story's tasks under it in the List.
  */
 export function TaskRow({
   task,
   showOwner = false,
   showRole = true,
   showProject = true,
+  showParent = true,
+  depth = 0,
   className,
 }: {
   task: TaskItem;
   showOwner?: boolean;
   showRole?: boolean;
   showProject?: boolean;
+  /** The "Parent / " breadcrumb (off where the row already sits under its parent). */
+  showParent?: boolean;
+  depth?: 0 | 1 | 2;
   className?: string;
 }) {
   const { org, viewer, actor, showTask } = useTasks();
@@ -56,67 +61,66 @@ export function TaskRow({
     showRole &&
     task.ownerId !== viewer.userId &&
     task.assignees.some((a) => a.userId === viewer.userId);
-  const subtasksDone = task.subtasks.filter((s) => s.status === "COMPLETED").length;
+  const progress = rollUp(task.subtasks);
+  const color = projectColor(task.project);
 
   return (
     <li
       className={cn(
-        "group hover:bg-muted/50 focus-within:bg-muted/50 flex items-center gap-2.5 px-3 py-2 transition-colors duration-150 sm:gap-3",
+        "group hover:bg-muted/60 focus-within:bg-muted/60 rounded-field relative flex items-center gap-3 px-3 py-3 transition-colors duration-150 sm:gap-3.5",
+        "[&+&]:before:bg-border [&+&]:before:absolute [&+&]:before:start-12 [&+&]:before:end-3 [&+&]:before:top-0 [&+&]:before:h-px",
+        depth === 1 && "ps-9 [&+&]:before:start-[4.5rem]",
+        depth === 2 && "ps-16 [&+&]:before:start-24",
+        done && "opacity-80",
         className,
       )}
     >
-      <QuickDone task={task} disabled={!editable} />
+      {task.type === "EPIC" ? (
+        <TaskTypeChip type="EPIC" iconOnly />
+      ) : (
+        <QuickDone task={task} disabled={!editable} />
+      )}
 
       <button
         type="button"
         onClick={() => showTask(task)}
-        className="focus-visible:ring-ring min-w-0 flex-1 rounded text-left focus-visible:ring-2 focus-visible:outline-none"
+        className="focus-visible:outline-foreground min-w-0 flex-1 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <PriorityDot priority={task.priority} />
-            {priv && <PrivateMark />}
-            <span className="min-w-0 truncate text-sm">
-              {task.parentTask && (
-                <span className="text-muted-foreground">{task.parentTask.title} / </span>
-              )}
-              <span className={cn("font-medium", done && "text-muted-foreground line-through")}>
-                {task.title}
-              </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {priv && <PrivateMark />}
+          {task.type === "STORY" && <TaskTypeChip type="STORY" iconOnly />}
+          <span className="min-w-0 truncate text-[15px] leading-snug">
+            {showParent && task.parentTask && (
+              <span className="text-muted-foreground">{task.parentTask.title} / </span>
+            )}
+            <span className={cn("font-medium", done && "text-muted-foreground line-through")}>
+              {task.title}
             </span>
           </span>
           {flagged && <FlagBadge />}
-          {task.labels.slice(0, 3).map(({ label }) => (
-            <Badge
-              key={label.id}
-              style={{ backgroundColor: label.color, color: labelTextColor(label.color) }}
-              className="border-0"
-            >
-              {label.name}
-            </Badge>
-          ))}
         </span>
 
-        <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs">
-          {/* On a phone the right-hand cluster is gone, so the due date lives here. */}
-          <DueLabel
-            dueDate={task.dueDate}
-            todayKey={org.todayKey}
-            done={done}
-            className="sm:hidden"
-          />
+        <span className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
+          {showProject && task.project && <TagChip color={color}>{task.project.name}</TagChip>}
+          <DueLabel dueDate={task.dueDate} todayKey={org.todayKey} done={done} />
+          {task.labels.slice(0, 3).map(({ label }) => (
+            <TagChip key={label.id} color={label.color}>
+              {label.name}
+            </TagChip>
+          ))}
           {priv && <span className="font-medium">Private</span>}
-          {showProject && task.project && <span className="truncate">{task.project.name}</span>}
           {involvedOnly && <span>Involved</span>}
-          {task.subtasks.length > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <ListChecks className="size-3" aria-hidden="true" />
-              {subtasksDone}/{task.subtasks.length}
-            </span>
+          {progress.total > 0 && (
+            <ProgressBar
+              done={progress.done}
+              total={progress.total}
+              color={color}
+              className="w-24"
+            />
           )}
           {task._count.comments > 0 && (
             <span className="inline-flex items-center gap-1">
-              <MessageSquare className="size-3" aria-hidden="true" />
+              <MessageSquare className="size-3.5" aria-hidden="true" />
               {task._count.comments}
             </span>
           )}
@@ -127,12 +131,11 @@ export function TaskRow({
       </button>
 
       <div className="flex shrink-0 items-center gap-2">
-        <DueLabel
-          dueDate={task.dueDate}
-          todayKey={org.todayKey}
-          done={done}
-          className="text-muted-foreground hidden w-24 justify-end text-xs sm:flex"
-        />
+        {task.priority === "HIGH" && !done && (
+          <Badge variant="accent" className="max-sm:hidden">
+            High
+          </Badge>
+        )}
         {showOwner &&
           (task.owner ? (
             <UserAvatar user={task.owner} size="sm" />
@@ -144,11 +147,10 @@ export function TaskRow({
               ?
             </span>
           ))}
-        <QuickStatus task={task} disabled={!editable} quiet className="hidden md:flex" />
         <PinToggle
           path={`/tasks/${task.id}`}
           label={task.title}
-          className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+          className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-sm:hidden"
         />
         <TaskItemMenu
           task={{ id: task.id, title: task.title, subtaskCount: task.subtasks.length }}
