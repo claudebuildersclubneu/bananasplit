@@ -1,4 +1,3 @@
-import { trashCutoff } from "@/lib/notes/trash";
 import { withSystemOrgTx, type TxClient } from "@/server/db/context";
 
 import { deleteBlobs } from "./index";
@@ -100,33 +99,25 @@ export interface EmptiedTrash {
   fileKeys: string[];
 }
 
-/** Long ago: an emptied file's deletedAt, past every restore and purge window. */
-const EMPTIED_AT = new Date(0);
-
 /**
  * Empty trash, in the caller's transaction as the caller (RLS decides what
  * they may empty: their own, and an owner's or admin's the shared ones):
- *
- * - notes in the trash are deleted for good; their history goes with them
- *   (ON DELETE CASCADE), and the database takes its bytes off the counter;
- * - files in the trash can no longer be restored (their deletedAt moves
- *   past the restore window) and their bytes are deleted from the store
- *   after commit (deleteEmptiedFiles). The app roles can't delete OrgFile
- *   rows, so their sizes stay on the counter until the database can purge
- *   those rows (see docs/features/platform-services.md, Storage).
+ * notes and files in the trash are deleted for good. A note's history goes
+ * with it (ON DELETE CASCADE); the database takes every byte off the
+ * counter; the files' bytes leave the store after commit
+ * (deleteEmptiedFiles).
  */
 export async function emptyTrash(db: TxClient, orgId: string): Promise<EmptiedTrash> {
   const notes = await db.note.deleteMany({
     where: { organizationId: orgId, deletedAt: { not: null } },
   });
   const files = await db.orgFile.findMany({
-    where: { organizationId: orgId, deletedAt: { gte: trashCutoff(), not: null } },
+    where: { organizationId: orgId, deletedAt: { not: null } },
     select: { id: true, storageKey: true },
   });
   if (files.length > 0) {
-    await db.orgFile.updateMany({
+    await db.orgFile.deleteMany({
       where: { organizationId: orgId, id: { in: files.map((f) => f.id) } },
-      data: { deletedAt: EMPTIED_AT },
     });
   }
   return { notes: notes.count, files: files.length, fileKeys: files.map((f) => f.storageKey) };
@@ -145,9 +136,9 @@ export interface ReconcileResult {
 
 /**
  * The nightly check of one space (src/server/jobs/handlers/storage.ts):
- * the counter against the real sums. The runtime roles can't write the
- * counter (only the database's triggers do), so drift is reported, not
- * repaired, until the database has a reconcile function.
+ * the counter against the real sums. A drift is repaired by
+ * app.storage_reconcile (the runtime roles never write the counter
+ * themselves) and reported.
  */
 export function reconcileOrg(orgId: string): Promise<ReconcileResult & { keys: string[] }> {
   return withSystemOrgTx(orgId, async ({ db }) => {
@@ -159,6 +150,10 @@ export function reconcileOrg(orgId: string): Promise<ReconcileResult & { keys: s
     const keys = (
       await db.orgFile.findMany({ where: { organizationId: orgId }, select: { storageKey: true } })
     ).map((f) => f.storageKey);
-    return { orgId, counted: Number(org?.storageUsedBytes ?? 0), actual, keys };
+    const counted = Number(org?.storageUsedBytes ?? 0);
+    if (counted !== actual) {
+      await db.$queryRaw`SELECT app.storage_reconcile(${orgId}) AS n`;
+    }
+    return { orgId, counted, actual, keys };
   });
 }

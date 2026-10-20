@@ -193,7 +193,12 @@ export async function scheduleOrgTaskJobs(
               status: { not: TaskStatus.COMPLETED },
               dueDate: { in: [...dueKeys].map(fromDateKey) },
             },
-            select: { id: true, dueDate: true, ownerId: true, assignees: { select: { userId: true } } },
+            select: {
+              id: true,
+              dueDate: true,
+              ownerId: true,
+              assignees: { select: { userId: true } },
+            },
           });
     for (const task of due) {
       const dueKey = dueDateKey(task.dueDate!);

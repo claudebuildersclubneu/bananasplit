@@ -1,24 +1,27 @@
-import { ListChecks, MessageSquare } from "lucide-react";
+import { Layers, MessageSquare } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { TagChip } from "@/components/ui/chip";
 import { UserAvatar } from "@/components/user-avatar";
+import { rollUp } from "@/lib/tasks/hierarchy";
+import { projectColor } from "@/lib/tasks/project-color";
 import { cn } from "@/lib/utils";
 
 import {
   BlockedNote,
   DueLabel,
   FlagBadge,
-  PriorityDot,
   PrivateBadge,
   isTaskFlagged,
   isTaskPrivate,
 } from "./task-badges";
+import { ProgressBar, TaskTypeChip } from "./task-type";
 import type { TaskItem } from "./types";
-import { labelTextColor } from "@/lib/label-colors";
 
 export type TaskCardData = Pick<
   TaskItem,
   | "id"
+  | "type"
   | "title"
   | "status"
   | "visibility"
@@ -32,87 +35,126 @@ export type TaskCardData = Pick<
   | "subtasks"
   | "blockedReason"
   | "parentTask"
+  | "project"
   | "_count"
 >;
 
 /**
- * Plain presentational card: no button role of its own. Inside a sortable
- * list the wrapper (SortableTaskCard) owns click, focus and drag on a single
- * element; a nested <button> here would compete with it.
- *
- * A private task gets a dashed edge as well as the badge. Nothing else in
- * the workspace is dashed, so on a board of forty cards the restricted ones
- * are countable at a glance, without relying on a colour.
+ * A board card (Moonstone 10.1): a rounded tile with the project chip (and
+ * the priority chip), the parent epic, the title, the subtask bar in the
+ * project's colour with "2/3", and a meta row of date, comments and faces.
+ * Plain and presentational: inside a sortable list the wrapper owns click,
+ * focus and drag. A private task gets a dashed edge as well as the badge
+ * (nothing else on the board is dashed). `dragging` is the lifted copy.
  */
-export function TaskCard({ task, todayKey }: { task: TaskCardData; todayKey: string }) {
-  const completedSubtasks = task.subtasks.filter((s) => s.status === "COMPLETED").length;
+export function TaskCard({
+  task,
+  todayKey,
+  dragging = false,
+  showEpic = true,
+  check,
+}: {
+  task: TaskCardData;
+  todayKey: string;
+  dragging?: boolean;
+  /** The parent epic's name (off inside an epic's swimlane). */
+  showEpic?: boolean;
+  /** The completion circle, for cards in the Completed column. */
+  check?: React.ReactNode;
+}) {
   const done = task.status === "COMPLETED";
   const flagged = isTaskFlagged(task);
   const priv = isTaskPrivate(task);
+  const progress = rollUp(task.subtasks);
+  const color = projectColor(task.project);
+  const epic =
+    task.parentTask?.type === "EPIC"
+      ? task.parentTask
+      : task.parentTask?.parentTask?.type === "EPIC"
+        ? task.parentTask.parentTask
+        : null;
+  const people = [
+    ...(task.owner ? [task.owner] : []),
+    ...task.assignees.map((a) => a.user).filter((u) => u.id !== task.ownerId),
+  ];
 
   return (
     <div
       className={cn(
-        "bg-card group-hover:border-foreground/20 w-full space-y-2 rounded-xl border p-3 text-sm transition-colors duration-150",
-        priv && "border-dashed",
-        done && "opacity-70",
+        "bg-card edge rounded-tile flex w-full flex-col gap-2.5 p-3.5 text-sm transition-[box-shadow,transform] duration-200 ease-(--ease-ink)",
+        "group-hover:shadow-e2 motion-safe:group-hover:-translate-y-0.5",
+        priv && "border border-dashed",
+        dragging &&
+          "shadow-e2 outline-brand-accent scale-[1.02] rotate-[2.5deg] outline-2 -outline-offset-1 motion-reduce:rotate-0",
       )}
     >
-      {task.parentTask && (
-        <p className="text-muted-foreground truncate text-xs">{task.parentTask.title} /</p>
+      {(task.project || task.priority === "HIGH" || task.type === "STORY") && !done && (
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pe-7">
+          {task.project && <TagChip color={color}>{task.project.name}</TagChip>}
+          {task.type === "STORY" && <TaskTypeChip type="STORY" />}
+          {task.priority === "HIGH" && <Badge variant="accent">High</Badge>}
+        </div>
       )}
-      <p
-        className={cn(
-          "leading-snug font-medium text-pretty",
-          done && "text-muted-foreground line-through",
-        )}
-      >
-        {task.title}
-      </p>
+      {showEpic && epic && !done && (
+        <p className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs font-medium">
+          <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{epic.title}</span>
+        </p>
+      )}
+      <div className="flex min-w-0 items-start gap-2">
+        {check}
+        <p
+          className={cn(
+            "min-w-0 flex-1 pe-6 text-[15px] leading-[1.3] font-semibold text-pretty",
+            done && "text-muted-foreground font-medium",
+          )}
+        >
+          {task.title}
+        </p>
+      </div>
 
-      {(priv || flagged || task.labels.length > 0) && (
-        <div className="flex flex-wrap gap-1">
+      {(priv || flagged || task.labels.length > 0) && !done && (
+        <div className="flex flex-wrap gap-1.5">
           {priv && <PrivateBadge />}
           {flagged && <FlagBadge />}
-          {task.labels.map(({ label }) => (
-            <Badge
-              key={label.id}
-              style={{ backgroundColor: label.color, color: labelTextColor(label.color) }}
-              className="border-0"
-            >
+          {task.labels.slice(0, 3).map(({ label }) => (
+            <TagChip key={label.id} color={label.color}>
               {label.name}
-            </Badge>
+            </TagChip>
           ))}
         </div>
       )}
 
       {task.status === "BLOCKED" && <BlockedNote reason={task.blockedReason} />}
 
-      <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
-        <div className="flex min-w-0 items-center gap-3">
-          <PriorityDot priority={task.priority} />
-          <DueLabel dueDate={task.dueDate} todayKey={todayKey} done={done} />
-          {task.subtasks.length > 0 && (
-            <span className="flex items-center gap-1">
-              <ListChecks className="size-3.5" aria-hidden="true" />
-              {completedSubtasks}/{task.subtasks.length}
-            </span>
-          )}
-          {task._count.comments > 0 && (
-            <span className="flex items-center gap-1">
-              <MessageSquare className="size-3.5" aria-hidden="true" />
-              {task._count.comments}
-            </span>
-          )}
-        </div>
+      {progress.total > 0 && !done && (
+        <ProgressBar done={progress.done} total={progress.total} color={color} />
+      )}
 
-        <div className="flex shrink-0 items-center -space-x-1.5">
-          {task.owner && <UserAvatar user={task.owner} size="sm" />}
-          {task.assignees.slice(0, 2).map(({ user }) => (
-            <UserAvatar key={user.id} user={user} size="xs" />
-          ))}
-          {task.assignees.length > 2 && <span className="pl-2">+{task.assignees.length - 2}</span>}
-        </div>
+      <div className="text-muted-foreground flex items-center gap-2.5 text-[13px]">
+        <DueLabel dueDate={task.dueDate} todayKey={todayKey} done={done} />
+        {task._count.comments > 0 && (
+          <span className="flex items-center gap-1">
+            <MessageSquare className="size-3.5" aria-hidden="true" />
+            {task._count.comments}
+          </span>
+        )}
+        <span className="flex-1" />
+        {people.length > 0 && (
+          <span className="flex shrink-0 items-center">
+            {people.slice(0, 3).map((u, i) => (
+              <UserAvatar
+                key={u.id}
+                user={u}
+                size="sm"
+                className={cn("ring-card ring-2", i > 0 && "-ms-2")}
+              />
+            ))}
+            {people.length > 3 && (
+              <span className="ms-1 text-xs font-medium">+{people.length - 3}</span>
+            )}
+          </span>
+        )}
       </div>
     </div>
   );

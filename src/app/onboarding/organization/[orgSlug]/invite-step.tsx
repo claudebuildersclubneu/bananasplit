@@ -31,7 +31,7 @@ const ROLES: { value: InviteRole; label: string }[] = [
 const roleLabel = (role: string) =>
   ROLES.find((r) => r.value === role)?.label ?? role.charAt(0) + role.slice(1).toLowerCase();
 
-const AVATAR_TONES = ["bg-banana", "bg-wheat", "bg-dusk", "bg-spot text-cream"] as const;
+const AVATAR_TONES = ["bg-brand-accent", "bg-avatar-1", "bg-avatar-3", "bg-avatar-4 text-primary-foreground"] as const;
 
 /**
  * B6 · Invite officers: email invites (the same invites as Settings >
@@ -102,12 +102,12 @@ export function InviteStep({
         <>
           <PreviewHeader meta="Who's joining" />
           <PreviewTile className="flex-row items-center gap-3">
-            <span className="bg-ink text-cream grid size-9 flex-none place-items-center rounded-full text-[13px] font-bold">
+            <span className="bg-primary text-primary-foreground grid size-9 flex-none place-items-center rounded-full text-[13px] font-bold">
               {(me.name ?? me.email).trim()[0]?.toUpperCase()}
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[14px] font-semibold">{me.name ?? me.email}</span>
-              <span className="text-ink-soft text-[12px]">Owner · that&apos;s you</span>
+              <span className="text-muted-foreground text-[12px]">Owner · that&apos;s you</span>
             </span>
           </PreviewTile>
           {sent.map((invite, i) => (
@@ -122,15 +122,15 @@ export function InviteStep({
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[14px] font-semibold">{invite.email}</span>
-                <span className="text-ink-soft text-[12px]">
+                <span className="text-muted-foreground text-[12px]">
                   {roleLabel(invite.role)} · invited
                 </span>
               </span>
             </PreviewTile>
           ))}
           {code && (
-            <p className="text-ink-faint m-0 mt-auto text-[12px] leading-normal">
-              Anyone with the code <b className="text-ink-muted font-mono">{code}</b> and a verified
+            <p className="text-muted-foreground m-0 mt-auto text-[12px] leading-normal">
+              Anyone with the code <b className="text-muted-foreground font-mono">{code}</b> and a verified
               email can join as a member.
             </p>
           )}
@@ -144,9 +144,9 @@ export function InviteStep({
 
       <StepBody className="gap-5">
         {code && (
-          <div className="bg-oat flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-4 py-3.5">
+          <div className="bg-muted flex flex-wrap items-center justify-between gap-3 rounded-[14px] px-4 py-3.5">
             <span className="flex flex-col gap-1">
-              <span className="text-ink-soft text-[13px] font-semibold">Your invite code</span>
+              <span className="text-muted-foreground text-[13px] font-semibold">Your invite code</span>
               <span
                 className="font-heading text-[30px] leading-none tracking-[0.12em]"
                 aria-label={`Invite code ${code.split("").join(" ")}`}
@@ -208,7 +208,7 @@ export function InviteStep({
               {inviting ? "Sending…" : "Send invite"}
             </button>
           </div>
-          <span className="text-ink-soft text-[13px]">
+          <span className="text-muted-foreground text-[13px]">
             The link is valid for 7 days. They sign in with this address to join.
           </span>
         </form>
@@ -218,13 +218,13 @@ export function InviteStep({
             {sent.map((invite) => (
               <li
                 key={invite.email}
-                className="bg-paper border-ink/10 flex h-[50px] items-center gap-3 rounded-xl border px-4"
+                className="bg-card border-foreground/10 flex h-10 items-center gap-3 rounded-field border px-4"
               >
                 <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
                   {invite.email}
                 </span>
-                <span className="text-ink-soft text-[13px]">{roleLabel(invite.role)}</span>
-                <span className="bg-leaf text-leaf-ink rounded-full px-2 py-0.5 text-[11px] font-bold">
+                <span className="text-muted-foreground text-[13px]">{roleLabel(invite.role)}</span>
+                <span className="bg-tint-success text-tint-success-foreground rounded-full px-2 py-0.5 text-[11px] font-bold">
                   ✓ Invited
                 </span>
               </li>

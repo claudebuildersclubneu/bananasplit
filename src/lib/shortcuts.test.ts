@@ -64,7 +64,7 @@ describe("keyboard shortcuts", () => {
   it("leaves out what the plan doesn't have", () => {
     const sections = [{ id: "tasks", label: "Tasks" }];
     const free = shortcutGroups({ mod: "⌘", sections, isAdmin: true, taskViews: false });
-    expect(rows(free, "Tasks page")).not.toContain("Board, Week, Table or Dashboard");
+    expect(rows(free, "Tasks page")).not.toContain("Board, Week, List, Table, Roadmap or Dashboard");
     expect(rows(free, "Tasks page")).not.toContain("Weekly update");
     const club = shortcutGroups({
       mod: "⌘",
@@ -75,7 +75,7 @@ describe("keyboard shortcuts", () => {
     });
     expect(rows(club, "Tasks page")).toEqual(
       expect.arrayContaining([
-        "Board, Week, Table or Dashboard",
+        "Board, Week, List, Table, Roadmap or Dashboard",
         "Filter by person",
         "Weekly update",
       ]),

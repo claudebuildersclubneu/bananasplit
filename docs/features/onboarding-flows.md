@@ -8,10 +8,12 @@ Two flows, from the design in the "Onboarding flows" flowchart:
   become its owner.
 
 Both flows use one step screen (the design handoff's "Onboarding"): a top bar
-with what's being set up, a stepper of named steps, and a framed card with the
+with what's being set up, a stepper of numbered steps, and a card with the
 step on the left and a live preview on the right
 (`src/components/onboarding/setup-shell.tsx`). Like sign-in and sign-up, it is
-Bananasplit's own look, not a club's theme. Every step saves when you press
+Bananasplit's own look (Moonstone, dark first, inside `BrandRoot`), not a
+club's theme: the screens use the app's tokens and shared components, sentence
+case and pill buttons (docs/design/moonstone.md). Every step saves when you press
 **Continue**, so leaving halfway loses nothing (**Save and exit** goes to the
 club), and each step has its own URL.
 
@@ -56,7 +58,7 @@ top of the org's theme. If an org locks light or dark, the lock still wins.
 enforced by the database. Other members only ever see busy or free for each
 hour of a typical week, on your people page. They never see the labels ("Lab
 section"), the dates or the reasons. Each org decides whether its members see
-busy times (B5). That org's admins, and you, always do.
+busy times (the Teams step). That org's admins, and you, always do.
 
 ## Joining (A7, `/onboarding/join`)
 
@@ -97,17 +99,22 @@ finishes (the flowchart's "invite link shown on first load").
 
 ## Flow B: create an organization
 
-| Step | Page                                  | What it does                                                                                                                                                                                                                                                                                                                                                                            |
-| ---- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1   | `/onboarding/organization`            | Club basics: name, web address (checked as you type) and time zone, plus a club-creation code where the platform requires one. Creates the club, with you as owner.                                                                                                                                                                                                                     |
-| B2   | `/onboarding/organization/<url>/data` | The club's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. All optional: the club's data is stored in Bananasplit from the start, so **Continue** always works (with nothing connected it marks them skipped). |
-| B3   | `.../labels`                          | The club's task labels (the same ones as Settings › Labels): keep, rename, recolour, remove or add. A new club starts with four suggestions. The preview shows the newest tasks wearing them. Database names and who can see them live in Settings › Privacy and Databases.                                                                                                             |
-| B4   | `.../finance`                         | Which sections the finance dashboard shows, and when the fiscal year starts. An owner or treasurer can start that year's budget period here, with the usual categories at $0.                                                                                                                                                                                                           |
-| B5   | `.../teams`                           | Teams, each with a lead and a regular meeting. They're published as the org chart: the first team is the top and the rest report to it. The meetings are added to the calendar for the next 12 weeks, and mirror to Google Calendar when it's connected. Also: whether members see each other's busy times.                                                                             |
-| B6   | `.../invite`                          | Invite officers by email (the same invites as Settings › Members, valid for 7 days, as Admin, Treasurer or Member) and share the club code. **Finish setup** opens the club.                                                                                                                                                                                                            |
-| End  | `/app/<url>?welcome=1`                | The club's overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                                                                                                 |
+The steps, in the order of `ORG_STEPS` (`src/lib/onboarding/steps.ts`); the
+stepper numbers them 1 to 8.
 
-B2-B6 are for owners and admins. Anyone else who opens them is told so.
+| #   | Page                                    | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `/onboarding/organization`              | Club basics: name, web address (checked as you type) and time zone, plus a club-creation code where the platform requires one. Creates the club, with you as owner.                                                                                                                                                                                                                                                                                                                |
+| 2   | `/onboarding/organization/<url>/labels` | The club's tags (the same ones as Settings › Labels): keep, rename, recolour, remove or add. A new club starts with four suggestions. The preview shows the newest tasks wearing them.                                                                                                                                                                                                                                                                                             |
+| 3   | `.../finance`                           | Which sections the finance dashboard shows, and when the fiscal year starts. An owner or treasurer can start that year's budget period here, with the usual categories at $0.                                                                                                                                                                                                                                                                                                      |
+| 4   | `.../teams`                             | Teams, each with a lead and a regular meeting. They're published as the org chart: the first team is the top and the rest report to it. The meetings can be added to the calendar for the next 12 weeks (off until asked for). Also: whether members see each other's busy times.                                                                                                                                                                                                  |
+| 5   | `.../pulse`                             | The weekly pulse: the day (a Mon to Sun segmented control, Friday by default), the time (5 PM), who gets it (Everyone, or Officers: owners, admins and treasurers) and how (in the app, email). Saved to `OrgSettings` (`pulseEnabled`, `pulseDay`, `pulseHourLocal`, `pulseAudience`, `pulseInApp`, `pulseEmail`) through `src/server/onboarding/pulse.ts`, the same saver as Admin panel › Weekly pulse. **Don't send one** turns it off. The pulse itself: `src/server/pulse/`. |
+| 6   | `.../invite`                            | Invite officers by email (the same invites as Settings › Members, valid for 7 days, as Admin, Treasurer or Member) and share the invite code.                                                                                                                                                                                                                                                                                                                                      |
+| 7   | `.../data`                              | Connect tools: the club's real connections (club website data, Google Calendar, email sender, Claude), with live status. **Connect** opens the guided setup for that service, which tests it; you come back with **← Back to organization setup**. All optional: the club's data is stored in Bananasplit from the start, so **Continue** always works (with nothing connected it marks them skipped).                                                                             |
+| 8   | `.../bring`                             | Bring things in: events, polls and tasks from the creator's Personal space. Skipped when there's nothing to bring.                                                                                                                                                                                                                                                                                                                                                                 |
+| End | `/app/<url>?welcome=1`                  | The club's Overview, as its admin, with the invite code ready to share.                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+Steps 2 to 8 are for owners and admins. Anyone else who opens them is told so.
 Everything can be changed later in Settings, the Org Chart, Finance and
 Databases.
 
@@ -173,7 +180,8 @@ crossing between them.
 - Step lists and input rules: `src/lib/onboarding/`. Availability rules:
   `src/lib/availability`. Personal theme: `src/lib/theme/personal.ts`.
   Invite-code format: `src/lib/join-code.ts`.
-- Server: `src/server/onboarding/` (profile saves, invite codes, org setup).
+- Server: `src/server/onboarding/` (profile saves, invite codes, org setup,
+  the weekly pulse settings).
 - Database: migrations `20260929120000_onboarding_flow` and
   `20260930120000_private_availability`.
   - The new user columns are `onboardedAt`, `preferredTitle` and

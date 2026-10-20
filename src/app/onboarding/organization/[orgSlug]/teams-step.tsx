@@ -47,7 +47,7 @@ const STARTER: TeamInput[] = [
 
 /** The small selects on a team row (lead, day, time, cadence). */
 const smallSelect =
-  "border-ink/16 bg-paper focus-banana h-8 cursor-pointer rounded-lg border px-2 text-[13px] outline-none";
+  "border-input bg-card focus-banana h-8 cursor-pointer rounded-lg border px-2 text-[13px] outline-none";
 
 /**
  * B5 · Teams: the teams become the published org chart (the first is the
@@ -111,21 +111,21 @@ export function TeamsStep({
         <>
           <PreviewHeader meta="Org chart" />
           <PreviewTile className="items-center gap-0 py-5">
-            <span className="bg-ink text-cream max-w-full truncate rounded-full px-3 py-1.5 text-[13px] font-bold">
+            <span className="bg-primary text-primary-foreground max-w-full truncate rounded-full px-3 py-1.5 text-[13px] font-bold">
               {top?.name.trim() || "Top team"}
             </span>
             {rest.length > 0 && (
               <>
-                <span aria-hidden="true" className="bg-ink/30 h-3.5 w-px" />
+                <span aria-hidden="true" className="bg-foreground/30 h-3.5 w-px" />
                 {/* Each child draws its half of the bar above it, so the bar
                     runs from the first child's centre to the last one's. */}
                 <div className="flex max-w-full flex-wrap justify-center">
                   {rest.map((t, i) => (
                     <span
                       key={i}
-                      className="before:bg-ink/30 after:bg-ink/30 relative flex max-w-[50%] min-w-0 flex-col items-center px-[3px] pt-3 before:absolute before:top-0 before:right-0 before:left-0 before:h-px after:absolute after:top-0 after:left-1/2 after:h-3 after:w-px first:before:left-1/2 last:before:right-1/2"
+                      className="before:bg-foreground/30 after:bg-foreground/30 relative flex max-w-[50%] min-w-0 flex-col items-center px-[3px] pt-3 before:absolute before:top-0 before:right-0 before:left-0 before:h-px after:absolute after:top-0 after:left-1/2 after:h-3 after:w-px first:before:left-1/2 last:before:right-1/2"
                     >
-                      <span className="bg-oat max-w-full truncate rounded-full px-2.5 py-[5px] text-[12px] font-semibold">
+                      <span className="bg-muted max-w-full truncate rounded-full px-2.5 py-[5px] text-[12px] font-semibold">
                         {t.name.trim() || "New team"}
                       </span>
                     </span>
@@ -142,7 +142,7 @@ export function TeamsStep({
                 <span className="truncate text-[14px] font-semibold">
                   {t.name.trim() || "New team"}
                 </span>
-                <span className="text-ink-soft text-[12px]">
+                <span className="text-muted-foreground text-[12px]">
                   {DAY_LABELS[t.meeting!.day]} · {timeLabel(t.meeting!.minutes)} ·{" "}
                   {CADENCES.find((c) => c.value === t.meeting!.cadence)?.label}
                   {leadName(t.leadUserId) ? ` · ${leadName(t.leadUserId)}` : ""}
@@ -150,7 +150,7 @@ export function TeamsStep({
               </PreviewTile>
             ))}
           {meetings === 0 && (
-            <p className="text-ink-faint m-0 text-[12px]">No regular meetings yet.</p>
+            <p className="text-muted-foreground m-0 text-[12px]">No regular meetings yet.</p>
           )}
         </>
       }
@@ -162,7 +162,7 @@ export function TeamsStep({
 
       <StepBody className="gap-3">
         {state.hasPublishedChart && (
-          <p className="bg-oat text-ink-muted m-0 rounded-xl px-3.5 py-2.5 text-[13px]">
+          <p className="bg-muted text-muted-foreground m-0 rounded-field px-3.5 py-2.5 text-[13px]">
             Your club already has an org chart. Continuing publishes these teams as a new version;
             the old one stays in the chart&apos;s history.
           </p>
@@ -187,7 +187,7 @@ export function TeamsStep({
           )}
         </div>
 
-        <div className="border-ink/10 divide-ink/10 divide-y rounded-xl border">
+        <div className="border-foreground/10 divide-border divide-y rounded-field border">
           <Toggle
             checked={addMeetings}
             onChange={setAddMeetings}
@@ -238,7 +238,7 @@ function Toggle({
     <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-semibold">{title}</span>
-        <span className="text-ink-soft block text-[13px]">{detail}</span>
+        <span className="text-muted-foreground block text-[13px]">{detail}</span>
       </span>
       <Switch checked={checked} onCheckedChange={onChange} />
     </label>
@@ -262,14 +262,14 @@ function TeamRow({
   return (
     <div
       className={cn(
-        "bg-paper focus-within-banana flex flex-col gap-2 rounded-xl border px-4 py-3",
-        top ? "border-ink/30" : "border-ink/10",
+        "bg-card focus-within-banana flex flex-col gap-2 rounded-field border px-4 py-3",
+        top ? "border-foreground/30" : "border-foreground/10",
       )}
     >
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className={cn("size-2.5 flex-none rounded-full", top ? "bg-ink" : "bg-dusk")}
+          className={cn("size-2.5 flex-none rounded-full", top ? "bg-primary" : "bg-avatar-3")}
         />
         <input
           aria-label="Team name"
@@ -279,7 +279,7 @@ function TeamRow({
           onChange={(e) => onChange({ name: e.target.value })}
           className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none"
         />
-        {top && <span className="text-ink-soft flex-none text-[13px]">Top of the chart</span>}
+        {top && <span className="text-muted-foreground flex-none text-[13px]">Top of the chart</span>}
         {onRemove && <RemoveButton label={`Remove ${team.name || "team"}`} onClick={onRemove} />}
       </div>
       <div className="flex flex-wrap items-center gap-2 pl-[22px]">

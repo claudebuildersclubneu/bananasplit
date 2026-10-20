@@ -12,9 +12,13 @@ import {
   fromDateKey,
   isDateKey,
   localDateKey,
+  addDaysToKey,
+  mondayOfKey,
+  zonedInstant,
   updateWeekStartKey,
   updateWeekStartOfKey,
 } from "@/lib/tasks/dates";
+import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
@@ -26,7 +30,9 @@ import {
   getBoardTasks,
   getOrgLabels,
   getOrgProjects,
+  getRoadmapEpics,
   getTableTasks,
+  getTaskStats,
   type TaskFilters,
 } from "@/server/tasks/queries";
 import {
@@ -45,6 +51,7 @@ import { WeeklyUpdateStrip, type WeeklyStatus } from "./updates/weekly-update-st
 import { WeekView } from "./week/week-view";
 import { WorkspaceHeader } from "./workspace-header";
 import { ListView } from "./list/list-view";
+import { RoadmapView } from "./roadmap/roadmap-view";
 import {
   DEFAULT_TASK_LAYOUT,
   isDestination,
@@ -153,6 +160,18 @@ export default async function TasksPage({
     visibility: ws.visibility,
   };
 
+  // The stat strip: the same question, counted (Monday to Sunday is the week).
+  const weekStartKey = mondayOfKey(todayKey);
+  const stats = simple
+    ? null
+    : await withOrgTx(org.id, ({ db }) =>
+        getTaskStats(db, org.id, filters, {
+          today,
+          weekEnd: fromDateKey(addDaysToKey(weekStartKey, 6)),
+          weekStart: zonedInstant(weekStartKey, 0, base.tz),
+        }),
+      );
+
   const content = await renderView({
     ws,
     filters,
@@ -184,11 +203,13 @@ export default async function TasksPage({
       members={members}
       labels={base.labels}
       projects={base.projects}
+      can={creationRights(isAdmin, settings)}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
         <WorkspaceHeader
           title={sectionLabel(settings?.sidebar, "tasks")}
           teamwork={teamwork && !simple}
+          stats={stats}
         />
         {ws.view === "week" && weekly && <WeeklyUpdateStrip status={weekly} />}
         {content}
@@ -262,6 +283,13 @@ async function renderView(input: {
           moreLimit={limit + 100}
         />
       );
+    }
+
+    case "roadmap": {
+      const epics = await withOrgTx(org.id, ({ db }) =>
+        getRoadmapEpics(db, org.id, filters, today),
+      );
+      return <RoadmapView epics={epics} />;
     }
 
     case "table": {
@@ -369,6 +397,7 @@ async function renderView(input: {
             olderCompleted={older}
             showAll={showAll}
             todayKey={todayKey}
+            lanes={param(query.lanes) === "epic"}
           />
         </QueryProvider>
       );

@@ -82,7 +82,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/onboarding/
       )}
 
       {invites.length > 0 && (
-        <section className="border-ink/10 flex flex-col gap-2 border-t pt-4">
+        <section className="border-foreground/10 flex flex-col gap-2 border-t pt-4">
           <h2 className="m-0 text-[14px] font-semibold">
             Or accept an email invite to {profile.email}
           </h2>

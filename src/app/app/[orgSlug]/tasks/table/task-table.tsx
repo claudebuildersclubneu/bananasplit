@@ -17,7 +17,8 @@ import {
 } from "@/components/tasks/task-badges";
 import { accessSubjectOf, useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import type { TaskItem } from "@/components/tasks/types";
-import { Badge } from "@/components/ui/badge";
+import { TaskTypeChip } from "@/components/tasks/task-type";
+import { TagChip } from "@/components/ui/chip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -99,7 +100,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   involved: "Also involved",
   creator: "Creator",
   project: "Project",
-  labels: "Labels",
+  labels: "Tags",
   priority: "Priority",
   dueDate: "Due date",
 };
@@ -358,7 +359,7 @@ export function TaskTable({
                   onClick={toggleSort}
                 />
               )}
-              {visible.labels && <TableHead>Labels</TableHead>}
+              {visible.labels && <TableHead>Tags</TableHead>}
               {visible.project && <TableHead>Project</TableHead>}
               {visible.creator && <TableHead>Creator</TableHead>}
             </TableRow>
@@ -435,6 +436,7 @@ export function TaskTable({
                           <span className="w-4 shrink-0" />
                         )}
                         {isTaskPrivate(task) && <PrivateMark />}
+                        {task.type !== "TASK" && <TaskTypeChip type={task.type} iconOnly />}
                         <span className="truncate">{task.title}</span>
                         {task.subtasks.length > 0 && (
                           <span className="text-muted-foreground shrink-0 text-xs">
@@ -493,13 +495,9 @@ export function TaskTable({
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {task.labels.map(({ label }) => (
-                            <Badge
-                              key={label.id}
-                              style={{ backgroundColor: label.color, color: "white" }}
-                              className="border-0"
-                            >
+                            <TagChip key={label.id} color={label.color}>
                               {label.name}
-                            </Badge>
+                            </TagChip>
                           ))}
                         </div>
                       </TableCell>

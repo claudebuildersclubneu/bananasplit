@@ -231,7 +231,7 @@ export function WeekView({
             }
             description={bucket.description}
           />
-          <ul className={cn("divide-border divide-y", TASK_PANEL)}>
+          <ul className={TASK_PANEL}>
             {bucket.tasks.map((task) => (
               <TaskRow key={task.id} task={task} showOwner={!mine} />
             ))}
@@ -261,7 +261,7 @@ export function WeekView({
             <span className="text-xs tabular-nums">{completed.length}</span>
           </button>
           {showDone && (
-            <ul className={cn("divide-border mt-1.5 divide-y", TASK_PANEL)}>
+            <ul className={cn("mt-1.5", TASK_PANEL)}>
               {completed.map((task) => (
                 <TaskRow key={task.id} task={task} showOwner={!mine} />
               ))}

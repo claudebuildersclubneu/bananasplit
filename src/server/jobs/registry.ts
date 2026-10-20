@@ -204,6 +204,31 @@ export const JOB_KINDS = {
       "18:00 local reminder, on the club's weekly update day, to a lead who hasn't posted the week's update (once=true), enqueued by /api/cron/task-digest.",
   }),
 
+  // ---- The weekly pulse (src/server/pulse) ----
+  "weekly-pulse": kind({
+    payload: z.object({ weekStart: isoDate }).strict(),
+    scope: "org",
+    maxRuntimeMs: 60_000,
+    leaseSeconds: 120,
+    tier: "fast",
+    afterEligible: false,
+    handler: () => import("@/server/pulse/jobs").then((m) => m.weeklyPulseJob),
+    description:
+      "The club's weekly pulse at OrgSettings.pulseDay and pulseHourLocal (once=true per week): compiles and stores the PulseIssue, writes the Team Advanced summary, marks it sent, notifies in-app and queues pulse-email; enqueued by /api/cron/task-digest.",
+  }),
+  "pulse-email": kind({
+    payload: z.object({ issueId: id, userId: id }).strict(),
+    scope: "org",
+    maxRuntimeMs: 20_000,
+    leaseSeconds: 60,
+    tier: "fast",
+    afterEligible: false,
+    sendsEmail: true,
+    handler: () => import("@/server/pulse/jobs").then((m) => m.pulseEmailJob),
+    description:
+      "One weekly pulse email to one recipient (Money moved only for finance roles); key pulse-email:{issueId}:{userId}.",
+  }),
+
   // ---- Calendar (Phase 7; handlers owned by B7) ----
   gcal: kind({
     payload: z.object({ eventId: id }).strict(),

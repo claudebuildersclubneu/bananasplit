@@ -23,6 +23,14 @@ export interface TasksViewer {
   chart: ViewerChart;
 }
 
+/** What the viewer may make on the spot, from the club's creation rules. */
+export interface TasksCan {
+  /** OrgSettings.memberCanCreateProjects, or an owner/admin. */
+  createProjects: boolean;
+  /** OrgSettings.memberCanCreateTags, or an owner/admin. */
+  createTags: boolean;
+}
+
 export interface TasksOrg {
   id: string;
   slug: string;

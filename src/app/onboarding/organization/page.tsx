@@ -31,7 +31,7 @@ export default async function ClubBasicsPage() {
     policy.denial === "unverified" ? (
       <VerifyEmailNotice email={identity?.email ?? user.email} action="create a club" />
     ) : policy.denial ? (
-      <p className="bg-oat text-ink-muted m-0 rounded-xl px-4 py-3.5 text-[15px] leading-normal">
+      <p className="bg-muted text-muted-foreground m-0 rounded-field px-4 py-3.5 text-[15px] leading-normal">
         {ORG_CREATION_DENIAL_MESSAGES[policy.denial]}
       </p>
     ) : undefined;
