@@ -266,7 +266,7 @@ function ProjectListRow({
   }
 
   return (
-    <li className="group hover:bg-muted/60 rounded-tile [&+&]:before:bg-border relative flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors sm:flex-nowrap [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
+    <li className="group hover:bg-muted/60 rounded-tile [li+&]:before:bg-border relative flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors sm:flex-nowrap [li+&]:before:absolute [li+&]:before:inset-x-3 [li+&]:before:top-0 [li+&]:before:h-px">
       <span
         aria-hidden="true"
         className="size-2.5 shrink-0 rounded-full"

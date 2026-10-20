@@ -92,13 +92,18 @@ export function RoadmapView({ epics }: { epics: RoadmapEpic[] }) {
         style={{ ...grid, minWidth: 200 + weeks.length * 60 }}
       >
         <div role="row" className="contents">
-          <span role="columnheader" className="sr-only">
+          <span
+            role="columnheader"
+            style={{ gridColumn: 1 }}
+            className="border-border text-muted-foreground border-b pb-1.5 text-xs font-semibold"
+          >
             Epic
           </span>
           {weeks.map((w, i) => (
             <span
               key={w}
               role="columnheader"
+              style={{ gridColumn: i + 2 }}
               className={cn(
                 "border-border border-b pb-1.5 text-xs font-semibold",
                 i === nowCol ? "text-foreground" : "text-muted-foreground",
@@ -143,7 +148,7 @@ export function RoadmapView({ epics }: { epics: RoadmapEpic[] }) {
               const color = projectColor(e.project);
               return (
                 <div key={e.id} role="row" className="contents">
-                  <span role="cell" className="min-w-0 pe-3">
+                  <span role="cell" style={{ gridColumn: 1 }} className="min-w-0 pe-3">
                     <button
                       type="button"
                       onClick={() => openTask(e.id)}

@@ -115,18 +115,18 @@ export function DashboardView({
           <MixBar
             label={`${totals.notStarted} not started, ${totals.inProgress} in progress, ${totals.blocked} blocked, ${totals.done} done`}
             segments={[
-              { label: `Not started ${totals.notStarted}`, value: totals.notStarted, hatch: true },
+              { label: "Not started", value: totals.notStarted, hatch: true },
               {
-                label: `In progress ${totals.inProgress}`,
+                label: "In progress",
                 value: totals.inProgress,
                 color: "var(--chart-2)",
               },
               {
-                label: `Blocked ${totals.blocked}`,
+                label: "Blocked",
                 value: totals.blocked,
                 color: "var(--destructive)",
               },
-              { label: `Done ${totals.done}`, value: totals.done, color: "var(--chart-4)" },
+              { label: "Done", value: totals.done, color: "var(--chart-4)" },
             ]}
           />
         </section>
@@ -414,10 +414,7 @@ function WeeklyUpdates({
 
 function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h3
-      id={id}
-      className="text-muted-foreground flex items-baseline text-xs font-medium tracking-wide uppercase"
-    >
+    <h3 id={id} className="heading flex items-baseline gap-2">
       {children}
     </h3>
   );

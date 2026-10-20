@@ -68,9 +68,9 @@ export function TaskRow({
     <li
       className={cn(
         "group hover:bg-muted/60 focus-within:bg-muted/60 rounded-field relative flex items-center gap-3 px-3 py-3 transition-colors duration-150 sm:gap-3.5",
-        "[&+&]:before:bg-border [&+&]:before:absolute [&+&]:before:start-12 [&+&]:before:end-3 [&+&]:before:top-0 [&+&]:before:h-px",
-        depth === 1 && "ps-9 [&+&]:before:start-[4.5rem]",
-        depth === 2 && "ps-16 [&+&]:before:start-24",
+        "[li+&]:before:bg-border [li+&]:before:absolute [li+&]:before:start-12 [li+&]:before:end-3 [li+&]:before:top-0 [li+&]:before:h-px",
+        depth === 1 && "ps-9 [li+&]:before:start-[4.5rem]",
+        depth === 2 && "ps-16 [li+&]:before:start-24",
         done && "opacity-80",
         className,
       )}

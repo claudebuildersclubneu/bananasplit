@@ -137,7 +137,7 @@ export function Subtasks({
             return (
               <li
                 key={s.id}
-                className="hover:bg-muted/60 rounded-field [&+&]:before:bg-border relative flex min-h-11 items-center gap-2.5 px-2 py-1.5 text-sm transition-colors [&+&]:before:absolute [&+&]:before:start-10 [&+&]:before:end-2 [&+&]:before:top-0 [&+&]:before:h-px"
+                className="hover:bg-muted/60 rounded-field [li+&]:before:bg-border relative flex min-h-11 items-center gap-2.5 px-2 py-1.5 text-sm transition-colors [li+&]:before:absolute [li+&]:before:start-10 [li+&]:before:end-2 [li+&]:before:top-0 [li+&]:before:h-px"
               >
                 {story ? (
                   <TaskTypeChip type="STORY" iconOnly />

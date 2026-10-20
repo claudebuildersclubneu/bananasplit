@@ -180,7 +180,7 @@ function TagListRow({
   }
 
   return (
-    <li className="hover:bg-muted/60 rounded-tile [&+&]:before:bg-border relative px-3 py-2.5 transition-colors [&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px">
+    <li className="hover:bg-muted/60 rounded-tile [li+&]:before:bg-border relative px-3 py-2.5 transition-colors [li+&]:before:absolute [li+&]:before:inset-x-3 [li+&]:before:top-0 [li+&]:before:h-px">
       <div className="flex min-h-9 items-center gap-3">
         {mode === "rename" ? (
           <form
