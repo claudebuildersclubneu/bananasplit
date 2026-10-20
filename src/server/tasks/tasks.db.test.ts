@@ -322,6 +322,52 @@ describe.skipIf(!seeded)("tasks against the local database (seeded CBC)", () => 
     expect(subs.map((x) => x.ownerRelation)).toEqual(["DOWN_LINE", "DOWN_LINE"]);
   });
 
+  it("nests epic > story > task, fixes types on the way and refuses a third level", async () => {
+    const epic = await create({
+      title: "Moonstone test: epic",
+      type: "EPIC",
+      ownerId: p.oliver.id,
+      dueDate: due(30),
+    });
+    const story = await create({
+      title: "Moonstone test: story",
+      parentTaskId: epic,
+      type: "STORY",
+    });
+    const step = await create({ title: "Moonstone test: step", parentTaskId: story });
+    const plain = await create({ title: "Moonstone test: plain", parentTaskId: epic });
+    const types = await read(({ db }) =>
+      db.task.findMany({
+        where: { id: { in: [epic, story, step, plain] } },
+        select: { id: true, type: true },
+      }),
+    );
+    expect(Object.fromEntries(types.map((t) => [t.id, t.type]))).toEqual({
+      [epic]: "EPIC",
+      [story]: "STORY",
+      [step]: "TASK",
+      [plain]: "TASK",
+    });
+
+    // A task under a story can't be broken down, and an epic can't go inside anything.
+    await expect(act(svc.createTask)(s.cbcId, { title: "x", parentTaskId: step })).rejects.toThrow(
+      "A task inside a story can't be broken down any further.",
+    );
+    await expect(act(svc.updateTask)(s.cbcId, story, { type: "TASK" })).rejects.toThrow(
+      "It has subtasks (some may be deleted), so it can't be a plain task.",
+    );
+    await expect(act(svc.updateTask)(s.cbcId, plain, { type: "EPIC" })).rejects.toThrow(
+      "An epic always sits at the top. It can't go inside another task.",
+    );
+
+    // Breaking down a plain task under the epic makes it a story.
+    await create({ title: "Moonstone test: under plain", parentTaskId: plain });
+    const promoted = await read(({ db }) =>
+      db.task.findUniqueOrThrow({ where: { id: plain }, select: { type: true } }),
+    );
+    expect(promoted.type).toBe("STORY");
+  });
+
   it("mentions notify only new, non-self, member mentions", async () => {
     const id = await create({
       title: "B6 test: mentions",

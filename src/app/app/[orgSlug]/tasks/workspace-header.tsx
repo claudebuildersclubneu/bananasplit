@@ -1,13 +1,28 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ClipboardPaste, Plus } from "lucide-react";
+import {
+  AlarmClock,
+  ArrowLeft,
+  CalendarRange,
+  ChevronDown,
+  CircleCheck,
+  CircleDot,
+  ClipboardPaste,
+  FolderKanban,
+  Layers,
+  Plus,
+} from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import { WorkspaceToolbar } from "@/components/tasks/workspace-toolbar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Stat, StatStrip } from "@/components/ui/stat";
+import type { TaskStats } from "@/server/tasks/queries";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,11 +56,14 @@ import { isDestination, TASK_LAYOUTS, type TaskLayout } from "./views";
 export function WorkspaceHeader({
   title = "Tasks",
   teamwork = true,
+  stats = null,
 }: {
   /** The section's name in the club's sidebar. */
   title?: string;
   /** The weekly update exists (a club's layouts; not Personal or the Free plan). */
   teamwork?: boolean;
+  /** The stat strip (none on the Free plan). */
+  stats?: TaskStats | null;
 }) {
   const { newTask, org } = useTasks();
   const ws = useWorkspace();
@@ -99,22 +117,29 @@ export function WorkspaceHeader({
   }, [startNew, newTask, projectId, searchParams, router, pathname]);
 
   return (
-    <div className="mb-5 space-y-4">
+    <div className="mb-[30px] space-y-[30px]">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <h1 className="page-title mr-auto">{title}</h1>
 
         <div className="flex flex-wrap items-center gap-2">
           {inDestination ? (
-            <Button variant="ghost" size="sm" onClick={() => ws.setView("board")}>
+            <Button variant="ghost" onClick={() => ws.setView("board")}>
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back to tasks
             </Button>
-          ) : null}
+          ) : (
+            <Button variant="outline" asChild>
+              <Link href={`/app/${org.slug}/tasks/projects`}>
+                <FolderKanban className="size-4" aria-hidden="true" />
+                Projects
+              </Link>
+            </Button>
+          )}
 
-          {/* New task, with "Paste a list" in its menu (just New task on the Free plan). */}
+          {/* New task (the screen's one create), with more ways in its menu. */}
           {ws.simple ? (
             <Button
-              size="sm"
+              variant="create"
               title="New task (c)"
               onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
             >
@@ -124,8 +149,8 @@ export function WorkspaceHeader({
           ) : (
             <div className="flex">
               <Button
-                size="sm"
-                className="rounded-r-none"
+                variant="create"
+                className="rounded-r-none pe-3"
                 title="New task (c)"
                 onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
               >
@@ -135,11 +160,11 @@ export function WorkspaceHeader({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    size="sm"
-                    className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
+                    variant="create"
+                    className="border-brand-accent-foreground/20 rounded-l-none border-l ps-2.5 pe-3"
                     aria-label="More ways to add tasks"
                   >
-                    <ChevronDown className="size-3.5" aria-hidden="true" />
+                    <ChevronDown className="size-4" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
@@ -148,6 +173,14 @@ export function WorkspaceHeader({
                   >
                     <Plus className="size-4" aria-hidden="true" />
                     New task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      newTask({ type: "EPIC", projectId: ws.query.projectId ?? null })
+                    }
+                  >
+                    <Layers className="size-4" aria-hidden="true" />
+                    New epic
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setImporting(true)}>
                     <ClipboardPaste className="size-4" aria-hidden="true" />
@@ -164,6 +197,30 @@ export function WorkspaceHeader({
           )}
         </div>
       </div>
+
+      {!inDestination && stats && (
+        <StatStrip>
+          <Stat icon={CircleDot} value={stats.open} label="Open" />
+          <Stat icon={CalendarRange} value={stats.dueThisWeek} label="Due this week" />
+          <Stat
+            icon={AlarmClock}
+            value={stats.overdue}
+            label="Overdue"
+            chip={
+              stats.overdue > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => ws.setFilters({ blockers: true })}
+                  className="focus-glow rounded-full"
+                >
+                  <Badge variant="destructive">Show them</Badge>
+                </button>
+              ) : undefined
+            }
+          />
+          <Stat icon={CircleCheck} value={stats.doneThisWeek} label="Done this week" />
+        </StatStrip>
+      )}
 
       {!inDestination && <WorkspaceToolbar />}
       {importing && (

@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,7 +25,7 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 
 /** The surface a list of tasks sits on. */
-export const TASK_PANEL = "bg-card overflow-hidden rounded-xl border";
+export const TASK_PANEL = "bg-card edge rounded-card p-2 max-sm:p-1.5";
 
 export function GroupHeader({
   id,
@@ -51,24 +52,24 @@ export function GroupHeader({
     <div className={cn("flex min-w-0 items-center gap-2 px-1", className)}>
       {dot && (
         <span
-          className="size-2 shrink-0 rounded-full"
-          style={{ background: dot }}
+          className="size-2 shrink-0 rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,var(--dot)_24%,transparent)]"
+          style={{ background: dot, "--dot": dot } as CSSProperties}
           aria-hidden="true"
         />
       )}
       <h2
         id={id}
         className={cn(
-          "truncate text-sm font-semibold tracking-tight",
-          tone === "danger" && "text-destructive",
+          "truncate text-sm font-semibold",
+          tone === "danger" && "text-tint-danger-foreground",
           tone === "warning" && "text-warning",
         )}
       >
         {title}
       </h2>
-      <span className="bg-muted text-muted-foreground rounded-md px-1.5 text-[11px] font-medium tabular-nums">
+      <Badge variant="secondary" className="tabular-nums">
         {count}
-      </span>
+      </Badge>
       {description && (
         <span className="text-muted-foreground hidden truncate text-xs sm:inline">
           {description}

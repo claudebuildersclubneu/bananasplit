@@ -7,6 +7,7 @@ import { loadTaskActivity } from "@/app/app/[orgSlug]/tasks/actions";
 import { Button } from "@/components/ui/button";
 import { RELATION_LABELS, type AssignmentRelationValue } from "@/lib/tasks/assignment";
 import { formatDueKey } from "@/lib/tasks/dates";
+import { typeLabel } from "@/lib/tasks/hierarchy";
 import type { TaskActivityItem } from "@/server/tasks/queries";
 
 import { STATUS_LABELS } from "./status-select";
@@ -45,6 +46,8 @@ function describe(item: TaskActivityItem, nameOf: (id: unknown) => string): stri
       return `changed the due date to ${typeof d.to === "string" ? formatDueKey(d.to) : "none"}`;
     case "COMMENTED":
       return "commented";
+    case "TYPE_CHANGED":
+      return `made it ${typeof d.to === "string" ? `${/^E/.test(d.to) ? "an" : "a"} ${typeLabel(d.to).toLowerCase()}` : "another type"}`;
     default:
       return item.type.toLowerCase().replace(/_/g, " ");
   }

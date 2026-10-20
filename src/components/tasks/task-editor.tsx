@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Maximize2, Plus, SquareCheck, Trash2, UserMinus, UserPlus, X } from "lucide-react";
+import { Maximize2, Plus, Trash2, UserMinus, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 
@@ -25,6 +25,8 @@ import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enu
 import { canAcknowledgeFlag, canEditTask } from "@/lib/tasks/access";
 import { relationFor } from "@/lib/tasks/assignment";
 import { dueDateKey } from "@/lib/tasks/dates";
+import { allowedTypes, TASK_TYPES, typeLabel, type TaskTypeValue } from "@/lib/tasks/hierarchy";
+import { projectColor } from "@/lib/tasks/project-color";
 import { MAX_BLOCKED_REASON } from "@/lib/tasks/status";
 import { canChangeVisibility, namedAudienceIds } from "@/lib/tasks/visibility";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,9 @@ import {
 } from "./task-fields";
 import { TaskMarkdown } from "./task-markdown";
 import { TaskSentence } from "./task-sentence";
+import { TaskTypeChip, TYPE_OPTIONS } from "./task-type";
+import { HashTagHint } from "./tag-menu";
+import { useHashTags } from "./use-hash-tags";
 import { accessSubjectOf, useTasks, visibilitySubjectOf } from "./tasks-context";
 import type { TaskItem } from "./types";
 import { AudienceList } from "./visibility-control";
@@ -80,6 +85,10 @@ export interface TaskEditorDefaults {
   ownerId?: string | null;
   /** Pre-set who can see it (a subtask inherits its parent). */
   visibility?: TaskVisibility;
+  /** Epic, story or task (a plain task unless said). */
+  type?: TaskTypeValue;
+  /** The parent's type, when `parentTaskId` is set (which types may go under it). */
+  parentType?: TaskTypeValue;
 }
 
 export function TaskEditor({
@@ -106,6 +115,7 @@ export function TaskEditor({
   const [error, setError] = useState<string | null>(null);
   const [confirmElement, confirmFlagged] = useConfirmFlagged();
   const [confirmEl, confirm] = useConfirm();
+  const hashTags = useHashTags();
   const mod = useModKey();
   const saving = useRef(false);
   const [view, setView] = useState<"form" | "sentence">("form");
@@ -138,6 +148,20 @@ export function TaskEditor({
     task?.assignees.map((a) => a.userId) ?? [],
   );
   const [labelIds, setLabelIds] = useState<string[]>(task?.labels.map((l) => l.label.id) ?? []);
+  const [type, setType] = useState<TaskTypeValue>(task?.type ?? defaults?.type ?? "TASK");
+  // Which types fit where it stands (a parent hidden from the viewer counts
+  // as a story, the stricter case; the server decides anyway).
+  const parentType: TaskTypeValue | null = parentTaskId
+    ? (task?.parentTask?.type ?? defaults?.parentType ?? "STORY")
+    : null;
+  const typeOptions = TYPE_OPTIONS.filter((o) =>
+    allowedTypes({ parentType, childTypes: task?.subtasks.map((s) => s.type) ?? [] }).includes(
+      o.value,
+    ),
+  );
+  // Whether it can hold subtasks: an epic or a story, or a plain task that
+  // breaking down would make a story (not one already inside a story).
+  const canHoldChildren = type !== "TASK" || parentType === null || parentType === "EPIC";
 
   const canEdit = task ? canEditTask(actor, accessSubjectOf(task)) : true;
   const readOnly = !canEdit;
@@ -201,8 +225,22 @@ export function TaskEditor({
       confirmed = await confirmFlagged(above.map((id) => memberById.get(id)?.name ?? "Someone"));
       if (!confirmed) return;
     }
+    // `#tag` in the title tags the task (making new tags as the club allows).
+    let finalTitle = title;
+    let finalLabelIds = labelIds;
+    if (hashTags.preview(title).length > 0) {
+      const resolved = await hashTags.resolve(title);
+      if (resolved.error) {
+        setError(resolved.error);
+        return;
+      }
+      finalTitle = resolved.title;
+      finalLabelIds = [...new Set([...labelIds, ...resolved.labelIds])];
+      setTitle(finalTitle);
+      setLabelIds(finalLabelIds);
+    }
     const input = {
-      title,
+      title: finalTitle,
       description: description.trim() ? description : null,
       status,
       blockedReason: status === TaskStatus.BLOCKED ? blockedReason.trim() : null,
@@ -211,7 +249,8 @@ export function TaskEditor({
       projectId,
       ownerId,
       assigneeIds: assigneeIds.filter((id) => id !== ownerId),
-      labelIds,
+      labelIds: finalLabelIds,
+      ...(isNew || type !== task?.type ? { type } : {}),
       ...(canSetVisibility ? { visibility } : {}),
       confirmFlagged: confirmed,
     };
@@ -310,13 +349,7 @@ export function TaskEditor({
   const involved = self.owner || self.joined;
   const isAssignee = self.joined;
 
-  const heading = task
-    ? task.parentTaskId
-      ? "Subtask"
-      : "Task"
-    : parentTaskId
-      ? "New subtask"
-      : "New task";
+  const heading = isNew ? `New ${typeLabel(type).toLowerCase()}` : typeLabel(type);
   const visibilityHint =
     visibility === TaskVisibility.PRIVATE
       ? "Only the people on it, plus the club's owners and admins, can see this task."
@@ -352,13 +385,7 @@ export function TaskEditor({
           onClick={() => void save()}
           disabled={isPending || !title.trim()}
         >
-          {isPending
-            ? "Saving…"
-            : isNew
-              ? parentTaskId
-                ? "Create subtask"
-                : "Create task"
-              : "Save"}
+          {isPending ? "Saving…" : isNew ? `Create ${typeLabel(type).toLowerCase()}` : "Save"}
           <span aria-hidden="true" className="hidden gap-0.5 sm:inline-flex">
             <kbd className="bg-primary-foreground/15 inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] px-1 font-mono text-[11px] font-semibold">
               {mod}
@@ -392,6 +419,7 @@ export function TaskEditor({
           }}
           className="placeholder:text-muted-foreground/70 field-sizing-content w-full resize-none border-0 bg-transparent p-0 text-[26px] leading-[1.25] font-semibold tracking-[-0.015em] outline-none disabled:opacity-100"
         />
+        {!readOnly && <HashTagHint title={title} />}
         <label htmlFor="task-description" className="sr-only">
           Description
         </label>
@@ -414,6 +442,24 @@ export function TaskEditor({
           />
         )}
       </div>
+
+      {typeOptions.length > 1 && (
+        <Field>
+          <FieldLabel htmlFor="task-type">Type</FieldLabel>
+          <SegmentBox
+            id="task-type"
+            label="Type"
+            value={type}
+            onChange={setType}
+            options={typeOptions}
+            disabled={readOnly}
+          />
+          <p className="text-muted-foreground text-xs">
+            {TASK_TYPES.find((t) => t.value === type)?.hint}
+            {type === "EPIC" && ". Its progress rolls up from the stories and tasks inside it."}
+          </p>
+        </Field>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
@@ -465,6 +511,7 @@ export function TaskEditor({
             value={projectId}
             onChange={setProjectId}
             disabled={readOnly}
+            current={task?.project}
           />
         </Field>
       </div>
@@ -508,7 +555,7 @@ export function TaskEditor({
 
       <Field>
         <FieldLabel htmlFor="task-labels" optional>
-          Labels
+          Tags
         </FieldLabel>
         <LabelsField
           id="task-labels"
@@ -642,12 +689,14 @@ export function TaskEditor({
 
   const extras = task && (
     <div className="space-y-6">
-      {isTopLevel && (
+      {canHoldChildren && (
         <Subtasks
           parentId={task.id}
+          parentType={task.type}
           subtasks={task.subtasks}
           canAdd={canEdit}
           onOpen={onOpenTask}
+          projectColor={task.project ? projectColor(task.project) : "var(--chart-1)"}
         />
       )}
       <section className="space-y-2 border-t pt-5">
@@ -691,16 +740,16 @@ export function TaskEditor({
 
       <header className="flex shrink-0 items-center justify-between gap-2 py-3.5 ps-6 pe-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="bg-primary/15 text-primary grid size-[22px] shrink-0 place-items-center rounded-md"
-          >
-            {isNew ? (
+          {isNew ? (
+            <span
+              aria-hidden="true"
+              className="bg-muted grid size-6 shrink-0 place-items-center rounded-full"
+            >
               <Plus className="size-3.5" strokeWidth={2.2} />
-            ) : (
-              <SquareCheck className="size-3.5" />
-            )}
-          </span>
+            </span>
+          ) : (
+            <TaskTypeChip type={type} iconOnly />
+          )}
           <span className="truncate text-sm font-semibold">{heading}</span>
           {task && isTaskPrivate(task) && <PrivateBadge />}
         </div>
