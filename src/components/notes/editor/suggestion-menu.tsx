@@ -3,7 +3,14 @@
 import type { LucideIcon } from "lucide-react";
 import { ReactRenderer } from "@tiptap/react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -41,9 +48,13 @@ function MenuInner<T extends MenuItem>(
   ref: React.Ref<SuggestionMenuHandle>,
 ) {
   const [selected, setSelected] = useState(0);
+  const [shownItems, setShownItems] = useState(items);
   const list = useRef<HTMLDivElement>(null);
-
-  useEffect(() => setSelected(0), [items]);
+  // A new query starts at the top.
+  if (shownItems !== items) {
+    setShownItems(items);
+    setSelected(0);
+  }
   useEffect(() => {
     list.current
       ?.querySelector<HTMLElement>(`[data-index="${selected}"]`)
@@ -78,7 +89,6 @@ function MenuInner<T extends MenuItem>(
     );
   }
 
-  let lastGroup: string | undefined;
   return (
     <div
       ref={list}
@@ -87,8 +97,7 @@ function MenuInner<T extends MenuItem>(
       className="bg-popover text-popover-foreground shadow-e2 rounded-tile max-h-80 w-72 overflow-y-auto border p-1.5"
     >
       {items.map((item, index) => {
-        const heading = item.group && item.group !== lastGroup ? item.group : null;
-        lastGroup = item.group;
+        const heading = item.group && item.group !== items[index - 1]?.group ? item.group : null;
         const Icon = item.icon;
         return (
           <div key={item.key}>
@@ -121,7 +130,9 @@ function MenuInner<T extends MenuItem>(
                 )}
               </span>
               {item.hint && (
-                <kbd className="text-muted-foreground ms-auto shrink-0 text-[11px]">{item.hint}</kbd>
+                <kbd className="text-muted-foreground ms-auto shrink-0 text-[11px]">
+                  {item.hint}
+                </kbd>
               )}
             </button>
           </div>

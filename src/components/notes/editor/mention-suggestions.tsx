@@ -10,6 +10,7 @@ import { NoteMention } from "@/lib/notes/nodes";
 import { addDaysToKey } from "@/lib/tasks/dates";
 import { parseDueText } from "@/lib/tasks/due-text";
 
+import { noteHooks } from "./note-hooks";
 import { suggestionMenuRenderer, type MenuItem } from "./suggestion-menu";
 
 /**
@@ -30,7 +31,8 @@ export interface MentionPage {
   icon: string | null;
 }
 
-type AtItem = MenuItem & ({ kind: "person"; id: string; label: string } | { kind: "date"; date: string });
+type AtItem = MenuItem &
+  ({ kind: "person"; id: string; label: string } | { kind: "date"; date: string });
 type PageItem = MenuItem & { id: string; label: string };
 
 function atItems(query: string, members: MentionMember[], selfId: string | null): AtItem[] {
@@ -78,19 +80,25 @@ function insert(editor: Editor, range: Range, node: Record<string, unknown>) {
 }
 
 /** The mention node with the "@" and "[[" menus, for the editor's schema override. */
-export function noteMentionWithMenus(options: {
-  members: () => MentionMember[];
-  pages: () => MentionPage[];
-  selfId: string | null;
-  noteId: string | null;
-}) {
+export function noteMentionWithMenus() {
   return NoteMention.configure({
     suggestions: [
       {
         char: "@",
         pluginKey: new PluginKey("noteAtMenu"),
-        items: ({ query }: { query: string }) => atItems(query, options.members(), options.selfId),
-        command: ({ editor, range, props: raw }: { editor: Editor; range: Range; props: unknown }) => {
+        items: ({ query, editor }: { query: string; editor: Editor }) => {
+          const hooks = noteHooks(editor);
+          return atItems(query, hooks?.people() ?? [], hooks?.selfId() ?? null);
+        },
+        command: ({
+          editor,
+          range,
+          props: raw,
+        }: {
+          editor: Editor;
+          range: Range;
+          props: unknown;
+        }) => {
           const props = raw as AtItem;
           if (props.kind === "person") {
             insert(editor, range, { type: "mention", attrs: { id: props.id, label: props.label } });
@@ -104,11 +112,12 @@ export function noteMentionWithMenus(options: {
         char: "[[",
         allowSpaces: true,
         pluginKey: new PluginKey("notePageMenu"),
-        items: ({ query }: { query: string }): PageItem[] => {
+        items: ({ query, editor }: { query: string; editor: Editor }): PageItem[] => {
           const needle = query.toLowerCase().trim();
-          return options
-            .pages()
-            .filter((p) => p.id !== options.noteId && p.title.toLowerCase().includes(needle))
+          const hooks = noteHooks(editor);
+          const self = hooks?.noteId() ?? null;
+          return (hooks?.pages() ?? [])
+            .filter((p) => p.id !== self && p.title.toLowerCase().includes(needle))
             .slice(0, 10)
             .map((p) => ({
               key: p.id,
@@ -117,7 +126,11 @@ export function noteMentionWithMenus(options: {
               title: p.title || "Untitled",
               group: "Pages",
               ...(p.icon
-                ? { leading: <span className="grid size-7 place-items-center text-base">{p.icon}</span> }
+                ? {
+                    leading: (
+                      <span className="grid size-7 place-items-center text-base">{p.icon}</span>
+                    ),
+                  }
                 : { icon: FileText }),
             }));
         },

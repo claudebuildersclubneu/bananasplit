@@ -181,9 +181,7 @@ function TaskChipView({ node }: ReactNodeViewProps) {
           {dayLabel(task.dueDate, today)}
         </span>
       )}
-      {task && task !== "missing" && task.assignee && (
-        <UserAvatar user={task.assignee} size="xs" />
-      )}
+      {task && task !== "missing" && task.assignee && <UserAvatar user={task.assignee} size="xs" />}
       {task && task !== "missing" && (
         <Link
           href={`/app/${orgSlug}/tasks/${task.id}`}

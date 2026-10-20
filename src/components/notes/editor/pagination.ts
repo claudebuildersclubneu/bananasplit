@@ -218,12 +218,14 @@ export const Pagination = Extension.create<PaginationOptions>({
                 return;
               }
               view.dispatch(
-                view.state.tr.setMeta(paginationKey, {
-                  breaks,
-                  tail,
-                  pages,
-                  decorations: decorationsFor(view, breaks, tail, options),
-                } satisfies PaginationState).setMeta("addToHistory", false),
+                view.state.tr
+                  .setMeta(paginationKey, {
+                    breaks,
+                    tail,
+                    pages,
+                    decorations: decorationsFor(view, breaks, tail, options),
+                  } satisfies PaginationState)
+                  .setMeta("addToHistory", false),
               );
             });
           };

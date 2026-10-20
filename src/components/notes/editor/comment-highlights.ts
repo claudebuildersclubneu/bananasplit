@@ -9,6 +9,7 @@ import {
 } from "@tiptap/y-tiptap";
 import * as Y from "yjs";
 
+import { noteHooks } from "./note-hooks";
 import {
   anchorFor,
   findPassage,
@@ -152,13 +153,10 @@ export function setHighlightThreads(
   return tr.setMeta(SET_META, { threads, active });
 }
 
-export const CommentHighlights = Extension.create<{
-  onClickThread?: (id: string) => void;
-}>({
+export const CommentHighlights = Extension.create({
   name: "commentHighlights",
-  addOptions: () => ({ onClickThread: undefined }),
   addProseMirrorPlugins() {
-    const options = this.options;
+    const editor = this.editor;
     return [
       new Plugin<PluginState>({
         key: commentHighlightsKey,
@@ -166,8 +164,7 @@ export const CommentHighlights = Extension.create<{
           init: () => ({ threads: [], active: null, decorations: DecorationSet.empty }),
           apply(tr, value, _old, newState) {
             const set = tr.getMeta(SET_META) as
-              | { threads: HighlightThread[]; active: string | null }
-              | undefined;
+              { threads: HighlightThread[]; active: string | null } | undefined;
             if (set) {
               return { ...set, decorations: build(newState, set.threads, set.active) };
             }
@@ -183,7 +180,7 @@ export const CommentHighlights = Extension.create<{
           handleClick: (view, pos, event) => {
             const target = (event.target as HTMLElement | null)?.closest?.("[data-thread-id]");
             const id = target?.getAttribute("data-thread-id");
-            if (id) options.onClickThread?.(id);
+            if (id) noteHooks(editor)?.clickThread(id);
             return false;
           },
         },

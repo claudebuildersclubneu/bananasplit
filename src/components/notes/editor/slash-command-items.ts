@@ -51,7 +51,11 @@ function startTrigger(editor: Editor, range: Range, trigger: string) {
   editor.chain().focus().deleteRange(range).insertContent(trigger).run();
 }
 
-function viaHook(editor: Editor, range: Range, call: (h: NonNullable<ReturnType<typeof noteHooks>>) => void) {
+function viaHook(
+  editor: Editor,
+  range: Range,
+  call: (h: NonNullable<ReturnType<typeof noteHooks>>) => void,
+) {
   editor.chain().focus().deleteRange(range).run();
   const hooks = noteHooks(editor);
   if (hooks) call(hooks);
@@ -233,7 +237,10 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
         .chain()
         .focus()
         .deleteRange(r)
-        .insertContent([{ type: "dateChip", attrs: { date: todayKey() } }, { type: "text", text: " " }])
+        .insertContent([
+          { type: "dateChip", attrs: { date: todayKey() } },
+          { type: "text", text: " " },
+        ])
         .run(),
   },
   {
@@ -290,7 +297,12 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     group: LAYOUT,
     keywords: ["columns", "column", "side", "layout", "split"],
     run: (e, r) =>
-      e.chain().focus().deleteRange(r).insertContent({ type: "columns", content: [column(), column()] }).run(),
+      e
+        .chain()
+        .focus()
+        .deleteRange(r)
+        .insertContent({ type: "columns", content: [column(), column()] })
+        .run(),
   },
   {
     key: "columns-3",

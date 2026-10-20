@@ -4,7 +4,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { DOCX, googleDocId, sniffNoteFile } from "@/lib/files/types";
 import { trashCutoff } from "@/lib/notes/trash";
 import { withOrgTx, type TxClient } from "@/server/db/context";
-import { readZipDirectory, verifyZipEntries, SourceRejectedError } from "@/server/org-chart/extract";
+import {
+  readZipDirectory,
+  verifyZipEntries,
+  SourceRejectedError,
+} from "@/server/org-chart/extract";
 import { everyWord } from "@/server/search/where";
 import { deleteBlobs, getBlob, MAX_UPLOAD_BYTES, putBlob, randomKeyId } from "@/server/storage";
 
@@ -59,7 +63,10 @@ const fileSelect = {
 } as const;
 
 function cleanName(name: string): string {
-  const one = name.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
+  const one = name
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return (one.length > 200 ? one.slice(0, 200) : one) || "Untitled file";
 }
 
@@ -77,7 +84,8 @@ export async function storeNoteFile(input: {
 }): Promise<NoteFileRow> {
   const contentType = sniffNoteFile(input.bytes, input.filename);
   if (!contentType) throw new FileRejectedError(UNSUPPORTED);
-  if (input.bytes.length > MAX_UPLOAD_BYTES) throw new FileRejectedError("Files are limited to 4 MB.", 413);
+  if (input.bytes.length > MAX_UPLOAD_BYTES)
+    throw new FileRejectedError("Files are limited to 4 MB.", 413);
   const excerpt = await excerptOf(input.bytes, contentType);
   const stored = await putBlob("files", input.orgId, [randomKeyId()], input.bytes, { contentType });
   try {
@@ -114,9 +122,15 @@ export function listNoteFiles(
     where: {
       organizationId: orgId,
       deletedAt: null,
-      ...(filters.folderId ? { folderId: filters.folderId === "none" ? null : filters.folderId } : {}),
+      ...(filters.folderId
+        ? { folderId: filters.folderId === "none" ? null : filters.folderId }
+        : {}),
       // Every word, in the name, the excerpt or the folder's name (as the ⌘K palette finds them).
-      ...everyWord<Prisma.OrgFileWhereInput>(q, (c) => [{ name: c }, { excerpt: c }, { folder: { name: c } }]),
+      ...everyWord<Prisma.OrgFileWhereInput>(q, (c) => [
+        { name: c },
+        { excerpt: c },
+        { folder: { name: c } },
+      ]),
     },
     orderBy: { createdAt: "desc" },
     select: fileSelect,
@@ -124,7 +138,11 @@ export function listNoteFiles(
   });
 }
 
-export function getNoteFile(db: TxClient, orgId: string, fileId: string): Promise<NoteFileRow | null> {
+export function getNoteFile(
+  db: TxClient,
+  orgId: string,
+  fileId: string,
+): Promise<NoteFileRow | null> {
   return db.orgFile.findFirst({
     where: { id: fileId, organizationId: orgId, deletedAt: null },
     select: fileSelect,
@@ -154,7 +172,11 @@ export async function readNoteFile(
  * allows). Its bytes stay NOTE_TRASH_DAYS so it can be restored; the daily
  * maintenance job deletes them after that.
  */
-export async function removeNoteFile(db: TxClient, orgId: string, fileId: string): Promise<string | null> {
+export async function removeNoteFile(
+  db: TxClient,
+  orgId: string,
+  fileId: string,
+): Promise<string | null> {
   const row = await db.orgFile.findFirst({
     where: { id: fileId, organizationId: orgId, deletedAt: null },
     select: { storageKey: true },
@@ -168,7 +190,11 @@ export async function removeNoteFile(db: TxClient, orgId: string, fileId: string
 }
 
 /** Brings a file back from "Recently deleted" (within NOTE_TRASH_DAYS). */
-export async function restoreNoteFile(db: TxClient, orgId: string, fileId: string): Promise<boolean> {
+export async function restoreNoteFile(
+  db: TxClient,
+  orgId: string,
+  fileId: string,
+): Promise<boolean> {
   const { count } = await db.orgFile.updateMany({
     where: { id: fileId, organizationId: orgId, deletedAt: { gte: trashCutoff() } },
     data: { deletedAt: null },
@@ -264,9 +290,12 @@ const GOOGLE_HOSTS = /^(docs\.google\.com|[a-z0-9-]+\.googleusercontent\.com)$/;
  * page, which is reported as a sharing problem. Redirects are followed by
  * hand, only between Google's document hosts, with the size capped.
  */
-export async function fetchGoogleDocAsDocx(link: string): Promise<{ bytes: Buffer; title: string | null }> {
+export async function fetchGoogleDocAsDocx(
+  link: string,
+): Promise<{ bytes: Buffer; title: string | null }> {
   const id = googleDocId(link);
-  if (!id) throw new FileRejectedError("Paste a Google Docs link (docs.google.com/document/…).", 400);
+  if (!id)
+    throw new FileRejectedError("Paste a Google Docs link (docs.google.com/document/…).", 400);
   let url = `https://docs.google.com/document/d/${id}/export?format=docx`;
   const notShared =
     "Google didn't let us open that doc. Share it as “Anyone with the link can view”, or download it as Word (.docx) and upload that.";
@@ -293,10 +322,10 @@ export async function fetchGoogleDocAsDocx(link: string): Promise<{ bytes: Buffe
     if (bytes.length > MAX_UPLOAD_BYTES) throw new FileRejectedError("That doc is over 4 MB.", 413);
     if (sniffNoteFile(bytes, "doc.docx") !== DOCX) throw new FileRejectedError(notShared, 422);
     const disposition = res.headers.get("content-disposition") ?? "";
-    const m = /filename\*=UTF-8''([^;]+)/i.exec(disposition) ?? /filename="([^"]+)"/i.exec(disposition);
+    const m =
+      /filename\*=UTF-8''([^;]+)/i.exec(disposition) ?? /filename="([^"]+)"/i.exec(disposition);
     const title = m ? titleFromFilename(decodeURIComponent(m[1])) : null;
     return { bytes, title };
   }
   throw new FileRejectedError(notShared, 422);
 }
-

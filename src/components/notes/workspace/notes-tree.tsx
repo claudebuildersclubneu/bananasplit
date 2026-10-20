@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { createNote, importNote, updateNoteSettings } from "@/app/app/[orgSlug]/notes/actions";
 import { toast } from "@/components/ui/toaster";
@@ -35,29 +35,11 @@ import { cn } from "@/lib/utils";
  */
 
 const PAGE_MIME = "application/x-bananasplit-page";
-const OPEN_KEY = "notes-tree-open";
 
 const TEMPLATE_ICONS: Record<string, LucideIcon> = { Users, CalendarDays, Target, ListChecks };
 
 export interface TreePage extends TreeNote {
   updatedAt?: Date | string;
-}
-
-function readOpen(): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(OPEN_KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function writeOpen(open: Set<string>) {
-  try {
-    window.localStorage.setItem(OPEN_KEY, JSON.stringify([...open].slice(-300)));
-  } catch {
-    // A private window: the tree just forgets.
-  }
 }
 
 export function NotesTree({
@@ -78,33 +60,33 @@ export function NotesTree({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  // Chevrons the viewer clicked (id -> open); the pages above this one start open.
+  const [toggled, setToggled] = useState<Map<string, boolean>>(() => new Map());
   const [over, setOver] = useState<string | null>(null);
   const tree = useMemo(() => buildNoteTree(pages), [pages]);
   const byId = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages]);
   const base = `/app/${orgSlug}/notes`;
 
-  // The pages above the open one start expanded, plus whatever was open before.
-  useEffect(() => {
-    const next = readOpen();
+  const open = useMemo(() => {
+    const result = new Set<string>();
     let parent = currentId ? byId.get(currentId)?.parentId : null;
-    const seen = new Set<string>();
-    while (parent && !seen.has(parent)) {
-      next.add(parent);
-      seen.add(parent);
+    while (parent && !result.has(parent)) {
+      result.add(parent);
       parent = byId.get(parent)?.parentId ?? null;
     }
-    setOpen(next);
-  }, [currentId, byId]);
+    for (const [id, isOpen] of toggled) {
+      if (isOpen) result.add(id);
+      else result.delete(id);
+    }
+    return result;
+  }, [currentId, byId, toggled]);
+
+  function setOpenFor(id: string, isOpen: boolean) {
+    setToggled((prev) => new Map(prev).set(id, isOpen));
+  }
 
   function toggle(id: string) {
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      writeOpen(next);
-      return next;
-    });
+    setOpenFor(id, !open.has(id));
   }
 
   function newPage(parentId: string | null) {
@@ -114,13 +96,7 @@ export function NotesTree({
         toast({ title: result.error ?? "Couldn't make the page", tone: "error" });
         return;
       }
-      if (parentId) {
-        setOpen((prev) => {
-          const next = new Set(prev).add(parentId);
-          writeOpen(next);
-          return next;
-        });
-      }
+      if (parentId) setOpenFor(parentId, true);
       onNavigate?.();
       router.push(`${base}/${result.noteId}`);
     });
@@ -166,15 +142,13 @@ export function NotesTree({
         toast({ title: result.error, tone: "error" });
         return;
       }
-      if (parentId) {
-        setOpen((prev) => {
-          const next = new Set(prev).add(parentId);
-          writeOpen(next);
-          return next;
-        });
-      }
+      if (parentId) setOpenFor(parentId, true);
       const target = parentId ? byId.get(parentId)?.title || "Untitled" : "the top level";
-      toast({ title: `Moved into ${target}`, description: page.title || "Untitled", tone: "success" });
+      toast({
+        title: `Moved into ${target}`,
+        description: page.title || "Untitled",
+        tone: "success",
+      });
       router.refresh();
     });
   }
@@ -205,7 +179,9 @@ export function NotesTree({
         {...(children ? dropProps(page.id) : {})}
         className={cn(
           "group flex h-8 items-center gap-0.5 rounded-xl pr-1 text-[13px] transition-colors",
-          active ? "bg-muted text-foreground font-semibold" : "text-muted-foreground hover:bg-muted/60",
+          active
+            ? "bg-muted text-foreground font-semibold"
+            : "text-muted-foreground hover:bg-muted/60",
           over === page.id && "ring-ring bg-muted ring-2",
         )}
         style={{ paddingLeft: 4 + depth * 14 }}
@@ -214,7 +190,11 @@ export function NotesTree({
           <button
             type="button"
             onClick={() => toggle(page.id)}
-            aria-label={expanded ? `Collapse ${page.title || "Untitled"}` : `Expand ${page.title || "Untitled"}`}
+            aria-label={
+              expanded
+                ? `Collapse ${page.title || "Untitled"}`
+                : `Expand ${page.title || "Untitled"}`
+            }
             aria-expanded={children.length > 0 ? expanded : undefined}
             className={cn(
               "hover:bg-muted-strong grid size-6 shrink-0 place-items-center rounded-lg",

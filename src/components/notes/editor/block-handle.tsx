@@ -88,6 +88,7 @@ function lock(editor: Editor, locked: boolean) {
 export function BlockHandle({ editor }: { editor: Editor }) {
   const target = useRef<Target | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [textual, setTextual] = useState(true);
 
   /** Puts the caret inside the block, so the block commands act on it. */
   function selectInside(t: Target) {
@@ -113,7 +114,11 @@ export function BlockHandle({ editor }: { editor: Editor }) {
   function duplicate() {
     const t = target.current;
     if (!t) return;
-    editor.chain().focus().insertContentAt(t.pos + t.node.nodeSize, t.node.toJSON()).run();
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(t.pos + t.node.nodeSize, t.node.toJSON())
+      .run();
   }
 
   function move(direction: -1 | 1) {
@@ -142,14 +147,14 @@ export function BlockHandle({ editor }: { editor: Editor }) {
       .run();
   }
 
-  const textual = target.current?.node.isTextblock ?? true;
-
   return (
     <DragHandle
       editor={editor}
       className="note-block-handle"
       onNodeChange={({ node, pos }) => {
-        if (!menuOpen) target.current = node ? { node, pos } : null;
+        if (menuOpen) return;
+        target.current = node ? { node, pos } : null;
+        setTextual(node?.isTextblock ?? true);
       }}
     >
       <div className="relative flex items-center gap-0.5">
@@ -187,7 +192,10 @@ export function BlockHandle({ editor }: { editor: Editor }) {
           }}
         >
           <DropdownMenuTrigger asChild>
-            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-7" />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-7"
+            />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="left" className="w-52">
             {textual && (

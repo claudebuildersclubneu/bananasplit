@@ -77,7 +77,12 @@ export function getNotesForList(
  * member may restore (their own, and for an admin any shared note), the
  * same people restoreNote lets through.
  */
-export function getDeletedNotes(db: TxClient, organizationId: string, userId: string, isAdmin: boolean) {
+export function getDeletedNotes(
+  db: TxClient,
+  organizationId: string,
+  userId: string,
+  isAdmin: boolean,
+) {
   return db.note.findMany({
     where: {
       organizationId,
@@ -97,7 +102,12 @@ export function getDeletedNotes(db: TxClient, organizationId: string, userId: st
 }
 
 /** How many items "Recently deleted" holds for this member (notes and files). */
-export async function countDeleted(db: TxClient, organizationId: string, userId: string, isAdmin: boolean) {
+export async function countDeleted(
+  db: TxClient,
+  organizationId: string,
+  userId: string,
+  isAdmin: boolean,
+) {
   const since = trashCutoff();
   const notes = await db.note.count({
     where: {
@@ -107,7 +117,11 @@ export async function countDeleted(db: TxClient, organizationId: string, userId:
     },
   });
   const files = await db.orgFile.count({
-    where: { organizationId, deletedAt: { gte: since }, ...(isAdmin ? {} : { uploadedById: userId }) },
+    where: {
+      organizationId,
+      deletedAt: { gte: since },
+      ...(isAdmin ? {} : { uploadedById: userId }),
+    },
   });
   return notes + files;
 }

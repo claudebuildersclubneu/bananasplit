@@ -61,34 +61,32 @@ export interface EmbedTarget {
 }
 
 /** The databases and polls a link card may open. */
-export const listEmbedTargets = readAction(
-  async (ctx): Promise<{ targets: EmbedTarget[] }> => {
-    // One transaction: one query at a time.
-    const databases = await ctx.db.databaseDefinition.findMany({
-      where: { organizationId: ctx.organizationId, archivedAt: null },
-      select: { key: true, name: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      take: 100,
-    });
-    const polls = await ctx.db.poll.findMany({
-      where: { organizationId: ctx.organizationId },
-      select: { id: true, question: true },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
-    return {
-      targets: [
-        ...databases.map((d) => ({
-          kind: "database" as const,
-          path: `databases/${encodeURIComponent(d.key)}`,
-          title: d.name,
-        })),
-        ...polls.map((p) => ({
-          kind: "poll" as const,
-          path: `calendar/polls/${encodeURIComponent(p.id)}`,
-          title: p.question,
-        })),
-      ],
-    };
-  },
-);
+export const listEmbedTargets = readAction(async (ctx): Promise<{ targets: EmbedTarget[] }> => {
+  // One transaction: one query at a time.
+  const databases = await ctx.db.databaseDefinition.findMany({
+    where: { organizationId: ctx.organizationId, archivedAt: null },
+    select: { key: true, name: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    take: 100,
+  });
+  const polls = await ctx.db.poll.findMany({
+    where: { organizationId: ctx.organizationId },
+    select: { id: true, question: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+  return {
+    targets: [
+      ...databases.map((d) => ({
+        kind: "database" as const,
+        path: `databases/${encodeURIComponent(d.key)}`,
+        title: d.name,
+      })),
+      ...polls.map((p) => ({
+        kind: "poll" as const,
+        path: `calendar/polls/${encodeURIComponent(p.id)}`,
+        title: p.question,
+      })),
+    ],
+  };
+});

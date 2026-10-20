@@ -25,31 +25,26 @@ import { parseDueText } from "@/lib/tasks/due-text";
  * opens.
  */
 
-export function TaskInsertDialog({
-  orgId,
-  open,
-  initialTitle,
-  onClose,
-  onCreated,
-}: {
+interface TaskInsertProps {
   orgId: string;
-  open: boolean;
   initialTitle: string;
   onClose: () => void;
   onCreated: (task: { id: string; title: string }) => void;
-}) {
+}
+
+export function TaskInsertDialog({ open, ...props }: TaskInsertProps & { open: boolean }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && props.onClose()}>
+      <DialogContent className="sm:max-w-md">{open && <TaskForm {...props} />}</DialogContent>
+    </Dialog>
+  );
+}
+
+function TaskForm({ orgId, initialTitle, onClose, onCreated }: TaskInsertProps) {
   const [title, setTitle] = useState(initialTitle);
   const [due, setDue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setTitle(initialTitle);
-      setDue("");
-      setError(null);
-    }
-  }, [open, initialTitle]);
 
   const dueKey = due.trim() ? parseDueText(due, todayKey()) : null;
 
@@ -77,58 +72,56 @@ export function TaskInsertDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New task</DialogTitle>
-          <DialogDescription>
-            It goes on the club&apos;s task board and shows here as a chip you can check off.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="grid gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          <div className="grid gap-1.5">
-            <Label htmlFor="note-task-title">Task</Label>
-            <Input
-              id="note-task-title"
-              autoFocus
-              value={title}
-              maxLength={200}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Book a photographer"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="note-task-due">Due (optional)</Label>
-            <Input
-              id="note-task-due"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-              placeholder="Fri, Oct 21, in 3 days…"
-            />
-          </div>
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy || !title.trim()}>
-              {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-              Add task
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>New task</DialogTitle>
+        <DialogDescription>
+          It goes on the club&apos;s task board and shows here as a chip you can check off.
+        </DialogDescription>
+      </DialogHeader>
+      <form
+        className="grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="note-task-title">Task</Label>
+          <Input
+            id="note-task-title"
+            autoFocus
+            value={title}
+            maxLength={200}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Book a photographer"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="note-task-due">Due (optional)</Label>
+          <Input
+            id="note-task-due"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
+            placeholder="Fri, Oct 21, in 3 days…"
+          />
+        </div>
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error}
+          </p>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={busy || !title.trim()}>
+            {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            Add task
+          </Button>
+        </DialogFooter>
+      </form>
+    </>
   );
 }
 
@@ -143,20 +136,36 @@ export function EmbedPickerDialog({
   onClose: () => void;
   onPick: (target: EmbedTarget) => void;
 }) {
+  return (
+    <Dialog open={kind !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        {kind && <EmbedPickerBody key={kind} orgId={orgId} kind={kind} onPick={onPick} />}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EmbedPickerBody({
+  orgId,
+  kind,
+  onPick,
+}: {
+  orgId: string;
+  kind: "database" | "poll";
+  onPick: (target: EmbedTarget) => void;
+}) {
   const [targets, setTargets] = useState<EmbedTarget[] | null>(null);
   const [q, setQ] = useState("");
 
   useEffect(() => {
-    if (!kind) return;
     let live = true;
-    setQ("");
     void listEmbedTargets(orgId).then((r) => {
       if (live) setTargets("targets" in r ? r.targets : []);
     });
     return () => {
       live = false;
     };
-  }, [kind, orgId]);
+  }, [orgId]);
 
   const shown = (targets ?? [])
     .filter((t) => t.kind === kind)
@@ -165,53 +174,51 @@ export function EmbedPickerDialog({
   const noun = kind === "poll" ? "poll" : "database";
 
   return (
-    <Dialog open={kind !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{kind === "poll" ? "Add a poll" : "Add a database view"}</DialogTitle>
-          <DialogDescription>
-            A card in the note that opens the {noun}. Readers see it only if they can open it.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="relative">
-          <Search
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-            aria-hidden="true"
-          />
-          <Input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={`Find a ${noun}`}
-            aria-label={`Find a ${noun}`}
-            className="pl-9"
-          />
-        </div>
-        <ul className="-mx-1 max-h-72 space-y-0.5 overflow-y-auto">
-          {targets === null ? (
-            <li className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm">
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Loading…
+    <>
+      <DialogHeader>
+        <DialogTitle>{kind === "poll" ? "Add a poll" : "Add a database view"}</DialogTitle>
+        <DialogDescription>
+          A card in the note that opens the {noun}. Readers see it only if they can open it.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="relative">
+        <Search
+          className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+          aria-hidden="true"
+        />
+        <Input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={`Find a ${noun}`}
+          aria-label={`Find a ${noun}`}
+          className="pl-9"
+        />
+      </div>
+      <ul className="-mx-1 max-h-72 space-y-0.5 overflow-y-auto">
+        {targets === null ? (
+          <li className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Loading…
+          </li>
+        ) : shown.length === 0 ? (
+          <li className="text-muted-foreground px-3 py-2 text-sm">
+            {q ? "Nothing matches." : `This club has no ${noun}s yet.`}
+          </li>
+        ) : (
+          shown.map((t) => (
+            <li key={t.path}>
+              <button
+                type="button"
+                onClick={() => onPick(t)}
+                className="hover:bg-muted flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm"
+              >
+                <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{t.title}</span>
+              </button>
             </li>
-          ) : shown.length === 0 ? (
-            <li className="text-muted-foreground px-3 py-2 text-sm">
-              {q ? "Nothing matches." : `This club has no ${noun}s yet.`}
-            </li>
-          ) : (
-            shown.map((t) => (
-              <li key={t.path}>
-                <button
-                  type="button"
-                  onClick={() => onPick(t)}
-                  className="hover:bg-muted flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm"
-                >
-                  <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{t.title}</span>
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      </DialogContent>
-    </Dialog>
+          ))
+        )}
+      </ul>
+    </>
   );
 }

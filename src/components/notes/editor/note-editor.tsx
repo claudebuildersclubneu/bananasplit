@@ -4,6 +4,7 @@ import "./editor.css";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/core";
+import type { EditorView } from "@tiptap/pm/view";
 import { EditorContent, useEditor, useEditorState, type JSONContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -33,12 +34,8 @@ import { renderCaret, renderSelection } from "./carets";
 import { CommentHighlights } from "./comment-highlights";
 import { EditorToolbar } from "./editor-toolbar";
 import { EmbedPickerDialog, TaskInsertDialog } from "./insert-dialogs";
-import {
-  noteMentionWithMenus,
-  type MentionMember,
-  type MentionPage,
-} from "./mention-suggestions";
-import { NoteHooksExtension, setNoteHooks } from "./note-hooks";
+import { noteMentionWithMenus, type MentionMember, type MentionPage } from "./mention-suggestions";
+import { NoteHooksExtension, noteHooks, setNoteHooks } from "./note-hooks";
 import { nodeViewOverrides, NoteViewContext } from "./node-views";
 import { Pagination, paginationKey } from "./pagination";
 import { SlashCommand } from "./slash-command-extension";
@@ -124,14 +121,16 @@ export function NoteEditor({
   const paginate = isDocument && !narrow;
   // The menus read the latest lists without rebuilding the editor.
   const placeRef = useRef(place);
-  placeRef.current = place;
   const clickThread = useRef(onClickThread);
-  clickThread.current = onClickThread;
   // The body as last typed: a new layout rebuilds the editor from it.
   const latestContent = useRef<JSONContent | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const editableRef = useRef(editable);
-  editableRef.current = editable;
+  useEffect(() => {
+    placeRef.current = place;
+    clickThread.current = onClickThread;
+    editableRef.current = editable;
+  });
 
   const extensions = useMemo(
     () => [
@@ -139,12 +138,7 @@ export function NoteEditor({
         collaborative: Boolean(collaboration),
         override: {
           ...nodeViewOverrides(),
-          mention: noteMentionWithMenus({
-            members: () => placeRef.current.members,
-            pages: () => placeRef.current.pages,
-            selfId: placeRef.current.viewer.id || null,
-            noteId: placeRef.current.noteId || null,
-          }),
+          mention: noteMentionWithMenus(),
         },
       }),
       Placeholder.configure({
@@ -160,7 +154,7 @@ export function NoteEditor({
       SlashCommand,
       NoteHooksExtension,
       Suggesting,
-      CommentHighlights.configure({ onClickThread: (id) => clickThread.current?.(id) }),
+      CommentHighlights,
       Pagination.configure({
         enabled: paginate,
         contentHeight: paper.contentHeight,
@@ -184,7 +178,7 @@ export function NoteEditor({
     // The schema and plugins are fixed for an editor; a new layout or paper
     // rebuilds it (the document stays: same content or the same Y.Doc).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [collaboration, isDocument, paginate, paper.contentHeight],
+    [collaboration?.doc, collaboration?.provider, isDocument, paginate, paper.contentHeight],
   );
 
   const editor = useEditor(
@@ -194,7 +188,13 @@ export function NoteEditor({
       extensions,
       // A live editor takes its content from the Y.Doc; passing content too
       // would insert it a second time.
-      content: collaboration ? undefined : (latestContent.current ?? content),
+      content: collaboration ? undefined : content,
+      // Rebuilt for a new layout: carry on from what was typed.
+      onCreate: ({ editor: created }) => {
+        if (!collaboration && latestContent.current) {
+          created.commands.setContent(latestContent.current, { emitUpdate: false });
+        }
+      },
       editorProps: {
         attributes: {
           class: cn(
@@ -202,8 +202,8 @@ export function NoteEditor({
             isDocument && "prose-document",
           ),
         },
-        handlePaste: (_view, event) => uploadFromEvent(event.clipboardData?.files),
-        handleDrop: (_view, event) => uploadFromEvent((event as DragEvent).dataTransfer?.files),
+        handlePaste: (view, event) => pasteImages(view, event.clipboardData?.files),
+        handleDrop: (view, event) => pasteImages(view, (event as DragEvent).dataTransfer?.files),
       },
       onUpdate: ({ editor, transaction }) => {
         // onUpdate fires for any dispatched transaction, including no-op ones
@@ -217,7 +217,9 @@ export function NoteEditor({
     [extensions],
   );
 
-  editorRef.current = editor ?? null;
+  useEffect(() => {
+    editorRef.current = editor ?? null;
+  }, [editor]);
 
   useEffect(() => {
     editor?.setEditable(editable);
@@ -281,17 +283,20 @@ export function NoteEditor({
     }
   }
 
-  function uploadFromEvent(list: FileList | null | undefined): boolean {
-    const files = Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
-    if (files.length === 0 || !editableRef.current) return false;
-    void insertUploads(files, true);
-    return true;
-  }
-
   // The slash menu's dialogs and uploads.
   useEffect(() => {
     if (!editor) return;
     setNoteHooks(editor, {
+      people: () => placeRef.current.members,
+      pages: () => placeRef.current.pages,
+      selfId: () => placeRef.current.viewer.id || null,
+      noteId: () => placeRef.current.noteId || null,
+      clickThread: (id) => clickThread.current?.(id),
+      uploadImages: (files) => {
+        if (!editableRef.current) return false;
+        void insertUploads(files, true);
+        return true;
+      },
       uploadImage: () => imageInput.current?.click(),
       uploadFile: () => fileInput.current?.click(),
       insertTask: () => setTaskOpen(true),
@@ -312,6 +317,8 @@ export function NoteEditor({
       },
     });
     return () => setNoteHooks(editor, null);
+    // insertUploads reads only refs, so it needn't re-register the hooks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, onCreateSubpage]);
 
   const viewContext = useMemo(
@@ -324,7 +331,7 @@ export function NoteEditor({
     [place.orgId, place.orgSlug, place.pages, editable],
   );
 
-  if (!editor) return <div className="bg-muted/30 h-64 animate-pulse rounded-tile" />;
+  if (!editor) return <div className="bg-muted/30 rounded-tile h-64 animate-pulse" />;
 
   const body = (
     <>
@@ -346,7 +353,10 @@ export function NoteEditor({
         />
       </BubbleMenu>
       {editable && !isDocument && <BlockHandle editor={editor} />}
-      <EditorContent editor={editor} className={cn("note-editor-content", !isDocument && "min-h-[40vh]")} />
+      <EditorContent
+        editor={editor}
+        className={cn("note-editor-content", !isDocument && "min-h-[40vh]")}
+      />
     </>
   );
 
@@ -365,7 +375,7 @@ export function NoteEditor({
         )}
         {linkOpen && (
           <form
-            className="bg-card edge rounded-full mx-auto flex max-w-xl items-center gap-2 px-4 py-2"
+            className="bg-card edge mx-auto flex max-w-xl items-center gap-2 rounded-full px-4 py-2"
             onSubmit={(e) => {
               e.preventDefault();
               const url = linkValue.trim();
@@ -478,9 +488,7 @@ function PageCount({ editor, footer }: { editor: Editor; footer: string }) {
   return (
     <div className="note-page-band note-page-footer note-last-footer" aria-hidden="true">
       <span>{footer}</span>
-      <span>
-        {pages}
-      </span>
+      <span>{pages}</span>
     </div>
   );
 }
@@ -510,7 +518,12 @@ function FormatCapsule({
     }),
   });
   const tools = [
-    { key: "bold", label: "Bold", icon: Bold, run: () => editor.chain().focus().toggleBold().run() },
+    {
+      key: "bold",
+      label: "Bold",
+      icon: Bold,
+      run: () => editor.chain().focus().toggleBold().run(),
+    },
     {
       key: "italic",
       label: "Italic",
@@ -557,7 +570,9 @@ function FormatCapsule({
         ))}
       {canComment && onComment && (
         <>
-          {state.editable && <span className="bg-chrome-foreground/20 mx-1 h-5 w-px" aria-hidden="true" />}
+          {state.editable && (
+            <span className="bg-chrome-foreground/20 mx-1 h-5 w-px" aria-hidden="true" />
+          )}
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
@@ -571,6 +586,15 @@ function FormatCapsule({
       )}
     </>
   );
+}
+
+/** Pasted or dropped pictures go up to the club's files (the page's hook does it). */
+function pasteImages(view: EditorView, list: FileList | null | undefined): boolean {
+  const files = Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
+  if (files.length === 0) return false;
+  const editor = (view.dom as HTMLElement & { editor?: Editor }).editor;
+  const hooks = editor ? noteHooks(editor) : null;
+  return hooks ? hooks.uploadImages(files) : false;
 }
 
 const NARROW = "(max-width: 900px)";

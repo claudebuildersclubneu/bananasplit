@@ -114,7 +114,7 @@ export const addNoteComment = filesAction(
         threadId: thread?.id ?? null,
         body,
         // A reply sits where its thread does.
-        anchorText: thread ? null : (anchorText?.trim() || null),
+        anchorText: thread ? null : anchorText?.trim() || null,
         anchor: thread || !anchor ? undefined : (anchor as object),
       },
       select: { id: true },

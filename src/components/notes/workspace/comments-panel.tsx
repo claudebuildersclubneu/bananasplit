@@ -130,7 +130,8 @@ export function CommentsPanel({
         floor = top + (el?.offsetHeight ?? 120) + 10;
       }
       setTops((prev) =>
-        prev.size === next.size && [...next].every(([k, v]) => Math.abs((prev.get(k) ?? -1) - v) < 1)
+        prev.size === next.size &&
+        [...next].every(([k, v]) => Math.abs((prev.get(k) ?? -1) - v) < 1)
           ? prev
           : next,
       );
@@ -180,7 +181,9 @@ export function CommentsPanel({
           canModerate={canModerate}
           people={people}
           active={activeId === t.root.id}
-          detached={Boolean(t.root.anchorText) && !(editor && threadRanges(editor.state).has(t.root.id))}
+          detached={
+            Boolean(t.root.anchorText) && !(editor && threadRanges(editor.state).has(t.root.id))
+          }
           onActive={onActive}
           apply={apply}
           confirm={confirm}
@@ -306,10 +309,21 @@ function NewThread({
         label="New comment"
       />
       <div className="flex justify-end gap-2">
-        <Button type="button" size="sm" variant="ghost" onClick={() => onDone(null)} disabled={busy}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onDone(null)}
+          disabled={busy}
+        >
           Cancel
         </Button>
-        <Button type="button" size="sm" onClick={() => void submit()} disabled={busy || !body.trim()}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void submit()}
+          disabled={busy || !body.trim()}
+        >
           {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
           Comment
         </Button>
@@ -373,7 +387,12 @@ function NoteLevelComment({
         <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Cancel
         </Button>
-        <Button type="button" size="sm" onClick={() => void submit()} disabled={busy || !body.trim()}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void submit()}
+          disabled={busy || !body.trim()}
+        >
           Comment
         </Button>
       </div>
@@ -603,7 +622,13 @@ function ThreadCard({
                 <Button type="button" size="sm" variant="ghost" onClick={() => setReply("")}>
                   Cancel
                 </Button>
-                <Button type="button" size="sm" variant="secondary" onClick={() => void sendReply()} disabled={busy}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void sendReply()}
+                  disabled={busy}
+                >
                   Reply
                 </Button>
               </div>
