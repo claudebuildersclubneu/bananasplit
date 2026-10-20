@@ -22,7 +22,7 @@ export function InstagramLink({
       aria-label={`${name} on Instagram`}
       title={`${name} on Instagram`}
       className={cn(
-        "inline-grid size-7 flex-none place-items-center rounded-full text-(--rsvp-soft) hover:bg-(--rsvp-tile) hover:text-(--rsvp-fg)",
+        "text-muted-foreground hover:bg-muted hover:text-foreground inline-grid size-7 flex-none place-items-center rounded-full",
         className,
       )}
     >

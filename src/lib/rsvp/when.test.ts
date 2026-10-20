@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { allDayInstants } from "@/lib/calendar/dates";
 
 import { googleCalendarUrl } from "./format";
-import { dateLine, dateTile, whenLine } from "./when";
+import { dateLine, dateTile, startShort, whenLine } from "./when";
 
 describe("an all-day event's date", () => {
   // Stored as midnight in the club's timezone: Berlin's October 15 starts at
@@ -51,5 +51,27 @@ describe("an all-day event's date", () => {
       }),
     );
     expect(url.searchParams.get("dates")).toBe("20261015T220000Z/20261016T003000Z");
+  });
+});
+
+describe("startShort", () => {
+  const zone = "America/New_York";
+  const start = new Date("2026-10-15T23:00:00Z"); // Thu, Oct 15, 7:00 PM EDT
+
+  it("says today and tomorrow in the club's timezone", () => {
+    expect(startShort(start, zone, false, new Date("2026-10-15T14:00:00Z"))).toBe("Today, 7:00 PM");
+    // 10 PM EDT on the 14th is already the 15th in UTC.
+    expect(startShort(start, zone, false, new Date("2026-10-15T02:00:00Z"))).toBe(
+      "Tomorrow, 7:00 PM",
+    );
+  });
+
+  it("names the day further out, and all-day events", () => {
+    expect(startShort(start, zone, false, new Date("2026-10-10T12:00:00Z"))).toBe(
+      "Thu, Oct 15, 7:00 PM",
+    );
+    expect(startShort(start, zone, true, new Date("2026-10-10T12:00:00Z"))).toBe(
+      "Thu, Oct 15, All day",
+    );
   });
 });

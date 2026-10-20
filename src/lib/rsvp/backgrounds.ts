@@ -1,31 +1,56 @@
 /**
- * The RSVP page's backgrounds (Event.rsvpBackground): flat colours from the
- * brand palette, no gradients. The ids are stored, so they keep their old
- * names: "banana" (the default) is plain cream and "peel" ("Tint") is a soft
- * tint of the club's accent (butter for Bananasplit's own yellow). `tone`
- * says whether the page's own text sits on a light or a dark backdrop; the
- * registration card is always paper, whatever is behind it.
- * "cover" blurs the event's cover image behind the page, and falls back to
- * "banana" when there is no cover. Pure and client-safe.
+ * The RSVP page's light (Event.rsvpBackground). Moonstone pages sit on the
+ * club theme's own ground, so a host doesn't pick a fill: they pick the
+ * colour of the glow behind the top of the page (src/app/e/rsvp.css).
+ * The ids are stored, so they keep their old names: "banana" (the default)
+ * is the theme's own glow, "cream" a faint one, "peel" a bright one and
+ * "night" none to speak of. "cover" lights the page with the event's cover,
+ * blurred, and falls back to "banana" when there is no cover. Pure and
+ * client-safe.
  */
 
 export interface RsvpBackground {
   id: string;
   label: string;
-  tone: "light" | "dark";
-  /** A small preview for the picker (Tailwind classes). */
+  /** A small preview for the picker (Tailwind classes): the glow on the ground. */
   swatch: string;
 }
 
+const ground = "bg-background bg-no-repeat";
+
 export const RSVP_BACKGROUNDS = [
-  { id: "banana", label: "Cream", tone: "light", swatch: "bg-cream" },
-  { id: "cream", label: "Paper", tone: "light", swatch: "bg-paper" },
-  { id: "peel", label: "Tint", tone: "light", swatch: "bg-butter" },
-  { id: "night", label: "Night", tone: "dark", swatch: "bg-night" },
-  { id: "pine", label: "Pine", tone: "dark", swatch: "bg-[#1d3a32]" },
-  { id: "brick", label: "Brick", tone: "dark", swatch: "bg-[#5c241f]" },
-  { id: "navy", label: "Navy", tone: "dark", swatch: "bg-[#222c4f]" },
-  { id: "cover", label: "Cover photo", tone: "dark", swatch: "bg-spot" },
+  {
+    id: "banana",
+    label: "Glow",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,color-mix(in_oklab,var(--glow)_55%,transparent),transparent_75%)]`,
+  },
+  {
+    id: "cream",
+    label: "Soft",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,color-mix(in_oklab,var(--glow)_22%,transparent),transparent_75%)]`,
+  },
+  {
+    id: "peel",
+    label: "Bright",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,var(--glow),transparent_80%)]`,
+  },
+  { id: "night", label: "None", swatch: ground },
+  {
+    id: "pine",
+    label: "Pine",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,#2f9a74,transparent_80%)]`,
+  },
+  {
+    id: "brick",
+    label: "Brick",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,#d0553f,transparent_80%)]`,
+  },
+  {
+    id: "navy",
+    label: "Navy",
+    swatch: `${ground} bg-[radial-gradient(circle_at_30%_25%,#4a6fd8,transparent_80%)]`,
+  },
+  { id: "cover", label: "Cover photo", swatch: "bg-muted" },
 ] as const satisfies readonly RsvpBackground[];
 
 export type RsvpBackgroundId = (typeof RSVP_BACKGROUNDS)[number]["id"];
