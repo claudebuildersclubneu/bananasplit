@@ -2,21 +2,27 @@
 
 import { z } from "zod";
 
-import { NoteShareRole, NoteVisibility, NotificationType } from "@/generated/prisma/client";
+import {
+  NoteLayout,
+  NoteShareRole,
+  NoteVisibility,
+  NotificationType,
+  PaperSize,
+} from "@/generated/prisma/client";
 import { collabConfig } from "@/lib/collab/config";
 import { applyContentToState, InvalidNoteContentError, seedNoteState } from "@/lib/collab/note-doc";
 import {
   canEditNote,
   canShareNote,
   fromGeneralAccess,
-  isNoteVisibleTo,
-  toNoteAccess,
   type NoteGeneralAccess,
 } from "@/lib/notes/access";
 import { revokeNoteSessions } from "@/server/collab/revoke";
 import { mintNoteCollabSession, type NoteCollabSession } from "@/server/collab/session";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
 import { listNoteShares, type NoteShareRow } from "@/server/notes/sharing";
+import { loadNote } from "@/server/notes/load";
+import { snapshotBeforeSave } from "@/server/notes/versions";
 import { notifyUsers } from "@/server/notifications";
 
 /** Every action here belongs to files (withOrgAction's space check). */
@@ -74,6 +80,22 @@ const noteDetailsSchema = z.object({
 
 export type NoteDetailsInput = z.infer<typeof noteDetailsSchema>;
 
+const noteIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid id");
+
+/**
+ * The page's own settings: its icon, Page or Document layout, paper and
+ * the page it sits inside. Not the body, so no version bump: an autosave
+ * editor keeps saving, and the last change wins per field.
+ */
+const noteSettingsSchema = z.object({
+  icon: z.string().trim().max(32).nullable().optional(),
+  layout: z.enum([NoteLayout.PAGE, NoteLayout.DOCUMENT]).optional(),
+  paperSize: z.enum([PaperSize.LETTER, PaperSize.A4]).optional(),
+  parentId: noteIdSchema.nullable().optional(),
+});
+
+export type NoteSettingsInput = z.infer<typeof noteSettingsSchema>;
+
 interface ActionResult {
   error?: string;
   conflict?: boolean;
@@ -84,25 +106,6 @@ interface ActionResult {
 const NOT_FOUND = "Note not found.";
 const NO_SHARING =
   "Only the note's author (or an admin, on a club note) can change who has access.";
-
-/**
- * The note and the caller's access to it (their own share included), or
- * null when it doesn't exist in this org or they can't see it. Deleted
- * notes only when asked for (restore).
- */
-async function loadNote(ctx: OrgContext, noteId: string, { deleted = false } = {}) {
-  const row = await ctx.db.note.findFirst({
-    where: {
-      id: noteId,
-      organizationId: ctx.organizationId,
-      ...(deleted ? {} : { deletedAt: null }),
-    },
-    include: { shares: { where: { userId: ctx.userId }, select: { role: true }, take: 1 } },
-  });
-  if (!row) return null;
-  const note = toNoteAccess(row);
-  return isNoteVisibleTo(ctx.userId, note) ? note : null;
-}
 
 async function assertEventBelongsToOrg(ctx: OrgContext, eventId: string | null) {
   if (!eventId) return null;
@@ -122,12 +125,31 @@ function revokeAfterCommit(ctx: OrgContext, noteId: string) {
   ctx.afterCommit(() => revokeNoteSessions(ctx.organizationId, noteId));
 }
 
+/**
+ * The page a new note goes inside, or an error: one the caller can see.
+ * A subpage starts with its parent's general access (a page inside a club
+ * page is a club page); the people a private page is shared with are not
+ * copied.
+ */
+async function parentFor(ctx: OrgContext, parentId: string | null | undefined) {
+  if (!parentId) return { parent: null };
+  if (!noteIdSchema.safeParse(parentId).success) return { error: NOT_FOUND };
+  const parent = await loadNote(ctx, parentId);
+  if (!parent) return { error: "That page no longer exists." };
+  return { parent };
+}
+
 export const createNote = filesAction(
-  async (ctx, prefill?: { title?: string; eventId?: string }): Promise<ActionResult> => {
+  async (
+    ctx,
+    prefill?: { title?: string; eventId?: string; parentId?: string | null },
+  ): Promise<ActionResult> => {
     if (prefill?.eventId) {
       const eventError = await assertEventBelongsToOrg(ctx, prefill.eventId);
       if (eventError) return { error: eventError };
     }
+    const { parent, error } = await parentFor(ctx, prefill?.parentId);
+    if (error) return { error };
 
     const note = await ctx.db.note.create({
       data: {
@@ -135,10 +157,13 @@ export const createNote = filesAction(
         title: prefill?.title?.trim() || "Untitled note",
         contentJson: EMPTY_DOC,
         contentText: "",
-        visibility: NoteVisibility.PRIVATE,
+        visibility: parent?.visibility ?? NoteVisibility.PRIVATE,
+        memberCanEdit: parent?.visibility === NoteVisibility.ORGANIZATION && parent.memberCanEdit,
         authorId: ctx.userId,
         updatedById: ctx.userId,
         eventId: prefill?.eventId ?? null,
+        parentId: parent?.id ?? null,
+        layout: parent?.layout ?? NoteLayout.PAGE,
       },
       select: { id: true },
     });
@@ -152,6 +177,8 @@ const importSchema = z.object({
   contentText: z.string().max(200_000),
   folderId: z.string().max(64).nullable().optional(),
   visibility: z.enum(NOTE_VISIBILITY_VALUES).optional(),
+  /** A page to put it inside (a template started from the page tree). */
+  parentId: noteIdSchema.nullable().optional(),
 });
 
 /**
@@ -183,6 +210,8 @@ export const importNote = filesAction(async (ctx, input: unknown): Promise<Actio
     });
     if (!folder) return { error: "That folder no longer exists." };
   }
+  const { parent, error: parentError } = await parentFor(ctx, parsed.data.parentId);
+  if (parentError) return { error: parentError };
   const note = await ctx.db.note.create({
     data: {
       organizationId: ctx.organizationId,
@@ -191,6 +220,7 @@ export const importNote = filesAction(async (ctx, input: unknown): Promise<Actio
       contentText: parsed.data.contentText,
       visibility: parsed.data.visibility ?? NoteVisibility.PRIVATE,
       folderId,
+      parentId: parent?.id ?? null,
       authorId: ctx.userId,
       updatedById: ctx.userId,
       ...(collabConfig() ? { yjsState: new Uint8Array(state) } : {}),
@@ -247,6 +277,12 @@ export const updateNote = filesAction(
 
     const eventError = await assertEventBelongsToOrg(ctx, data.eventId);
     if (eventError) return { error: eventError };
+
+    // Version history: the body as it was, if no version was taken lately
+    // (written after this save commits).
+    if (existing.version === expectedVersion && data.contentText !== existing.contentText) {
+      await snapshotBeforeSave(ctx, existing);
+    }
 
     const result = await ctx.db.note.updateMany({
       where: { id: noteId, organizationId: ctx.organizationId, version: expectedVersion },
@@ -317,6 +353,58 @@ export const updateNoteDetails = filesAction(
     ) {
       revokeAfterCommit(ctx, noteId);
     }
+    return { noteId };
+  },
+);
+
+/** Walks up from `parentId`: whether `noteId` is above it (moving it there would loop). */
+async function wouldLoop(ctx: OrgContext, noteId: string, parentId: string): Promise<boolean> {
+  const seen = new Set<string>();
+  let current: string | null = parentId;
+  while (current && !seen.has(current)) {
+    if (current === noteId) return true;
+    seen.add(current);
+    const row: { parentId: string | null } | null = await ctx.db.note.findFirst({
+      where: { id: current, organizationId: ctx.organizationId },
+      select: { parentId: true },
+    });
+    current = row?.parentId ?? null;
+  }
+  return false;
+}
+
+/**
+ * A page's icon, layout (Page or Document), paper size, or the page it sits
+ * inside (null: the top level). Whoever may edit the page changes these;
+ * a page goes only inside one the caller can see, and never inside itself
+ * or one of its own subpages (app.note_cycle_guard says the same).
+ */
+export const updateNoteSettings = filesAction(
+  async (ctx, noteId: string, input: unknown): Promise<ActionResult> => {
+    const parsed = noteSettingsSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const existing = await loadNote(ctx, noteId);
+    if (!existing) return { error: NOT_FOUND };
+    if (!canEditNote(ctx, existing)) {
+      return { error: "You don't have permission to edit this note." };
+    }
+    const patch: NoteSettingsInput = { ...parsed.data };
+    if (patch.icon === "") patch.icon = null;
+    if (patch.parentId !== undefined && patch.parentId !== existing.parentId) {
+      if (patch.parentId !== null) {
+        if (patch.parentId === noteId || (await wouldLoop(ctx, noteId, patch.parentId))) {
+          return { error: "A page can't go inside itself or one of its own subpages." };
+        }
+        if (!(await loadNote(ctx, patch.parentId))) return { error: "That page no longer exists." };
+      }
+    } else {
+      delete patch.parentId;
+    }
+    if (Object.keys(patch).length === 0) return { noteId };
+    await ctx.db.note.updateMany({
+      where: { id: noteId, organizationId: ctx.organizationId },
+      data: patch,
+    });
     return { noteId };
   },
 );
