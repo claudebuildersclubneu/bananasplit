@@ -65,6 +65,22 @@ function toNode(contentJson: unknown): ProseMirrorNode {
   }
 }
 
+/**
+ * contentJson checked against the note schema, with its plain text (what
+ * editor.getText() gives); throws InvalidNoteContentError. For bodies that
+ * arrive from the browser outside an autosave (named versions).
+ */
+export function checkNoteContent(contentJson: unknown): NoteContent {
+  const node = toNode(contentJson);
+  return {
+    json: node.toJSON() as JSONContent,
+    text: getText(node, {
+      blockSeparator: "\n\n",
+      textSerializers: getTextSerializersFromSchema(noteSchema()),
+    }),
+  };
+}
+
 function emptyNode(): ProseMirrorNode {
   return noteSchema().topNodeType.createAndFill() as ProseMirrorNode;
 }
