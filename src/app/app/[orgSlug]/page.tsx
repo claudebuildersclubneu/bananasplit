@@ -237,6 +237,7 @@ export default async function OrgOverviewPage({
   const nextMeeting = data.meetings[0];
   const stats = (
     <OverviewStats
+      className="sm:gap-x-8"
       stats={data.stats}
       nextMeeting={
         nextMeeting
@@ -303,7 +304,7 @@ export default async function OrgOverviewPage({
         todayKey={todayKey}
       />
     ),
-    "task-stats": <OverviewStats stats={data.stats} nextMeeting={null} className="sm:gap-x-8" />,
+    "task-stats": stats,
     recent: <RecentList items={data.recent} now={now} />,
     meetings: (
       <UpcomingEventsCard
@@ -455,7 +456,6 @@ export default async function OrgOverviewPage({
         bodies={bodies}
         headerActions={headerActions}
         intro={greetingBlock}
-        stats={stats}
         notice={
           data.joinCode || data.setup ? (
             <>

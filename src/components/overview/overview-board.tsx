@@ -15,7 +15,6 @@ export function OverviewBoard({
   bodies,
   headerActions,
   intro,
-  stats,
   notice,
 }: {
   orgId: string;
@@ -27,9 +26,7 @@ export function OverviewBoard({
   headerActions?: Record<string, ReactNode>;
   /** The page's greeting, on the Customize button's row. */
   intro?: ReactNode;
-  /** The stat strip under the greeting. */
-  stats?: ReactNode;
-  /** The admin's setup prompt or the new club's invite card, above the widgets. */
+  /** The admin's setup prompt or the new club's invite card, under the widgets (Up next leads). */
   notice?: ReactNode;
 }) {
   return (
@@ -40,8 +37,7 @@ export function OverviewBoard({
       bodies={bodies}
       headerActions={headerActions}
       intro={intro}
-      belowIntro={stats}
-      notice={notice}
+      footer={notice}
       onSave={(layout) => saveBoardAction(orgId, "overview", layout)}
     />
   );
