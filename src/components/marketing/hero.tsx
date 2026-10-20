@@ -73,6 +73,7 @@ export function Hero() {
             </div>
             <Screenshot
               src="/marketing/app-overview.webp"
+              eager
               alt="A club's Overview: open tasks, the next meeting and what's up next this week"
               sizes="(min-width: 1240px) 1100px, 90vw"
               className="aspect-[16/8.5]"
@@ -102,6 +103,7 @@ export function Hero() {
           <div className="bg-ink shadow-phone relative mx-auto -mb-[38%] aspect-[9/18] w-[min(240px,70vw)] rounded-[38px] p-2 sm:absolute sm:right-[clamp(0px,2vw,24px)] sm:-bottom-8 sm:mx-0 sm:mb-0 sm:w-[clamp(140px,21vw,270px)] sm:rounded-[clamp(30px,4vw,44px)] sm:p-[clamp(6px,0.8vw,9px)]">
             <Screenshot
               src="/marketing/app-tasks-phone.webp"
+              eager
               alt="Tasks on a phone: open work grouped by epic"
               sizes="270px"
               className="size-full rounded-[30px] sm:rounded-[clamp(24px,3.3vw,36px)]"

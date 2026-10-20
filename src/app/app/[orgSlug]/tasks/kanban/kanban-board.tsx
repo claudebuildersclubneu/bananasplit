@@ -270,6 +270,9 @@ export function KanbanBoard({
         </div>
       )}
       <DndContext
+        // A fixed id: dnd-kit's own counter differs between the server and
+        // the browser, which broke hydration (aria-describedby).
+        id="tasks-kanban"
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}

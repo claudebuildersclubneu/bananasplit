@@ -14,16 +14,27 @@ export function Screenshot({
   sizes,
   className,
   children,
+  eager = false,
 }: {
   src: string;
   alt: string;
   sizes: string;
   className?: string;
   children?: React.ReactNode;
+  /** Above the fold (the hero): load at once, as the page's largest paint. */
+  eager?: boolean;
 }) {
   return (
     <div className={cn("bg-oat relative overflow-hidden", className)}>
-      <Image src={src} alt={alt} fill sizes={sizes} className="object-cover object-left-top" />
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : undefined}
+        className="object-cover object-left-top"
+      />
       {children}
     </div>
   );
