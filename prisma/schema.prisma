@@ -90,7 +90,6 @@ model User {
   chartPositions         OrgChartPosition[]   @relation("OrgChartPositionUser")
   contacts               Contact[]            @relation("ContactUser")
   ownedTasks             Task[]               @relation("TaskOwner")
-  ledProjects            Project[]            @relation("ProjectLead")
   createdLabels          Label[]              @relation("LabelCreatedBy")
   assignmentsMade        TaskAssignee[]       @relation("TaskAssignedBy")
   taskComments           TaskComment[]        @relation("TaskCommentAuthor")
@@ -369,7 +368,6 @@ model Organization {
 
   memberships       Membership[]
   invitations       Invitation[]
-  projects          Project[]
   tasks             Task[]
   labels            Label[]
   notes             Note[]
@@ -569,42 +567,7 @@ enum TaskPriority {
   HIGH
 }
 
-/// Where a project stands (Project.status).
-enum ProjectStatus {
-  ACTIVE
-  ON_HOLD
-  DONE
-}
 
-/// OWNER/ADMIN create projects, and so does every member while
-/// OrgSettings.memberCanCreateProjects is on (RLS); any member edits one
-/// (the departing member clears their own lead, untieDepartingMember);
-/// OWNER/ADMIN delete.
-model Project {
-  id             String        @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  /// Strict "#rrggbb" (check constraint), or NULL for the default colour.
-  color          String?
-  /// The member who leads it (app.assert_org_member); NULL when nobody does.
-  /// They may delete it; on app_user only an OWNER/ADMIN or the lead
-  /// changes it (app.project_lead_guard).
-  leadId         String?
-  status         ProjectStatus @default(ACTIVE)
-  /// Calendar dates (no time of day).
-  startDate      DateTime?     @db.Date
-  targetDate     DateTime?     @db.Date
-  archivedAt     DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @default(now()) @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lead         User?        @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
-  tasks        Task[]
-
-  @@index([organizationId])
-}
 
 /// The task hierarchy (app.task_hierarchy_guard): an EPIC is always
 /// top-level; a STORY sits at the top or under an EPIC; a TASK at the top,
@@ -618,7 +581,6 @@ enum TaskType {
 model Task {
   id                String              @id @default(cuid())
   organizationId    String
-  projectId         String?
   /// EPIC, STORY or TASK; which parent it may have is enforced by
   /// app.task_hierarchy_guard (see TaskType).
   type              TaskType            @default(TASK)
@@ -634,6 +596,9 @@ model Task {
   /// A calendar date (no time of day): where an epic's or story's bar starts
   /// on the Roadmap. NULL: the Roadmap's own rule (made, or earliest work).
   startDate         DateTime?           @db.Date
+  /// Epics: their colour on the Roadmap, chips and bars (strict "#rrggbb";
+  /// NULL takes a theme colour). Epics took over from projects.
+  color             String?
   /// Fractional-indexing rank string for kanban ordering within a status column.
   rank              String
   parentTaskId      String?
@@ -656,7 +621,6 @@ model Task {
   ownerAssignedById String?
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project       Project?       @relation(fields: [projectId], references: [id])
   createdBy     User           @relation("TaskCreatedBy", fields: [createdById], references: [id])
   owner         User?          @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   parentTask    Task?          @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
@@ -1888,7 +1852,6 @@ model OrgSettings {
   pulseEmail                    Boolean          @default(true)
   pulseInApp                    Boolean          @default(true)
   // What members (not only OWNER/ADMIN) may create; RLS reads these.
-  memberCanCreateProjects       Boolean          @default(true)
   memberCanCreateTags           Boolean          @default(true)
   updatedById                   String?
   updatedAt                     DateTime         @default(now()) @updatedAt

@@ -51,7 +51,7 @@ export function TaskDetailSheet({
           <TaskEditor
             key={
               task?.id ??
-              `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.projectId ?? ""}-${defaults?.dueDate ?? ""}`
+              `new-${defaults?.parentTaskId ?? "top"}-${defaults?.status ?? ""}-${defaults?.type ?? ""}-${defaults?.dueDate ?? ""}`
             }
             task={task}
             defaults={defaults}

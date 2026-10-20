@@ -7,7 +7,7 @@ import {
   ListTree,
   ChevronDown,
   Columns3,
-  FolderKanban,
+  Layers,
   Gauge,
   Lock,
   SlidersHorizontal,
@@ -39,7 +39,7 @@ import { hasModifier, isTypingTarget, overlayOpen, SCOPE_KEYS, TASK_KEYS } from 
 import { cn } from "@/lib/utils";
 
 import { STATUS_LABELS } from "./status-select";
-import { ProjectDot, ProjectMenu } from "./project-menu";
+import { EpicDot, ParentMenu } from "./epic-menu";
 import { menuItemClass, useMemberSearch } from "./task-fields";
 import { useTasks, useWorkspace } from "./tasks-context";
 
@@ -90,7 +90,7 @@ function Chip({
 }
 
 export function WorkspaceToolbar() {
-  const { org, labels, projects, members } = useTasks();
+  const { org, labels, parentById, members } = useTasks();
   const ws = useWorkspace();
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -114,9 +114,7 @@ export function WorkspaceToolbar() {
     [ws],
   );
 
-  const activeProject = ws.query.projectId
-    ? projects.find((p) => p.id === ws.query.projectId)
-    : null;
+  const activeEpic = ws.query.epicId ? parentById.get(ws.query.epicId) : null;
   const activeLabel = ws.query.labelId ? labels.find((l) => l.id === ws.query.labelId) : null;
   const pinnedPerson = ws.query.ownerId ?? ws.query.assigneeId;
   const pinnedMember = pinnedPerson ? members.find((m) => m.id === pinnedPerson) : null;
@@ -153,7 +151,7 @@ export function WorkspaceToolbar() {
             </Chip>
           ))}
           {members.length > 1 && <PersonFilter />}
-          <ProjectFilter />
+          <EpicFilter />
           {labels.length > 0 && <TagFilter />}
         </div>
 
@@ -217,12 +215,12 @@ export function WorkspaceToolbar() {
       </div>
 
       {/* What is currently narrowing the view, each removable on its own. */}
-      {(ws.filterCount > 0 || activeProject) && (
+      {(ws.filterCount > 0 || activeEpic) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {activeProject && (
+          {activeEpic && (
             <FilterPill
-              label={activeProject.name}
-              onClear={() => ws.setFilters({ projectId: undefined })}
+              label={activeEpic.title}
+              onClear={() => ws.setFilters({ epicId: undefined })}
             />
           )}
           {ws.query.status && (
@@ -298,38 +296,33 @@ export function WorkspaceToolbar() {
 }
 
 /**
- * Filter by project, as a pill of its own so it is there even before the
- * club has a project: its menu can make the first one, and links to the
- * projects list.
+ * Filter by epic, as a pill of its own so it is there even before the club
+ * has an epic: its menu can make the first one.
  */
-function ProjectFilter() {
-  const { projectById } = useTasks();
+function EpicFilter() {
+  const { parentById } = useTasks();
   const ws = useWorkspace();
   const [open, setOpen] = useState(false);
-  const project = ws.query.projectId ? projectById.get(ws.query.projectId) : undefined;
+  const epic = ws.query.epicId ? parentById.get(ws.query.epicId) : undefined;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={project ? `Filtered to project ${project.name}` : "Filter by project"}
-          className={chipClass(Boolean(project))}
+          aria-label={epic ? `Filtered to epic ${epic.title}` : "Filter by epic"}
+          className={chipClass(Boolean(epic))}
         >
-          {project ? (
-            <ProjectDot project={project} />
-          ) : (
-            <FolderKanban className="size-3.5" aria-hidden="true" />
-          )}
-          <span className="max-w-36 truncate">{project?.name ?? "Project"}</span>
+          {epic ? <EpicDot epic={epic} /> : <Layers className="size-3.5" aria-hidden="true" />}
+          <span className="max-w-36 truncate">{epic?.title ?? "Epic"}</span>
           <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 gap-px p-1.5">
-        <ProjectMenu
-          value={ws.query.projectId ?? null}
-          noneLabel="All projects"
+        <ParentMenu
+          value={ws.query.epicId ?? null}
+          noneLabel="All epics"
           onPick={(id) => {
-            ws.setFilters({ projectId: id ?? undefined });
+            ws.setFilters({ epicId: id ?? undefined });
             setOpen(false);
           }}
         />

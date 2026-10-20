@@ -46,7 +46,7 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 const PARAM: Partial<Record<keyof WorkspaceQuery, string>> = {
   view: "view",
   scope: "scope",
-  projectId: "project",
+  epicId: "epic",
   status: "status",
   ownerId: "owner",
   assigneeId: "assignee",

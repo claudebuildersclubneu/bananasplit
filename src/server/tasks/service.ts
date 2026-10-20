@@ -130,7 +130,13 @@ const baseFields = {
   dueDate: dateKeySchema.nullable().optional(),
   /** Where an epic or story starts (the Roadmap); on or before its due date. */
   startDate: dateKeySchema.nullable().optional(),
-  projectId: idSchema.nullable().optional(),
+  /** Epics: their colour (strict #rrggbb; null takes a theme colour). */
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour.")
+    .transform((c) => c.toLowerCase())
+    .nullable()
+    .optional(),
   parentTaskId: idSchema.nullable().optional(),
   ownerId: idSchema.nullable().optional(),
   assigneeIds: z.array(idSchema).max(50).optional(),
@@ -241,7 +247,7 @@ const subjectSelect = {
   priority: true,
   dueDate: true,
   startDate: true,
-  projectId: true,
+  color: true,
   type: true,
   parentTaskId: true,
   createdById: true,
@@ -635,15 +641,6 @@ async function syncMentions(
 
 // ---- Validation helpers ----------------------------------------------------------
 
-async function loadProject(env: TaskEnv, projectId: string) {
-  const project = await env.ctx.db.project.findFirst({
-    where: { id: projectId, organizationId: env.ctx.organizationId, archivedAt: null },
-    select: { id: true },
-  });
-  if (!project) throw new TaskError("That project doesn't exist in this organization.");
-  return project;
-}
-
 async function assertLabels(env: TaskEnv, labelIds: readonly string[]): Promise<void> {
   if (labelIds.length === 0) return;
   const count = await env.ctx.db.label.count({
@@ -760,7 +757,6 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   const d = parse(createTaskSchema, input);
   const { db, organizationId } = env.ctx;
 
-  const project = d.projectId ? await loadProject(env, d.projectId) : null;
   const parent = d.parentTaskId ? await loadParent(env, d.parentTaskId) : null;
   // Its type: what was asked for (TASK by default), fitted to the parent.
   const nesting = parent
@@ -824,7 +820,7 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
       priority,
       dueDate: dueKey ? fromDateKey(dueKey) : null,
       startDate: startKey ? fromDateKey(startKey) : null,
-      projectId: project?.id ?? null,
+      color: nesting.childType === TaskType.EPIC ? (d.color ?? null) : null,
       parentTaskId: parent?.id ?? null,
       rank,
       createdById: env.actor.userId,
@@ -990,9 +986,8 @@ async function applyUpdate(
       activity.push({ type: "BLOCKED", diffJson: { reason: sf.blockedReason } });
   }
 
-  if (d.projectId !== undefined && d.projectId !== s.projectId) {
-    if (d.projectId) await loadProject(env, d.projectId);
-    data.projectId = d.projectId;
+  if (d.color !== undefined && d.color !== s.color) {
+    data.color = d.color;
     fieldEdit = true;
   }
 

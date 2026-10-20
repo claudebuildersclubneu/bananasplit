@@ -85,8 +85,7 @@ export function outstandingExpensesMessage(n: number, self: boolean): string {
  *   - task assignments and event invitations (so the org's events leave
  *     their ICS feed);
  *   - ownership of open tasks (they become unowned and anyone can claim
- *     them; completed tasks keep their owner as history) and the lead of
- *     projects (a lead must be a member);
+ *     them; completed tasks keep their owner as history), epics included;
  *   - org chart positions revert to placeholders (the title stays), and the
  *     member drops out of draft match suggestions.
  * Their notes, comments and past events stay, authored by a former member.
@@ -111,10 +110,6 @@ export async function untieDepartingMember(
       deletedAt: null,
     },
     data: { ownerId: null, ownerRelation: null, ownerFlagged: false, ownerAssignedById: null },
-  });
-  await db.project.updateMany({
-    where: { organizationId, leadId: userId },
-    data: { leadId: null },
   });
   await untieOrgChart(db, organizationId, userId);
 }

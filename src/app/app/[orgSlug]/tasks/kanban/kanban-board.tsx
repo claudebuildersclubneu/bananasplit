@@ -198,7 +198,13 @@ export function KanbanBoard({
           parentTask:
             targetLane === NO_EPIC || !lane
               ? null
-              : { id: lane.id, title: lane.title, type: "EPIC", parentTask: null },
+              : {
+                  id: lane.id,
+                  title: lane.title,
+                  type: "EPIC",
+                  color: "color" in lane ? ((lane.color as string | null) ?? null) : null,
+                  parentTask: null,
+                },
         };
       }
       let insertAt: number;

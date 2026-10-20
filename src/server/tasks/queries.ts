@@ -30,7 +30,7 @@ export const taskListSelect = {
   startDate: true,
   rank: true,
   parentTaskId: true,
-  projectId: true,
+  color: true,
   createdById: true,
   createdAt: true,
   completedAt: true,
@@ -75,14 +75,14 @@ export const taskListSelect = {
     },
     orderBy: { rank: "asc" },
   },
-  project: { select: { id: true, name: true, color: true } },
-  // Two levels up: a task under a story still knows its epic.
+  // Two levels up: a task under a story still knows its epic (epicOf).
   parentTask: {
     select: {
       id: true,
       title: true,
       type: true,
-      parentTask: { select: { id: true, title: true, type: true } },
+      color: true,
+      parentTask: { select: { id: true, title: true, type: true, color: true } },
     },
   },
   _count: { select: { comments: { where: { deletedAt: null } } } },
@@ -206,8 +206,15 @@ export async function getMyOpenTasks(
       visibility: true,
       dueDate: true,
       blockedReason: true,
-      project: { select: { name: true } },
-      parentTask: { select: { title: true } },
+      parentTask: {
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          color: true,
+          parentTask: { select: { id: true, title: true, type: true, color: true } },
+        },
+      },
     },
     orderBy: [
       { dueDate: { sort: "asc", nulls: "last" } },
@@ -229,7 +236,8 @@ export type MyOpenTask = Awaited<ReturnType<typeof getMyOpenTasks>>["tasks"][num
  * switching layout never silently changes what you are looking at.
  */
 export interface TaskFilters {
-  projectId?: string;
+  /** One epic's work: the epic, its stories and their tasks (?epic=). */
+  epicId?: string;
   status?: TaskStatus | "open";
   /** Owned by exactly this person (the org-chart panel links ?owner=). */
   ownerId?: string;
@@ -271,7 +279,15 @@ export function taskFilterWhere(
   today?: Date,
 ): Prisma.TaskWhereInput {
   const and: Prisma.TaskWhereInput[] = [live(organizationId)];
-  if (f.projectId) and.push({ projectId: f.projectId });
+  if (f.epicId) {
+    and.push({
+      OR: [
+        { id: f.epicId },
+        { parentTaskId: f.epicId },
+        { parentTask: { is: { parentTaskId: f.epicId } } },
+      ],
+    });
+  }
   if (f.status === "open") and.push({ status: { in: [...OPEN_STATUSES] } });
   else if (f.status) and.push({ status: f.status });
   if (f.ownerId) and.push({ ownerId: f.ownerId });
@@ -310,16 +326,20 @@ export function taskFilterWhere(
   return { AND: and };
 }
 
-/** The table and the board show top-level tasks only. */
+/**
+ * The table and the dashboard count what the board shows: stories and
+ * tasks at the top or straight inside an epic (a story's own tasks ride
+ * with it, and an epic is a heading, not a row).
+ */
 export function tableWhere(
   organizationId: string,
   f: TaskFilters,
   today?: Date,
 ): Prisma.TaskWhereInput {
-  return { AND: [taskFilterWhere(organizationId, f, today), { parentTaskId: null }] };
+  return { AND: [taskFilterWhere(organizationId, f, today), BOARD_ITEM] };
 }
 
-/** True when anything beyond the project picker is narrowing the view. */
+/** True when anything beyond the epic picker is narrowing the view. */
 export function hasActiveFilters(f: TaskFilters): boolean {
   return Boolean(
     f.status ||
@@ -446,72 +466,85 @@ export function getOrgLabels(db: TxClient, organizationId: string) {
   });
 }
 
-/** What every project picker, filter and chip needs. */
-export const projectOptionSelect = {
+/** What every epic picker, filter and chip needs. */
+export const epicOptionSelect = {
   id: true,
-  name: true,
+  title: true,
+  type: true,
   color: true,
-  leadId: true,
   status: true,
+  ownerId: true,
   startDate: true,
-  targetDate: true,
-  archivedAt: true,
-} satisfies Prisma.ProjectSelect;
+  dueDate: true,
+  visibility: true,
+  parentTaskId: true,
+} satisfies Prisma.TaskSelect;
 
 /**
- * The club's projects, by name. Pickers and filters take the live ones only
- * (an archived project can't be picked: createTask and updateTask refuse
- * it); the projects list asks for the archived ones too.
+ * The club's live epics and stories, by title: what a task can be part of
+ * (the editor's Part of), and the epics for the toolbar's Epic filter and
+ * the board's lanes. Done ones last.
  */
-export function getOrgProjects(db: TxClient, organizationId: string, includeArchived = false) {
-  return db.project.findMany({
-    where: { organizationId, ...(includeArchived ? {} : { archivedAt: null }) },
-    select: projectOptionSelect,
-    orderBy: { name: "asc" },
+export function getOrgParents(db: TxClient, organizationId: string) {
+  return db.task.findMany({
+    where: { ...live(organizationId), type: { in: [TaskType.EPIC, TaskType.STORY] } },
+    select: epicOptionSelect,
+    orderBy: [{ completedAt: { sort: "asc", nulls: "first" } }, { title: "asc" }],
+    take: 1000,
   });
 }
 
-export type ProjectOption = Prisma.ProjectGetPayload<{ select: typeof projectOptionSelect }>;
+/** An epic or a story, as the pickers list it. */
+export type ParentOption = Awaited<ReturnType<typeof getOrgParents>>[number];
 
 /**
- * The projects list: every project (archived ones too) with its lead and
- * how much of its work is open and done. Counts are what the viewer can see
- * (RLS hides private tasks they aren't on), epics left out: an epic holds
- * work, its stories and tasks are the work.
+ * The Epics page: every live epic with its owner, its stories and tasks
+ * counted open and done (what the viewer can see; RLS hides private work
+ * they aren't on), the next due date among them, and how many are overdue.
  */
-export async function getProjectsOverview(db: TxClient, organizationId: string) {
-  const projects = await db.project.findMany({
-    where: { organizationId },
+export async function getEpicsOverview(db: TxClient, organizationId: string, today: Date) {
+  const epics = await db.task.findMany({
+    where: { ...live(organizationId), type: TaskType.EPIC },
     select: {
-      ...projectOptionSelect,
+      ...epicOptionSelect,
       description: true,
-      lead: { select: userPublicSelect },
+      createdAt: true,
+      completedAt: true,
+      owner: { select: userPublicSelect },
+      subtasks: {
+        where: { deletedAt: null },
+        select: {
+          type: true,
+          status: true,
+          dueDate: true,
+          subtasks: { where: { deletedAt: null }, select: { status: true, dueDate: true } },
+        },
+      },
     },
-    orderBy: { name: "asc" },
+    orderBy: [
+      { completedAt: { sort: "asc", nulls: "first" } },
+      { dueDate: { sort: "asc", nulls: "last" } },
+      { title: "asc" },
+    ],
+    take: 500,
   });
-  const counts = await db.task.groupBy({
-    by: ["projectId", "status"],
-    where: {
-      organizationId,
-      deletedAt: null,
-      projectId: { not: null },
-      type: { not: TaskType.EPIC },
-    },
-    _count: { _all: true },
-  });
-  return projects.map((p) => {
-    let open = 0;
-    let done = 0;
-    for (const c of counts) {
-      if (c.projectId !== p.id) continue;
-      if (c.status === TaskStatus.COMPLETED) done += c._count._all;
-      else open += c._count._all;
-    }
-    return { ...p, open, done };
+  return epics.map(({ subtasks, ...e }) => {
+    const work = subtasks.flatMap((s) => [s, ...s.subtasks]);
+    const done = work.filter((w) => w.status === TaskStatus.COMPLETED).length;
+    const overdue = work.filter(
+      (w) => w.status !== TaskStatus.COMPLETED && w.dueDate !== null && w.dueDate < today,
+    ).length;
+    return {
+      ...e,
+      stories: subtasks.filter((x) => x.type === TaskType.STORY).length,
+      open: work.length - done,
+      done,
+      overdue,
+    };
   });
 }
 
-export type ProjectOverviewItem = Awaited<ReturnType<typeof getProjectsOverview>>[number];
+export type EpicOverviewItem = Awaited<ReturnType<typeof getEpicsOverview>>[number];
 
 /**
  * The Roadmap: the club's epics (filtered like every layout) with what the
@@ -533,9 +566,9 @@ export async function getRoadmapEpics(
       status: true,
       dueDate: true,
       startDate: true,
+      color: true,
       createdAt: true,
       completedAt: true,
-      project: { select: { id: true, name: true, color: true } },
       owner: { select: userPublicSelect },
       subtasks: {
         where: { deletedAt: null },
@@ -572,7 +605,7 @@ export async function getRoadmapEpics(
       id: e.id,
       title: e.title,
       status: e.status,
-      project: e.project,
+      color: e.color,
       owner: e.owner,
       start: end && end < start ? end : start,
       end,

@@ -184,7 +184,6 @@ export async function renderTaskNotificationEmail(
         ownerId: true,
         createdById: true,
         assignees: { select: { userId: true } },
-        project: { select: { name: true } },
         parentTask: {
           select: {
             title: true,
@@ -226,7 +225,6 @@ export async function renderTaskNotificationEmail(
       title: task.title,
       dueLabel: dueKey ? formatDueKey(dueKey, todayKey) : null,
       priority: PRIORITY_LABELS[task.priority] ?? task.priority,
-      projectName: task.project?.name ?? null,
       // A subtask's breadcrumb is dropped when the parent is out of reach:
       // somebody handed a piece of a private task must not learn its title.
       parentTitle:

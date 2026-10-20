@@ -20,7 +20,7 @@ import type { TaskEditorDefaults } from "./task-editor";
 import type {
   LabelOption,
   MemberOption,
-  ProjectOption,
+  ParentOption,
   TaskItem,
   TasksCan,
   TasksOrg,
@@ -29,7 +29,8 @@ import type {
 
 /**
  * Everything the task layouts share: the org, the viewer (role, chart view
- * for hand-down warnings), members, labels and projects, one status message
+ * for hand-down warnings), members, labels, the epics and stories work can
+ * sit in, one status message
  * area for optimistic actions that fail, and ONE task detail surface.
  *
  * The detail surface living here is the point: every layout — the week, the
@@ -45,12 +46,16 @@ interface TasksContextValue {
   members: MemberOption[];
   memberById: Map<string, MemberOption>;
   labels: LabelOption[];
-  projects: ProjectOption[];
-  projectById: Map<string, ProjectOption>;
+  /** Live epics and stories (what work can be part of). */
+  parents: ParentOption[];
+  /** The epics alone, done ones last. */
+  epics: ParentOption[];
+  parentById: Map<string, ParentOption>;
   /** What the viewer may make on the spot (the club's creation rules). */
   can: TasksCan;
-  /** A project or tag just made inline: usable at once, before the page refreshes. */
-  addProject: (project: ProjectOption) => void;
+  /** An epic just made inline (a picker's "Create epic"): usable at once. */
+  addParent: (parent: ParentOption) => void;
+  /** A tag just made inline: usable at once, before the page refreshes. */
   addLabel: (label: LabelOption) => void;
   /** Shows a short message (e.g. a refused optimistic change). */
   announce: (message: string) => void;
@@ -70,7 +75,7 @@ export function TasksProvider({
   viewer,
   members,
   labels,
-  projects,
+  parents,
   can,
   children,
 }: {
@@ -78,7 +83,7 @@ export function TasksProvider({
   viewer: TasksViewer;
   members: MemberOption[];
   labels: LabelOption[];
-  projects: ProjectOption[];
+  parents: ParentOption[];
   /** The club's creation rules for this viewer (admins only when left out). */
   can?: TasksCan;
   children: React.ReactNode;
@@ -126,23 +131,22 @@ export function TasksProvider({
 
   // Made inline in a picker: shown at once, and dropped again once the
   // server's list (after refresh) carries them.
-  const [madeProjects, setMadeProjects] = useState<ProjectOption[]>([]);
   const [madeLabels, setMadeLabels] = useState<LabelOption[]>([]);
-  const addProject = useCallback(
-    (p: ProjectOption) => setMadeProjects((xs) => [...xs.filter((x) => x.id !== p.id), p]),
+  const [madeParents, setMadeParents] = useState<ParentOption[]>([]);
+  const addParent = useCallback(
+    (p: ParentOption) => setMadeParents((xs) => [...xs.filter((x) => x.id !== p.id), p]),
     [],
   );
+  const allParents = useMemo(() => {
+    const known = new Set(parents.map((p) => p.id));
+    const extra = madeParents.filter((p) => !known.has(p.id));
+    return extra.length === 0 ? parents : [...parents, ...extra];
+  }, [parents, madeParents]);
   const addLabel = useCallback(
     (l: LabelOption) => setMadeLabels((xs) => [...xs.filter((x) => x.id !== l.id), l]),
     [],
   );
-  const allProjects = useMemo(() => {
-    const known = new Set(projects.map((p) => p.id));
-    const extra = madeProjects.filter((p) => !known.has(p.id));
-    return extra.length === 0
-      ? projects
-      : [...projects, ...extra].sort((a, b) => a.name.localeCompare(b.name));
-  }, [projects, madeProjects]);
+  const epics = useMemo(() => allParents.filter((p) => p.type === "EPIC"), [allParents]);
   const allLabels = useMemo(() => {
     const known = new Set(labels.map((l) => l.id));
     const extra = madeLabels.filter((l) => !known.has(l.id));
@@ -159,10 +163,11 @@ export function TasksProvider({
       members,
       memberById: new Map(members.map((m) => [m.id, m])),
       labels: allLabels,
-      projects: allProjects,
-      projectById: new Map(allProjects.map((p) => [p.id, p])),
-      can: can ?? { createProjects: viewer.isAdmin, createTags: viewer.isAdmin },
-      addProject,
+      parents: allParents,
+      epics,
+      parentById: new Map(allParents.map((p) => [p.id, p])),
+      can: can ?? { createTags: true },
+      addParent,
       addLabel,
       announce,
       openTask,
@@ -175,9 +180,10 @@ export function TasksProvider({
       viewer,
       members,
       allLabels,
-      allProjects,
+      allParents,
+      epics,
       can,
-      addProject,
+      addParent,
       addLabel,
       announce,
       openTask,

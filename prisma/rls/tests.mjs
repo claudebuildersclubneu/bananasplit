@@ -2265,7 +2265,6 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "PollSlot:UPDATE",
         "PollVote:DELETE",
         "PollVote:INSERT",
-        "Project:UPDATE",
         "RecentVisit:DELETE",
         "RecentVisit:INSERT",
         "RecentVisit:UPDATE",
@@ -2442,10 +2441,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       // The nightly job's counter repair (service path, its org context only).
       storage_reconcile: "s",
       // Moonstone gaps: "Free now" asks whether availability was shared at
-      // all (member path only); the trigger that keeps who leads a project
-      // with admins and the lead (no grant).
+      // all (member path only).
       member_availability_shared: "u",
-      project_lead_guard: "",
     };
     await tcase(
       "T27f",

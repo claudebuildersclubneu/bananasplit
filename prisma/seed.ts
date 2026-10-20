@@ -24,7 +24,6 @@ import {
   PaperSize,
   PollAvailability,
   PrismaClient,
-  ProjectStatus,
   PulseAudience,
   Role,
   RSVPStatus,
@@ -167,15 +166,22 @@ async function main() {
   const orgAMembers = [alice, bob, carol, dave];
   const orgBMembers = [eve, dave, frank, grace];
 
-  // --- Projects ---
-  const [showcase, clubOps] = await Promise.all([
-    prisma.project.create({ data: { organizationId: orgA.id, name: "Fall Showcase Robot" } }),
-    prisma.project.create({ data: { organizationId: orgA.id, name: "Club Operations" } }),
-  ]);
-  const [tournament, recruitment] = await Promise.all([
-    prisma.project.create({ data: { organizationId: orgB.id, name: "Regional Tournament" } }),
-    prisma.project.create({ data: { organizationId: orgB.id, name: "Recruitment Drive" } }),
-  ]);
+  // --- Epics (the top of the one hierarchy; projects became epics) ---
+  const epic = (organizationId: string, title: string, by: string) =>
+    prisma.task.create({
+      data: {
+        organizationId,
+        type: TaskType.EPIC,
+        title,
+        rank: "a0",
+        createdById: by,
+        ownerId: by,
+      },
+    });
+  const showcase = await epic(orgA.id, "Fall Showcase Robot", alice.id);
+  const clubOps = await epic(orgA.id, "Club Operations", alice.id);
+  const tournament = await epic(orgB.id, "Regional Tournament", eve.id);
+  const recruitment = await epic(orgB.id, "Recruitment Drive", eve.id);
 
   // --- Labels ---
   const orgALabelNames = ["Urgent", "Build", "Software", "Outreach"];
@@ -237,7 +243,7 @@ async function main() {
       const task = await prisma.task.create({
         data: {
           organizationId,
-          projectId: faker.helpers.arrayElement(projects).id,
+          parentTaskId: faker.helpers.arrayElement(projects).id,
           title: faker.hacker.phrase().replace(/^./, (c) => c.toUpperCase()),
           description: faker.datatype.boolean() ? faker.lorem.sentences(2) : null,
           status,
@@ -264,7 +270,6 @@ async function main() {
       await prisma.task.create({
         data: {
           organizationId,
-          projectId: (await prisma.task.findUniqueOrThrow({ where: { id: parent.id } })).projectId,
           title: faker.hacker.phrase().replace(/^./, (c) => c.toUpperCase()),
           status: faker.helpers.arrayElement(statuses),
           priority: faker.helpers.arrayElement(priorities),
@@ -892,48 +897,52 @@ async function seedMoonstoneShowcase(
       pulseAudience: PulseAudience.EVERYONE,
       pulseEmail: true,
       pulseInApp: true,
-      memberCanCreateProjects: true,
       memberCanCreateTags: true,
     },
   });
 
-  // --- Projects ---
-  const project = (data: Omit<Prisma.ProjectUncheckedCreateInput, "organizationId">) =>
-    prisma.project.create({ data: { organizationId, ...data } });
-  const showcase = await project({
-    name: "Fall Showcase",
-    description: "The end-of-semester demo night: projects, sponsors and a crowd.",
-    color: "#d97757",
-    leadId: members.oliver,
-    status: ProjectStatus.ACTIVE,
-    startDate: day(-21),
-    targetDate: day(32),
-  });
-  await project({
-    name: "Recruitment",
+  // --- Two epics outside the showcase tree (projects became epics) ---
+  const plainEpic = (data: {
+    title: string;
+    description: string;
+    color: string;
+    owner: CbcPersonKey;
+    status: TaskStatus;
+    start: number;
+    due?: number;
+  }) =>
+    prisma.task.create({
+      data: {
+        organizationId,
+        type: TaskType.EPIC,
+        title: data.title,
+        description: data.description,
+        color: data.color,
+        status: data.status,
+        rank: "a0",
+        createdById: members[data.owner],
+        ownerId: members[data.owner],
+        startDate: day(data.start),
+        dueDate: data.due === undefined ? null : day(data.due),
+        completedAt: data.status === TaskStatus.COMPLETED ? day(-14) : null,
+      },
+    });
+  await plainEpic({
+    title: "Recruitment",
     description: "Fall recruitment: tabling, the info session and first workshops.",
     color: "#3b82f6",
-    leadId: members.kristine,
-    status: ProjectStatus.DONE,
-    startDate: day(-56),
-    targetDate: day(-14),
+    owner: "kristine",
+    status: TaskStatus.COMPLETED,
+    start: -56,
+    due: -14,
   });
-  await project({
-    name: "Club operations",
+  await plainEpic({
+    title: "Club operations",
     description: "Budget, rooms, the board calendar and everything that keeps the club running.",
     color: "#64748b",
-    leadId: members.jackson,
-    status: ProjectStatus.ACTIVE,
-    startDate: day(-70),
-  });
-  const sponsors = await project({
-    name: "Sponsors",
-    description: "Sponsor outreach for the year. Paused until the showcase deck is ready.",
-    color: "#16a34a",
-    leadId: members.lucas,
-    status: ProjectStatus.ON_HOLD,
-    startDate: day(-30),
-    targetDate: day(60),
+    owner: "jackson",
+    status: TaskStatus.NOT_STARTED,
+    start: -70,
   });
 
   // --- Tags made inline by members ---
@@ -962,7 +971,9 @@ async function seedMoonstoneShowcase(
     status: TaskStatus;
     due: number;
     priority?: TaskPriority;
-    project?: string;
+    /** Epics: their colour and start (days from today). */
+    color?: string;
+    start?: number;
     labels?: string[];
     children?: Node[];
   }
@@ -971,8 +982,9 @@ async function seedMoonstoneShowcase(
     const task = await prisma.task.create({
       data: {
         organizationId,
-        projectId: node.project ?? showcase.id,
         type: node.type,
+        color: node.color ?? null,
+        startDate: node.start === undefined ? null : day(node.start),
         title: node.title,
         status: node.status,
         priority: node.priority ?? TaskPriority.MEDIUM,
@@ -1002,6 +1014,8 @@ async function seedMoonstoneShowcase(
     {
       type: TaskType.EPIC,
       title: "Venue and logistics",
+      color: "#d97757",
+      start: -21,
       owner: "oliver",
       status: TaskStatus.IN_PROGRESS,
       due: 28,
@@ -1064,6 +1078,8 @@ async function seedMoonstoneShowcase(
     {
       type: TaskType.EPIC,
       title: "Sponsors",
+      color: "#16a34a",
+      start: -30,
       owner: "lucas",
       status: TaskStatus.NOT_STARTED,
       due: 21,
@@ -1075,7 +1091,6 @@ async function seedMoonstoneShowcase(
           owner: "lucas",
           status: TaskStatus.NOT_STARTED,
           due: 14,
-          project: sponsors.id,
           labels: [sponsorTag.id],
           children: [
             {
@@ -1084,7 +1099,6 @@ async function seedMoonstoneShowcase(
               owner: "lucas",
               status: TaskStatus.IN_PROGRESS,
               due: 5,
-              project: sponsors.id,
             },
             {
               type: TaskType.TASK,
@@ -1092,7 +1106,6 @@ async function seedMoonstoneShowcase(
               owner: "anthony",
               status: TaskStatus.NOT_STARTED,
               due: 9,
-              project: sponsors.id,
             },
           ],
         },
@@ -1208,20 +1221,46 @@ async function seedMoonstoneShowcase(
   const end = zonedInstant(addDaysToKey(to, 1), 0, tz);
   const nextEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const projects = await prisma.project.findMany({
-    where: { organizationId, archivedAt: null },
-    select: { id: true, name: true, color: true },
-    orderBy: { name: "asc" },
+  // Work per epic (stored as byProject; each line is an epic now).
+  const epicRows = await prisma.task.findMany({
+    where: {
+      organizationId,
+      deletedAt: null,
+      type: TaskType.EPIC,
+      status: { not: TaskStatus.COMPLETED },
+    },
+    select: { id: true, title: true, color: true },
+    orderBy: { title: "asc" },
   });
-  const live = { organizationId, deletedAt: null };
+  const live = { organizationId, deletedAt: null, type: { not: TaskType.EPIC } };
   const doneIn = { ...live, completedAt: { gte: start, lt: end } };
+  const inEpic = (id: string) => ({
+    OR: [{ parentTaskId: id }, { parentTask: { is: { parentTaskId: id } } }],
+  });
+  const outside = {
+    NOT: {
+      OR: [
+        { parentTask: { is: { type: TaskType.EPIC } } },
+        { parentTask: { is: { parentTask: { is: { type: TaskType.EPIC } } } } },
+      ],
+    },
+  };
   const byProject = [];
-  for (const p of [...projects, { id: null, name: "No project", color: null }]) {
-    const done = await prisma.task.count({ where: { ...doneIn, projectId: p.id } });
+  for (const e of epicRows) {
+    const done = await prisma.task.count({ where: { ...doneIn, ...inEpic(e.id) } });
     const open = await prisma.task.count({
-      where: { ...live, projectId: p.id, status: { not: TaskStatus.COMPLETED } },
+      where: { ...live, ...inEpic(e.id), status: { not: TaskStatus.COMPLETED } },
     });
-    if (done || open) byProject.push({ projectId: p.id, name: p.name, color: p.color, done, open });
+    if (done || open)
+      byProject.push({ projectId: e.id, name: e.title, color: e.color, done, open });
+  }
+  {
+    const done = await prisma.task.count({ where: { ...doneIn, ...outside } });
+    const open = await prisma.task.count({
+      where: { ...live, ...outside, status: { not: TaskStatus.COMPLETED } },
+    });
+    if (done || open)
+      byProject.push({ projectId: null, name: "Not in an epic", color: null, done, open });
   }
 
   const events = await prisma.event.findMany({

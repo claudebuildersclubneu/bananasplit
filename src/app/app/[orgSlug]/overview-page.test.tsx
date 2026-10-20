@@ -216,7 +216,6 @@ describe("org overview", () => {
           visibility: "ORG",
           dueDate: new Date("2026-10-01T00:00:00Z"),
           blockedReason: null,
-          project: { name: "Fall kickoff" },
           parentTask: null,
         },
         {
@@ -226,8 +225,13 @@ describe("org overview", () => {
           visibility: "PRIVATE",
           dueDate: new Date("2026-10-05T00:00:00Z"),
           blockedReason: "Waiting on the budget",
-          project: null,
-          parentTask: { title: "Fall kickoff logistics" },
+          parentTask: {
+            id: "s_1",
+            title: "Fall kickoff logistics",
+            type: "STORY",
+            color: null,
+            parentTask: { id: "e_1", title: "Fall kickoff", type: "EPIC", color: null },
+          },
         },
       ],
     });
@@ -243,7 +247,7 @@ describe("org overview", () => {
     expect(html).toContain("1 overdue");
     expect(html).toContain("Overdue · Thu, Oct 1");
     expect(html).toContain("Blocked");
-    expect(html).toContain("Subtask of Fall kickoff logistics");
+    expect(html).toContain("Part of Fall kickoff logistics");
     expect(html).toContain('aria-label="Private task"');
     expect(html).toContain("View all 8");
   });

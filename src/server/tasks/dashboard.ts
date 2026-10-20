@@ -8,11 +8,12 @@ import { tableWhere, type TaskFilters } from "./queries";
 
 /**
  * The task dashboard (?view=dashboard), a layout like the board, week and
- * table, open to everyone: where the tasks in view stand, by project and by
+ * table, open to everyone: where the tasks in view stand, by epic and by
  * person. It reads the same scope and filters as the other layouts (Mine,
- * My team, Everyone, a person, a project...) and counts what the board shows
- * (top-level tasks; subtasks ride with their parent), so every figure links
- * to a board or table listing exactly those tasks.
+ * My team, Everyone, a person, an epic...) and counts what the board shows
+ * (stories and tasks at the top or inside an epic; a story's tasks ride
+ * with it), so every figure links to a board or table listing exactly
+ * those tasks.
  *
  * Runs on the viewer's ctx.db (withOrgTx): RLS hides private tasks the
  * viewer is not on, so no title or count shows here that the board would not
@@ -31,10 +32,12 @@ export interface StatusCounts {
   overdue: number;
 }
 
-export interface ProjectStatus extends StatusCounts {
-  projectId: string | null;
+export interface EpicStatus extends StatusCounts {
+  epicId: string | null;
   name: string;
-  archived: boolean;
+  color: string | null;
+  /** The epic itself is marked done. */
+  finished: boolean;
   total: number;
 }
 
@@ -51,7 +54,7 @@ export interface TaskDashboard {
     unowned: number;
     doneRecently: number;
   };
-  projects: ProjectStatus[];
+  epics: EpicStatus[];
   /** Owners only: a task with no owner counts in `totals.unowned`. */
   people: PersonStatus[];
   /** Blocked or overdue, soonest due first. */
@@ -68,7 +71,8 @@ const attentionSelect = {
   blockedReason: true,
   priority: true,
   owner: { select: userPublicSelect },
-  project: { select: { id: true, name: true } },
+  // Its epic (epicOf): a work item's parent is its epic or nothing.
+  parentTask: { select: { id: true, title: true, type: true, color: true } },
 } satisfies Prisma.TaskSelect;
 
 const emptyCounts = (): StatusCounts => ({
@@ -90,7 +94,7 @@ export async function getTaskDashboard(
   db: TxClient,
   organizationId: string,
   opts: {
-    /** The workspace's filters: the scope's people, a person, a project... */
+    /** The workspace's filters: the scope's people, a person, an epic... */
     filters: TaskFilters;
     /**
      * Whose rows the People table has: the scope's or the filter's people,
@@ -116,13 +120,14 @@ export async function getTaskDashboard(
     completedAt: { gte: new Date(now.getTime() - RECENT_DAYS * DAY_MS) },
   };
 
-  const byProjectStatus = await db.task.groupBy({
-    by: ["projectId", "status"],
+  // A work item's parent is its epic or nothing (tableWhere).
+  const byEpicStatus = await db.task.groupBy({
+    by: ["parentTaskId", "status"],
     where: where(),
     _count: { _all: true },
   });
-  const overdueByProject = await db.task.groupBy({
-    by: ["projectId"],
+  const overdueByEpic = await db.task.groupBy({
+    by: ["parentTaskId"],
     where: where(overdue),
     _count: { _all: true },
   });
@@ -153,48 +158,49 @@ export async function getTaskDashboard(
     take: ATTENTION_LIMIT,
   });
 
-  // Totals and projects.
+  // Totals and epics.
   const totals = { ...emptyCounts(), open: 0, dueSoon, unowned, doneRecently };
-  const projectCounts = new Map<string | null, StatusCounts>();
-  for (const row of byProjectStatus) {
-    const counts = projectCounts.get(row.projectId) ?? emptyCounts();
+  const epicCounts = new Map<string | null, StatusCounts>();
+  for (const row of byEpicStatus) {
+    const counts = epicCounts.get(row.parentTaskId) ?? emptyCounts();
     addStatus(counts, row.status, row._count._all);
     addStatus(totals, row.status, row._count._all);
-    projectCounts.set(row.projectId, counts);
+    epicCounts.set(row.parentTaskId, counts);
   }
-  for (const row of overdueByProject) {
-    const counts = projectCounts.get(row.projectId) ?? emptyCounts();
+  for (const row of overdueByEpic) {
+    const counts = epicCounts.get(row.parentTaskId) ?? emptyCounts();
     counts.overdue = row._count._all;
     totals.overdue += row._count._all;
-    projectCounts.set(row.projectId, counts);
+    epicCounts.set(row.parentTaskId, counts);
   }
   totals.open = totals.notStarted + totals.inProgress + totals.blocked;
 
-  const projectIds = [...projectCounts.keys()].filter((id): id is string => id !== null);
-  const projectRows =
-    projectIds.length > 0
-      ? await db.project.findMany({
-          where: { organizationId, id: { in: projectIds } },
-          select: { id: true, name: true, archivedAt: true },
+  const epicIds = [...epicCounts.keys()].filter((id): id is string => id !== null);
+  const epicRows =
+    epicIds.length > 0
+      ? await db.task.findMany({
+          where: { organizationId, id: { in: epicIds } },
+          select: { id: true, title: true, color: true, status: true },
         })
       : [];
-  const projectById = new Map(projectRows.map((p) => [p.id, p]));
-  const projects: ProjectStatus[] = [...projectCounts.entries()]
-    .map(([projectId, counts]) => {
-      const project = projectId ? projectById.get(projectId) : undefined;
+  const epicById = new Map(epicRows.map((e) => [e.id, e]));
+  const epics: EpicStatus[] = [...epicCounts.entries()]
+    .map(([epicId, counts]) => {
+      const epic = epicId ? epicById.get(epicId) : undefined;
       return {
         ...counts,
-        projectId,
-        name: projectId ? (project?.name ?? "Project") : "No project",
-        archived: Boolean(project?.archivedAt),
+        epicId,
+        name: epicId ? (epic?.title ?? "Epic") : "Not in an epic",
+        color: epic?.color ?? null,
+        finished: epic?.status === TaskStatus.COMPLETED,
         total: counts.notStarted + counts.inProgress + counts.blocked + counts.done,
       };
     })
-    // Live projects with open work first, the loose tasks last.
+    // Live epics with open work first, the loose tasks last.
     .sort(
       (a, b) =>
-        Number(a.projectId === null) - Number(b.projectId === null) ||
-        Number(a.archived) - Number(b.archived) ||
+        Number(a.epicId === null) - Number(b.epicId === null) ||
+        Number(a.finished) - Number(b.finished) ||
         b.overdue + b.blocked - (a.overdue + a.blocked) ||
         b.total - b.done - (a.total - a.done) ||
         a.name.localeCompare(b.name),
@@ -223,7 +229,7 @@ export async function getTaskDashboard(
 
   return {
     totals,
-    projects,
+    epics,
     people: [...personCounts.values()].filter((p) => !team || team.has(p.userId)),
     attention,
     window: {

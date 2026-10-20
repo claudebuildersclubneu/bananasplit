@@ -8,7 +8,7 @@ import { TagChip } from "@/components/ui/chip";
 import { UserAvatar } from "@/components/user-avatar";
 import { canEditTask } from "@/lib/tasks/access";
 import { rollUp } from "@/lib/tasks/hierarchy";
-import { projectColor } from "@/lib/tasks/project-color";
+import { epicColor, epicOf } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 
 import { QuickDone } from "./quick-controls";
@@ -28,7 +28,7 @@ import type { TaskItem } from "./types";
 /**
  * One task as a list row (Moonstone 7.11) — the Week, the List and
  * Personal home all use it, so a task reads the same wherever you meet it.
- * The circle, the title, a meta row (project chip, due date, tags, progress,
+ * The circle, the title, a meta row (epic chip, due date, tags, progress,
  * comments), then the priority chip, the owner and the ••• on the right.
  * Rows become a soft tile on hover; a full-width line ends each task.
  * `depth` hangs a story's tasks under it in the List, on a rail from the
@@ -38,7 +38,7 @@ export function TaskRow({
   task,
   showOwner = false,
   showRole = true,
-  showProject = true,
+  showEpic = true,
   showParent = true,
   depth = 0,
   className,
@@ -46,7 +46,8 @@ export function TaskRow({
   task: TaskItem;
   showOwner?: boolean;
   showRole?: boolean;
-  showProject?: boolean;
+  /** The epic's chip (off where the row already sits under its epic). */
+  showEpic?: boolean;
   /** The "Parent / " breadcrumb (off where the row already sits under its parent). */
   showParent?: boolean;
   depth?: 0 | 1 | 2;
@@ -63,7 +64,8 @@ export function TaskRow({
     task.ownerId !== viewer.userId &&
     task.assignees.some((a) => a.userId === viewer.userId);
   const progress = rollUp(task.subtasks);
-  const color = projectColor(task.project);
+  const epic = epicOf(task);
+  const color = epicColor(epic);
 
   return (
     <li
@@ -97,7 +99,8 @@ export function TaskRow({
           {priv && <PrivateMark />}
           {task.type === "STORY" && <TaskTypeChip type="STORY" iconOnly />}
           <span className="min-w-0 truncate text-[15px] leading-snug">
-            {showParent && task.parentTask && (
+            {/* The story it's in (its epic is the chip below). */}
+            {showParent && task.parentTask && task.parentTask.type !== "EPIC" && (
               <span className="text-muted-foreground">{task.parentTask.title} / </span>
             )}
             <span className={cn("font-medium", done && "text-muted-foreground line-through")}>
@@ -108,7 +111,7 @@ export function TaskRow({
         </span>
 
         <span className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
-          {showProject && task.project && <TagChip color={color}>{task.project.name}</TagChip>}
+          {showEpic && epic && epic.id !== task.id && <TagChip color={color}>{epic.title}</TagChip>}
           <DueLabel dueDate={task.dueDate} todayKey={org.todayKey} done={done} />
           {task.labels.slice(0, 3).map(({ label }) => (
             <TagChip key={label.id} color={label.color}>

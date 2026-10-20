@@ -106,7 +106,8 @@ export function parseScope(value: unknown): TaskScope | null {
 export interface WorkspaceQuery {
   view: TaskView;
   scope: TaskScope;
-  projectId?: string;
+  /** One epic's work (?epic=; the old ?project= links land here too: a project's epic kept its id). */
+  epicId?: string;
   status?: TaskStatus | "open";
   ownerId?: string;
   assigneeId?: string;
@@ -155,7 +156,7 @@ export function parseWorkspaceQuery(
   return {
     view,
     scope,
-    projectId: str(query.project),
+    epicId: str(query.epic) ?? str(query.project),
     status,
     ownerId,
     assigneeId,
@@ -169,7 +170,7 @@ export function parseWorkspaceQuery(
   };
 }
 
-/** How many toolbar filters (beyond the scope and the project) are on. */
+/** How many toolbar filters (beyond the scope and the epic) are on. */
 export function activeFilterCount(q: WorkspaceQuery): number {
   return [
     q.status,
@@ -193,7 +194,7 @@ export function workspaceHref(
   const p = new URLSearchParams();
   p.set("view", q.view);
   if (q.scope && q.scope !== "all") p.set("scope", q.scope);
-  if (q.projectId) p.set("project", q.projectId);
+  if (q.epicId) p.set("epic", q.epicId);
   if (q.status) p.set("status", q.status);
   if (q.ownerId) p.set("owner", q.ownerId);
   if (q.assigneeId) p.set("assignee", q.assigneeId);

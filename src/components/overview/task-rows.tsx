@@ -16,7 +16,7 @@ import { TaskCheck } from "./task-check";
 
 /**
  * My tasks' rows (redesign guide 7.11, 16): a 22px circle check, the title,
- * a meta line (the project as a tag chip, the due label by urgency), and a
+ * a meta line (the epic as a tag chip, the due label by urgency), and a
  * High chip on the right. Checking one marks it done through the tasks
  * action (the same checks as the task page), with the check's spring and a
  * "Done: …" toast with Undo; the row leaves when the page refreshes.
@@ -28,7 +28,8 @@ export interface TaskRowData {
   href: string;
   status: TaskStatus;
   private: boolean;
-  project: { name: string; color: string | null } | null;
+  /** The epic it's part of (when the context line doesn't already name it). */
+  epic: { name: string; color: string | null } | null;
   /** "Subtask of …", when it is one. */
   context: string | null;
   due: { text: string; tone: DueTone } | null;
@@ -82,7 +83,7 @@ function TaskRow({ orgId, task, first }: { orgId: string; task: TaskRowData; fir
   return (
     <li
       className={cn(
-        "group/row hover:bg-muted/60 relative -mx-3 flex items-center gap-3.5 rounded-field px-3 py-3 transition-[background-color,opacity] duration-300",
+        "group/row hover:bg-muted/60 rounded-field relative -mx-3 flex items-center gap-3.5 px-3 py-3 transition-[background-color,opacity] duration-300",
         !first &&
           "before:bg-border before:absolute before:top-0 before:right-3 before:left-12 before:h-px hover:before:opacity-0",
         done && "opacity-70",
@@ -103,8 +104,8 @@ function TaskRow({ orgId, task, first }: { orgId: string; task: TaskRowData; fir
           <span className="truncate">{task.title}</span>
         </Link>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
-          {task.project && (
-            <TagChip color={task.project.color ?? "var(--chart-3)"}>{task.project.name}</TagChip>
+          {task.epic && (
+            <TagChip color={task.epic.color ?? "var(--chart-3)"}>{task.epic.name}</TagChip>
           )}
           {task.status === TaskStatus.BLOCKED && (
             <span className="text-tint-danger-foreground inline-flex items-center gap-1 font-medium">
@@ -113,7 +114,12 @@ function TaskRow({ orgId, task, first }: { orgId: string; task: TaskRowData; fir
             </span>
           )}
           {task.due && (
-            <span className={cn("inline-flex items-center gap-1 whitespace-nowrap", DUE_TONE[task.due.tone])}>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 whitespace-nowrap",
+                DUE_TONE[task.due.tone],
+              )}
+            >
               <CalendarDays className="size-3.5" aria-hidden="true" />
               {task.due.text}
             </span>

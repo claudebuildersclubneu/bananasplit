@@ -81,7 +81,8 @@ saved to `Note.layout`; switching never changes the content).
   comments, version history and suggestions (collapsible; a sheet on
   phones). The top bar has breadcrumbs, who else is in the note, the mode
   switch, Share, comments and history.
-- **Page mode** (like Notion): hover a block for **+** (a new block with
+- **Page mode** (like Notion): the title and body sit on a sheet (a card
+  surface); the add-icon button shows when you're at the title. Hover a block for **+** (a new block with
   the slash menu open) and a grip (drag to move; click for Turn into,
   Duplicate, Move up/down, Delete block). The slash menu has text,
   headings, lists, checklists, toggles, callouts, quotes, code, tables,

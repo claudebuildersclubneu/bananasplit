@@ -18,7 +18,6 @@ import {
   updateWeekStartKey,
   updateWeekStartOfKey,
 } from "@/lib/tasks/dates";
-import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
@@ -29,7 +28,7 @@ import {
   getAgendaTasks,
   getBoardTasks,
   getOrgLabels,
-  getOrgProjects,
+  getOrgParents,
   getRoadmapEpics,
   getTableTasks,
   getTaskStats,
@@ -118,8 +117,8 @@ export default async function TasksPage({
   const base = await withOrgTx(org.id, async ({ db }) => {
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
     const labels = await getOrgLabels(db, org.id);
-    const projects = await getOrgProjects(db, org.id);
-    return { tz: effectiveTimezone(me, org), labels, projects };
+    const parents = await getOrgParents(db, org.id);
+    return { tz: effectiveTimezone(me, org), labels, parents };
   });
   const todayKey = localDateKey(now, base.tz);
   const today = fromDateKey(todayKey);
@@ -146,7 +145,7 @@ export default async function TasksPage({
   const peopleIds =
     ws.scope === "mine" ? [user.id] : ws.scope === "team" ? [user.id, ...chart.subtree] : undefined;
   const filters: TaskFilters = {
-    projectId: ws.projectId,
+    epicId: ws.epicId,
     status: ws.status,
     ownerId: ws.ownerId,
     assigneeId: ws.assigneeId,
@@ -202,8 +201,7 @@ export default async function TasksPage({
       viewer={{ userId: user.id, name: user.name, isAdmin, chart }}
       members={members}
       labels={base.labels}
-      projects={base.projects}
-      can={creationRights(isAdmin, settings)}
+      parents={base.parents}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
         <WorkspaceHeader

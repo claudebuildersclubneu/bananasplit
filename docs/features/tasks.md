@@ -164,8 +164,8 @@ became **destinations** in the header.
 | **Week**      | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week.                                                                                                                                                                                                            | `2` |
 | **List**      | Open work grouped by epic (stories with their tasks under them, roll-up progress), then everything outside an epic. A club without epics gets one plain list. A quick add on top takes `#tags`. The Free plan's only view.                                                                                                             | `3` |
 | **Table**     | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                                                                                                                                                      | `4` |
-| **Roadmap**   | Epics on a week timeline, grouped by project: each bar runs from the epic's start date (or, without one, when it was made or its earliest dated work) to its due date with its progress filled in, and this week is marked.                                                                                                            | `5` |
-| **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by project and person.                                                                                                                                                                                                                                    | `6` |
+| **Roadmap**   | Epics on a week timeline, the ones still going first: each bar runs from the epic's start date (or, without one, when it was made or its earliest dated work) to its due date with its progress filled in, and this week is marked.                                                                                                    | `5` |
+| **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by epic and person.                                                                                                                                                                                                                                       | `6` |
 
 Due dates also show on the main Calendar (its Tasks layer). A **stat strip**
 heads every layout: Open, Due this week, Overdue (one click shows them) and
@@ -178,8 +178,9 @@ Done this week, for the toolbar's question.
 The toolbar above the layouts is the same in all of them, a row of pills:
 
 - **Scope** — _Mine_, _My team_ (only if you have reports) or _Everyone_.
-- **Person**, **Project** (there even before the first project: its menu
-  can make one) and **Tag**.
+- **Person**, **Epic** (there even before the first epic: its menu can
+  make one) and **Tag**. Filtering to an epic shows it, its stories and
+  their tasks; new tasks from the header or the quick add go into it.
 - **Search** — by title; `/` focuses it from anywhere, Enter applies it.
 - **Filter** — status and visibility.
 - Active filters show as removable pills with **Clear all**.
@@ -212,7 +213,7 @@ Deep links other sections use, all unchanged:
 
 ### Who can change a task
 
-Editing a task — title, description, status, due date, labels, project,
+Editing a task — title, description, status, due date, labels, what it's part of,
 owner, collaborators, subtasks — is open to its **creator**, its **owner**,
 anyone **involved**, a **chart manager of the owner** (anyone above them in
 the published chart), and **owners and admins**. Visibility is narrower: see _Who can change the flag_ above.
@@ -222,30 +223,34 @@ remove **themselves** as a collaborator on any task they can see, and take
 ownership of a task that has no owner. Nothing else — no title, status or
 due-date edits, and never removing somebody else's ownership.
 
-### Projects
+### Epics (projects became epics)
 
-**Tasks › Projects** lists the club's projects with their colour, lead,
-status (active, on hold, done), start and target dates and progress (done
-over all, epics left out). A project's own view is the workspace filtered to
-it (`?project=`). Every project picker (the form's field, the sentence, the
-toolbar's Project pill) can make one on the spot: type a name and pick
-**Create project “…”**. A new project takes the theme's next chart colour
-unless one is picked. Archived projects never appear in pickers; a task
-still filed under one shows it, marked archived, until somebody moves it.
+There is one hierarchy: **Epic > Story > Task**. Projects were the same
+idea one level up, so `20261020130000_projects_into_epics` turned each
+project into an epic (same id, so old `?project=` links still land on it)
+with its name, description, colour (`Task.color`), lead (as owner), start
+and target dates, and a status (active: not started; on hold: blocked "On
+hold"; done or archived: done). Its club-wide work moved under it: a story
+or task straight in, an epic inside it as a story (that epic's stories
+became tasks, their tasks moving up beside them). Private top-level work
+stayed where it was. The Project table, its policies and lead guard,
+`Task.projectId` and the "members can create projects" switch are gone.
 
-| Who                                                                     | May                                                                                                               |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Every member, while **Members can create projects** is on (the default) | Create (choosing its first lead) and edit (rename, recolour, status, dates)                                       |
-| The project's lead                                                      | Edit it (even with the switch off), hand the lead on, archive, unarchive, and delete it (its tasks stay, unfiled) |
-| Owners and admins                                                       | All of it, on every project                                                                                       |
-
-The switch lives on **Settings › Tags**. The checks are in the server
-actions (`src/lib/tasks/projects.ts`); the Project INSERT policy reads the
-same switch, and DELETE is owners', admins' and the project's lead's. Since
-leading a project lets you delete it, only an owner, an admin or the current
-lead changes who leads an existing one (the form's Lead is locked for anyone
-else, and `app.project_lead_guard` refuses it in the database); a member
-leaving clears their own lead as before.
+- **Tasks › Epics** (the header's **Epics** button; `/tasks/projects`
+  redirects there) shows every epic as a card: its colour, status, dates,
+  progress over its stories and tasks, how many are overdue, and its owner.
+  **New epic** asks for a name, colour, owner, dates and a line about it;
+  each card's ••• edits it, marks it done or reopens it, or deletes it (with
+  Undo). A card opens the List filtered to that epic.
+- **Part of** in the task editor (and "in …" in Sentence mode) picks what a
+  story or task sits in: an epic, or for a task a story, each epic followed
+  by its stories. Typing a new name offers **Create epic “…”**. An epic gets
+  a **Colour** row instead.
+- The board, table and dashboard count stories and tasks at the top or
+  straight inside an epic; rows and cards wear their epic's chip in its
+  colour. The dashboard's **Epics** table and the weekly pulse's "work done"
+  line are per epic.
+- Epics are tasks, so who may edit one is the task rules above.
 
 ### Tags
 
@@ -257,10 +262,15 @@ unique index on the org and the lower-cased name): when two people make the
 same tag at once, `createTag` catches the clash and hands back the one that
 won. Duplicates made before the index were merged into the oldest. `#tag` in a title (the composer,
 the Sentence title, the List's quick add) tags the task: "Book a
-photographer #showcase". Who may make new tags is **Members can create
-tags** on **Settings › Tags** (everyone by default); owners and admins
-rename, recolour, merge (with suggestions for near-duplicates like
-"Design" and "designs") and delete there.
+photographer #showcase". Anyone makes a tag while adding or editing a task
+(**Settings › Tags** is gone, and with it the switch that kept new tags to
+owners and admins; `20261020120000_overview_reset_tags_open` turned it back
+on everywhere). Renaming, merging and deleting tags went with that page.
+
+In the List, a full-width line ends each task and a story's tasks hang off
+a rail from its circle. The List's "Done in the last 7 days" and the
+Board's Completed column have a clear icon in their corner: it moves the
+finished tasks you may edit to the trash, with Undo on the toast.
 
 ### Handing work down
 

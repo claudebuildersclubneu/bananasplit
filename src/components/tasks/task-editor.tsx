@@ -26,7 +26,8 @@ import { canAcknowledgeFlag, canEditTask } from "@/lib/tasks/access";
 import { relationFor } from "@/lib/tasks/assignment";
 import { dueDateKey } from "@/lib/tasks/dates";
 import { allowedTypes, TASK_TYPES, typeLabel, type TaskTypeValue } from "@/lib/tasks/hierarchy";
-import { projectColor } from "@/lib/tasks/project-color";
+import { LABEL_COLOR_PALETTE } from "@/lib/label-colors";
+import { epicColor, parentTypesFor } from "@/lib/tasks/epic";
 import { MAX_BLOCKED_REASON } from "@/lib/tasks/status";
 import { canChangeVisibility, namedAudienceIds } from "@/lib/tasks/visibility";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ import {
   OwnerField,
   PeopleField,
   PRIORITY_OPTIONS,
-  ProjectField,
+  PartOfField,
   SegmentBox,
   STATUS_OPTIONS,
   VISIBILITY_OPTIONS,
@@ -67,7 +68,8 @@ import { AudienceList } from "./visibility-control";
  * bottom. A new task can also be written as one sentence (Sentence mode).
  * Create and edit:
  * title, description with @mentions, status (a reason when Blocked),
- * priority, due date (and a start date for epics and stories), project, labels, the accountable owner and "also
+ * priority, due date (and a start date for epics and stories), what it's
+ * part of (an epic, or a task's story; an epic gets a colour instead), labels, the accountable owner and "also
  * involved" collaborators, 'Created by', flags with their acknowledgement,
  * subtasks, comments and history.
  *
@@ -79,7 +81,6 @@ import { AudienceList } from "./visibility-control";
 export interface TaskEditorDefaults {
   status?: TaskStatus;
   parentTaskId?: string | null;
-  projectId?: string | null;
   dueDate?: string | null;
   /** Pre-set the owner (handing work down from a Team lane). */
   ownerId?: string | null;
@@ -110,7 +111,7 @@ export function TaskEditor({
   mode?: "dialog" | "page";
   initialComments?: React.ComponentProps<typeof TaskComments>["initial"];
 }) {
-  const { org, viewer, actor, labels, memberById, members, announce } = useTasks();
+  const { org, viewer, actor, labels, memberById, members, announce, parentById } = useTasks();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmElement, confirmFlagged] = useConfirmFlagged();
@@ -120,9 +121,8 @@ export function TaskEditor({
   const saving = useRef(false);
   const [view, setView] = useState<"form" | "sentence">("form");
 
-  const initialProjectId = task?.projectId ?? defaults?.projectId ?? null;
   const isNew = task === null;
-  const parentTaskId = task?.parentTaskId ?? defaults?.parentTaskId ?? null;
+  const initialParentId = task?.parentTaskId ?? defaults?.parentTaskId ?? null;
 
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
@@ -137,7 +137,9 @@ export function TaskEditor({
   const [startDate, setStartDate] = useState(() =>
     task?.startDate ? dueDateKey(task.startDate) : "",
   );
-  const [projectId, setProjectId] = useState<string | null>(initialProjectId);
+  // What it's part of (an epic, or for a task a story); picking one moves it.
+  const [parentTaskId, setParentTaskId] = useState<string | null>(initialParentId);
+  const [color, setColor] = useState<string | null>(task?.color ?? null);
   const [visibility, setVisibility] = useState<TaskVisibility>(
     task?.visibility ?? defaults?.visibility ?? TaskVisibility.ORG,
   );
@@ -155,7 +157,10 @@ export function TaskEditor({
   // Which types fit where it stands (a parent hidden from the viewer counts
   // as a story, the stricter case; the server decides anyway).
   const parentType: TaskTypeValue | null = parentTaskId
-    ? (task?.parentTask?.type ?? defaults?.parentType ?? "STORY")
+    ? ((parentById.get(parentTaskId)?.type as TaskTypeValue | undefined) ??
+      (task?.parentTask?.id === parentTaskId ? task.parentTask.type : undefined) ??
+      defaults?.parentType ??
+      "STORY")
     : null;
   const typeOptions = TYPE_OPTIONS.filter((o) =>
     allowedTypes({ parentType, childTypes: task?.subtasks.map((s) => s.type) ?? [] }).includes(
@@ -252,7 +257,11 @@ export function TaskEditor({
       dueDate: dueDate || null,
       // Epics and stories have a start (the Roadmap); a plain task doesn't.
       ...(hasStart || task?.startDate ? { startDate: hasStart ? startDate || null : null } : {}),
-      projectId,
+      // An epic sits at the top; anything else goes where "Part of" says.
+      ...(isNew || parentTaskId !== task?.parentTaskId || type === "EPIC"
+        ? { parentTaskId: type === "EPIC" ? null : parentTaskId }
+        : {}),
+      ...(type === "EPIC" ? { color } : {}),
       ownerId,
       assigneeIds: assigneeIds.filter((id) => id !== ownerId),
       labelIds: finalLabelIds,
@@ -267,7 +276,7 @@ export function TaskEditor({
           const send = (extra: { confirmFlagged: boolean }) =>
             task
               ? updateTask(org.id, task.id, { ...input, ...extra, expectedVersion: task.version })
-              : createTask(org.id, { ...input, ...extra, parentTaskId });
+              : createTask(org.id, { ...input, ...extra });
           let result = await send({ confirmFlagged: confirmed });
           if ("confirm" in result && result.confirm) {
             const ok = await confirmFlagged(result.confirm.flagged.map((f) => f.name ?? "Someone"));
@@ -523,18 +532,64 @@ export function TaskEditor({
           </FieldLabel>
           <DueField id="task-due-date" value={dueDate} onChange={setDueDate} disabled={readOnly} />
         </Field>
-        <Field>
-          <FieldLabel htmlFor="task-project" optional>
-            Project
-          </FieldLabel>
-          <ProjectField
-            id="task-project"
-            value={projectId}
-            onChange={setProjectId}
-            disabled={readOnly}
-            current={task?.project}
-          />
-        </Field>
+        {type === "EPIC" ? (
+          <Field>
+            <FieldLabel htmlFor="task-color" optional>
+              Colour
+            </FieldLabel>
+            <div
+              id="task-color"
+              role="radiogroup"
+              aria-label="Epic colour"
+              className="flex flex-wrap items-center gap-1.5 py-1.5"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={color === null}
+                aria-label="Theme colour"
+                title="Theme colour"
+                disabled={readOnly}
+                onClick={() => setColor(null)}
+                className={cn(
+                  "focus-glow hatch bg-muted size-6 rounded-full transition-transform active:scale-[0.94]",
+                  color === null && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                )}
+              />
+              {LABEL_COLOR_PALETTE.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={color === c}
+                  aria-label={`Colour ${c}`}
+                  disabled={readOnly}
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    "focus-glow size-6 rounded-full transition-transform active:scale-[0.94]",
+                    color === c && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                  )}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+          </Field>
+        ) : (
+          <Field>
+            <FieldLabel htmlFor="task-parent" optional>
+              Part of
+            </FieldLabel>
+            <PartOfField
+              id="task-parent"
+              value={parentTaskId}
+              onChange={setParentTaskId}
+              types={parentTypesFor(type)}
+              disabled={readOnly}
+              current={task?.parentTask ?? null}
+              excludeId={task?.id}
+            />
+          </Field>
+        )}
       </div>
 
       <Field>
@@ -717,7 +772,7 @@ export function TaskEditor({
           subtasks={task.subtasks}
           canAdd={canEdit}
           onOpen={onOpenTask}
-          projectColor={task.project ? projectColor(task.project) : "var(--chart-1)"}
+          projectColor={task.type === "EPIC" ? epicColor(task) : "var(--chart-1)"}
         />
       )}
       <section className="space-y-2 border-t pt-5">
@@ -833,8 +888,8 @@ export function TaskEditor({
             onOwner={setOwnerId}
             dueDate={dueDate}
             onDue={setDueDate}
-            projectId={projectId}
-            onProject={setProjectId}
+            parentTaskId={parentTaskId}
+            onParent={setParentTaskId}
             priority={priority}
             onPriority={setPriority}
             status={status}
