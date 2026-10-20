@@ -172,8 +172,8 @@ previews on Settings > Theme included. No grain on the page.
 
 ## Bananasplit's own pages (developers)
 
-The home page, sign-in, sign-up, password help, email confirmation, checkout
-and the 404 page belong to no club, so they never take an org theme. They
+Sign-in, sign-up, password help, email confirmation, checkout and the 404
+page belong to no club, so they never take an org theme. They
 mount `BrandRoot` (`src/components/brand/brand-root.tsx`), which since the
 Moonstone redesign uses the app's own tokens as they are (globals.css): the
 same Moonstone colours, type and components as the app, **dark by default**
@@ -194,7 +194,12 @@ pill buttons (`pill()`: `ink` is the primary, `glow` the one create action,
 
 The older cream-and-banana palette stays in brand.css as Tailwind colours
 (`bg-ink`, `bg-cream`, `bg-banana` ...) for the pages that still use it (the
-public RSVP pages, onboarding, the theme preview). `<BrandRoot look="cream">`
+home page, the RSVP flyer, the theme preview). The home page keeps its
+original cream-and-banana sections (the hero screenshots, the feature
+bento, ripeness, finance), with Moonstone's floating glass header and the
+four-plan pricing on top; its decoration (`bg-hero`, `bg-peel`,
+`bg-glow-banana-*`, the paper shadows) lives at the end of brand.css.
+`<BrandRoot look="cream">`
 gives a page that look whole: always light, with the tokens pointed at the
 cream palette, so token-based components (the pill buttons, the brand
 fields, Input) print in ink on cream.

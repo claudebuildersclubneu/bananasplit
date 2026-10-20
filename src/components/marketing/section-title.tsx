@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** A section's headline: the display face, 34 to 56px, set tight. */
+/** A section's headline: Young Serif, 38 to 64px. */
 export function SectionTitle({
   children,
   className,
@@ -11,7 +11,7 @@ export function SectionTitle({
   return (
     <h2
       className={cn(
-        "display-title text-[clamp(34px,4.6vw,56px)] leading-[1.0] tracking-[-0.04em]",
+        "font-heading text-[clamp(38px,5vw,64px)] leading-[1.02] tracking-[-0.03em]",
         className,
       )}
     >
@@ -35,14 +35,14 @@ export function SectionIntro({
   className?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-5">
-      <SectionTitle className="max-w-[700px]">{title}</SectionTitle>
-      <p className={cn("text-muted-foreground text-[17px] leading-[1.55]", className)}>
-        {children}
-      </p>
+    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+      <div className="flex max-w-[700px] flex-col gap-[18px]">
+        <SectionTitle className="text-balance">{title}</SectionTitle>
+      </div>
+      <p className={cn("text-ink-muted text-[17px] leading-[1.55]", className)}>{children}</p>
     </div>
   );
 }
 
-/** The page's column: 1240px, a 40px gutter (16 on phones). */
-export const CONTAINER = "mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-10";
+/** The page's column: 1240px with a 24px gutter, as every section uses. */
+export const CONTAINER = "mx-auto w-full max-w-[1240px] px-6";

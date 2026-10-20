@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 };
 
 /**
- * The marketing home page, in Moonstone (redesign guide 10.8): dark by
- * default, the banana glow as the hero's light, block cards and a glass
- * header. It is the home page for everyone, signed in or not; signed-in
- * visitors get an "Open your club" way into the app (/app) instead of Log in.
+ * The marketing home page (the design handoff's "Bananasplit Home"), in its
+ * cream-and-banana look, with the Moonstone glass header and the four plans.
+ * It is the home page for everyone, signed in or not; signed-in visitors get
+ * an "Open your club" way into the app (/app) instead of Log in.
  *
  * `overflow-x-clip` keeps wide decoration from scrolling the page sideways
  * without breaking the sticky header, as `hidden` would.
@@ -32,7 +32,7 @@ export default async function Home() {
   const signedIn = Boolean(await getSession());
 
   return (
-    <BrandRoot className="overflow-x-clip">
+    <BrandRoot look="cream" className="overflow-x-clip">
       <SiteHeader signedIn={signedIn} />
       <main id="top">
         <Hero />

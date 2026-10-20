@@ -268,3 +268,122 @@
     }
   }
 }
+
+/*
+ * The home page's own decoration (the design handoff): its hero, peel and
+ * glow backgrounds and cream-paper shadows. Only the marketing sections use
+ * these; they are fixed brand colours, like the logo's.
+ */
+@theme {
+  --shadow-cta: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 12px 24px -12px rgb(28 24 16 / 0.5);
+  --shadow-cta-soft: 0 12px 24px -12px rgb(28 24 16 / 0.5);
+  --shadow-featured:
+    0 0 0 4px color-mix(in oklab, var(--color-banana) 25%, transparent),
+    0 30px 60px -30px rgb(28 24 16 / 0.35);
+  --shadow-frame-soft: 0 1px 2px rgb(28 24 16 / 0.05), 0 40px 80px -40px rgb(28 24 16 / 0.3);
+  --shadow-segment: 0 1px 2px rgb(28 24 16 / 0.12);
+  --shadow-phone: 0 40px 60px -24px rgb(28 24 16 / 0.55);
+  --shadow-browser: 0 -30px 80px -30px rgb(160 110 0 / 0.35), 0 0 0 6px rgb(255 253 247 / 0.5);
+  --shadow-widget: 0 30px 60px -30px rgb(0 0 0 / 0.6);
+  --shadow-field: 0 1px 1px rgb(28 24 16 / 0.04);
+  --shadow-ring-ink: 0 0 0 2px var(--color-cream), 0 0 0 4px var(--color-ink);
+  --shadow-divider-left: -1px 0 0 rgb(28 24 16 / 0.06);
+}
+
+@utility focus-banana-sm {
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-banana) 35%, transparent);
+  }
+}
+
+@utility bg-hero {
+  background: linear-gradient(
+    180deg,
+    var(--color-cream) 0%,
+    var(--color-cream) 40%,
+    var(--color-butter) 72%,
+    var(--color-banana) 100%
+  );
+}
+
+@utility bg-hero-grid {
+  background-image:
+    linear-gradient(rgb(28 24 16 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(28 24 16 / 0.05) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 55%);
+}
+
+@utility bg-peel {
+  background: radial-gradient(
+    120% 90% at 30% 0%,
+    var(--color-lemon) 0%,
+    var(--color-banana) 50%,
+    var(--color-gold) 100%
+  );
+}
+
+@utility bg-peel-center {
+  background-color: var(--color-banana);
+  background-image: radial-gradient(
+    120% 90% at 50% 0%,
+    var(--color-lemon) 0%,
+    var(--color-banana) 50%,
+    var(--color-gold) 100%
+  );
+}
+
+@utility bg-event-cover {
+  background: linear-gradient(135deg, var(--color-banana), var(--color-ripe));
+}
+
+@utility bg-glow-cream {
+  background: radial-gradient(circle, rgb(255 240 180 / 0.7), transparent 70%);
+}
+
+@utility bg-glow-banana {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 26%, transparent),
+    transparent 70%
+  );
+}
+
+@utility bg-glow-banana-22 {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 22%, transparent),
+    transparent 65%
+  );
+}
+
+@utility bg-glow-banana-20 {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 20%, transparent),
+    transparent 65%
+  );
+}
+
+@utility bg-glow-banana-10 {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-banana) 10%, transparent),
+    transparent 65%
+  );
+}
+
+@utility bg-stage-4 {
+  background-color: var(--color-banana);
+  background-image: radial-gradient(circle at 30% 50%, var(--color-freckle) 2px, transparent 2.5px);
+}
+
+@utility bg-stage-5 {
+  background-color: var(--color-ripe);
+  background-image:
+    radial-gradient(circle at 25% 45%, var(--color-stem) 2px, transparent 2.5px),
+    radial-gradient(circle at 65% 60%, var(--color-stem) 2.5px, transparent 3px);
+}

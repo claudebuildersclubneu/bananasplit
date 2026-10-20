@@ -433,35 +433,36 @@ function ComparisonTable({ plans }: { plans: readonly Tier[] }) {
   );
 }
 
-/** "For schools": a graphite panel (the chrome colour) lit from its corner. */
+/** The dark "For schools" panel, under the club plans only. */
 function SchoolsPanel() {
   return (
-    <div className="bg-chrome text-chrome-foreground glow-corner rounded-shell relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-center gap-x-14 gap-y-8 overflow-hidden p-[clamp(24px,4vw,48px)]">
+    <div className="bg-night text-cream relative grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-center gap-x-14 gap-y-8 overflow-hidden rounded-[28px] p-[clamp(28px,4vw,48px)]">
+      <span
+        aria-hidden="true"
+        className="bg-glow-banana-20 absolute -top-[140px] -right-[120px] size-[380px] rounded-full"
+      />
       <div className="relative flex flex-col gap-3.5">
-        <span className="text-[14px] font-medium opacity-70">For schools</span>
-        <h3 className="display-title text-[clamp(28px,3vw,40px)] leading-[1.06] tracking-[-0.03em]">
+        <span className="text-banana text-[14px] font-bold">For schools</span>
+        <h3 className="font-heading text-[clamp(28px,3vw,40px)] leading-[1.06] tracking-[-0.025em] text-balance">
           Run every club on campus from one place.
         </h3>
-        <p className="max-w-[480px] text-[16px] leading-[1.6] opacity-75">
+        <p className="text-dusk max-w-[480px] text-[16px] leading-[1.6]">
           Platform plans host all your clubs under one school, with platform admins deciding who can
           start a club. One per-member, per-semester rate across campus, with volume discounts.
         </p>
       </div>
       <div className="relative flex flex-col items-start gap-5">
-        <ul className="m-0 flex list-none flex-col gap-2.5 p-0 text-[15px]">
+        <div className="text-dusk-light flex flex-col gap-2.5 text-[15px]">
           {SCHOOL_PERKS.map((perk) => (
-            <li key={perk} className="flex gap-2.5">
-              <Check className="mt-0.5 size-4 flex-none opacity-70" aria-hidden="true" />
+            <span key={perk} className="flex gap-2.5">
+              <span className="text-banana">✓</span>
               {perk}
-            </li>
+            </span>
           ))}
-        </ul>
+        </div>
         <SiteLink
           href={CONTACT_HREF}
-          className={cn(
-            pill({ size: "md" }),
-            "bg-chrome-foreground text-chrome hover:bg-chrome-foreground/90",
-          )}
+          className="bg-banana text-ink hover:bg-lemon hover:text-ink rounded-full px-[22px] py-[13px] text-[15px] font-semibold whitespace-nowrap"
         >
           Talk to us
         </SiteLink>

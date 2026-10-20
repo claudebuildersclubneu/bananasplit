@@ -1,29 +1,31 @@
-import { ArrowRight } from "@/components/brand/arrows";
-import { CoreMark } from "@/components/brand/logo";
-import { pill } from "@/components/brand/pill";
-import { cn } from "@/lib/utils";
-
 /**
- * The closing panel: a shell-sized card with the banana glow rising from
- * below, the mark in its own colours, the headline and the one create
- * action.
+ * The closing yellow panel, lit from the top, with a giant wordmark that
+ * the panel's bottom edge crops.
  */
 export function FinalCta() {
   return (
     <section className="px-[clamp(8px,1.5vw,20px)]">
-      <div className="bg-card text-card-foreground edge ring-foreground/6 glow-rise rounded-shell relative overflow-hidden ring-1">
-        <div className="mx-auto flex max-w-[1240px] flex-col items-center gap-6 px-6 py-[clamp(64px,9vw,120px)] text-center">
-          <CoreMark size={56} />
-          <h2 className="display-title max-w-[820px] text-[clamp(36px,5vw,64px)] leading-[1.0] tracking-[-0.04em]">
+      <div className="bg-peel-center relative overflow-hidden rounded-[clamp(24px,3vw,40px)]">
+        <div className="mx-auto flex max-w-[1240px] flex-col items-center gap-6 px-6 pt-[clamp(72px,9vw,112px)] text-center">
+          <h2 className="font-heading max-w-[820px] text-[clamp(36px,4.8vw,64px)] leading-[1.02] tracking-[-0.03em] text-balance">
             Split the work. Keep the club together.
           </h2>
-          <p className="text-muted-foreground max-w-[460px] text-[17px] leading-[1.55]">
-            Guided setup walks you through data, tags, finance and teams. Invite your officers with
-            a code.
+          <p className="text-bark-soft max-w-[460px] text-[17px] leading-[1.55]">
+            Guided setup walks you through data, labels, finance and teams. Invite your officers
+            with a code.
           </p>
-          <a href="#pricing" className={cn(pill({ tone: "glow" }), "mt-1 h-11 px-6 text-[15px]")}>
-            Create your club <ArrowRight />
+          <a
+            href="#pricing"
+            className="bg-ink text-cream shadow-cta-soft hover:bg-ink-hover hover:text-cream rounded-full px-[26px] py-[15px] text-[16px] font-semibold whitespace-nowrap"
+          >
+            Create your club
           </a>
+          <div
+            aria-hidden="true"
+            className="font-heading text-ink mt-[clamp(32px,5vw,64px)] -mb-[0.12em] text-[clamp(64px,17vw,240px)] leading-[0.78] tracking-[-0.05em] whitespace-nowrap"
+          >
+            bananasplit
+          </div>
         </div>
       </div>
     </section>
