@@ -149,7 +149,7 @@ export async function chooseClubRole(page: Page, orgSlug: string, role?: string)
 
 /**
  * Org setup (onboarding Flow B) with the defaults: name the club, keep the
- * suggested labels, finance and starter teams, invite no one, skip the
+ * suggested labels, finance, starter teams and pulse, invite no one, skip the
  * connections, and land on the new club's home as its OWNER. Returns the slug.
  */
 export async function createOrgViaOnboarding(page: Page, orgName: string): Promise<string> {
@@ -163,6 +163,9 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.waitForURL(/\/finance$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/teams$/);
+  await page.getByRole("button", { name: "Continue" }).click();
+  // The weekly pulse, with its defaults (Fridays at 5 PM, to everyone).
+  await page.waitForURL(/\/pulse$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Continue" }).click();
