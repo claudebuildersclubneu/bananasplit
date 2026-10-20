@@ -47,7 +47,7 @@ export function SignUpForm({
           }
         />
         {state.error && <FormMessage>{state.error}</FormMessage>}
-        <Link href={signInHref} className={cn(pill({ raised: true }), "w-full")}>
+        <Link href={signInHref} className={cn(pill(), "w-full")}>
           Go to log in
         </Link>
       </>
@@ -70,7 +70,6 @@ export function SignUpForm({
             required
             autoComplete="name"
             placeholder="Maya Chen"
-            className="h-12"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -83,27 +82,29 @@ export function SignUpForm({
             required
             autoComplete="email"
             placeholder="you@example.com"
-            className="h-12"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </BrandField>
-        <NewPasswordField inputClassName="h-12" />
+        <NewPasswordField />
         {state.error && <FormMessage>{state.error}</FormMessage>}
         <PrimaryButton type="submit" disabled={isPending}>
           {isPending ? "Creating account…" : "Create account"}
         </PrimaryButton>
-        <p className="text-ink-soft m-0 text-center text-[13px] leading-normal">
+        <p className="text-muted-foreground m-0 text-center text-[13px] leading-[1.5]">
           By continuing you agree to the{" "}
-          <a href={TERMS_HREF} className="text-ink-muted underline">
+          <a href={TERMS_HREF} className="text-foreground underline underline-offset-2">
             Terms
           </a>{" "}
           and{" "}
-          <a href={PRIVACY_HREF} className="text-ink-muted underline">
+          <a href={PRIVACY_HREF} className="text-foreground underline underline-offset-2">
             Privacy Policy
           </a>
           . Have an account?{" "}
-          <Link href={signInHref} className="font-bold">
+          <Link
+            href={signInHref}
+            className="text-foreground font-semibold underline decoration-current/30 underline-offset-2 hover:decoration-current"
+          >
             Log in
           </Link>
         </p>

@@ -18,7 +18,7 @@
   --xy-node-boxshadow-selected: none;
   --xy-handle-background-color: transparent;
   --xy-handle-border-color: transparent;
-  --xy-controls-button-background-color: var(--background);
+  --xy-controls-button-background-color: var(--card);
   --xy-controls-button-background-color-hover: var(--muted);
   --xy-controls-button-color: var(--foreground);
   --xy-controls-button-color-hover: var(--foreground);
@@ -43,4 +43,22 @@
 
 .org-chart-flow .react-flow__attribution a {
   color: var(--muted-foreground);
+}
+
+/* Moonstone: the zoom controls as one pill, like the other circle buttons. */
+.org-chart-flow .react-flow__controls {
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  box-shadow: var(--elevation-1);
+}
+
+.org-chart-flow .react-flow__controls-button {
+  width: 32px;
+  height: 32px;
+  border-bottom: none;
+}
+
+.org-chart-flow .react-flow__edge-path {
+  stroke-linecap: round;
 }

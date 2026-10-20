@@ -42,7 +42,7 @@ export default async function ResetPasswordPage({ params }: PageProps<"/reset-pa
     return (
       <AuthCard>
         <AuthTitle title={copy.title} description={copy.description} />
-        <Link href="/forgot-password" className={cn(pill({ raised: true }), "w-full")}>
+        <Link href="/forgot-password" className={cn(pill(), "w-full")}>
           Send a new link
         </Link>
       </AuthCard>

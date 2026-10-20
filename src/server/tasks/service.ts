@@ -6,6 +6,7 @@ import {
   Prisma,
   TaskPriority,
   TaskStatus,
+  TaskType,
   TaskVisibility,
 } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/permissions";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/tasks/access";
 import type { ViewerChart } from "@/lib/tasks/assignment";
 import { dueDateKey, formatDueKey, fromDateKey, isDateKey, localDateKey } from "@/lib/tasks/dates";
+import { checkTypeChange, planNesting, type NestingChild } from "@/lib/tasks/hierarchy";
 import {
   diffMentions,
   mentionsToNotify,
@@ -42,6 +44,7 @@ import {
 import type { OrgContext } from "@/server/db/context";
 import { notifyUsers } from "@/server/notifications";
 
+import { BOARD_ITEM } from "./queries";
 import { orgAdminIds } from "./visibility";
 
 import {
@@ -132,6 +135,8 @@ const baseFields = {
   labelIds: z.array(idSchema).max(50).optional(),
   /** C4: ORG (the open board) or PRIVATE. A subtask follows its parent. */
   visibility: z.enum(VISIBILITY_VALUES).optional(),
+  /** EPIC, STORY or TASK (src/lib/tasks/hierarchy.ts says where each may sit). */
+  type: z.enum(TaskType).optional(),
   /** The actor confirmed an above-level (flagged) assignment. */
   confirmFlagged: z.boolean().optional(),
 };
@@ -234,6 +239,7 @@ const subjectSelect = {
   priority: true,
   dueDate: true,
   projectId: true,
+  type: true,
   parentTaskId: true,
   createdById: true,
   ownerId: true,
@@ -644,24 +650,79 @@ async function assertLabels(env: TaskEnv, labelIds: readonly string[]): Promise<
     throw new TaskError("One or more labels don't belong to this organization.");
 }
 
-/** One level of nesting: the parent must be top-level and editable by the actor. */
-async function loadParent(env: TaskEnv, parentTaskId: string, childId?: string): Promise<Subject> {
+/** The type of the task above `parentTaskId` (null at the top, or when the viewer can't see it). */
+async function parentTypeOf(env: TaskEnv, parentTaskId: string | null): Promise<TaskType | null> {
+  if (!parentTaskId) return null;
+  const parent = await env.ctx.db.task.findFirst({
+    where: { id: parentTaskId, organizationId: env.ctx.organizationId },
+    select: { type: true },
+  });
+  return parent?.type ?? null;
+}
+
+/** A task's subtasks' types, trashed ones included (the hierarchy trigger counts them). */
+async function childTypesOf(env: TaskEnv, taskId: string): Promise<TaskType[]> {
+  const children = await env.ctx.db.task.findMany({
+    where: { organizationId: env.ctx.organizationId, parentTaskId: taskId },
+    select: { type: true },
+  });
+  return children.map((c) => c.type);
+}
+
+/**
+ * The parent a task is going under: it must exist, be editable by the
+ * actor, and not be the task itself or one of its own subtasks. Two levels
+ * (epic > story > task; src/lib/tasks/hierarchy.ts has the rules).
+ */
+async function loadParent(
+  env: TaskEnv,
+  parentTaskId: string,
+  childId?: string,
+): Promise<Subject & { grandparentType: TaskType | null }> {
   const parent = await loadSubject(env, parentTaskId).catch(() => {
     throw new TaskError("That parent task doesn't exist.");
   });
-  if (parent.parentTaskId) throw new TaskError("Cannot nest a subtask under another subtask.");
   if (childId && parent.id === childId) throw new TaskError("A task can't be its own subtask.");
   if (!canEditTask(env.actor, accessOf(parent))) {
     throw new TaskError("You can only break down tasks you can edit.");
   }
-  if (childId) {
-    const children = await env.ctx.db.task.count({
-      where: { organizationId: env.ctx.organizationId, parentTaskId: childId, deletedAt: null },
+  let grandparentType: TaskType | null = null;
+  if (parent.parentTaskId) {
+    const grandparent = await env.ctx.db.task.findFirst({
+      where: { id: parent.parentTaskId, organizationId: env.ctx.organizationId },
+      select: { id: true, type: true },
     });
-    if (children > 0)
-      throw new TaskError("This task has subtasks of its own and can't become a subtask.");
+    if (childId && (parent.parentTaskId === childId || grandparent?.id === childId)) {
+      throw new TaskError("A task can't go inside one of its own subtasks.");
+    }
+    // A parent the viewer can't see is a private task above it: assume the
+    // stricter case (a story) and let the trigger have the last word.
+    grandparentType = grandparent?.type ?? TaskType.STORY;
   }
-  return parent;
+  return { ...parent, grandparentType };
+}
+
+/** Where a task goes under `parent`, or the reason it can't (a TaskError). */
+function nest(
+  parent: { type: TaskType; grandparentType: TaskType | null },
+  child: NestingChild,
+): { childType: TaskType; promoteParent: boolean } {
+  const plan = planNesting({ type: parent.type, parentType: parent.grandparentType }, child);
+  if (!plan.ok) throw new TaskError(plan.error);
+  return { childType: plan.childType, promoteParent: plan.promoteParent };
+}
+
+/**
+ * A TASK can't have subtasks (app.task_hierarchy_guard): breaking one down
+ * makes it a STORY. Call it once nothing can refuse the write any more
+ * (after the confirmation return), so a refusal leaves the parent as it was.
+ */
+async function makeParentable(env: TaskEnv, parent: Subject): Promise<void> {
+  if (parent.type !== TaskType.TASK) return;
+  await env.ctx.db.task.updateMany({
+    where: { id: parent.id, organizationId: env.ctx.organizationId, type: TaskType.TASK },
+    data: { type: TaskType.STORY },
+  });
 }
 
 async function nextRankForStatus(env: TaskEnv, status: TaskStatus): Promise<string> {
@@ -691,6 +752,14 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
 
   const project = d.projectId ? await loadProject(env, d.projectId) : null;
   const parent = d.parentTaskId ? await loadParent(env, d.parentTaskId) : null;
+  // Its type: what was asked for (TASK by default), fitted to the parent.
+  const nesting = parent
+    ? nest(parent, {
+        type: d.type ?? TaskType.TASK,
+        explicit: d.type !== undefined,
+        childTypes: [],
+      })
+    : { childType: d.type ?? TaskType.TASK, promoteParent: false };
   const subject: TaskAccessSubject = {
     createdById: env.actor.userId,
     ownerId: null,
@@ -731,9 +800,11 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   // enforces it too).
   const visibility = parent ? parent.visibility : (d.visibility ?? TaskVisibility.ORG);
 
+  if (parent && nesting.promoteParent) await makeParentable(env, parent);
   const task = await db.task.create({
     data: {
       organizationId,
+      type: nesting.childType,
       title: d.title,
       description: d.description?.trim() ? d.description : null,
       ...statusData,
@@ -901,9 +972,37 @@ async function applyUpdate(
   }
 
   let nextParentId = s.parentTaskId;
-  if (d.parentTaskId !== undefined && d.parentTaskId !== s.parentTaskId) {
-    if (d.parentTaskId) {
-      const parent = await loadParent(env, d.parentTaskId, s.id);
+  let newParent: Subject | null = null;
+  const parentChanges = d.parentTaskId !== undefined && d.parentTaskId !== s.parentTaskId;
+  const typeChanges = d.type !== undefined && d.type !== s.type;
+  let movedUnder: Subject | null = null;
+  if (parentChanges && d.parentTaskId) {
+    // Moving under a parent: fit its type (and its own subtasks) to the new place.
+    const parent = await loadParent(env, d.parentTaskId, s.id);
+    movedUnder = parent;
+    const nesting = nest(parent, {
+      type: d.type ?? s.type,
+      explicit: typeChanges,
+      childTypes: await childTypesOf(env, s.id),
+    });
+    if (nesting.promoteParent) newParent = parent;
+    if (nesting.childType !== s.type) data.type = nesting.childType;
+  } else if (typeChanges) {
+    // Changing the type where it stands (or at the top, when it moves out).
+    const error = checkTypeChange(d.type!, {
+      parentType: parentChanges ? null : await parentTypeOf(env, s.parentTaskId),
+      childTypes: await childTypesOf(env, s.id),
+    });
+    if (error) throw new TaskError(error);
+    data.type = d.type;
+  }
+  if (data.type !== undefined) {
+    activity.push({ type: "TYPE_CHANGED", diffJson: { from: s.type, to: data.type } });
+    fieldEdit = true;
+  }
+  if (parentChanges) {
+    if (movedUnder) {
+      const parent = movedUnder;
       data.rank = await nextSubtaskRank(env, parent.id);
       // The trigger would do this anyway; setting it here keeps the mention
       // audience below in step with what is about to be written.
@@ -912,8 +1011,8 @@ async function applyUpdate(
     } else {
       data.rank = await nextRankForStatus(env, nextStatus);
     }
-    data.parentTaskId = d.parentTaskId;
-    nextParentId = d.parentTaskId;
+    data.parentTaskId = d.parentTaskId ?? null;
+    nextParentId = d.parentTaskId ?? null;
     fieldEdit = true;
   }
 
@@ -958,6 +1057,7 @@ async function applyUpdate(
 
   if (!fieldEdit && !plan) return { taskId: s.id, version: s.version };
 
+  if (newParent) await makeParentable(env, newParent);
   const res = await db.task.updateMany({
     where: {
       id: s.id,
@@ -1118,15 +1218,20 @@ export async function reorderTask(env: TaskEnv, input: unknown): Promise<TaskAct
   const d = parse(reorderSchema, input);
   const { db, organizationId } = env.ctx;
   const s = await loadSubject(env, d.taskId);
-  if (s.parentTaskId) throw new TaskError("Subtasks move with their parent.");
+  // The board holds top-level work and an epic's stories and tasks; a
+  // story's tasks move with their story, and epics aren't on the board.
+  if (s.type === TaskType.EPIC) throw new TaskError("Epics aren't on the board.");
+  if (s.parentTaskId && (await parentTypeOf(env, s.parentTaskId)) !== TaskType.EPIC) {
+    throw new TaskError("Subtasks move with their parent.");
+  }
   const check = checkFieldEdit(env.actor, accessOf(s));
   if (!check.ok) throw new TaskError(check.reason);
 
-  // Client-supplied neighbours: only this org's live top-level tasks in the target column.
+  // Client-supplied neighbours: only this org's live board cards in the target column.
   const neighbour = (id: string | null) =>
     id
       ? db.task.findFirst({
-          where: { id, organizationId, deletedAt: null, parentTaskId: null, status: d.status },
+          where: { id, organizationId, deletedAt: null, status: d.status, ...BOARD_ITEM },
           select: { rank: true },
         })
       : Promise.resolve(null);
@@ -1178,9 +1283,9 @@ async function rebalanceColumn(
     where: {
       organizationId,
       status,
-      parentTaskId: null,
       deletedAt: null,
       id: { not: movedTaskId },
+      ...BOARD_ITEM,
     },
     orderBy: { rank: "asc" },
     select: { id: true },

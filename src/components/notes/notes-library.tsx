@@ -40,6 +40,7 @@ import { ItemMenu } from "@/components/item-menu";
 import { FILE_ICONS, FILE_LABELS } from "@/components/notes/file-card";
 import { NewFolderForm } from "@/components/notes/new-folder-form";
 import { PinToggle } from "@/components/pins/pins-context";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -70,6 +71,16 @@ const FILE_MIME = "application/x-bananasplit-file";
 
 const COLORS = ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"] as const;
 
+/** A tile's preview: the first line with words in it. */
+function firstLine(text: string) {
+  return (
+    text
+      .split("\n")
+      .map((l) => l.trim())
+      .find(Boolean) ?? ""
+  );
+}
+
 export interface LibraryFolder {
   id: string;
   name: string;
@@ -82,6 +93,8 @@ export interface LibraryFolder {
 export interface LibraryNote {
   id: string;
   title: string;
+  /** The page's icon (an emoji), if it has one. */
+  icon?: string | null;
   snippet: string;
   visibility: "PRIVATE" | "ORGANIZATION";
   updatedAt: Date;
@@ -365,14 +378,14 @@ export function NotesLibrary({
 
   /** The card itself: a link to open it, dragged to file it in a folder. */
   const cardLink = cn(
-    "bg-card hover:border-foreground/20 focus-visible:ring-ring flex h-full flex-col overflow-hidden rounded-xl border transition-colors focus-visible:ring-2 focus-visible:outline-none",
-    view === "list" && "flex-row items-center",
+    "bg-card edge rounded-tile focus-glow flex h-full flex-col overflow-hidden transition-[transform,box-shadow] duration-200 ease-(--ease-ink) hover:-translate-y-0.5 hover:shadow-e2 motion-reduce:hover:translate-y-0",
+    view === "list" && "flex-row items-center hover:translate-y-0",
   );
   // Pin and "…" sit on the card's text, at the right: beside the title and
   // details in a grid, centred on the row in a list.
   const cardActions = cn(
     "absolute right-2 flex items-center gap-1",
-    view === "grid" ? "bottom-4.5" : "top-1/2 -translate-y-1/2",
+    view === "grid" ? "top-3" : "top-1/2 -translate-y-1/2",
   );
   const pinClass = (href: string) =>
     cn(
@@ -397,18 +410,20 @@ export function NotesLibrary({
           className={cardLink}
         >
           {view === "grid" && (
-            <div className="bg-muted/40 relative h-32 overflow-hidden border-b px-5 pt-4">
-              <div className="bg-background h-full rounded-t-md border border-b-0 px-4 pt-3 text-[10px] leading-relaxed">
-                <p className="mb-1 truncate text-[11px] font-semibold">{name}</p>
-                <p className="text-muted-foreground line-clamp-5 whitespace-pre-line">
-                  {n.snippet || "Empty note"}
-                </p>
-              </div>
+            <div className="flex items-center gap-2 px-4 pt-4">
+              <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-full text-base leading-none">
+                {n.icon ? (
+                  <span aria-hidden="true">{n.icon}</span>
+                ) : (
+                  <NotebookText className="size-[18px]" aria-hidden="true" />
+                )}
+              </span>
+              <Badge variant="secondary">Note</Badge>
             </div>
           )}
           <div
             className={cn(
-              "flex min-w-0 flex-1 flex-col gap-1 p-3",
+              "flex min-w-0 flex-1 flex-col gap-1 px-4 pt-3 pb-4",
               view === "list" && "flex-row items-center gap-3 py-2.5",
             )}
           >
@@ -428,6 +443,11 @@ export function NotesLibrary({
               ) : null}
               <span className="truncate">{name}</span>
             </p>
+            {view === "grid" && (
+              <p className="text-muted-foreground line-clamp-2 min-h-[2.5em] text-[13px] leading-snug">
+                {firstLine(n.snippet) || "Empty note"}
+              </p>
+            )}
             <p
               className={cn(
                 "text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 pe-16 text-xs",
@@ -435,7 +455,8 @@ export function NotesLibrary({
               )}
             >
               <span className="truncate">
-                Note · {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
+                {view === "list" ? "Note · " : ""}
+                {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
               </span>
               {(n.sharedWithMe || n.shareCount > 0 || n.memberCanEdit) && (
                 <span className="truncate">
@@ -497,31 +518,33 @@ export function NotesLibrary({
           }}
           className={cardLink}
         >
-          {view === "grid" && (
-            <div className="bg-muted/40 relative grid h-32 place-items-center overflow-hidden border-b">
-              {family === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a private, permission-checked file
+          {view === "grid" &&
+            (family === "image" ? (
+              <div className="bg-muted relative h-32 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a private, permission-checked file */}
                 <img src={src} alt="" loading="lazy" className="size-full object-cover" />
-              ) : f.excerpt ? (
-                <div className="bg-background absolute inset-x-5 top-4 bottom-0 rounded-t-md border border-b-0 px-4 pt-3 text-[10px] leading-relaxed">
-                  <p className="text-muted-foreground line-clamp-6 whitespace-pre-line">
-                    {f.excerpt}
-                  </p>
-                </div>
-              ) : (
-                <Icon
+                <Badge variant="secondary" className="absolute bottom-2 left-3">
+                  {FILE_LABELS[family]}
+                </Badge>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 pt-4">
+                <span
                   className={cn(
-                    "size-8",
-                    family === "pdf" ? "text-destructive" : "text-muted-foreground",
+                    "grid size-9 shrink-0 place-items-center rounded-full",
+                    family === "pdf"
+                      ? "bg-tint-danger text-tint-danger-foreground"
+                      : "bg-tint-info text-tint-info-foreground",
                   )}
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-          )}
+                >
+                  <Icon className="size-[18px]" aria-hidden="true" />
+                </span>
+                <Badge variant="secondary">{FILE_LABELS[family]}</Badge>
+              </div>
+            ))}
           <div
             className={cn(
-              "flex min-w-0 flex-1 flex-col gap-1 p-3",
+              "flex min-w-0 flex-1 flex-col gap-1 px-4 pt-3 pb-4",
               view === "list" && "flex-row items-center gap-3 py-2.5",
             )}
           >
@@ -534,6 +557,11 @@ export function NotesLibrary({
               )}
               <span className="truncate">{f.name}</span>
             </p>
+            {view === "grid" && family !== "image" && (
+              <p className="text-muted-foreground line-clamp-2 min-h-[2.5em] text-[13px] leading-snug">
+                {firstLine(f.excerpt ?? "") || formatBytes(f.sizeBytes)}
+              </p>
+            )}
             <p
               className={cn(
                 "text-muted-foreground pe-16 text-xs",
@@ -899,7 +927,7 @@ export function NotesLibrary({
           <ul
             className={cn(
               view === "grid"
-                ? "grid [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))] gap-3"
+                ? "grid [grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))] gap-[18px]"
                 : "space-y-2",
               pending && "opacity-70",
             )}
@@ -1045,7 +1073,7 @@ function TrashView({
             Notes and files deleted in the last {NOTE_TRASH_DAYS} days. Restore puts them back where
             they were; after {NOTE_TRASH_DAYS} days deleted files are gone for good.
           </p>
-          <ul className={cn("divide-y rounded-xl border", pending && "opacity-70")}>
+          <ul className={cn("bg-card edge rounded-tile divide-y", pending && "opacity-70")}>
             {rows.map((r) => (
               <li key={`${r.kind}-${r.id}`} className="flex items-center gap-3 px-3 py-2.5">
                 <r.Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />

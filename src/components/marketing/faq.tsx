@@ -3,7 +3,7 @@ import { SectionTitle } from "./section-title";
 const FAQS = [
   {
     q: "Do I need a club to make RSVP pages?",
-    a: "No. Every account comes with Personal, free: RSVP pages with sign-ups, waitlists, QR check-in and invite links, plus your own tasks, calendar and availability polls. Start a club when you want to run things with others.",
+    a: "No. Every account comes with Personal, free: RSVP pages with sign-ups, waitlists, QR check-in and invite links, plus your own tasks, calendar, availability polls, notes and files (1 GB, or 25 GB with Personal Plus). Start a club when you want to run things with others.",
   },
   {
     q: "Does it cost anything to join a club?",
@@ -23,15 +23,15 @@ const FAQS = [
   },
   {
     q: "Which data sources can we connect?",
-    a: "Google Sheets, Airtable, Notion, Excel, Supabase and Postgres. Club plans include two connections and Society includes six.",
+    a: "Google Sheets, Airtable, Notion, Excel, Supabase and Postgres. Team includes two connections, Team Advanced six, and Personal Plus one.",
   },
   {
     q: "Can other clubs see our data?",
     a: "No. Each club’s data is separated by the database itself, with every table locked down per club and per person. Changes are recorded in an audit log and secrets are encrypted.",
   },
   {
-    q: "We’re not a school club. Can we use it?",
-    a: "Yes. The Team and Business plans are for startups, studios and any group that wants the same tools, billed per seat each month.",
+    q: "How much can we store?",
+    a: "Team clubs get 100 GB with files up to 250 MB; Team Advanced gets 500 GB with files up to 1 GB. Receipts, note history and the trash count toward it, and nothing is ever deleted for going over: uploads just pause until you make room or upgrade.",
   },
 ] as const;
 

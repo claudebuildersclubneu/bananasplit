@@ -18,6 +18,7 @@ import { pollHref } from "@/lib/polls/paths";
 import { addDaysToKey, effectiveTimezone, fromDateKey, localDateKey } from "@/lib/tasks/dates";
 import { NotFoundError } from "@/lib/auth/errors";
 import { withOrgTx, withUserTx, type TxClient } from "@/server/db/context";
+import { listNoteFiles } from "@/server/notes/files";
 import { myRsvpRegistrations, type RegistrationRow } from "@/server/rsvp/my-registrations";
 import { findPendingInvitationsForMe, type PendingInvitation } from "@/server/settings/invitations";
 import { taskFilterWhere } from "@/server/tasks/queries";
@@ -51,6 +52,7 @@ const PER_SPACE_TASKS = 8;
 const PER_SPACE_POLLS = 4;
 const HOSTED_PAGES = 6;
 const RSVP_LIMIT = 8;
+const RECENT_FILES = 6;
 
 export const UPCOMING_LIMIT = 10;
 export const DUE_SOON_LIMIT = 10;
@@ -206,6 +208,10 @@ export interface PersonalHomeData {
   profileGaps: ProfileGap[];
   /** Where "Finish your profile" goes (the first gap), or null. */
   finishProfileHref: string | null;
+  /** "Your week": tasks finished in the last seven days, per space (most first). */
+  yourWeek: { done: number; bySpace: { space: SpaceRef; done: number }[] };
+  /** Personal's newest files. */
+  recentFiles: { id: string; name: string; contentType: string; createdAt: Date; href: string }[];
 }
 
 // ---------------------------------------------------------------- raw reads
@@ -254,6 +260,10 @@ export interface SpaceDigest {
     going: number;
     waitlist: number;
   }[];
+  /** Tasks you finished in the last seven days (yours, or ones you're on). */
+  doneThisWeek?: number;
+  /** Personal only: the newest files. */
+  recentFiles?: { id: string; name: string; contentType: string; createdAt: Date }[];
 }
 
 export type { RegistrationRow };
@@ -344,6 +354,24 @@ export async function readSpaceDigest(
     take: PER_SPACE_TASKS,
   });
   const openTasks = club ? await db.task.count({ where: mine }) : 0;
+  // "Your week": what you finished in the last seven days.
+  const doneThisWeek = await db.task.count({
+    where: {
+      AND: [
+        taskFilterWhere(organizationId, club ? { assigneeId: userId } : {}),
+        { status: "COMPLETED", completedAt: { gte: new Date(now.getTime() - 7 * DAY_MS) } },
+      ],
+    },
+  });
+  // Personal's files (Personal spaces have notes and files now).
+  const recentFiles = club
+    ? []
+    : (await listNoteFiles(db, organizationId)).slice(0, RECENT_FILES).map((f) => ({
+        id: f.id,
+        name: f.name,
+        contentType: f.contentType,
+        createdAt: f.createdAt,
+      }));
   const unread = club
     ? await db.notification.count({ where: { organizationId, userId, readAt: null } })
     : 0;
@@ -459,6 +487,8 @@ export async function readSpaceDigest(
     waitingQuestions,
     ownPolls,
     hosted,
+    doneThisWeek,
+    recentFiles,
   };
 }
 
@@ -714,7 +744,17 @@ export function shapePersonalHome(raw: PersonalHomeRaw, now: Date): PersonalHome
     }));
 
   const profileGaps = profileGapsOf(raw.user);
+  const bySpace = raw.spaces
+    .map(({ space, digest }) => ({ space: refOf(space), done: digest?.doneThisWeek ?? 0 }))
+    .filter((s) => s.done > 0)
+    .sort((a, b) => b.done - a.done);
+  const personalDigest = raw.spaces.find((s) => s.space.kind === "PERSONAL");
   return {
+    yourWeek: { done: bySpace.reduce((n, s) => n + s.done, 0), bySpace },
+    recentFiles: (personalDigest?.digest?.recentFiles ?? []).map((f) => ({
+      ...f,
+      href: `/app/${personalDigest!.space.slug}/notes/files/${f.id}`,
+    })),
     firstName: raw.user?.name?.trim().split(/\s+/)[0] || null,
     timeZone,
     todayKey,

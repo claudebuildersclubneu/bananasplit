@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { SpaceStorageBanner } from "@/components/billing/space-storage-banner";
 import { NotesLibrary } from "@/components/notes/notes-library";
 import { NotesNewMenu } from "@/components/notes/notes-new-menu";
 import { PageHeader } from "@/components/page-header";
@@ -129,6 +130,7 @@ export default async function NotesPage({
           />
         }
       />
+      <SpaceStorageBanner orgSlug={orgSlug} />
       <NotesLibrary
         orgId={org.id}
         orgSlug={orgSlug}
@@ -144,6 +146,7 @@ export default async function NotesPage({
         notes={data.notes.map((n) => ({
           id: n.id,
           title: n.title,
+          icon: n.icon,
           snippet: n.contentText.trim().slice(0, 400),
           visibility: n.visibility,
           updatedAt: n.updatedAt,

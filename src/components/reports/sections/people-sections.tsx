@@ -1,3 +1,5 @@
+import { Stamp, UserPlus, Users } from "lucide-react";
+
 import { reportLinks } from "@/server/reports/links";
 
 import { BarList } from "../bar-list";
@@ -64,7 +66,7 @@ export async function RetentionSection({ ctx }: { ctx: ReportViewContext }) {
         />
       </StatRow>
       {r.perSession.length === 0 ? (
-        <ReportEmpty>No check-ins in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={Users}>No check-ins in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
       ) : (
         <>
           <LazyStackedColumnsChart
@@ -136,12 +138,13 @@ export async function SignupsSection({ ctx }: { ctx: ReportViewContext }) {
         />
       </StatRow>
       {r.total === 0 ? (
-        <ReportEmpty>No signups in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
+        <ReportEmpty icon={UserPlus}>No signups in {ctx.rangeLabel.toLowerCase()}.</ReportEmpty>
       ) : (
         <>
           <LazyStackedColumnsChart
             label={`Signups per week, ${r.weeks.length} weeks`}
             series={["Came to a session", "Not yet"]}
+            hatchTop
             columns={r.weeks.map((w) => ({
               key: w.week,
               tick: shortDate(w.week),
@@ -209,7 +212,9 @@ export async function StampsSection({ ctx }: { ctx: ReportViewContext }) {
         detail="Checked in at least once in the range"
       />
       {r.milestones.length === 0 ? (
-        <ReportEmpty>No reward milestones are set. Add them in the Admin panel.</ReportEmpty>
+        <ReportEmpty icon={Stamp}>
+          No reward milestones are set. Add them in the Admin panel.
+        </ReportEmpty>
       ) : (
         <BarList
           label="Stamp cards reaching each milestone"

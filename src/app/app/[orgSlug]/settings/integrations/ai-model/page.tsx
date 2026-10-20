@@ -23,28 +23,32 @@ export default async function AiModelIntegrationPage({
   const { organization, dto, canWrite, canRemove } = page;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-7.5">
       <IntegrationHeader
         orgSlug={orgSlug}
         title="Other AI models"
+        dto={dto}
         description="Optional. The AI imports (a pasted list of action items into tasks, a calendar screenshot into events) use whichever model your club connects: this one, or Claude. Members pick between them when both are set up."
       />
-      <StatusPanel dto={dto} secretLabel="API key" />
-      <AiModelForm orgId={organization.id} dto={dto} canWrite={canWrite} />
-      {dto.hasSecret && (
-        <TestAndRemove
-          orgId={organization.id}
-          provider="OPENAI_COMPATIBLE"
-          canTest={canWrite}
-          canRemove={canRemove}
-          removeCopy="The key is deleted. The AI imports use Claude if it's connected, and are off otherwise."
-        />
-      )}
-      <p className="text-muted-foreground text-xs">
+      <div className="space-y-4.5">
+        <StatusPanel dto={dto} secretLabel="API key" />
+        <AiModelForm orgId={organization.id} dto={dto} canWrite={canWrite} />
+        {dto.hasSecret && (
+          <TestAndRemove
+            orgId={organization.id}
+            provider="OPENAI_COMPATIBLE"
+            name="the model key"
+            canTest={canWrite}
+            canRemove={canRemove}
+            removeCopy="The key is deleted. The AI imports use Claude if it's connected, and are off otherwise."
+          />
+        )}
+      </div>
+      <p className="text-muted-foreground text-sm">
         Prefer Claude? Connect it under{" "}
         <Link
           href={`/app/${orgSlug}/settings/integrations/claude`}
-          className="underline underline-offset-2"
+          className="text-foreground font-medium underline underline-offset-4"
         >
           Claude API
         </Link>

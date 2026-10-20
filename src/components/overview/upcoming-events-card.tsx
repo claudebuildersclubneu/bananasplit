@@ -54,7 +54,7 @@ export function UpcomingEventsCard({
         {events.length === 0 ? (
           (empty ?? <p className="text-muted-foreground text-sm">Nothing on the calendar yet.</p>)
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-border/70 divide-y">
             {events.map((event) => {
               const rsvp = rsvps.get(event.id);
               const RsvpIcon = rsvp ? RSVP_ICON[rsvp] : null;
@@ -62,10 +62,10 @@ export function UpcomingEventsCard({
                 <li key={event.id}>
                   <Link
                     href={`/app/${orgSlug}/calendar/${event.id}`}
-                    className="hover:bg-accent/50 -mx-2 block space-y-0.5 rounded-md px-2 py-2"
+                    className="hover:bg-muted/60 rounded-field -mx-3 block space-y-0.5 px-3 py-2.5"
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium">{event.title}</span>
+                      <span className="truncate text-[15px] font-medium">{event.title}</span>
                       {rsvp && RsvpIcon && (
                         <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs">
                           <RsvpIcon className="size-3.5" aria-hidden="true" />
@@ -92,7 +92,7 @@ export function UpcomingEventsCard({
             })}
           </ul>
         )}
-        <Link href={`/app/${orgSlug}/calendar`} className="text-muted-foreground block pt-1 text-xs hover:underline">
+        <Link href={`/app/${orgSlug}/calendar`} className="text-muted-foreground hover:text-foreground block pt-2 text-[13px] font-medium">
           Open the calendar
         </Link>
       </div>
@@ -118,7 +118,7 @@ export function UpcomingEventsCard({
         {events.length === 0 ? (
           (empty ?? <p className="text-muted-foreground text-sm">Nothing on the calendar yet.</p>)
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-border/70 divide-y">
             {events.map((event) => {
               const rsvp = rsvps.get(event.id);
               const RsvpIcon = rsvp ? RSVP_ICON[rsvp] : null;
@@ -126,10 +126,10 @@ export function UpcomingEventsCard({
                 <li key={event.id}>
                   <Link
                     href={`/app/${orgSlug}/calendar/${event.id}`}
-                    className="hover:bg-accent/50 -mx-2 block space-y-0.5 rounded-md px-2 py-2"
+                    className="hover:bg-muted/60 rounded-field -mx-3 block space-y-0.5 px-3 py-2.5"
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium">{event.title}</span>
+                      <span className="truncate text-[15px] font-medium">{event.title}</span>
                       {rsvp && RsvpIcon && (
                         <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs">
                           <RsvpIcon className="size-3.5" aria-hidden="true" />

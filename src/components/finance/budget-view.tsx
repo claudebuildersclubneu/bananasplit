@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { CalendarRange, Check, Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -15,6 +15,7 @@ import {
 } from "@/app/app/[orgSlug]/finance/periods-actions";
 import { EmptyState } from "@/components/empty-state";
 import { ItemMenu } from "@/components/item-menu";
+import { seriesColor } from "@/components/reports/charts/chart-kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -28,10 +29,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Gauge, TickMeter } from "@/components/ui/meters";
 import { toast } from "@/components/ui/toaster";
-import { formatCents, parseDollarsToCents } from "@/lib/finance/money";
+import { formatCents, formatDollars, parseDollarsToCents } from "@/lib/finance/money";
+
+import { tickUnitCents } from "./budget-ticks";
 import { formatPeriodRange, PERIOD_PRESETS, type PeriodDraft } from "@/lib/finance/periods";
 import { cn } from "@/lib/utils";
+
+const SECTION = "bg-card text-card-foreground ring-foreground/6 edge rounded-card ring-1";
 
 export interface BudgetPeriodRow {
   id: string;
@@ -125,14 +131,18 @@ export function BudgetView({
     (t, c) => ({ budget: t.budget + c.allocatedCents, spent: t.spent + c.spentCents }),
     { budget: 0, spent: 0 },
   );
+  // Every budget line's ticks are the same real amount, so lines read to scale.
+  const maxAllocated = Math.max(1, ...categories.map((c) => c.allocatedCents));
+  const unit = tickUnitCents(maxAllocated);
+  const maxTicks = Math.ceil(maxAllocated / unit);
 
   return (
-    <div className="space-y-6">
-      <section className="bg-card rounded-xl border">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+    <div className="space-y-4.5">
+      <section className={SECTION}>
+        <header className="flex flex-wrap items-center justify-between gap-3 px-6 pt-6 pb-3">
           <div>
-            <h2 className="heading text-base">Budget periods</h2>
-            <p className="text-muted-foreground text-xs">
+            <h2 className="heading text-[17px]">Budget periods</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
               The stretch of time a budget covers. Money goes into the active one.
             </p>
           </div>
@@ -145,9 +155,9 @@ export function BudgetView({
           )}
         </header>
         {periods.length === 0 ? (
-          <div className="p-4">
+          <div className="px-6 pb-4">
             <EmptyState
-              size="compact"
+              icon={CalendarRange}
               title="No budget period yet"
               description="Start one for this school year in a click, or pick your own dates."
               action={
@@ -159,13 +169,16 @@ export function BudgetView({
             />
           </div>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-border/70 divide-y px-3.5 pb-3.5">
             {periods.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <li
+                key={p.id}
+                className="hover:bg-muted/50 rounded-field flex flex-wrap items-center gap-3 px-2.5 py-3 transition-colors"
+              >
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-medium">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
                     {p.label}
-                    {p.isActive && <Badge variant="secondary">Active</Badge>}
+                    {p.isActive && <Badge variant="success">Active</Badge>}
                   </p>
                   <p className="text-muted-foreground text-xs">
                     {formatPeriodRange(p.startsOn, p.endsOn)}
@@ -201,59 +214,83 @@ export function BudgetView({
       </section>
 
       {error && (
-        <p role="alert" className="text-destructive text-sm">
+        <p
+          role="alert"
+          className="bg-tint-danger text-tint-danger-foreground rounded-tile px-4 py-2.5 text-sm"
+        >
           {error}
         </p>
       )}
 
       {active && (
-        <section className="bg-card rounded-xl border">
-          <header className="flex flex-wrap items-end justify-between gap-3 border-b px-4 py-3">
-            <div>
-              <h2 className="heading text-base">Categories · {active.label}</h2>
-              <p className="text-muted-foreground text-xs">
+        <section className={SECTION}>
+          <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 px-6 pt-6 pb-2">
+            <div className="min-w-0">
+              <h2 className="heading text-[17px]">Categories · {active.label}</h2>
+              <p className="text-muted-foreground mt-1 max-w-prose text-sm">
                 Set how much each category may spend. Type a number and click away to save.
               </p>
             </div>
-            <dl className="flex gap-5 text-right text-xs">
-              <div>
-                <dt className="text-muted-foreground">Budgeted</dt>
-                <dd className="text-sm font-semibold tabular-nums">{formatCents(totals.budget)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Spent</dt>
-                <dd className="text-sm font-semibold tabular-nums">{formatCents(totals.spent)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Left</dt>
-                <dd
-                  className={cn(
-                    "text-sm font-semibold tabular-nums",
-                    totals.budget - totals.spent < 0 && "text-destructive",
-                  )}
-                >
-                  {formatCents(totals.budget - totals.spent)}
-                </dd>
-              </div>
-            </dl>
+            <div className="flex items-center gap-5">
+              {totals.budget > 0 && (
+                <Gauge
+                  value={(totals.spent / totals.budget) * 100}
+                  caption={totals.spent > totals.budget ? "over" : "spent"}
+                  size={92}
+                  className="[&_b]:text-[22px]"
+                />
+              )}
+              <dl className="flex gap-6 text-right">
+                <div>
+                  <dt className="text-muted-foreground text-[13px]">Budgeted</dt>
+                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.budget)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-[13px]">Spent</dt>
+                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.spent)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-[13px]">Left</dt>
+                  <dd
+                    className={cn(
+                      "numeral mt-1 text-[22px]",
+                      totals.budget - totals.spent < 0 && "text-destructive",
+                    )}
+                  >
+                    {formatDollars(totals.budget - totals.spent)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </header>
-          <div className="text-muted-foreground hidden grid-cols-[minmax(0,1fr)_8rem_6rem_6rem_2rem] gap-3 px-4 pt-3 text-xs font-medium sm:grid">
-            <span>Category</span>
-            <span>Budget</span>
-            <span className="text-right">Spent</span>
-            <span className="text-right">Left</span>
-            <span />
+          <div className="px-3.5">
+            <div className="text-muted-foreground rounded-field hidden h-10 grid-cols-[minmax(0,1fr)_8rem_6rem_6rem_2rem] items-center gap-3 bg-[color-mix(in_oklab,var(--muted)_70%,var(--card))] px-2.5 text-[12.5px] font-semibold sm:grid">
+              <span>Category</span>
+              <span>Budget</span>
+              <span className="text-right">Spent</span>
+              <span className="text-right">Left</span>
+              <span />
+            </div>
+            <ul className="divide-border/70 divide-y">
+              {categories.map((c, i) => (
+                <CategoryRow
+                  key={c.id}
+                  orgId={orgId}
+                  category={c}
+                  color={seriesColor(i)}
+                  ticks={Math.max(1, Math.ceil(c.allocatedCents / unit))}
+                  maxTicks={maxTicks}
+                  unit={unit}
+                  onDelete={() => void removeCategory(c)}
+                />
+              ))}
+            </ul>
+            {categories.length > 0 && (
+              <p className="text-muted-foreground px-2.5 pt-1 pb-2 text-xs">
+                One tick per {formatDollars(unit)}
+              </p>
+            )}
           </div>
-          <ul className="divide-y">
-            {categories.map((c) => (
-              <CategoryRow
-                key={c.id}
-                orgId={orgId}
-                category={c}
-                onDelete={() => void removeCategory(c)}
-              />
-            ))}
-          </ul>
           <NewCategory orgId={orgId} periodId={active.id} />
         </section>
       )}
@@ -279,10 +316,20 @@ export function BudgetView({
 function CategoryRow({
   orgId,
   category,
+  color,
+  ticks,
+  maxTicks,
+  unit,
   onDelete,
 }: {
   orgId: string;
   category: BudgetCategoryRow;
+  /** The category's chart slot (its place in the budget). */
+  color: string;
+  ticks: number;
+  maxTicks: number;
+  /** Cents per tick. */
+  unit: number;
   onDelete: () => void;
 }) {
   const router = useRouter();
@@ -291,8 +338,7 @@ function CategoryRow({
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const left = category.allocatedCents - category.spentCents;
-  const used =
-    category.allocatedCents > 0 ? Math.min(1, category.spentCents / category.allocatedCents) : 0;
+  const over = left < 0;
 
   async function save(patch: { name?: string; allocatedCents?: number }) {
     setState("saving");
@@ -309,7 +355,7 @@ function CategoryRow({
   }
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_8rem_6rem_6rem_2rem]">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-2.5 py-3 sm:grid-cols-[minmax(0,1fr)_8rem_6rem_6rem_2rem]">
       <div className="min-w-0">
         <Label htmlFor={`cat-name-${category.id}`} className="sr-only">
           Category name
@@ -324,14 +370,24 @@ function CategoryRow({
             if (!next) setName(category.name);
             else if (next !== category.name) void save({ name: next });
           }}
-          className="hover:border-input focus-visible:border-input h-8 border-transparent px-1.5 font-medium shadow-none"
+          className="hover:border-input focus-visible:border-input h-8 border-transparent bg-transparent px-2 font-semibold shadow-none"
         />
-        <div className="bg-muted mt-1 h-1 overflow-hidden rounded-full" aria-hidden="true">
+        {category.allocatedCents > 0 ? (
           <div
-            className={cn("h-full rounded-full", left < 0 ? "bg-destructive" : "bg-primary")}
-            style={{ width: `${Math.round(used * 100)}%` }}
-          />
-        </div>
+            className="mt-1.5 px-2"
+            style={{ width: `${Math.max(10, (ticks / maxTicks) * 100)}%` }}
+          >
+            <TickMeter
+              total={ticks}
+              filled={over ? ticks : category.spentCents / unit}
+              height={12}
+              color={over ? "var(--destructive)" : color}
+              label={`${category.name}: ${formatCents(category.spentCents)} spent of ${formatCents(category.allocatedCents)}`}
+            />
+          </div>
+        ) : (
+          <p className="text-muted-foreground mt-1 px-2 text-xs">No budget yet</p>
+        )}
       </div>
       <div className="relative">
         <Label htmlFor={`cat-budget-${category.id}`} className="sr-only">
@@ -357,7 +413,7 @@ function CategoryRow({
             setAmount((cents / 100).toFixed(2));
             if (cents !== category.allocatedCents) void save({ allocatedCents: cents });
           }}
-          className="h-8 pl-5 tabular-nums"
+          className="h-8 pl-5 text-right tabular-nums"
         />
         <span className="absolute top-1/2 -right-5 -translate-y-1/2" aria-live="polite">
           {state === "saving" && (
@@ -381,7 +437,7 @@ function CategoryRow({
         label={`Actions for ${category.name}`}
         items={[{ label: "Delete category", icon: Trash2, destructive: true, onSelect: onDelete }]}
       />
-      {message && <p className="text-destructive col-span-full text-xs">{message}</p>}
+      {message && <p className="text-destructive col-span-full px-2 text-xs">{message}</p>}
     </li>
   );
 }
@@ -419,7 +475,7 @@ function NewCategory({ orgId, periodId }: { orgId: string; periodId: string }) {
 
   return (
     <form
-      className="flex flex-wrap items-center gap-2 border-t px-4 py-3"
+      className="bg-muted/40 rounded-b-card flex flex-wrap items-center gap-2 px-6 py-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (name.trim()) add();
@@ -431,7 +487,7 @@ function NewCategory({ orgId, periodId }: { orgId: string; periodId: string }) {
         value={name}
         maxLength={100}
         onChange={(e) => setName(e.target.value)}
-        className="h-8 min-w-40 flex-1"
+        className="min-w-40 flex-1"
       />
       <div className="relative w-32">
         <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-sm">
@@ -443,10 +499,10 @@ function NewCategory({ orgId, periodId }: { orgId: string; periodId: string }) {
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="h-8 pl-5"
+          className="pl-5 text-right tabular-nums"
         />
       </div>
-      <Button type="submit" size="sm" variant="outline" disabled={pending || !name.trim()}>
+      <Button type="submit" variant="secondary" disabled={pending || !name.trim()}>
         {pending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : (
@@ -555,13 +611,13 @@ function PeriodForm({
                 aria-pressed={selected}
                 onClick={() => setDraft(made)}
                 className={cn(
-                  "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                  "rounded-tile focus-glow px-3.5 py-2.5 text-left text-sm transition-colors outline-none",
                   selected
-                    ? "border-primary bg-primary/5 ring-primary/20 ring-2"
-                    : "hover:bg-muted/60",
+                    ? "bg-muted ring-foreground ring-2 ring-inset"
+                    : "bg-muted/50 hover:bg-muted",
                 )}
               >
-                <span className="block font-medium">{preset.name}</span>
+                <span className="block font-semibold">{preset.name}</span>
                 <span className="text-muted-foreground block text-xs">{made.label}</span>
               </button>
             );
@@ -599,7 +655,10 @@ function PeriodForm({
         </div>
       </div>
       {error && (
-        <p role="alert" className="text-destructive text-sm">
+        <p
+          role="alert"
+          className="bg-tint-danger text-tint-danger-foreground rounded-field px-3 py-2 text-sm"
+        >
           {error}
         </p>
       )}

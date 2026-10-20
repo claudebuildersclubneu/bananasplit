@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, Plus, X } from "lucide-react";
+import { Link2, Loader2, Plus, X } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +22,7 @@ import {
   type ProfileLink,
 } from "@/lib/profile/links";
 
+import { SettingsCard } from "../settings/settings-card";
 import { saveProfileLinks } from "./actions";
 
 interface Row {
@@ -92,87 +94,110 @@ export function LinksForm({ initial }: { initial: ProfileLink[] }) {
     });
   }
 
-  return (
-    <form onSubmit={submit} className="space-y-4" noValidate>
-      {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No links yet.</p>
-      ) : (
-        <ul className="space-y-3">
-          {rows.map((row, index) => {
-            const serverError = errors[`links.${index}.url`] ?? errors[`links.${index}.kind`];
-            const error = serverError ?? (touched[row.key] ? localError(row) : null);
-            const errorId = `link-${row.key}-error`;
-            return (
-              <li key={row.key} className="space-y-1.5">
-                <div className="flex gap-2">
-                  <Select
-                    value={row.kind}
-                    onValueChange={(kind) => update(row.key, { kind: kind as LinkKind })}
-                  >
-                    <SelectTrigger className="w-32 shrink-0" aria-label={`Link ${index + 1} type`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LINK_KINDS.map((kind) => (
-                        <SelectItem key={kind} value={kind}>
-                          {LINK_KIND_META[kind].label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={row.url}
-                    onChange={(e) => update(row.key, { url: e.target.value })}
-                    onBlur={() => setTouched((t) => ({ ...t, [row.key]: true }))}
-                    placeholder={LINK_KIND_META[row.kind].example}
-                    inputMode="url"
-                    autoComplete="url"
-                    spellCheck={false}
-                    maxLength={300}
-                    aria-label={`${LINK_KIND_META[row.kind].label} URL`}
-                    aria-invalid={Boolean(error) || undefined}
-                    aria-describedby={error ? errorId : undefined}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(row.key)}
-                    aria-label={`Remove ${LINK_KIND_META[row.kind].label} link`}
-                  >
-                    <X className="size-4" aria-hidden="true" />
-                  </Button>
-                </div>
-                {error && (
-                  <p id={errorId} className="text-destructive text-sm">
-                    {error}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+  const statusLine =
+    errors.links || errors.form ? (
+      <span className="text-destructive">{errors.links ?? errors.form}</span>
+    ) : saved ? (
+      <span className="text-success">Saved.</span>
+    ) : rows.length >= MAX_LINKS ? (
+      <span className="text-muted-foreground">You can add up to {MAX_LINKS} links.</span>
+    ) : null;
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" onClick={add} disabled={rows.length >= MAX_LINKS}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add link
-        </Button>
-        <Button type="submit" disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-          Save links
-        </Button>
-        <p aria-live="polite" className="text-sm">
-          {errors.links || errors.form ? (
-            <span className="text-destructive">{errors.links ?? errors.form}</span>
-          ) : saved ? (
-            <span className="text-muted-foreground">Saved.</span>
-          ) : rows.length >= MAX_LINKS ? (
-            <span className="text-muted-foreground">You can add up to {MAX_LINKS} links.</span>
-          ) : null}
-        </p>
-      </div>
+  return (
+    <form onSubmit={submit} noValidate>
+      <SettingsCard
+        title="Links"
+        description={`LinkedIn, GitHub, your website and so on. Up to ${MAX_LINKS}.`}
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={add}
+            disabled={rows.length >= MAX_LINKS}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            Add link
+          </Button>
+        }
+        status={statusLine && <p aria-live="polite">{statusLine}</p>}
+        footer={
+          <Button type="submit" disabled={pending}>
+            {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            Save links
+          </Button>
+        }
+      >
+        {rows.length === 0 ? (
+          <EmptyState
+            size="compact"
+            icon={Link2}
+            title="No links yet."
+            description="Add one so members can find your work."
+            className="py-0"
+          />
+        ) : (
+          <ul className="space-y-3">
+            {rows.map((row, index) => {
+              const serverError = errors[`links.${index}.url`] ?? errors[`links.${index}.kind`];
+              const error = serverError ?? (touched[row.key] ? localError(row) : null);
+              const errorId = `link-${row.key}-error`;
+              return (
+                <li key={row.key} className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <Select
+                      value={row.kind}
+                      onValueChange={(kind) => update(row.key, { kind: kind as LinkKind })}
+                    >
+                      <SelectTrigger
+                        className="w-32 shrink-0"
+                        aria-label={`Link ${index + 1} type`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LINK_KINDS.map((kind) => (
+                          <SelectItem key={kind} value={kind}>
+                            {LINK_KIND_META[kind].label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={row.url}
+                      onChange={(e) => update(row.key, { url: e.target.value })}
+                      onBlur={() => setTouched((t) => ({ ...t, [row.key]: true }))}
+                      placeholder={LINK_KIND_META[row.kind].example}
+                      inputMode="url"
+                      autoComplete="url"
+                      spellCheck={false}
+                      maxLength={300}
+                      aria-label={`${LINK_KIND_META[row.kind].label} URL`}
+                      aria-invalid={Boolean(error) || undefined}
+                      aria-describedby={error ? errorId : undefined}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => remove(row.key)}
+                      aria-label={`Remove ${LINK_KIND_META[row.kind].label} link`}
+                    >
+                      <X className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                  {error && (
+                    <p id={errorId} className="text-destructive text-sm">
+                      {error}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SettingsCard>
     </form>
   );
 }

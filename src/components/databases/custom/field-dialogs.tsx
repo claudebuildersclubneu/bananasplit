@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   choiceId,
-  CHOICE_COLOR_CLASS,
   CHOICE_COLORS,
   FIELD_TYPE_META,
   FIELD_TYPES,
@@ -28,6 +27,7 @@ import {
 } from "@/lib/databases/fields";
 import { cn } from "@/lib/utils";
 
+import { choiceColor } from "../styles";
 import { FieldIcon } from "./field-icon";
 
 /** The "+" at the end of the header row: a name and a type. */
@@ -59,14 +59,14 @@ export function NewFieldPopover({
           type="button"
           aria-label="Add a field"
           title="Add a field"
-          className="text-muted-foreground hover:bg-muted/60 hover:text-foreground grid h-9 w-full place-items-center"
+          className="text-muted-foreground hover:bg-muted-strong hover:text-foreground data-[state=open]:bg-muted-strong mx-auto grid size-8 place-items-center rounded-full transition-colors"
         >
           <Plus className="size-4" aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 space-y-3 p-3">
+      <PopoverContent align="end" className="w-80 space-y-3 p-4">
         <form
-          className="space-y-3"
+          className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
             submit();
@@ -101,19 +101,19 @@ export function NewFieldPopover({
                   title={FIELD_TYPE_META[t].hint}
                   onClick={() => setType(t)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-xs",
+                    "rounded-field flex h-9 items-center gap-2 px-2.5 text-left text-[13px] transition-colors",
                     type === t
-                      ? "border-primary bg-primary/8 font-medium"
-                      : "hover:bg-muted border-transparent",
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "hover:bg-muted",
                   )}
                 >
-                  <FieldIcon type={t} />
+                  <FieldIcon type={t} className={cn(type === t && "text-current")} />
                   {FIELD_TYPE_META[t].label}
                 </button>
               ))}
             </div>
           </div>
-          <Button type="submit" size="sm" className="w-full" disabled={!name.trim() || pending}>
+          <Button type="submit" className="w-full" disabled={!name.trim() || pending}>
             {pending ? "Adding…" : "Add field"}
           </Button>
         </form>
@@ -205,20 +205,24 @@ export function ChoicesDialog({
                   <button
                     type="button"
                     aria-label={`Colour of ${c.label}`}
-                    className={cn("size-7 shrink-0 rounded-md border", CHOICE_COLOR_CLASS[c.color])}
-                  />
+                    style={{ "--tag": choiceColor(c.color) } as CSSProperties}
+                    className="border-input hover:bg-muted grid size-10 shrink-0 place-items-center rounded-full border transition-colors"
+                  >
+                    <span aria-hidden="true" className="size-4 rounded-full bg-(--tag)" />
+                  </button>
                 </PopoverTrigger>
-                <PopoverContent className="grid w-auto grid-cols-5 gap-1 p-2">
+                <PopoverContent className="grid w-auto grid-cols-5 gap-1.5 p-3">
                   {CHOICE_COLORS.map((color) => (
                     <button
                       key={color}
                       type="button"
                       aria-label={color}
+                      aria-pressed={c.color === color}
                       onClick={() => update(i, { color })}
+                      style={{ "--tag": choiceColor(color) } as CSSProperties}
                       className={cn(
-                        "size-7 rounded-md border",
-                        CHOICE_COLOR_CLASS[color],
-                        c.color === color && "ring-primary ring-2",
+                        "ring-offset-popover size-7 rounded-full bg-(--tag) transition-transform hover:scale-110",
+                        c.color === color && "ring-foreground ring-2 ring-offset-2",
                       )}
                     />
                   ))}
@@ -229,7 +233,6 @@ export function ChoicesDialog({
                 value={c.label}
                 maxLength={80}
                 onChange={(e) => update(i, { label: e.target.value })}
-                className="h-8"
               />
               <Button
                 type="button"

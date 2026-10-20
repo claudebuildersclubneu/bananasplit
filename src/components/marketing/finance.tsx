@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 
-/** Spending per month in the balance widget (sample figures, like the rest of the mock). */
+/**
+ * Spending per month in the balance widget (sample figures, like the rest of
+ * the mock): what was paid, and on top, hatched, what is waiting to be paid
+ * back.
+ */
 const MONTHS = [
-  { month: "Sep", height: "h-[82%]", tone: "bg-straw" },
-  { month: "Oct", height: "h-[64%]", tone: "bg-straw" },
-  { month: "Nov", height: "h-[90%]", tone: "bg-straw" },
-  { month: "Dec", height: "h-[38%]", tone: "bg-straw" },
-  { month: "Jan", height: "h-[56%]", tone: "bg-banana" },
-  { month: "Feb", height: "h-[44%]", tone: "bg-butter" },
+  { month: "Sep", paid: "h-[70%]", pending: "h-[0%]" },
+  { month: "Oct", paid: "h-[52%]", pending: "h-[0%]" },
+  { month: "Nov", paid: "h-[78%]", pending: "h-[0%]" },
+  { month: "Dec", paid: "h-[30%]", pending: "h-[0%]" },
+  { month: "Jan", paid: "h-[44%]", pending: "h-[14%]" },
+  { month: "Feb", paid: "h-[26%]", pending: "h-[22%]" },
 ] as const;
 
-const CATEGORIES = [
-  { name: "Events", amount: "$1,860", dot: "bg-banana" },
-  { name: "Food", amount: "$940", dot: "bg-ripe" },
-  { name: "Printing", amount: "$310", dot: "bg-spot" },
-  { name: "Other", amount: "$150", dot: "bg-dusk" },
+/** Budget lines, one tick per $200: spent of planned, drawn to scale. */
+const BUDGET_LINES = [
+  { name: "Events", spent: 9, planned: 12, amount: "$1,860 of $2,400" },
+  { name: "Food", spent: 5, planned: 6, amount: "$940 of $1,200" },
+  { name: "Printing", spent: 2, planned: 3, amount: "$310 of $600" },
 ] as const;
 
 const FEATURES = [
@@ -70,26 +74,58 @@ export function Finance() {
                     9 weeks of runway
                   </span>
                 </div>
-                <div className="flex h-[110px] items-stretch gap-2.5">
-                  {MONTHS.map((bar) => (
+                <div className="flex h-[110px] items-stretch gap-2.5" aria-hidden="true">
+                  {MONTHS.map((bar, i) => (
                     <div
                       key={bar.month}
                       className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
                     >
-                      <span className={cn("w-full max-w-7 rounded-md", bar.height, bar.tone)} />
+                      <span className="flex h-full w-full max-w-7 flex-col justify-end gap-[3px]">
+                        {bar.pending !== "h-[0%]" && (
+                          <span className={cn("bg-butter hatch w-full rounded-md", bar.pending)} />
+                        )}
+                        <span
+                          className={cn(
+                            "w-full rounded-md",
+                            bar.paid,
+                            i === MONTHS.length - 1 ? "bg-banana" : "bg-straw",
+                          )}
+                        />
+                      </span>
                       <span className="text-ink-faint text-[11px]">{bar.month}</span>
                     </div>
                   ))}
                 </div>
+                <div className="text-ink-soft flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="bg-straw size-2.5 rounded-full" /> Paid
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="bg-butter hatch size-2.5 rounded-full" /> Waiting to be paid
+                    back
+                  </span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-3">
                 <div className={cn(WIDGET, "max-sm:hidden")}>
-                  <span className="text-ink-soft text-[13px]">Spent by category</span>
-                  {CATEGORIES.map((category) => (
-                    <div key={category.name} className="flex items-center gap-2.5 text-[13px]">
-                      <span className={cn("size-2 rounded-full", category.dot)} />
-                      <span className="flex-1">{category.name}</span>
-                      <span className="font-semibold tabular-nums">{category.amount}</span>
+                  <span className="text-ink-soft text-[13px]">Budget lines</span>
+                  {BUDGET_LINES.map((line) => (
+                    <div key={line.name} className="flex flex-col gap-1.5 text-[13px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold">{line.name}</span>
+                        <span className="text-ink-soft tabular-nums">{line.amount}</span>
+                      </div>
+                      <div className="flex gap-[3px]" aria-hidden="true">
+                        {Array.from({ length: line.planned }, (_, i) => (
+                          <span
+                            key={i}
+                            className={cn(
+                              "h-2.5 flex-1 rounded-full",
+                              i < line.spent ? "bg-banana" : "bg-straw",
+                            )}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -102,9 +138,14 @@ export function Finance() {
                       <span className="text-ink-soft text-[13px]">Jay · $86.40</span>
                     </span>
                   </div>
-                  <span className="bg-leaf text-leaf-ink self-start rounded-full px-2.5 py-[5px] text-[12px] font-bold">
-                    ✓ Approved by treasurer
-                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="bg-leaf text-leaf-ink rounded-full px-2.5 py-[5px] text-[12px] font-bold">
+                      Approved
+                    </span>
+                    <span className="bg-butter hatch text-honey-deep rounded-full px-2.5 py-[5px] text-[12px] font-bold">
+                      Waiting to be paid back
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

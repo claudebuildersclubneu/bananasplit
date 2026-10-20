@@ -21,8 +21,8 @@ export function RefreshButton({ organizationId }: { organizationId: string }) {
   return (
     <>
       <Button
-        variant="ghost"
-        size="icon-sm"
+        variant="outline"
+        size="icon"
         aria-label="Refresh reports"
         title="Refresh reports"
         disabled={pending}

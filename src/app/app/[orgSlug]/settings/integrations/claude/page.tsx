@@ -17,23 +17,27 @@ export default async function ClaudeIntegrationPage({
   const { organization, dto, canWrite, canRemove } = page;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-7.5">
       <IntegrationHeader
         orgSlug={orgSlug}
         title="Claude API"
+        dto={dto}
         description="Optional. Your club's own Claude key powers the AI imports (a pasted list of action items into tasks, a calendar screenshot into events) and backs up the org chart importer for documents it can't read itself. Usage is billed to your Anthropic account."
       />
-      <StatusPanel dto={dto} secretLabel="API key" />
-      <ClaudeForm orgId={organization.id} dto={dto} canWrite={canWrite} />
-      {dto.hasSecret && (
-        <TestAndRemove
-          orgId={organization.id}
-          provider="CLAUDE"
-          canTest={canWrite}
-          canRemove={canRemove}
-          removeCopy="The key is deleted. Imports keep working with the portal's own parser; documents it cannot read will need a new key."
-        />
-      )}
+      <div className="space-y-4.5">
+        <StatusPanel dto={dto} secretLabel="API key" />
+        <ClaudeForm orgId={organization.id} dto={dto} canWrite={canWrite} />
+        {dto.hasSecret && (
+          <TestAndRemove
+            orgId={organization.id}
+            provider="CLAUDE"
+            name="the Claude key"
+            canTest={canWrite}
+            canRemove={canRemove}
+            removeCopy="The key is deleted. Imports keep working with the portal's own parser; documents it cannot read will need a new key."
+          />
+        )}
+      </div>
     </div>
   );
 }

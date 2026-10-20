@@ -109,7 +109,7 @@ export function BringStep({
         <>
           <PreviewHeader meta={clubName} label="Coming with you" />
           {count === 0 && moved.length === 0 && (
-            <p className="text-ink-faint m-0 text-[13px] leading-normal">
+            <p className="text-muted-foreground m-0 text-[13px] leading-normal">
               Nothing picked yet. Anything you leave stays in Personal, and you can move it later.
             </p>
           )}
@@ -119,12 +119,12 @@ export function BringStep({
             .map((i) => (
               <PreviewTile key={i.id}>
                 <span className="truncate text-[14px] font-semibold">{i.title}</span>
-                <span className="text-ink-soft text-[12px]">{i.meta}</span>
+                <span className="text-muted-foreground text-[12px]">{i.meta}</span>
               </PreviewTile>
             ))}
-          {count > 6 && <p className="text-ink-faint m-0 text-[12px]">and {count - 6} more</p>}
+          {count > 6 && <p className="text-muted-foreground m-0 text-[12px]">and {count - 6} more</p>}
           {moved.length > 0 && (
-            <p className="text-ink-muted m-0 mt-auto text-[13px] leading-normal">
+            <p className="text-muted-foreground m-0 mt-auto text-[13px] leading-normal">
               Already in {clubName}: {moved.join("; ")}.
             </p>
           )}
@@ -140,13 +140,13 @@ export function BringStep({
         {moved.length > 0 && (
           <p
             role="status"
-            className="bg-leaf text-leaf-ink m-0 rounded-xl px-3.5 py-2.5 text-[14px] font-semibold"
+            className="bg-tint-success text-tint-success-foreground m-0 rounded-field px-3.5 py-2.5 text-[14px] font-semibold"
           >
             Moved {moved[moved.length - 1]} into {clubName}.
           </p>
         )}
         {nothingLeft && moved.length === 0 && (
-          <p className="text-ink-muted m-0 text-[15px]">
+          <p className="text-muted-foreground m-0 text-[15px]">
             There&apos;s nothing in Personal to bring.
           </p>
         )}
@@ -163,7 +163,7 @@ export function BringStep({
                   type="button"
                   onClick={() => toggleSection(section)}
                   disabled={busy}
-                  className="text-ink-muted hover:text-ink cursor-pointer border-none bg-transparent p-0 text-[13px] font-semibold"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer border-none bg-transparent p-0 text-[13px] font-semibold"
                 >
                   {all ? "Clear" : "Pick all"}
                 </button>
@@ -171,7 +171,7 @@ export function BringStep({
               {section.groups.map((group) => (
                 <div key={group.label ?? "-"} className="mb-2 last:mb-0">
                   {group.label && (
-                    <p className="text-ink-soft m-0 mb-1.5 text-[12px] font-semibold tracking-wide uppercase">
+                    <p className="text-muted-foreground m-0 mb-1.5 text-[12px] font-semibold tracking-wide uppercase">
                       {group.label}
                     </p>
                   )}
@@ -180,8 +180,8 @@ export function BringStep({
                       <li key={item.id}>
                         <label
                           className={cn(
-                            "bg-paper border-ink/10 hover:border-ink/25 flex min-h-[50px] cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5",
-                            ticked.has(item.id) && "border-ink/40",
+                            "bg-card border-foreground/10 hover:border-foreground/25 flex min-h-10 cursor-pointer items-center gap-3 rounded-field border px-4 py-2.5",
+                            ticked.has(item.id) && "border-foreground/40",
                           )}
                         >
                           <input
@@ -189,11 +189,11 @@ export function BringStep({
                             checked={ticked.has(item.id)}
                             onChange={() => toggle(item.id)}
                             disabled={busy}
-                            className="accent-ink size-4 flex-none cursor-pointer"
+                            className="accent-primary size-4 flex-none cursor-pointer"
                           />
                           <span className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-[15px] font-semibold">{item.title}</span>
-                            <span className="text-ink-soft truncate text-[13px]">{item.meta}</span>
+                            <span className="text-muted-foreground truncate text-[13px]">{item.meta}</span>
                           </span>
                         </label>
                       </li>

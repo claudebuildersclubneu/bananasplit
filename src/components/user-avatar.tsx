@@ -25,6 +25,25 @@ const SIZES = {
 
 export type UserAvatarSize = keyof typeof SIZES;
 
+/**
+ * Initials sit on one of five tints drawn from the theme's chart slots
+ * (derive.ts avatar-1..5), picked from the person's name, so each member
+ * keeps the same slot everywhere and the colour follows the club theme.
+ */
+const TINTS = [
+  "bg-avatar-1 text-avatar-1-foreground",
+  "bg-avatar-2 text-avatar-2-foreground",
+  "bg-avatar-3 text-avatar-3-foreground",
+  "bg-avatar-4 text-avatar-4-foreground",
+  "bg-avatar-5 text-avatar-5-foreground",
+] as const;
+
+export function avatarTint(key: string | null | undefined): (typeof TINTS)[number] {
+  let hash = 0;
+  for (const ch of key ?? "") hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return TINTS[hash % TINTS.length];
+}
+
 export interface UserAvatarUser {
   name?: string | null;
   email?: string | null;
@@ -65,7 +84,9 @@ export function UserAvatar({
           referrerPolicy="no-referrer"
         />
       )}
-      <AvatarFallback className="text-[length:inherit]">{initialsOf(user.name, user.email)}</AvatarFallback>
+      <AvatarFallback className={cn("text-[length:inherit]", avatarTint(user.name ?? user.email))}>
+        {initialsOf(user.name, user.email)}
+      </AvatarFallback>
     </Avatar>
   );
 }

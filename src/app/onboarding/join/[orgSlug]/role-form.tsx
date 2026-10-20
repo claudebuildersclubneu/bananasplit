@@ -52,7 +52,7 @@ export function RoleForm({
       <div className="flex flex-wrap items-center justify-end gap-5">
         <Link
           href={`/app/${orgSlug}`}
-          className="text-ink-muted hover:text-ink text-[15px] font-semibold"
+          className="text-muted-foreground hover:text-foreground text-[15px] font-semibold"
         >
           Skip
         </Link>

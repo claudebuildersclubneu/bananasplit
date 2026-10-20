@@ -124,7 +124,8 @@ export const taskReminderJob: JobHandler<{
     }
     const tz = effectiveTimezone(user, task.organization);
     const today = localDateKey(new Date(), tz);
-    if (!stageApplies(stage, dueDate, today)) return cancelled(`too late for the ${stage} reminder`);
+    if (!stageApplies(stage, dueDate, today))
+      return cancelled(`too late for the ${stage} reminder`);
     const notice = REMINDER_NOTICE[stage];
     await notifyUsers(db, orgId, [userId], {
       type: notice.type,

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 
+import { capsuleButtonClass } from "@/components/shell/capsule";
 import type { ShellUser } from "@/components/shell/types";
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user-avatar";
 import { profileHref } from "@/lib/profile/href";
+import { cn } from "@/lib/utils";
 
 /**
  * The shell's user menu. `user` comes from the database on every request
@@ -28,7 +30,7 @@ import { profileHref } from "@/lib/profile/href";
  */
 export type UserMenuUser = ShellUser & { avatar?: unknown };
 
-export function UserMenu({ user }: { user: UserMenuUser }) {
+export function UserMenu({ user, className }: { user: UserMenuUser; className?: string }) {
   const displayName = user.name ?? user.email;
   // Each member's Light/Dark/System choice overrides the org's default mode,
   // unless the org locks the mode (Settings > Theme), which next-themes
@@ -43,13 +45,13 @@ export function UserMenu({ user }: { user: UserMenuUser }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
+          className={cn(capsuleButtonClass, className)}
           aria-label={`Open user menu for ${displayName}`}
         >
           <UserAvatar user={user} size="md" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align="end" sideOffset={8} className="w-60">
         <DropdownMenuLabel className="flex items-center gap-3">
           <UserAvatar user={user} size="lg" />
           <span className="flex min-w-0 flex-col">

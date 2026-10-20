@@ -2061,6 +2061,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         // policies cannot recurse into themselves. Answers only about
         // app.user_id().
         "can_edit_database",
+        // Moonstone: the NoteComment and NoteVersion policy predicate, like
+        // can_view_note (answers only about app.user_id() in its member org).
+        "can_edit_note",
         "can_read_task",
         // Note sharing: the Note and NoteShare policy predicates, which read
         // "Note"/"NoteShare" without RLS so the two cannot recurse. Answer
@@ -2093,6 +2096,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "move_personal_items",
         // The Personal dashboard's "Your RSVPs": the caller's own sign-ups.
         "my_rsvp_registrations",
+        // Moonstone: a trigger that walks a note's ancestors past RLS.
+        "note_cycle_guard",
         "note_share_role",
         "org_by_join_code",
         "org_has_members",
@@ -2126,6 +2131,14 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "secret_write",
         "set_ics_token_hash",
         "slug_available",
+        // Moonstone: the nightly counter repair (service path, its org only).
+        "storage_reconcile",
+        // Moonstone: Organization.storageUsedBytes, kept by a trigger the
+        // writers can't bypass (they have no UPDATE on the column).
+        "storage_used_track",
+        // Moonstone: the task hierarchy, checked against private parents and
+        // children too.
+        "task_hierarchy_guard",
         "user_has_role",
         "write_finance_audit",
         "write_org_audit",
@@ -2220,12 +2233,20 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "MemberPrefs:INSERT",
         "MemberPrefs:UPDATE",
         "Note:INSERT",
+        // Note comments and versions: app.can_view_note, app.can_edit_note
+        // and app.can_share_note are the role checks (Moonstone).
+        "NoteComment:DELETE",
+        "NoteComment:INSERT",
+        "NoteComment:UPDATE",
         "NoteFolder:INSERT",
         // Note sharing: app.can_share_note is the role check; anyone may
         // also take themselves off a note (DELETE).
         "NoteShare:DELETE",
         "NoteShare:INSERT",
         "NoteShare:UPDATE",
+        "NoteVersion:DELETE",
+        "NoteVersion:INSERT",
+        "NoteVersion:UPDATE",
         "Notification:INSERT",
         "Notification:UPDATE",
         "OrgFile:INSERT",
@@ -2404,6 +2425,19 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       can_view_note: "u",
       can_share_note: "u",
       note_sharing_guard: "",
+      // Moonstone: the note-edit predicate (member path only), and trigger
+      // functions (storage counter, task hierarchy, nested pages, comment
+      // and version rules), which get no grant.
+      can_edit_note: "u",
+      storage_used_track: "",
+      organization_storage_guard: "",
+      note_version_size: "",
+      task_hierarchy_guard: "",
+      note_cycle_guard: "",
+      note_parent_visible: "",
+      note_comment_guard: "",
+      // The nightly job's counter repair (service path, its org context only).
+      storage_reconcile: "s",
     };
     await tcase(
       "T27f",

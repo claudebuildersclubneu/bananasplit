@@ -127,6 +127,8 @@ export function OutlineTree({
 
   return (
     <DndContext
+      // A fixed id keeps dnd-kit's aria ids the same on server and client.
+      id="org-chart-outline"
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={onDragStart}

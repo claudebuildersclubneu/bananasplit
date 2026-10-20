@@ -1,5 +1,11 @@
+import { ArrowLeft, ArrowRight, ScrollText } from "lucide-react";
 import Link from "next/link";
 
+import { TableFrame } from "@/components/databases/table-frame";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -12,6 +18,7 @@ import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { planGate } from "@/server/billing/plan-gate";
 
+import { ChipLink } from "../chip-link";
 import { SettingsNoAccess } from "../settings-no-access";
 
 const PAGE_SIZE = 50;
@@ -63,9 +70,70 @@ const ACTION_COPY: Record<string, string> = {
   "export.expired": "data export expired",
   "workspace.bootstrapped": "applied a workspace template",
   "settings.sidebar.updated": "changed the sidebar",
-  "label.created": "created a label",
-  "label.deleted": "deleted a label",
+  "settings.pulse.updated": "changed the weekly pulse",
+  "label.created": "created a tag",
+  "label.deleted": "deleted a tag",
+  "label.renamed": "renamed or recoloured a tag",
+  "label.merged": "merged two tags",
+  "settings.creation_rules": "changed who can create tags and projects",
+  "labels.set_up": "set up the tags",
+  "theme.updated": "changed the theme",
+  "theme.reset": "reset the theme to the default",
+  "org.plan_changed": "changed the plan",
+  "join_code.created": "created the invite code",
+  "join_code.rotated": "made a new invite code",
+  "join_code.updated": "changed the invite code settings",
+  "join_code.used": "joined with the invite code",
+  "membership.own_title_set": "set their own title",
+  "setup.completed": "closed guided setup",
+  "setup.reopened": "reopened guided setup",
+  "setup.step_skipped": "skipped a setup step",
+  "integration.google_revoked": "revoked Google Calendar access",
+  "integration.needs_reauth": "lost an integration's access",
+  "teams.setup": "set up teams",
+  "event.created": "created an event",
+  "event.updated": "changed an event",
+  "event.deleted": "deleted an event",
+  "event.merged": "merged two events",
+  "event.rsvp_page_on": "opened an RSVP page",
+  "event.rsvp_page_off": "closed an RSVP page",
+  "personal.items_moved": "moved items in from Personal",
+  "signup.created": "added a sign-up",
+  "signup.deleted": "deleted a sign-up",
+  "signup.imported": "imported sign-ups",
+  "attendance.created": "recorded attendance",
+  "attendance.renamed": "renamed a session's attendance",
+  "attendance.deleted": "deleted attendance",
+  "attendance.imported": "imported attendance",
+  "contact.renamed": "renamed a contact",
+  "contact.merged": "merged two contacts",
+  "contact.split": "split a contact in two",
+  "orgchart.upload": "uploaded an org chart",
+  "orgchart.publish": "published the org chart",
+  "orgchart.rollback": "rolled the org chart back",
+  "orgchart.discard": "discarded an org chart draft",
+  "database.created": "created a database",
+  "database.archived": "archived a database",
+  "database.imported": "imported rows into a database",
+  "database.exported": "exported a database",
+  "database.field_deleted": "deleted a database field",
+  "database.settings_changed": "changed a database's settings",
+  "finance.records_imported": "imported finance records",
+  "finance.import_undone": "undid a finance import",
+  "finance.budget_imported": "imported a budget",
+  "calendar.google_sync_requested": "asked to sync Google Calendar",
+  "calendar.google_import_requested": "asked to import from Google Calendar",
+  "ballot_definition.updated": "changed a ballot",
+  "ai.action_items_read": "pulled action items from notes with AI",
+  "finance.setup": "set up finance",
 };
+
+/** An action with no sentence above, in words: "database.rows_deleted" -> "database: rows deleted". */
+function actionWords(action: string): string {
+  const [area, ...rest] = action.split(".");
+  const what = rest.join(" ").replace(/_/g, " ");
+  return what ? `${area?.replace(/_/g, " ")}: ${what}` : action.replace(/_/g, " ");
+}
 
 const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
@@ -107,7 +175,12 @@ export default async function AuditLogPage({
     GROUPS.find((g) => g.key === (typeof sp.group === "string" ? sp.group : "")) ?? GROUPS[0];
   const page = Math.max(1, Math.min(1000, Number(typeof sp.page === "string" ? sp.page : 1) || 1));
 
-  const rows = await withOrgTx(organization.id, async ({ db }) => {
+  const { rows, total } = await withOrgTx(organization.id, async ({ db }) => {
+    const where = {
+      organizationId: organization.id,
+      ...(group.key ? { action: { startsWith: group.key } } : {}),
+    };
+    const total = await db.orgAuditLog.count({ where });
     const entries = await db.orgAuditLog.findMany({
       where: {
         organizationId: organization.id,
@@ -134,84 +207,105 @@ export default async function AuditLogPage({
       ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
       : [];
     const names = new Map(users.map((u) => [u.id, u.name]));
-    return entries.map((e) => ({
+    const rows = entries.map((e) => ({
       ...e,
       targetName: e.targetType === "User" && e.targetId ? (names.get(e.targetId) ?? null) : null,
     }));
+    return { rows, total };
   });
   const hasNext = rows.length > PAGE_SIZE;
   const shown = rows.slice(0, PAGE_SIZE);
   const href = (g: string, p: number) =>
     `/app/${orgSlug}/settings/audit?${new URLSearchParams({ ...(g ? { group: g } : {}), ...(p > 1 ? { page: String(p) } : {}) })}`;
 
+  const first = (page - 1) * PAGE_SIZE + 1;
+  const summary =
+    total === 0
+      ? "No entries yet. Entries can't be edited or deleted."
+      : `${total} ${group.key ? `${group.label.toLowerCase()} ` : ""}entr${total === 1 ? "y" : "ies"}, newest first${
+          total > PAGE_SIZE ? ` · showing ${first}–${first + shown.length - 1}` : ""
+        }. Entries can't be edited or deleted.`;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Audit log</h1>
-        <p className="text-muted-foreground text-sm">
-          Who changed what, and when. Entries can&apos;t be edited or deleted.
-        </p>
-      </div>
-      <nav aria-label="Filter" className="flex flex-wrap gap-2">
-        {GROUPS.map((g) => (
-          <Link
-            key={g.key || "all"}
-            href={href(g.key, 1)}
-            aria-current={g.key === group.key ? "page" : undefined}
-            className={`rounded-md border px-3 py-1 text-sm ${g.key === group.key ? "bg-muted font-medium" : ""}`}
-          >
-            {g.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-44">When</TableHead>
-              <TableHead>What</TableHead>
-              <TableHead className="hidden md:table-cell">Details</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground text-sm">
-                  Nothing recorded yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              shown.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {fmt.format(e.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <span className="font-medium">{e.actor?.name ?? "System"}</span>{" "}
-                    {ACTION_COPY[e.action] ?? e.action}
-                    {e.targetName ? <span className="font-medium"> ({e.targetName})</span> : null}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground hidden text-xs md:table-cell">
-                    {summarize(e.diffJson)}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex justify-between text-sm">
-        {page > 1 ? (
-          <Link href={href(group.key, page - 1)} className="underline underline-offset-4">
-            Newer
-          </Link>
+    <div className="space-y-7.5">
+      <PageHeader title="Audit log" description={summary} />
+      <div className="space-y-4.5">
+        <nav aria-label="Filter" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <ul className="flex min-w-max gap-2">
+            {GROUPS.map((g) => (
+              <li key={g.key || "all"}>
+                <ChipLink href={href(g.key, 1)} active={g.key === group.key}>
+                  {g.label}
+                </ChipLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        {shown.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={ScrollText}
+              title={
+                group.key ? `No ${group.label.toLowerCase()} changes yet.` : "Nothing recorded yet."
+              }
+              description="Settings, membership, integration and export changes show here as they happen."
+            />
+          </Card>
         ) : (
-          <span />
+          <TableFrame maxHeight="none">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-44">When</TableHead>
+                  <TableHead>What</TableHead>
+                  <TableHead className="hidden md:table-cell">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shown.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {fmt.format(e.createdAt)}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-semibold">{e.actor?.name ?? "System"}</span>{" "}
+                      {ACTION_COPY[e.action] ?? (
+                        <span className="text-muted-foreground">· {actionWords(e.action)}</span>
+                      )}
+                      {e.targetName ? (
+                        <span className="font-semibold"> ({e.targetName})</span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden text-[13px] whitespace-normal md:table-cell">
+                      {summarize(e.diffJson)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableFrame>
         )}
-        {hasNext && (
-          <Link href={href(group.key, page + 1)} className="underline underline-offset-4">
-            Older
-          </Link>
+        {(page > 1 || hasNext) && (
+          <div className="flex justify-between gap-2">
+            {page > 1 ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={href(group.key, page - 1)}>
+                  <ArrowLeft data-icon="inline-start" aria-hidden="true" />
+                  Newer
+                </Link>
+              </Button>
+            ) : (
+              <span />
+            )}
+            {hasNext && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={href(group.key, page + 1)}>
+                  Older
+                  <ArrowRight data-icon="inline-end" aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

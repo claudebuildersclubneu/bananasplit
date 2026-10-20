@@ -14,6 +14,7 @@ import {
   StepFailure,
   type StepResult,
 } from "@/server/onboarding/org-setup";
+import { savePulseSettings } from "@/server/onboarding/pulse";
 import { loadSetupState, skipStep } from "@/server/setup/progress";
 
 /**
@@ -68,6 +69,9 @@ export const saveFinanceStepAction = step(async (ctx, input: unknown) =>
 export const saveTeamsStepAction = step(async (ctx, input: unknown) =>
   saveTeamsSetup(ctx, input, await orgTimezone(ctx)),
 );
+
+/** The Weekly pulse step: day, time, audience and channels (OrgSettings). */
+export const savePulseStepAction = step((ctx, input: unknown) => savePulseSettings(ctx, input));
 
 /** After a step saved: the next step, or the org's home as its admin (B7 -> END). */
 export async function goToNextOrgStep(orgSlug: string, current: OrgStep): Promise<void> {

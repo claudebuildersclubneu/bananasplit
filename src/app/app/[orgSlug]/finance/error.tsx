@@ -1,17 +1,19 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 /**
- * Finance's own error screen. In production a server error reaches the
- * browser only as a generic message and a digest (Next.js hides the
- * rest), so this shows the digest: quoting it finds the error in the
- * server logs. Try again re-renders the page; My reimbursements works for
+ * Finance's own error screen: a calm card with Finance's wallet and one
+ * action. In production a server error reaches the browser only as a
+ * generic message and a digest (Next.js hides the rest), so this shows the
+ * digest: quoting it finds the error in the server logs. Try again
+ * re-renders the page; My reimbursements (a link in the text) works for
  * every member.
  */
 export default function FinanceError({
@@ -23,30 +25,39 @@ export default function FinanceError({
 }) {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   return (
-    <EmptyState
-      title="This finance page couldn't load"
-      description={
-        <>
-          Try again in a moment. If it keeps happening, send your e-board this code so they can look
-          it up:{" "}
-          <code className="bg-muted rounded-md px-1 py-0.5 text-xs">
-            {error.digest ?? "no code"}
-          </code>
-        </>
-      }
-      action={
-        <div className="flex flex-wrap justify-center gap-2">
+    <Card role="alert" className="py-4">
+      <EmptyState
+        icon={Wallet}
+        title="This finance page couldn't load"
+        description={
+          <>
+            Try again in a moment. If it keeps happening, send your e-board this code so they can
+            look it up:{" "}
+            <code className="bg-muted rounded-[6px] px-1.5 py-0.5 font-mono text-xs">
+              {error.digest ?? "no code"}
+            </code>
+            {orgSlug && (
+              <>
+                {" "}
+                Your{" "}
+                <Link
+                  href={`/app/${orgSlug}/finance/my-reimbursements`}
+                  className="text-foreground focus-glow rounded-sm font-medium underline underline-offset-3"
+                >
+                  reimbursements
+                </Link>{" "}
+                still open.
+              </>
+            )}
+          </>
+        }
+        action={
           <Button type="button" onClick={() => retry()}>
-            <RotateCcw className="size-4" aria-hidden="true" />
+            <RotateCcw aria-hidden="true" />
             Try again
           </Button>
-          {orgSlug && (
-            <Button asChild variant="outline">
-              <Link href={`/app/${orgSlug}/finance/my-reimbursements`}>My reimbursements</Link>
-            </Button>
-          )}
-        </div>
-      }
-    />
+        }
+      />
+    </Card>
   );
 }

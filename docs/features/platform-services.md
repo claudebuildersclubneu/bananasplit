@@ -53,6 +53,24 @@ link there). A verified Google sign-in for the same address replaces an
 unconfirmed password account that never joined an org. This needs the
 platform sender (`RESEND_API_KEY`, `EMAIL_FROM`) in production.
 
+## Storage limits
+
+Each space's storage is `Organization.storageUsedBytes` (files, receipts,
+note history, the trash), kept by database triggers. Uploads check it and
+the plan (`PLAN_LIMITS`) before they start and again in the row's
+transaction. Notes files over 4 MB go straight from the browser to the
+private Vercel Blob store (`POST /api/orgs/{orgId}/files/uploads`, then
+`.../upload-token`, then `.../complete`); without `BLOB_READ_WRITE_TOKEN`
+the upload route takes files up to 25 MB (4 MB on Vercel). Downloads stream
+from the store. A trashed file's row is deleted when the trash is emptied
+(the uploader, or an owner or admin for shared files) or by the nightly
+purge after `NOTE_TRASH_DAYS`; only trashed rows can be deleted (OrgFile
+DELETE policies), and the trigger takes their bytes off the counter. The
+daily `storage-reconcile` job (heavy, from the cron) re-adds every space,
+repairs a counter that disagrees through `app.storage_reconcile` (service
+path, its org context only) and logs `[storage] repaired drift`, and
+deletes direct uploads that never got a row after a day.
+
 ## Local development
 
 Nothing to configure: with no Resend key, mail is written to the console and

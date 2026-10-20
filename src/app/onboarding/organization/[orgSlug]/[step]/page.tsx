@@ -15,7 +15,9 @@ import {
 } from "@/lib/onboarding/steps";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
+import { DEFAULT_PULSE_SETTINGS } from "@/lib/pulse/settings";
 import { loadFinanceSetup, loadTaskLabels, loadTeamsSetup } from "@/server/onboarding/org-setup";
+import { loadPulseSettings } from "@/server/onboarding/pulse";
 import { readBring } from "@/server/personal/bring-cookie";
 import { bringableIds, loadBringable } from "@/server/personal/move";
 import { loadSetupState } from "@/server/setup/progress";
@@ -25,6 +27,7 @@ import { DataStep, type DataConnection } from "../data-step";
 import { FinanceStep } from "../finance-step";
 import { InviteStep } from "../invite-step";
 import { LabelsStep } from "../labels-step";
+import { PulseStep } from "../pulse-step";
 import { TeamsStep } from "../teams-step";
 
 export const dynamic = "force-dynamic";
@@ -111,6 +114,16 @@ export default async function OrgSetupStepPage({
     case "teams": {
       const state = await withOrgTx(organization.id, (ctx) => loadTeamsSetup(ctx));
       return shell(<TeamsStep {...base} state={state} currentUserId={user.id} />);
+    }
+    case "pulse": {
+      const saved = await withOrgTx(organization.id, (ctx) => loadPulseSettings(ctx));
+      return shell(
+        <PulseStep
+          {...base}
+          clubName={organization.name}
+          initial={saved ?? DEFAULT_PULSE_SETTINGS}
+        />,
+      );
     }
     case "invite": {
       const canInvite = can({ role }, "members.invite");

@@ -13,17 +13,21 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Layers } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { useBlockedReason } from "@/components/tasks/prompts";
 import { TaskCard } from "@/components/tasks/task-card";
+import { ProgressBar, TaskTypeChip } from "@/components/tasks/task-type";
 import { useTasks } from "@/components/tasks/tasks-context";
 import type { TaskItem } from "@/components/tasks/types";
+import { chipClass } from "@/components/ui/segmented";
 import { TaskStatus } from "@/generated/prisma/enums";
 import { STATUS_ORDER, statusTransitionData } from "@/lib/tasks/status";
+import { cn } from "@/lib/utils";
 
-import { reorderTask } from "../actions";
+import { reorderTask, updateTask } from "../actions";
 import { KanbanColumn } from "./kanban-column";
 
 const COLUMNS: { status: TaskStatus; title: string }[] = [
@@ -32,12 +36,26 @@ const COLUMNS: { status: TaskStatus; title: string }[] = [
   { status: TaskStatus.BLOCKED, title: "Blocked" },
   { status: TaskStatus.COMPLETED, title: "Completed" },
 ];
-const COLUMN_IDS = new Set<string>(STATUS_ORDER);
+const STATUSES = new Set<string>(STATUS_ORDER);
+const NO_EPIC = "none";
+
+/** The epic a card sits in (its parent, when that is an epic). */
+function laneOf(task: TaskItem): string {
+  return task.parentTask?.type === "EPIC" ? task.parentTask.id : NO_EPIC;
+}
+
+/** "lane:STATUS" in swimlanes, "STATUS" without. */
+function parseDropId(id: string): { lane: string | null; status: TaskStatus } | null {
+  const [a, b] = id.includes(":") ? id.split(":") : [null, id];
+  return b && STATUSES.has(b) ? { lane: a, status: b as TaskStatus } : null;
+}
 
 /**
- * The kanban board (react-query holds the optimistic order). Dragging into
- * Blocked asks what it's blocked on; a refused or failed move rolls back.
- * Completed shows the last 14 days, with a link to show older ones.
+ * The kanban board (react-query holds the optimistic order). Cards are the
+ * club's stories and tasks; with swimlanes on (?lanes=epic) each epic gets a
+ * row of its own, and dragging a card into another lane moves it into that
+ * epic. Dragging into Blocked asks what it's blocked on; a refused or failed
+ * move rolls back. Completed shows the last 14 days.
  */
 export function KanbanBoard({
   initialTasks,
@@ -45,14 +63,16 @@ export function KanbanBoard({
   olderCompleted,
   showAll,
   todayKey,
+  lanes = false,
 }: {
   initialTasks: TaskItem[];
   queryKey: readonly unknown[];
   olderCompleted: number;
   showAll: boolean;
   todayKey: string;
+  lanes?: boolean;
 }) {
-  const { org, announce, showTask, newTask } = useTasks();
+  const { org, announce, showTask, openTask, newTask } = useTasks();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -73,9 +93,10 @@ export function KanbanBoard({
 
   const [activeTask, setActiveTask] = useState<TaskItem | null>(null);
 
-  function showOlderCompleted() {
+  function setParam(name: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("done", "all");
+    if (value) params.set(name, value);
+    else params.delete(name);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
@@ -84,16 +105,26 @@ export function KanbanBoard({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const columns = useMemo(() => {
-    const grouped: Record<TaskStatus, TaskItem[]> = {
-      NOT_STARTED: [],
-      IN_PROGRESS: [],
-      BLOCKED: [],
-      COMPLETED: [],
-    };
-    for (const task of tasks) grouped[task.status].push(task);
-    return grouped;
+  // The lanes: every epic with a card on the board, then "No epic".
+  const laneList = useMemo(() => {
+    const seen = new Map<string, { id: string; title: string; tasks: TaskItem[] }>();
+    for (const t of tasks) {
+      const key = laneOf(t);
+      if (key === NO_EPIC) continue;
+      const lane = seen.get(key) ?? { id: key, title: t.parentTask!.title, tasks: [] };
+      lane.tasks.push(t);
+      seen.set(key, lane);
+    }
+    return [
+      ...[...seen.values()].sort((a, b) => a.title.localeCompare(b.title)),
+      { id: NO_EPIC, title: "No epic", tasks: tasks.filter((t) => laneOf(t) === NO_EPIC) },
+    ];
   }, [tasks]);
+  const hasEpics = laneList.length > 1;
+  const showLanes = lanes && hasEpics;
+
+  const columnTasks = (status: TaskStatus, lane: string | null) =>
+    tasks.filter((t) => t.status === status && (lane === null || laneOf(t) === lane));
 
   function handleDragStart(event: DragStartEvent) {
     setActiveTask(tasks.find((t) => t.id === event.active.id) ?? null);
@@ -110,17 +141,23 @@ export function KanbanBoard({
 
     const overId = String(over.id);
     let targetStatus: TaskStatus;
+    let targetLane: string | null = showLanes ? laneOf(dragged) : null;
     let overTaskId: string | null = null;
-    if (COLUMN_IDS.has(overId)) {
-      targetStatus = overId as TaskStatus;
+    const drop = parseDropId(overId);
+    if (drop) {
+      targetStatus = drop.status;
+      if (showLanes && drop.lane) targetLane = drop.lane;
     } else {
       const overTask = tasks.find((t) => t.id === overId);
       if (!overTask) return;
       targetStatus = overTask.status;
       overTaskId = overTask.id;
+      if (showLanes) targetLane = laneOf(overTask);
     }
 
-    const targetColumnTasks = columns[targetStatus].filter((t) => t.id !== activeId);
+    const targetColumnTasks = columnTasks(targetStatus, targetLane).filter(
+      (t) => t.id !== activeId,
+    );
     let insertIndex = targetColumnTasks.length;
     if (overTaskId) {
       const idx = targetColumnTasks.findIndex((t) => t.id === overTaskId);
@@ -129,7 +166,8 @@ export function KanbanBoard({
     const beforeTask = insertIndex > 0 ? targetColumnTasks[insertIndex - 1] : null;
     const afterTask =
       insertIndex < targetColumnTasks.length ? targetColumnTasks[insertIndex] : null;
-    if (dragged.status === targetStatus && beforeTask?.id === dragged.id) return;
+    const movesLane = showLanes && targetLane !== null && targetLane !== laneOf(dragged);
+    if (!movesLane && dragged.status === targetStatus && beforeTask?.id === dragged.id) return;
 
     let blockedReason: string | null = null;
     if (targetStatus === TaskStatus.BLOCKED && dragged.status !== TaskStatus.BLOCKED) {
@@ -148,10 +186,21 @@ export function KanbanBoard({
     const previous = queryClient.getQueryData<TaskItem[]>(queryKey);
     queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) => {
       const withoutActive = old.filter((t) => t.id !== activeId);
-      const moved: TaskItem =
+      let moved: TaskItem =
         dragged.status === targetStatus
           ? dragged
           : { ...dragged, ...statusTransitionData(dragged, targetStatus, { blockedReason }) };
+      if (movesLane) {
+        const lane = laneList.find((l) => l.id === targetLane);
+        moved = {
+          ...moved,
+          parentTaskId: targetLane === NO_EPIC ? null : targetLane,
+          parentTask:
+            targetLane === NO_EPIC || !lane
+              ? null
+              : { id: lane.id, title: lane.title, type: "EPIC", parentTask: null },
+        };
+      }
       let insertAt: number;
       if (input.beforeId) {
         const idx = withoutActive.findIndex((t) => t.id === input.beforeId);
@@ -174,6 +223,13 @@ export function KanbanBoard({
       announce(message);
     };
     try {
+      if (movesLane) {
+        // Into another epic's lane: move it into that epic (or out of any).
+        const moved = await updateTask(org.id, activeId, {
+          parentTaskId: targetLane === NO_EPIC ? null : targetLane,
+        });
+        if (moved.error) return rollback(moved.error);
+      }
       const result = await reorderTask(org.id, input);
       if (result.error) rollback(result.error);
     } catch {
@@ -181,45 +237,126 @@ export function KanbanBoard({
     }
   }
 
+  const olderFooter =
+    !showAll && olderCompleted > 0 ? (
+      <button
+        type="button"
+        onClick={() => setParam("done", "all")}
+        className="text-muted-foreground hover:text-foreground block w-full rounded-full px-2 py-1 text-left text-xs underline-offset-4 hover:underline"
+      >
+        Show {olderCompleted} older completed
+      </button>
+    ) : null;
+
+  const open = (taskId: string) => {
+    const found = tasks.find((t) => t.id === taskId);
+    if (found) showTask(found);
+  };
+
   return (
     <>
       {blockedPrompt}
+      {hasEpics && (
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={showLanes}
+            onClick={() => setParam("lanes", showLanes ? null : "epic")}
+            className={chipClass(showLanes)}
+          >
+            <Layers aria-hidden="true" />
+            Swimlanes by epic
+          </button>
+        </div>
+      )}
       <DndContext
+        // A fixed id: dnd-kit's own counter differs between the server and
+        // the browser, which broke hydration (aria-describedby).
+        id="tasks-kanban"
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragEnd={(e) => void handleDragEnd(e)}
         onDragCancel={() => setActiveTask(null)}
       >
-        <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-4 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
-          {COLUMNS.map((col) => (
-            <KanbanColumn
-              key={col.status}
-              id={col.status}
-              title={col.title}
-              tasks={columns[col.status]}
-              todayKey={todayKey}
-              onOpenTask={(taskId) => {
-                const found = tasks.find((t) => t.id === taskId);
-                if (found) showTask(found);
-              }}
-              onAddTask={() => newTask({ status: col.status })}
-              footer={
-                col.status === TaskStatus.COMPLETED && !showAll && olderCompleted > 0 ? (
-                  <button
-                    type="button"
-                    onClick={showOlderCompleted}
-                    className="text-muted-foreground hover:text-foreground block w-full rounded px-1 py-1 text-left text-xs underline-offset-4 hover:underline"
-                  >
-                    Show {olderCompleted} older completed
-                  </button>
-                ) : null
-              }
-            />
-          ))}
-        </div>
+        {showLanes ? (
+          <div className="space-y-[30px]">
+            {laneList.map((lane) => {
+              const epicTask = lane.id === NO_EPIC ? null : lane;
+              const doneCount = lane.tasks.filter((t) => t.status === "COMPLETED").length;
+              return (
+                <section key={lane.id} aria-label={epicTask ? `Epic: ${lane.title}` : "No epic"}>
+                  <div className="mb-2.5 flex items-center gap-3 px-1">
+                    {epicTask ? (
+                      <>
+                        <TaskTypeChip type="EPIC" />
+                        <button
+                          type="button"
+                          onClick={() => openTask(lane.id)}
+                          className="heading truncate underline-offset-4 hover:underline"
+                        >
+                          {lane.title}
+                        </button>
+                        <ProgressBar
+                          done={doneCount}
+                          total={lane.tasks.length}
+                          color="var(--chart-4)"
+                          className="w-32"
+                        />
+                      </>
+                    ) : (
+                      <h2 className="heading text-muted-foreground">No epic</h2>
+                    )}
+                  </div>
+                  <div className="-mx-1 flex gap-3.5 overflow-x-auto px-1 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
+                    {COLUMNS.map((col) => (
+                      <KanbanColumn
+                        key={col.status}
+                        id={`${lane.id}:${col.status}`}
+                        status={col.status}
+                        title={col.title}
+                        tasks={columnTasks(col.status, lane.id)}
+                        todayKey={todayKey}
+                        showEpic={false}
+                        onOpenTask={open}
+                        onAddTask={() =>
+                          newTask({
+                            status: col.status,
+                            ...(epicTask
+                              ? { parentTaskId: lane.id, parentType: "EPIC" as const }
+                              : {}),
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="-mx-1 flex gap-3.5 overflow-x-auto px-1 pb-4 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
+            {COLUMNS.map((col) => (
+              <KanbanColumn
+                key={col.status}
+                id={col.status}
+                status={col.status}
+                title={col.title}
+                tasks={columnTasks(col.status, null)}
+                todayKey={todayKey}
+                onOpenTask={open}
+                onAddTask={() => newTask({ status: col.status })}
+                footer={col.status === TaskStatus.COMPLETED ? olderFooter : null}
+              />
+            ))}
+          </div>
+        )}
         <DragOverlay>
-          {activeTask && <TaskCard task={activeTask} todayKey={todayKey} />}
+          {activeTask && (
+            <div className={cn("cursor-grabbing")}>
+              <TaskCard task={activeTask} todayKey={todayKey} dragging showEpic={!showLanes} />
+            </div>
+          )}
         </DragOverlay>
       </DndContext>
     </>

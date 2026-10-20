@@ -4,6 +4,7 @@ import {
   goToKey,
   hasModifier,
   isShortcutSheetKey,
+  isSidebarToggleKey,
   isTypingTarget,
   shortcutGroups,
   type ShortcutGroup,
@@ -63,7 +64,7 @@ describe("keyboard shortcuts", () => {
   it("leaves out what the plan doesn't have", () => {
     const sections = [{ id: "tasks", label: "Tasks" }];
     const free = shortcutGroups({ mod: "⌘", sections, isAdmin: true, taskViews: false });
-    expect(rows(free, "Tasks page")).not.toContain("Board, Week, Table or Dashboard");
+    expect(rows(free, "Tasks page")).not.toContain("Board, Week, List, Table, Roadmap or Dashboard");
     expect(rows(free, "Tasks page")).not.toContain("Weekly update");
     const club = shortcutGroups({
       mod: "⌘",
@@ -74,12 +75,24 @@ describe("keyboard shortcuts", () => {
     });
     expect(rows(club, "Tasks page")).toEqual(
       expect.arrayContaining([
-        "Board, Week, Table or Dashboard",
+        "Board, Week, List, Table, Roadmap or Dashboard",
         "Filter by person",
         "Weekly update",
       ]),
     );
     const noTasks = shortcutGroups({ mod: "⌘", sections: [], isAdmin: false });
     expect(noTasks.map((g) => g.title)).toEqual(["Anywhere", "Go to"]);
+  });
+
+  it("collapses the sidebar with ⌘\\ or Ctrl \\, and lists it under Anywhere", () => {
+    expect(isSidebarToggleKey(key({ key: "\\", metaKey: true }))).toBe(true);
+    expect(isSidebarToggleKey(key({ key: "\\", ctrlKey: true }))).toBe(true);
+    // A layout where \ sits elsewhere still reports the physical key.
+    expect(isSidebarToggleKey(key({ key: "#", code: "Backslash", ctrlKey: true }))).toBe(true);
+    expect(isSidebarToggleKey(key({ key: "\\" }))).toBe(false);
+    expect(isSidebarToggleKey(key({ key: "\\", metaKey: true, altKey: true }))).toBe(false);
+    const sheet = shortcutGroups({ mod: "Ctrl", sections: [], isAdmin: false });
+    const row = sheet[0]!.rows.find((r) => r.label === "Collapse or expand the sidebar");
+    expect(row?.keys).toEqual([["Ctrl", "\\"]]);
   });
 });

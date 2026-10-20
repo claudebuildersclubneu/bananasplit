@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { ConnectionPicker, useAiConnections } from "@/components/ai/connection-picker";
+import { StepPills } from "@/components/databases/step-pills";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -268,6 +269,11 @@ export function CalendarShotImport({
                 : `Read by ${read?.readBy}. Check each event and fix what it got wrong.`}
           </DialogDescription>
         </DialogHeader>
+        <StepPills
+          steps={["Upload", "Check", "Add"]}
+          current={phase === "input" ? 0 : phase === "done" ? 3 : phase === "creating" ? 2 : 1}
+          label="Import steps"
+        />
 
         {phase === "input" && (
           <div className="min-h-0 space-y-3 overflow-y-auto">
@@ -304,8 +310,8 @@ export function CalendarShotImport({
                 if (f) pick(f);
               }}
               className={cn(
-                "hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-ring/50 relative grid min-h-48 cursor-pointer place-items-center overflow-hidden rounded-xl border-2 border-dashed p-4 text-center transition-colors outline-none focus-visible:ring-3",
-                dragging && "border-primary bg-primary/10",
+                "rounded-block border-border hover:border-foreground/40 hover:bg-muted/40 focus-visible:outline-foreground relative grid min-h-48 cursor-pointer place-items-center overflow-hidden border-[1.5px] border-dashed p-4 text-center transition-colors outline-none focus-visible:outline-2",
+                dragging && "border-foreground/50 bg-muted/60",
               )}
             >
               {preview ? (
@@ -314,7 +320,7 @@ export function CalendarShotImport({
                   <img
                     src={preview}
                     alt="Your screenshot"
-                    className="max-h-72 w-auto rounded-md border object-contain"
+                    className="rounded-tile ring-foreground/6 max-h-72 w-auto object-contain ring-1"
                   />
                   <button
                     type="button"
@@ -324,15 +330,17 @@ export function CalendarShotImport({
                       setFile(null);
                       setPreview(null);
                     }}
-                    className="bg-background/90 hover:bg-background absolute top-2 right-2 rounded-md border p-1"
+                    className="bg-background/90 hover:bg-background border-input absolute top-2 right-2 grid size-8 place-items-center rounded-full border"
                   >
                     <X className="size-4" aria-hidden="true" />
                   </button>
                 </>
               ) : (
                 <div className="space-y-1.5">
-                  <ImageUp className="text-muted-foreground mx-auto size-8" aria-hidden="true" />
-                  <p className="text-sm font-medium">
+                  <span className="bg-muted text-muted-foreground mx-auto mb-1 grid size-12 place-items-center rounded-full">
+                    <ImageUp className="size-5" aria-hidden="true" />
+                  </span>
+                  <p className="heading text-[15px]">
                     Drop a screenshot here, paste it, or click to choose
                   </p>
                   <p className="text-muted-foreground text-xs">
@@ -350,7 +358,10 @@ export function CalendarShotImport({
               what="the screenshot"
             />
             {error && (
-              <p role="alert" className="text-destructive flex items-start gap-1.5 text-sm">
+              <p
+                role="alert"
+                className="bg-tint-danger text-tint-danger-foreground rounded-tile flex items-start gap-2 p-3 text-sm"
+              >
                 <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 {error}
               </p>
@@ -361,9 +372,12 @@ export function CalendarShotImport({
         {(phase === "review" || phase === "creating") && read && (
           <div className="min-h-0 space-y-3 overflow-y-auto pe-1">
             {read.notes.length > 0 && (
-              <div className="border-warning/40 bg-warning/10 rounded-lg border p-3 text-sm">
-                <p className="font-medium">Worth a look</p>
-                <ul className="text-muted-foreground mt-1 list-disc space-y-0.5 ps-5 text-xs">
+              <div className="bg-muted/60 rounded-tile p-3 text-sm">
+                <p className="flex items-center gap-2 font-semibold">
+                  <CircleAlert className="text-warning size-4 shrink-0" aria-hidden="true" />
+                  Worth a look
+                </p>
+                <ul className="text-muted-foreground mt-1 list-disc space-y-0.5 ps-11 text-[13px]">
                   {read.notes.map((n, i) => (
                     <li key={i}>{n}</li>
                   ))}
@@ -386,20 +400,22 @@ export function CalendarShotImport({
 
         {phase === "done" && (
           <div className="min-h-0 space-y-3 overflow-y-auto">
-            <div className="flex items-start gap-3 rounded-xl border p-4">
-              <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
+            <div className="rounded-tile bg-muted/60 flex items-start gap-3 p-4">
+              <span className="bg-block-goal text-block-goal-foreground grid size-7 shrink-0 place-items-center rounded-full">
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+              </span>
               <div className="space-y-1.5 text-sm">
-                <p className="font-medium">
+                <p className="font-semibold">
                   {added.length === 0
                     ? "Nothing was added."
                     : `Added ${added.length} event${added.length === 1 ? "" : "s"}. Invited members were notified.`}
                 </p>
-                <ul className="space-y-0.5 text-xs">
+                <ul className="space-y-0.5 text-[13px]">
                   {added.map((m) => (
                     <li key={m.key}>
                       <Link
                         href={`/app/${orgSlug}/calendar/${m.eventId}`}
-                        className="text-primary underline underline-offset-2"
+                        className="text-foreground font-medium underline underline-offset-4"
                       >
                         {m.title}
                       </Link>
@@ -409,13 +425,12 @@ export function CalendarShotImport({
               </div>
             </div>
             {failed.length > 0 && (
-              <div className="border-destructive/30 space-y-1 rounded-xl border p-4 text-sm">
-                <p className="font-medium">Not added</p>
-                <ul className="space-y-1 text-xs">
+              <div className="bg-tint-danger text-tint-danger-foreground rounded-tile space-y-1 p-4 text-sm">
+                <p className="font-semibold">Not added</p>
+                <ul className="space-y-1 text-[13px]">
                   {failed.map((f) => (
                     <li key={f.key}>
-                      <span className="font-medium">{f.title}</span>:{" "}
-                      <span className="text-muted-foreground">{f.error}</span>
+                      <span className="font-medium">{f.title}</span>: <span>{f.error}</span>
                     </li>
                   ))}
                 </ul>
@@ -499,9 +514,9 @@ function EventRow({
   return (
     <li
       className={cn(
-        "bg-card space-y-2.5 rounded-xl border p-3 transition-opacity",
+        "rounded-tile bg-muted/50 space-y-2.5 p-3.5 transition-opacity",
         !row.include && "opacity-55",
-        problem && "border-destructive/50",
+        problem && "ring-destructive/60 ring-1",
       )}
     >
       <div className="flex items-center gap-2">
@@ -614,7 +629,7 @@ function EventRow({
             {invited.map((m) => (
               <span
                 key={m.id}
-                className="bg-muted inline-flex items-center gap-1 rounded-md py-0.5 ps-2 pe-1 text-xs"
+                className="bg-card ring-foreground/6 inline-flex h-6 items-center gap-1 rounded-full ps-2.5 pe-1 text-xs font-semibold ring-1"
               >
                 {m.name}
                 <button
@@ -623,7 +638,7 @@ function EventRow({
                   onClick={() =>
                     onChange({ attendeeIds: row.attendeeIds.filter((id) => id !== m.id) })
                   }
-                  className="hover:bg-background rounded-md p-0.5"
+                  className="hover:bg-muted grid size-5 place-items-center rounded-full"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -631,7 +646,7 @@ function EventRow({
             ))}
             {addable.length > 0 && (
               <select
-                className="border-input bg-background h-7 max-w-40 rounded-md border px-1.5 text-xs"
+                className="border-input bg-card h-8 max-w-40 rounded-full border px-2.5 text-xs font-medium"
                 value=""
                 aria-label="Invite someone"
                 onChange={(e) => {

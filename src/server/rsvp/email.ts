@@ -1,5 +1,5 @@
 import { escapeHtml, safeHref } from "@/server/email/escape";
-import { layout, paragraph, type RenderedEmail } from "@/server/email/templates";
+import { EMAIL_COLORS as C, layout, paragraph, type RenderedEmail } from "@/server/email/templates";
 import { mapsSearchUrl } from "@/lib/rsvp/format";
 
 import type { RsvpEmailTemplate } from "./service";
@@ -96,7 +96,7 @@ const COPY: Record<
 };
 
 function detailRow(label: string, valueHtml: string): string {
-  return `<tr><td style="padding:6px 12px 6px 0;vertical-align:top;font-size:12px;color:#7a6e58;white-space:nowrap">${escapeHtml(label)}</td><td style="padding:6px 0;vertical-align:top">${valueHtml}</td></tr>`;
+  return `<tr><td style="padding:6px 12px 6px 0;vertical-align:top;font-size:12px;color:${C.muted};white-space:nowrap">${escapeHtml(label)}</td><td style="padding:6px 0;vertical-align:top">${valueHtml}</td></tr>`;
 }
 
 export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
@@ -108,7 +108,7 @@ export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
     rows.push(
       detailRow(
         "Where",
-        `${escapeHtml(input.location)}<br><a href="${safeHref(mapsSearchUrl(input.location))}" style="color:#7a5a00">Open in Google Maps</a>`,
+        `${escapeHtml(input.location)}<br><a href="${safeHref(mapsSearchUrl(input.location))}" style="color:${C.ink}">Open in Google Maps</a>`,
       ),
     );
     text.push(`Where: ${input.location} (${mapsSearchUrl(input.location)})`);
@@ -121,7 +121,7 @@ export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
     rows.push(
       detailRow(
         "Online",
-        `<a href="${safeHref(input.joinUrl)}" style="color:#7a5a00">Join the meeting</a>`,
+        `<a href="${safeHref(input.joinUrl)}" style="color:${C.ink}">Join the meeting</a>`,
       ),
     );
     text.push(`Online: ${input.joinUrl}`);
@@ -134,7 +134,7 @@ export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
     rows.push(
       detailRow(
         "Ticket",
-        `<a href="${safeHref(input.ticketUrl)}" style="color:#7a5a00">Show this at the door</a>`,
+        `<a href="${safeHref(input.ticketUrl)}" style="color:${C.ink}">Show this at the door</a>`,
       ),
     );
     text.push(`Ticket (show it at the door): ${input.ticketUrl}`);
@@ -143,13 +143,13 @@ export function rsvpEmail(input: RsvpMessageInput): RenderedEmail {
     rows.push(
       detailRow(
         "Bring friends",
-        `<a href="${safeHref(input.inviteUrl)}" style="color:#7a5a00">${escapeHtml(input.inviteUrl.replace(/^https?:\/\//, ""))}</a>`,
+        `<a href="${safeHref(input.inviteUrl)}" style="color:${C.ink}">${escapeHtml(input.inviteUrl.replace(/^https?:\/\//, ""))}</a>`,
       ),
     );
     text.push(`Bring friends with your link: ${input.inviteUrl}`);
   }
 
-  const details = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;width:100%;background:#f7f2e6;border-radius:12px"><tr><td style="padding:12px 16px"><table role="presentation" cellpadding="0" cellspacing="0">${rows.join("")}</table></td></tr></table>`;
+  const details = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;width:100%;background:${C.page};border:1px solid ${C.line};border-radius:12px"><tr><td style="padding:12px 16px"><table role="presentation" cellpadding="0" cellspacing="0">${rows.join("")}</table></td></tr></table>`;
   const greeting = `Hi ${input.guestName.trim().split(/\s+/)[0] || "there"},`;
 
   return layout({

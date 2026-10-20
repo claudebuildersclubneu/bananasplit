@@ -1,3 +1,5 @@
+import { CircleCheck, TriangleAlert } from "lucide-react";
+
 import { SyncPanel } from "@/components/calendar/sync-panel";
 import { withOrgTx } from "@/server/db/context";
 import { getGoogleSyncStatus } from "@/server/google-calendar/requests";
@@ -6,7 +8,6 @@ import {
   type GoogleCallbackError,
 } from "@/server/integrations/google-connect";
 import { isGoogleConfigured } from "@/server/integrations/google";
-import { WARNING_BOX } from "@/lib/status-tones";
 import { planGate } from "@/server/billing/plan-gate";
 
 import { SettingsNoAccess } from "../../settings-no-access";
@@ -51,52 +52,62 @@ export default async function GoogleCalendarIntegrationPage({
       : null;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-7.5">
       <IntegrationHeader
         orgSlug={orgSlug}
         title="Google Calendar"
+        dto={dto}
+        secretLabel="token"
         description="Events you create here are mirrored to your Google calendars, so members can subscribe in their own calendar apps. The portal stays the source of truth."
       />
-      {notice && (
-        <p
-          role="status"
-          className={
-            code === "connected"
-              ? "bg-muted rounded-md p-3 text-sm"
-              : `rounded-md p-3 text-sm ${WARNING_BOX}`
-          }
-        >
-          {notice}
-        </p>
-      )}
-      <StatusPanel dto={dto} secretLabel="Refresh token" />
-      <GoogleCalendarPanel
-        orgId={organization.id}
-        dto={dto}
-        canWrite={canWrite}
-        configured={isGoogleConfigured()}
-        importPanel={
-          syncStatus && (
-            <SyncPanel
-              orgId={organization.id}
-              orgSlug={orgSlug}
-              canWrite={canWrite}
-              status={syncStatus}
-              sections={["import"]}
-            />
-          )
-        }
-      />
-      {dto.hasSecret && (
-        <TestAndRemove
+      <div className="space-y-4.5">
+        {notice && (
+          <p
+            role="status"
+            className={
+              code === "connected"
+                ? "bg-tint-success text-tint-success-foreground rounded-tile flex gap-2.5 p-3 text-sm"
+                : "bg-muted/60 rounded-tile flex gap-2.5 p-3 text-sm"
+            }
+          >
+            {code === "connected" ? (
+              <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            )}
+            <span>{notice}</span>
+          </p>
+        )}
+        <StatusPanel dto={dto} secretLabel="Refresh token" />
+        <GoogleCalendarPanel
           orgId={organization.id}
-          provider="GOOGLE_CALENDAR"
-          canTest={canWrite && dto.status !== "DISCONNECTED"}
-          canRemove={canRemove}
-          testLabel="Test and refresh calendars"
-          removeCopy="Access is revoked at Google and the token is deleted. Events stop mirroring; nothing already in Google is deleted."
+          dto={dto}
+          canWrite={canWrite}
+          configured={isGoogleConfigured()}
+          importPanel={
+            syncStatus && (
+              <SyncPanel
+                orgId={organization.id}
+                orgSlug={orgSlug}
+                canWrite={canWrite}
+                status={syncStatus}
+                sections={["import"]}
+              />
+            )
+          }
         />
-      )}
+        {dto.hasSecret && (
+          <TestAndRemove
+            orgId={organization.id}
+            provider="GOOGLE_CALENDAR"
+            name="Google Calendar"
+            canTest={canWrite && dto.status !== "DISCONNECTED"}
+            canRemove={canRemove}
+            testLabel="Test and refresh calendars"
+            removeCopy="Access is revoked at Google and the token is deleted. Events stop mirroring; nothing already in Google is deleted."
+          />
+        )}
+      </div>
     </div>
   );
 }

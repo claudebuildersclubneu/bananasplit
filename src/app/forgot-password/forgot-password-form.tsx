@@ -35,7 +35,7 @@ export function ForgotPasswordForm({
             </>
           }
         />
-        <Link href="/sign-in" className={cn(pill({ raised: true }), "w-full")}>
+        <Link href="/sign-in" className={cn(pill(), "w-full")}>
           Back to log in
         </Link>
       </>
@@ -66,10 +66,13 @@ export function ForgotPasswordForm({
         <PrimaryButton type="submit" disabled={isPending}>
           {isPending ? "Sending…" : "Send reset link"}
         </PrimaryButton>
-        <p className="text-ink-muted m-0 text-center text-[14px]">
+        <p className="text-muted-foreground m-0 text-center text-[14px] leading-[1.5]">
           {googleEnabled && "Signed up with Google? Just log in with Google. "}
           Remembered it?{" "}
-          <Link href="/sign-in" className="font-bold">
+          <Link
+            href="/sign-in"
+            className="text-foreground font-semibold underline decoration-current/30 underline-offset-2 hover:decoration-current"
+          >
             Log in
           </Link>
         </p>

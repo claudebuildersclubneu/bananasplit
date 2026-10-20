@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, Plug } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { setupStep } from "@/server/setup/catalog";
 import type { SetupState } from "@/server/setup/progress";
 
@@ -25,20 +26,22 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
 
   if (broken && next) {
     return (
-      <section className="border-destructive/40 bg-destructive/5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border p-4">
-        <AlertTriangle className="text-destructive size-5 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{next.title} has stopped working.</p>
-          <p className="text-muted-foreground text-sm">
+      <section className="rounded-card bg-tint-danger text-tint-danger-foreground flex flex-wrap items-center gap-x-5 gap-y-3 p-5 sm:p-6">
+        <span className="bg-card text-destructive grid size-9 shrink-0 place-items-center rounded-full">
+          <AlertTriangle className="size-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-[1_1_15rem] space-y-0.5">
+          <p className="heading text-[15px]">{next.title} has stopped working.</p>
+          <p className="text-sm">
             {next.title === "Club website data"
               ? "New check-ins are not arriving. The setup page says what the database returned and what to change."
               : "The last connection test failed. The setup page says what the service returned and what to change."}
           </p>
         </div>
-        <Button asChild size="sm">
+        <Button asChild variant="outline" size="sm" className="bg-card">
           <Link href={`/app/${orgSlug}/setup/status`}>
             See what failed
-            <ArrowRight className="size-4" aria-hidden="true" />
+            <ArrowRight data-icon="inline-end" aria-hidden="true" />
           </Link>
         </Button>
       </section>
@@ -48,12 +51,16 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
   if (!next) return null;
 
   return (
-    <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border p-4">
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-sm font-medium">
+    <Card className="flex-row flex-wrap items-center gap-x-5 gap-y-3 px-5 py-5 sm:px-6">
+      {/* IconChip (sm), drawn here: this renders on the server, and IconChip is a client component. */}
+      <span className="bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1">
+        <Plug className="size-[18px]" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-[1_1_15rem] space-y-0.5">
+        <p className="heading text-[15px]">
           {state.connectedCount === 0
             ? "Connect your club's accounts to fill this place up"
-            : `${state.connectedCount} of ${state.totalCount} connected — next up, ${next.title.toLowerCase()}`}
+            : `${state.connectedCount} of ${state.totalCount} connected. Next up, ${next.title.toLowerCase()}`}
         </p>
         <p className="text-muted-foreground text-sm">
           {state.connectedCount === 0
@@ -61,12 +68,12 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
             : `${next.unlocks[0]}. About ${next.minutes} minutes.`}
         </p>
       </div>
-      <Button asChild size="sm">
+      <Button asChild variant="outline" size="sm">
         <Link href={href}>
           {state.connectedCount === 0 ? "Connect tools" : "Keep connecting"}
-          <ArrowRight className="size-4" aria-hidden="true" />
+          <ArrowRight data-icon="inline-end" aria-hidden="true" />
         </Link>
       </Button>
-    </section>
+    </Card>
   );
 }

@@ -2,10 +2,15 @@ import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 
+import { CircleAlert, FileJson } from "lucide-react";
+
 import { BackLink } from "@/components/back-link";
 import { DefinitionEditForm, DefinitionImportForm } from "@/components/databases/definition-forms";
+import { notice } from "@/components/databases/styles";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { NotFoundError } from "@/lib/auth/errors";
 import { exclusionLabel, readDefinition } from "@/server/databases/ballot-definitions";
 import { fmtDate } from "@/server/databases/format";
@@ -75,47 +80,76 @@ export default async function BallotDefinitionsPage({
     (slug) => !data.definitions.some((d) => d.slug === slug),
   );
 
+  const countedTotal = data.reasons
+    .filter((r) => !r.excludedReason)
+    .reduce((s, r) => s + r._count._all, 0);
+  const n = data.definitions.length;
+  const summary = [
+    n === 0 ? "No polls yet" : `${n.toLocaleString()} ${n === 1 ? "poll" : "polls"}`,
+    countedTotal > 0 &&
+      `${countedTotal.toLocaleString()} counted ${countedTotal === 1 ? "ballot" : "ballots"}`,
+    unknown.length > 0 && `${unknown.length} waiting for a definition`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
+    <div className="max-w-3xl space-y-7.5">
+      <div className="space-y-3">
         <BackLink href={`/app/${orgSlug}/databases/${dbKey}`} label={data.database.name} />
-        <PageHeader
-          title="Poll definitions"
-          description="What each poll asks, its answer options, and when voting is open. If a poll's totals look off, check here: votes cast outside that window, votes from the website's own tests, and votes for options a poll no longer has are kept but not counted."
-        />
+        <PageHeader title="Poll definitions" description={summary} />
       </div>
 
-      <DefinitionImportForm organizationId={organization.id} sessions={sessions} />
+      <p className={notice.neutral}>
+        What each poll asks, its answer options, and when voting is open. If a poll&apos;s totals
+        look off, check here: votes cast outside that window, votes from the website&apos;s own
+        tests, and votes for options a poll no longer has are kept but not counted.
+      </p>
 
       {unknown.length > 0 && (
-        <p className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
-          Ballots are waiting for a definition: {unknown.join(", ")}. Import the poll file to count
-          them.
+        <p className="bg-muted/60 rounded-tile flex items-start gap-2 p-3 text-sm">
+          <CircleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            Ballots are waiting for a definition: {unknown.join(", ")}. Import the poll file to
+            count them.
+          </span>
         </p>
       )}
 
-      <ul className="space-y-4">
+      <DefinitionImportForm organizationId={organization.id} sessions={sessions} />
+
+      {n === 0 && (
+        <Card>
+          <EmptyState
+            icon={FileJson}
+            title="No poll definitions yet"
+            description="Import a poll file above to count its ballots and see its results."
+          />
+        </Card>
+      )}
+
+      <ul className="space-y-4.5">
         {data.definitions.map((d) => {
           const def = readDefinition(d.definition);
           const counts = bySlug.get(d.slug) ?? [];
           const counted = counts.filter((c) => !c.reason).reduce((s, c) => s + c.n, 0);
           return (
-            <li key={d.id} className="space-y-3 rounded-xl border p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold">{d.title}</h2>
-                <code className="text-muted-foreground text-xs">{d.slug}</code>
-                {d.isTest && <Badge variant="outline">Test</Badge>}
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {def.questions.length} questions · {counted} counted
-                {counts
-                  .filter((c) => c.reason)
-                  .map((c) => ` · ${c.n} ${exclusionLabel(c.reason).toLowerCase()}`)
-                  .join("")}
-              </p>
+            <li key={d.id}>
               <DefinitionEditForm
                 organizationId={organization.id}
                 sessions={sessions}
+                title={d.title}
+                action={d.isTest ? <Badge variant="secondary">Test</Badge> : undefined}
+                description={
+                  <span className="tabular-nums">
+                    <code className="font-mono text-xs">{d.slug}</code> · {def.questions.length}{" "}
+                    questions · {counted} counted
+                    {counts
+                      .filter((c) => c.reason)
+                      .map((c) => ` · ${c.n} ${exclusionLabel(c.reason).toLowerCase()}`)
+                      .join("")}
+                  </span>
+                }
                 definition={{
                   id: d.id,
                   title: d.title,

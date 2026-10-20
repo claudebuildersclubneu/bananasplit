@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCents, parseDollarsToCents, sumCents } from "./money";
+import { formatCents, formatDollars, parseDollarsToCents, sumCents } from "./money";
 
 /** Deterministic PRNG so a failing seed is reproducible without a fuzzing library. */
 function mulberry32(seed: number) {
@@ -69,5 +69,14 @@ describe("formatCents", () => {
     expect(formatCents(100)).toBe("$1.00");
     expect(formatCents(123456)).toBe("$1,234.56");
     expect(formatCents(-500)).toBe("-$5.00");
+  });
+});
+
+describe("formatDollars", () => {
+  it("rounds to whole dollars for headline figures", () => {
+    expect(formatDollars(183_000)).toBe("$1,830");
+    expect(formatDollars(45_250)).toBe("$453");
+    expect(formatDollars(-4_249)).toBe("-$42");
+    expect(formatDollars(0)).toBe("$0");
   });
 });
