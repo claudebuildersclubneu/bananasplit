@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { NoteEditorShell } from "@/components/notes/note-editor-shell";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { collabConfig } from "@/lib/collab/config";
+import { noteHistoryWindowDays } from "@/lib/notes/history";
 import { canEditNote, canShareNote, generalAccessOf, toNoteAccess } from "@/lib/notes/access";
 import { mintNoteCollabSession } from "@/server/collab/session";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -123,6 +124,7 @@ export default async function NoteDetailPage({
         paperSize: note.paperSize,
         updatedAt: note.updatedAt.toISOString(),
         updatedByName: data.updatedByName,
+        historyDays: noteHistoryWindowDays(org),
         focusCommentId: focus && data.comments.some((c) => c.id === focus) ? focus : null,
       }}
     />

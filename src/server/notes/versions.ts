@@ -65,8 +65,8 @@ export async function snapshotBeforeSave(ctx: MemberContext, before: SnapshotSou
 }
 
 /**
- * Deletes the note's autosave snapshots older than the history window.
- * Named versions stay. The service path (app_user may not delete them).
+ * Deletes the note's autosave snapshots older than the space's history
+ * window (spaceLimits(...).noteHistoryDays). Named versions stay. The service path (app_user may not delete them).
  */
 export async function pruneSnapshots(
   db: TxClient,
@@ -74,9 +74,13 @@ export async function pruneSnapshots(
   noteId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  // TODO(plans): pass the org's plan once noteHistoryWindowDays reads it.
+  const space = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { kind: true, plan: true },
+  });
+  if (!space) return 0;
   const result = await db.noteVersion.deleteMany({
-    where: { organizationId, noteId, name: null, createdAt: { lt: historyCutoff(now) } },
+    where: { organizationId, noteId, name: null, createdAt: { lt: historyCutoff(space, now) } },
   });
   return result.count;
 }

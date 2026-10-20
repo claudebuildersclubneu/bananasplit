@@ -25,6 +25,7 @@ import {
 
 import { dismissToast, toast } from "@/components/ui/toaster";
 import { NOTE_FIELD, type CollabUser } from "@/lib/collab/protocol";
+import { uploadNoteFile } from "@/lib/files/upload";
 import { paperPx } from "@/lib/notes/paper";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { cn } from "@/lib/utils";
@@ -239,19 +240,15 @@ export function NoteEditor({
 
   // Uploads go to the club's files (they count toward storage).
   async function upload(file: File): Promise<{ id: string; name: string } | null> {
-    const form = new FormData();
-    form.set("file", file);
-    form.set("visibility", placeRef.current.visibility);
-    const res = await fetch(`/api/orgs/${encodeURIComponent(placeRef.current.orgId)}/files`, {
-      method: "POST",
-      body: form,
+    // The route or a direct upload by size, with the plan's quota errors.
+    const result = await uploadNoteFile(placeRef.current.orgId, file, {
+      visibility: placeRef.current.visibility,
     });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast({ title: body?.error ?? "The upload failed.", tone: "error" });
+    if (!result.ok) {
+      toast({ title: result.error, tone: "error" });
       return null;
     }
-    return ((await res.json()) as { file: { id: string; name: string } }).file;
+    return result.file;
   }
 
   async function insertUploads(files: File[], asImage?: boolean) {

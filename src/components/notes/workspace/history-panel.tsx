@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { formatBytes } from "@/lib/files/types";
-import { noteHistoryWindowDays } from "@/lib/notes/history";
 import { cn } from "@/lib/utils";
 
 /**
@@ -56,6 +55,7 @@ export function HistoryPanel({
   currentJson,
   previewId,
   onPreview,
+  historyDays,
 }: {
   orgId: string;
   noteId: string;
@@ -67,6 +67,8 @@ export function HistoryPanel({
   currentJson: () => string | null;
   previewId: string | null;
   onPreview: (version: PreviewVersion | null) => void;
+  /** The plan's note-history window. */
+  historyDays: number;
 }) {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
@@ -236,7 +238,7 @@ export function HistoryPanel({
         </ul>
       )}
       <p className="text-muted-foreground px-1 text-[11px] leading-relaxed">
-        Autosaves are kept {noteHistoryWindowDays()} days, named versions until someone deletes
+        Autosaves are kept {historyDays} days, named versions until someone deletes
         them.
         {versions.length > 0 &&
           ` ${formatBytes(versions.reduce((n, v) => n + v.sizeBytes, 0))} of the club's storage.`}

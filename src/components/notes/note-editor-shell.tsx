@@ -107,6 +107,8 @@ export interface NoteWorkspace {
   updatedByName: string | null;
   /** ?comment= in the link from a notification. */
   focusCommentId: string | null;
+  /** How long autosave snapshots are kept (the plan's note-history window). */
+  historyDays: number;
 }
 
 export interface NoteEditorShellProps {
@@ -148,6 +150,7 @@ const EMPTY_WORKSPACE: NoteWorkspace = {
   updatedAt: new Date(0).toISOString(),
   updatedByName: null,
   focusCommentId: null,
+  historyDays: 90,
 };
 
 type RailTab = "comments" | "history" | "suggestions";
@@ -603,6 +606,7 @@ export function NoteEditorShell({
           canDelete={sharing.canShare}
           currentJson={() => (editor ? JSON.stringify(editor.getJSON()) : null)}
           previewId={preview?.id ?? null}
+          historyDays={workspace.historyDays}
           onPreview={(v) => {
             setPreview(v);
             setSheetRail(false);
@@ -907,7 +911,7 @@ export function NoteEditorShell({
                   placeholder="Untitled note"
                   aria-label="Title"
                   // Set like the page's title: no box, the display face, not faded when read-only.
-                  className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
+                  className="page-title h-auto min-w-0 text-[2rem] border-none bg-transparent px-0 py-0 shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
                 />
                 <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
                   <span>
