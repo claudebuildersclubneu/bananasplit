@@ -20,7 +20,9 @@ vi.mock("@/server/cache/invalidate", () => ({ invalidate: vi.fn() }));
 
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { withOrgTx } from "@/server/db/context";
-import { removeNoteFile } from "@/server/notes/files";
+import { removeNoteFile, storeNoteFile } from "@/server/notes/files";
+import { deleteBlobs } from "@/server/storage";
+import { sendFileToClub } from "@/server/storage/send-to-club";
 import { ensurePersonalSpace } from "@/server/personal/space";
 import { createOrganization } from "@/server/settings/org-creation";
 import { disconnectOwnerDb, ownerDb } from "@/test/owner-db";
@@ -116,6 +118,31 @@ describe("Organization.storageUsedBytes", () => {
     await withOrgTx(club.id, ({ db }) => removeNoteFile(db, club.id, fileId));
     // The trash counts until it is emptied.
     expect(await used(club.id)).toBe(before + 1234);
+  });
+
+  it("lets a Personal space upload a note file, and send a copy to a club that counts there", async () => {
+    if (!reachable) return;
+    requireUserMock.mockResolvedValue(owner);
+    const personalBefore = await used(personalId);
+    const file = await storeNoteFile({
+      orgId: personalId,
+      bytes: Buffer.from("hello from personal\n"),
+      filename: `hello-${tag}.txt`,
+      visibility: "PRIVATE",
+    });
+    expect(await used(personalId)).toBe(personalBefore + 20);
+
+    const clubBefore = await used(club.id);
+    const sent = await sendFileToClub(personalId, file.id, club.id);
+    expect(sent.ok).toBe(true);
+    expect(await used(club.id)).toBe(clubBefore + 20);
+    // The original stays in Personal.
+    expect(await used(personalId)).toBe(personalBefore + 20);
+    const keys = await ownerDb.orgFile.findMany({
+      where: { organizationId: { in: [personalId, club.id] }, name: `hello-${tag}.txt` },
+      select: { storageKey: true },
+    });
+    await deleteBlobs(keys.map((k) => k.storageKey));
   });
 
   it("can't be written by the app roles", async () => {
