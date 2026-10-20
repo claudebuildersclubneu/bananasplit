@@ -372,6 +372,18 @@ export const JOB_KINDS = {
     handler: () => import("./handlers/maintenance").then((m) => m.maintenanceJob),
     description: "Daily: prune rate-limit buckets and old finished jobs.",
   }),
+  "storage-reconcile": kind({
+    payload: z.object({}).strict(),
+    scope: "platform",
+    // Every space, one after another: heavy, so it runs alone in a cron invocation.
+    maxRuntimeMs: 240_000,
+    leaseSeconds: 330,
+    tier: "heavy",
+    afterEligible: false,
+    handler: () => import("./handlers/storage").then((m) => m.storageReconcileJob),
+    description:
+      "Daily: re-add each space's storage against Organization.storageUsedBytes (drift is logged) and delete direct uploads that never got a row.",
+  }),
 };
 
 export type JobKind = keyof typeof JOB_KINDS;

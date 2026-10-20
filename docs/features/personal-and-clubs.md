@@ -9,11 +9,16 @@ plan from a9b3141 and the old free /rsvp pages.
 - **Personal**: every account has one, free forever. It is an Organization
   with `kind = PERSONAL`, `personalOwnerId` = the user, exactly one member
   (the owner). It holds personal tasks, a personal calendar, availability
-  polls (When2meet-style) and RSVP event pages (Luma-style). No members,
-  invitations, roles, people, org chart, finance, databases, notes.
+  polls (When2meet-style), RSVP event pages (Luma-style), and (Moonstone,
+  2026-10-19) notes and files. No members, invitations, roles, people, org
+  chart, finance, databases. It is on **Personal Free** (`FREE`) or
+  **Personal Plus** (`PERSONAL_PLUS`, $4 a month or $36 a year: themes,
+  calendar sync, AI imports, more storage); its owner switches in Settings ›
+  Plan and storage.
 - **Club**: a shared space (`kind = CLUB`). Anyone can start one. A new club
-  gets a **30-day free trial** of everything (Society features), no card.
-  When the trial ends the owner picks **Club** or **Society**. Until then
+  gets a **30-day free trial** of everything (Team Advanced), no card.
+  When the trial ends the owner picks **Team** (`CLUB`) or **Team
+  Advanced** (`SOCIETY`). Until then
   the club is **paused**: everyone can still open and read everything,
   nothing is deleted, public RSVP and poll links keep working for guests,
   but members can't create or edit club content; owners and admins see a
@@ -28,7 +33,42 @@ plan from a9b3141 and the old free /rsvp pages.
 
 "Personal" and "Club" everywhere. No "workspace", "organization" or "org"
 in the UI. "Start a club" (owner, trial) and "Join a club" (free, code or
-link). Plans: Club and Society. Pricing says: "Joining members never pay."
+link). Plans: Personal Free, Personal Plus, Team and Team Advanced (the
+database values stay FREE, PERSONAL_PLUS, CLUB, SOCIETY and TRIAL; only
+`PLAN_NAMES` says them out loud). Pricing says: "Joining members never pay."
+
+## Plans and storage (Moonstone, redesign guide 11)
+
+Every number lives in `src/lib/billing/features.ts` (`PLAN_LIMITS`,
+`PLAN_FEATURES`, `PLAN_NAMES`) and `src/lib/billing/plans.ts` (prices).
+
+| | Personal Free | Personal Plus | Team | Team Advanced (and the trial) |
+|---|---|---|---|---|
+| Price | $0 | $4/month or $36/year | $4/member/semester | $7/member/semester |
+| Storage | 1 GB | 25 GB | 100 GB | 500 GB |
+| Largest file | 10 MB | 250 MB | 250 MB | 1 GB |
+| Note history | 7 days | 1 year | 90 days | 1 year |
+| Data connections | 0 | 1 | 2 | 6 |
+
+- Storage counts Notes files (and images in notes), receipts, note history
+  and the trash, until it is emptied (`Organization.storageUsedBytes`, kept
+  by database triggers; the app never writes it).
+- Every upload passes one gate (`src/server/storage/quota.ts`): the space
+  has the feature and isn't paused, the file is within the plan's largest
+  file, and it fits. Refusals say the numbers. Files over 4 MB go straight
+  to Vercel Blob with a short-lived, size-capped token
+  (`src/server/storage/direct.ts`); the browser side is `uploadNoteFile()`
+  in `src/lib/files/upload.ts`.
+- At 80% owners and admins (or the Personal owner) see a banner on the
+  storage page and the Files page (`SpaceStorageBanner`) and get one notice
+  (in-app and email) per crossing. At 100% uploads stop. Nothing is ever
+  deleted for being over; a downgrade that leaves a space over its limit
+  only stops uploads.
+- Settings › Plan and storage › Storage: the meter, the largest files and
+  Empty trash.
+- **Send to a club** (`src/server/storage/send-to-club.ts`): a copy of a
+  Personal note or file into one of your clubs, shared there and counted
+  toward the club's storage.
 
 ## Sign-up and onboarding
 

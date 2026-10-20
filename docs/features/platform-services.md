@@ -53,6 +53,31 @@ link there). A verified Google sign-in for the same address replaces an
 unconfirmed password account that never joined an org. This needs the
 platform sender (`RESEND_API_KEY`, `EMAIL_FROM`) in production.
 
+## Storage limits
+
+Each space's storage is `Organization.storageUsedBytes` (files, receipts,
+note history, the trash), kept by database triggers. Uploads check it and
+the plan (`PLAN_LIMITS`) before they start and again in the row's
+transaction. Notes files over 4 MB go straight from the browser to the
+private Vercel Blob store (`POST /api/orgs/{orgId}/files/uploads`, then
+`.../upload-token`, then `.../complete`); without `BLOB_READ_WRITE_TOKEN`
+the upload route takes files up to 25 MB (4 MB on Vercel). Downloads stream
+from the store. The daily `storage-reconcile` job (heavy, from the cron)
+re-adds every space and logs `[storage] drift` when the counter disagrees,
+and deletes direct uploads that never got a row after a day.
+
+Known database gaps (need a migration):
+
+- The runtime roles can't delete `OrgFile` rows, so a file's size stays on
+  the counter after the nightly purge or Empty trash removes its bytes.
+  Needed: a SECURITY DEFINER `app.purge_trashed_files(p_before timestamptz)`
+  for app_service (the purge) and app_user (Empty trash: the uploader, or an
+  owner/admin for shared files) that deletes the context org's trashed rows
+  and returns their storage keys.
+- The counter can't be corrected by the app: the reconcile job only reports
+  drift. Needed: a SECURITY DEFINER `app.storage_reconcile(p_org text)` for
+  app_service that recomputes and sets it.
+
 ## Local development
 
 Nothing to configure: with no Resend key, mail is written to the console and

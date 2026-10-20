@@ -74,6 +74,60 @@ export function sniffNoteFile(bytes: Buffer, filename: string): string | null {
   return null;
 }
 
+/** Valid UTF-8 up to a cut that may split the last character (a file's first bytes). */
+function isUtf8Prefix(bytes: Buffer): boolean {
+  for (let trim = 0; trim <= 3 && trim < bytes.length; trim++) {
+    if (isUtf8Text(bytes.subarray(0, bytes.length - trim))) return true;
+  }
+  return false;
+}
+
+/**
+ * The accepted type of a big file that came straight from the browser to
+ * blob storage (src/server/storage/direct.ts), from its first and last
+ * bytes only: the magic bytes are at the start, and an Office file's
+ * central directory, which names its parts, at the end. Text must be
+ * UTF-8 with no NUL as far as `head` goes.
+ */
+export function sniffNoteFileEdges(head: Buffer, tail: Buffer, filename: string): string | null {
+  const magic = sniffMimeType(head);
+  if (magic) return magic;
+  if (isZip(head)) return officeType(Buffer.concat([head, tail]));
+  const ext = extension(filename);
+  if (head.length > 0 && TEXT_EXTENSIONS.has(ext) && !head.includes(0) && isUtf8Prefix(head)) {
+    if (ext === "md" || ext === "markdown") return "text/markdown";
+    if (ext === "csv") return "text/csv";
+    return "text/plain";
+  }
+  return null;
+}
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  docx: DOCX,
+  pptx: PPTX,
+  xlsx: XLSX,
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  txt: "text/plain",
+  text: "text/plain",
+  md: "text/markdown",
+  markdown: "text/markdown",
+  csv: "text/csv",
+};
+
+/**
+ * The type a file's name says it is, for the browser to declare on a direct
+ * upload (the store only takes the Notes types; the server sniffs the
+ * bytes afterwards anyway). Null for a name the Notes page doesn't take.
+ */
+export function noteFileTypeFromName(filename: string): string | null {
+  return TYPE_BY_EXTENSION[extension(filename)] ?? null;
+}
+
 export const NOTE_FILE_ACCEPT = [
   ".pdf",
   ".docx",
