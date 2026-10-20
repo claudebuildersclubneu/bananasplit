@@ -91,7 +91,18 @@ export type TaskListItem = Prisma.TaskGetPayload<{ select: typeof taskListSelect
 
 const live = (organizationId: string) => ({ organizationId, deletedAt: null });
 
-/** Board: top-level tasks; Completed limited to those done since `completedSince`. */
+/**
+ * A card on the board: a story or a task, at the top or inside an epic. An
+ * epic is the swimlane, not a card, and a story's own tasks count on its
+ * card. A club that never makes epics gets exactly the old board: every
+ * top-level task.
+ */
+export const BOARD_ITEM = {
+  type: { not: TaskType.EPIC },
+  OR: [{ parentTaskId: null }, { parentTask: { is: { type: TaskType.EPIC } } }],
+} satisfies Prisma.TaskWhereInput;
+
+/** Board: its cards; Completed limited to those done since `completedSince`. */
 export function getBoardTasks(
   db: TxClient,
   organizationId: string,
@@ -107,7 +118,7 @@ export function getBoardTasks(
       }
     : {};
   return db.task.findMany({
-    where: { AND: [tableWhere(organizationId, filters, opts.today), openOrRecent] },
+    where: { AND: [taskFilterWhere(organizationId, filters, opts.today), BOARD_ITEM, openOrRecent] },
     select: taskListSelect,
     // Rank is a fractional-index sequence per status column: group by status first.
     orderBy: [{ status: "asc" }, { rank: "asc" }],
@@ -125,7 +136,8 @@ export function countOlderCompleted(
   return db.task.count({
     where: {
       AND: [
-        tableWhere(organizationId, filters, today),
+        taskFilterWhere(organizationId, filters, today),
+        BOARD_ITEM,
         { status: TaskStatus.COMPLETED },
         { OR: [{ completedAt: { lt: completedBefore } }, { completedAt: null }] },
       ],

@@ -9,6 +9,7 @@ import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enu
 import { cn } from "@/lib/utils";
 
 import { ProjectMenu } from "./project-menu";
+import { HashTagHint } from "./tag-menu";
 import { DueMenu, longDue, menuItemClass, PRIORITY_LABEL } from "./task-fields";
 import { STATUS_LABEL } from "./layout-ui";
 import { useTasks } from "./tasks-context";
@@ -86,6 +87,7 @@ export function TaskSentence({
           placeholder="Book a room for demo night"
           className="border-primary text-foreground placeholder:text-muted-foreground/70 w-full border-0 border-b-2 bg-transparent px-0.5 pt-0.5 pb-1 text-[21px] font-semibold outline-none placeholder:font-normal"
         />
+        <HashTagHint title={title} className="mt-1.5" />
       </div>
 
       <p className="text-foreground/80 m-0 text-[21px] leading-[1.85]">
@@ -183,7 +185,7 @@ export function TaskSentence({
       </p>
 
       <div className="-ms-2.5 flex flex-wrap gap-0.5">
-        {["Description", "Involved people", "Labels"].map((what) => (
+        {["Description", "Involved people", "Tags"].map((what) => (
           <button
             key={what}
             type="button"

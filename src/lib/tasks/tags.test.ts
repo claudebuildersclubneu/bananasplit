@@ -51,6 +51,13 @@ describe("extractHashTags", () => {
     });
   });
 
+  it("can take out only the tags it could use", () => {
+    expect(extractHashTags("Plan #venue and #catering", new Set(["venue"]))).toEqual({
+      title: "Plan and #catering",
+      tags: ["venue"],
+    });
+  });
+
   it("leaves a # inside a word, or on its own, alone", () => {
     expect(extractHashTags("Learn C# and fix issue#4 #")).toEqual({
       title: "Learn C# and fix issue#4 #",

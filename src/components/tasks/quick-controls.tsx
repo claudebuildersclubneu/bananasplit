@@ -1,9 +1,9 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useCallback, useOptimistic, useTransition } from "react";
 
 import { setTaskPriority, setTaskStatus } from "@/app/app/[orgSlug]/tasks/actions";
-import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "@/components/ui/toaster";
 import {
   Select,
   SelectContent,
@@ -15,6 +15,7 @@ import { TaskPriority, TaskStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
 import { useBlockedReason } from "./prompts";
+import { TaskCheck } from "./task-check";
 import { STATUS_LABELS } from "./status-select";
 import { PRIORITY_LABELS, PriorityDot } from "./task-badges";
 import { useTasks } from "./tasks-context";
@@ -144,9 +145,57 @@ export function QuickPriority({
   );
 }
 
-/** A checkbox that completes (or reopens) a task. */
-export function QuickDone({ task, disabled }: { task: QuickTask; disabled?: boolean }) {
+/**
+ * Completing a task, the Moonstone moment: the circle fills and springs,
+ * the seeds pop, and a toast says "Done: <title>" with Undo, which puts the
+ * task back the way it was (a blocked task keeps its reason).
+ */
+export function useCompleteTask() {
   const { org, announce } = useTasks();
+  return useCallback(
+    async (
+      task: { id: string; title: string; status: TaskStatus; blockedReason?: string | null },
+      next: TaskStatus,
+    ) => {
+      const result = await setTaskStatus(org.id, task.id, next);
+      if (result.error) {
+        announce(result.error);
+        return false;
+      }
+      if (next === TaskStatus.COMPLETED) {
+        const previous = task.status === TaskStatus.COMPLETED ? TaskStatus.NOT_STARTED : task.status;
+        toast({
+          title: `Done: ${task.title}`,
+          tone: "success",
+          action: {
+            label: "Undo",
+            run: async () =>
+              (
+                await setTaskStatus(
+                  org.id,
+                  task.id,
+                  previous,
+                  previous === TaskStatus.BLOCKED ? (task.blockedReason ?? null) : null,
+                )
+              ).error,
+          },
+        });
+      }
+      return true;
+    },
+    [org.id, announce],
+  );
+}
+
+/** The circle that completes (or reopens) a task. */
+export function QuickDone({
+  task,
+  disabled,
+}: {
+  task: QuickTask & { blockedReason?: string | null };
+  disabled?: boolean;
+}) {
+  const complete = useCompleteTask();
   const [status, setOptimistic] = useOptimistic(task.status);
   const [, startTransition] = useTransition();
   const done = status === TaskStatus.COMPLETED;
@@ -155,18 +204,16 @@ export function QuickDone({ task, disabled }: { task: QuickTask; disabled?: bool
     const next = done ? TaskStatus.NOT_STARTED : TaskStatus.COMPLETED;
     startTransition(async () => {
       setOptimistic(next);
-      const result = await setTaskStatus(org.id, task.id, next);
-      if (result.error) announce(result.error);
+      await complete(task, next);
     });
   }
 
   return (
-    <Checkbox
-      checked={done}
+    <TaskCheck
+      done={done}
       disabled={disabled}
-      onClick={(e) => e.stopPropagation()}
-      onCheckedChange={toggle}
-      aria-label={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
+      onToggle={toggle}
+      label={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
     />
   );
 }

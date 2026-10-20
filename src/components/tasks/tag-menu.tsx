@@ -11,6 +11,28 @@ import { cn } from "@/lib/utils";
 import { menuItemClass } from "./task-fields";
 import { useTasks } from "./tasks-context";
 import type { LabelOption } from "./types";
+import { useHashTags } from "./use-hash-tags";
+
+/** Under a title with `#tags` in it: what saving will tag it with. */
+export function HashTagHint({ title, className }: { title: string; className?: string }) {
+  const { preview } = useHashTags();
+  const tags = preview(title);
+  if (tags.length === 0) return null;
+  return (
+    <p
+      className={cn("text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs", className)}
+      aria-live="polite"
+    >
+      Tags it
+      {tags.map((t) => (
+        <span key={t.name} className="text-foreground font-medium">
+          #{t.name}
+          {t.isNew && <span className="text-muted-foreground font-normal"> (new)</span>}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 /**
  * The tag picker's menu: type to narrow, click to toggle, Enter to pick the

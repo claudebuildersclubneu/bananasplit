@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 
 import type { TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { ForbiddenError, NotFoundError } from "@/lib/auth/errors";
+import { hierarchyMessage } from "@/lib/tasks/hierarchy";
 import { withOrgAction, type OrgActionOptions } from "@/server/db/context";
 import { AppError } from "@/server/db/errors";
 import {
@@ -33,7 +34,12 @@ function refusal(error: unknown): string | null {
   if (error instanceof ForbiddenError)
     return error.message || "You don't have permission to do that.";
   if (error instanceof NotFoundError) return "Not found.";
-  if (error instanceof AppError) return error.message;
+  if (error instanceof AppError) {
+    // The hierarchy trigger's refusal (a race the service's checks missed),
+    // said the way the app says it.
+    const cause = error.cause instanceof Error ? error.cause.message : "";
+    return hierarchyMessage(cause) ?? error.message;
+  }
   return null;
 }
 

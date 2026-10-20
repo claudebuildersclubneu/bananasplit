@@ -53,13 +53,18 @@ const HASH_TAG = /(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]*)/gu;
  * photographer" tagged "showcase". Each tag once (ignoring case), in the
  * order typed. A "#" inside a word ("C#", "issue#4") is left alone.
  */
-export function extractHashTags(text: string): { title: string; tags: string[] } {
+export function extractHashTags(
+  text: string,
+  /** Only take out these (lower-cased names); the rest stay in the title as typed. */
+  only?: ReadonlySet<string>,
+): { title: string; tags: string[] } {
   const tags: string[] = [];
   const seen = new Set<string>();
   const title = text
-    .replace(HASH_TAG, (_match, lead: string, name: string) => {
+    .replace(HASH_TAG, (match, lead: string, name: string) => {
       const clean = cleanTagName(name);
       const key = clean.toLocaleLowerCase();
+      if (only && !only.has(key)) return match;
       if (clean && !seen.has(key)) {
         seen.add(key);
         tags.push(clean);
