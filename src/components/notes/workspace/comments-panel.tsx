@@ -3,7 +3,7 @@
 import type { Editor } from "@tiptap/core";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Check, Loader2, MessageSquarePlus, Pencil, RotateCcw, Trash2 } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   addNoteComment,
@@ -105,8 +105,24 @@ export function CommentsPanel({
   // Positions of the threads beside their passages, in Document mode.
   const container = useRef<HTMLDivElement>(null);
   const [tops, setTops] = useState<Map<string, number>>(new Map());
-  const ranges = editor && aligned ? threadRanges(editor.state) : new Map();
-  const rangeKey = [...ranges.entries()].map(([id, r]) => `${id}:${r.from}`).join(",");
+  // Which threads the editor found, and where (follows every transaction).
+  const [rangeKey, setRangeKey] = useState("");
+  useEffect(() => {
+    if (!editor) return;
+    const read = () => {
+      if (editor.isDestroyed) return;
+      const key = [...threadRanges(editor.state).entries()]
+        .map(([id, r]) => `${id}:${r.from}`)
+        .join(",");
+      setRangeKey((prev) => (prev === key ? prev : key));
+    };
+    read();
+    editor.on("transaction", read);
+    return () => {
+      editor.off("transaction", read);
+    };
+  }, [editor]);
+  const found = new Set(rangeKey ? rangeKey.split(",").map((part) => part.split(":")[0]) : []);
   useLayoutEffect(() => {
     if (!aligned || !editor || !container.current) return;
     const measure = () => {
@@ -122,7 +138,7 @@ export function CommentsPanel({
       }
       wanted.sort((a, b) => a.top - b.top);
       const next = new Map<string, number>();
-      let floor = draft ? 220 : 0;
+      let floor = 0;
       for (const w of wanted) {
         const el = container.current?.querySelector<HTMLElement>(`[data-thread="${w.id}"]`);
         const top = Math.max(w.top, floor);
@@ -137,10 +153,10 @@ export function CommentsPanel({
       );
     };
     measure();
-    editor.on("update", measure);
+    editor.on("transaction", measure);
     window.addEventListener("resize", measure);
     return () => {
-      editor.off("update", measure);
+      editor.off("transaction", measure);
       window.removeEventListener("resize", measure);
     };
   }, [aligned, editor, rangeKey, comments, draft, activeId]);
@@ -181,9 +197,7 @@ export function CommentsPanel({
           canModerate={canModerate}
           people={people}
           active={activeId === t.root.id}
-          detached={
-            Boolean(t.root.anchorText) && !(editor && threadRanges(editor.state).has(t.root.id))
-          }
+          detached={Boolean(t.root.anchorText) && !found.has(t.root.id)}
           onActive={onActive}
           apply={apply}
           confirm={confirm}

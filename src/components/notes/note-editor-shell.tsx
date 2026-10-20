@@ -542,7 +542,8 @@ export function NoteEditorShell({
       orgId={orgId}
       orgSlug={orgSlug}
       currentId={note.id}
-      pages={workspace.pages}
+      // This page as it is being typed.
+      pages={workspace.pages.map((p) => (p.id === note.id ? { ...p, title, icon } : p))}
       favoriteIds={workspace.favoriteIds}
       onNavigate={() => setTreeSheet(false)}
     />
