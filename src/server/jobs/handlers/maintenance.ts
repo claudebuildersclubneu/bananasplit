@@ -31,26 +31,23 @@ export const purgeUnverifiedJob: JobHandler<unknown> = async () => {
 
 /**
  * Notes files stay in "Recently deleted" for NOTE_TRASH_DAYS so they can be
- * restored; after that their bytes go. The window is a week wide so a few
- * missed daily runs still catch every file, without rescanning forever.
+ * restored; after that the rows go (the database takes their bytes off the
+ * storage counter) and then their bytes leave the store.
  */
 async function purgeDeletedNoteFiles(now: Date = new Date()): Promise<number> {
   const day = 24 * 60 * 60 * 1000;
   const before = new Date(now.getTime() - NOTE_TRASH_DAYS * day);
-  const after = new Date(before.getTime() - 7 * day);
   const orgIds = await serviceDb.$queryRaw<
     { id: string }[]
   >`SELECT id FROM app.active_org_ids() AS id`;
   let purged = 0;
   for (const { id } of orgIds) {
-    const keys = await withSystemOrgTx(id, async ({ db }) =>
-      (
-        await db.orgFile.findMany({
-          where: { organizationId: id, deletedAt: { lt: before, gte: after } },
-          select: { storageKey: true },
-        })
-      ).map((f) => f.storageKey),
-    );
+    const keys = await withSystemOrgTx(id, async ({ db }) => {
+      const where = { organizationId: id, deletedAt: { lt: before } };
+      const rows = await db.orgFile.findMany({ where, select: { storageKey: true } });
+      if (rows.length > 0) await db.orgFile.deleteMany({ where });
+      return rows.map((f) => f.storageKey);
+    });
     if (keys.length === 0) continue;
     await deleteBlobs(keys);
     purged += keys.length;

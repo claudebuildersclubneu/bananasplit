@@ -2434,6 +2434,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       note_cycle_guard: "",
       note_parent_visible: "",
       note_comment_guard: "",
+      // The nightly job's counter repair (service path, its org context only).
+      storage_reconcile: "s",
     };
     await tcase(
       "T27f",
