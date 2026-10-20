@@ -8,6 +8,7 @@ import { dollars } from "@/lib/billing/plans";
 import { CONTACT_HREF } from "@/lib/brand/links";
 import { cn } from "@/lib/utils";
 
+import { AudienceSwitch } from "./audience-switch";
 import { PlusToggle } from "./plus-toggle";
 import { CONTAINER, SectionTitle } from "./section-title";
 import { SiteLink } from "./site-link";
@@ -230,10 +231,11 @@ const PROMISES = [
 ] as const;
 
 /**
- * The four plans (redesign guide 11.1): Personal Free and Personal Plus for
- * one person, Team and Team Advanced for a club, as cards in one row (two
- * on a tablet, one on a phone), what each includes in a table underneath,
- * then the school-wide plan. `checkout`: whether checkout exists on this
+ * The four plans (redesign guide 11.1), two at a time behind a Personal /
+ * Teams switch: Personal Free and Personal Plus for one person, Team and
+ * Team Advanced for a club, as two cards side by side (stacked on a phone),
+ * what each includes in a table underneath, and under the team plans the
+ * school-wide plan. `checkout`: whether checkout exists on this
  * deployment (src/app/checkout/availability.ts), so Personal Plus only
  * links there when it does.
  */
@@ -245,6 +247,8 @@ export function Pricing({
   checkout?: boolean;
 }) {
   const plans = tiers(signedIn, checkout);
+  const personalPlans = plans.filter((t) => t.id === "free" || t.id === "plus");
+  const teamPlans = plans.filter((t) => t.id === "club" || t.id === "society");
 
   return (
     <section id="pricing" className={cn(CONTAINER, "flex flex-col gap-8 py-20 sm:gap-12 sm:py-32")}>
@@ -258,15 +262,15 @@ export function Pricing({
         </p>
       </div>
 
-      <div className="grid w-full items-stretch gap-4.5 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map((tier) => (
-          <TierCard key={tier.id} tier={tier} />
-        ))}
-      </div>
-
-      <ComparisonTable plans={plans} />
-
-      <SchoolsPanel />
+      <AudienceSwitch
+        personal={<PlanGroup plans={personalPlans} />}
+        teams={
+          <>
+            <PlanGroup plans={teamPlans} />
+            <SchoolsPanel />
+          </>
+        }
+      />
 
       <div className="text-muted-foreground flex flex-col items-center gap-1.5 text-[14px] sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-7 sm:gap-y-2">
         {PROMISES.map((promise, i) => (
@@ -281,6 +285,22 @@ export function Pricing({
         ))}
       </div>
     </section>
+  );
+}
+
+/** Two plans side by side, and what they include in a table underneath. */
+function PlanGroup({ plans }: { plans: readonly Tier[] }) {
+  return (
+    <>
+      <div className="mx-auto grid w-full max-w-[900px] items-stretch gap-4.5 md:grid-cols-2">
+        {plans.map((tier) => (
+          <TierCard key={tier.id} tier={tier} />
+        ))}
+      </div>
+      <div className="mx-auto w-full max-w-[900px]">
+        <ComparisonTable plans={plans} />
+      </div>
+    </>
   );
 }
 
@@ -313,7 +333,7 @@ function TierCard({ tier }: { tier: Tier }) {
           <span className="numeral text-[44px]">{tier.price}</span>
           <span className="text-muted-foreground text-[14px] leading-[1.3]">{tier.per}</span>
         </div>
-        <span className="text-muted-foreground text-[13px] leading-[1.45] xl:min-h-[2.9em]">
+        <span className="text-muted-foreground text-[13px] leading-[1.45] md:min-h-[2.9em]">
           {tier.note}
         </span>
       </div>
@@ -381,7 +401,7 @@ function ComparisonTable({ plans }: { plans: readonly Tier[] }) {
         <PlusToggle />
       </summary>
       <div className="overflow-x-auto px-2 pb-3 sm:px-4">
-        <table className="w-full min-w-[640px] border-collapse text-left">
+        <table className="w-full min-w-[480px] border-collapse text-left">
           <caption className="sr-only">What each plan includes</caption>
           <thead>
             <tr>

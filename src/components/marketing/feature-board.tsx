@@ -1,3 +1,5 @@
+import { Search } from "lucide-react";
+
 import { ArrowRight } from "@/components/brand/arrows";
 import { CoreMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -20,10 +22,31 @@ const REPLACED_APPS = [
 /** Tasks' three layouts, plus due dates on the club calendar. */
 const TASK_VIEWS = ["Board", "Week", "List", "Table", "Roadmap", "Dashboard"] as const;
 
+/** What the AI made from one typed line: an event and two assigned tasks. */
 const CHAT_RESULTS = [
-  "Event added: Spring Showcase, Apr 12",
-  "Task: Book venue → Maya",
-  "Task: Snacks → Jay",
+  { kind: "Event", text: "Spring Showcase, Apr 12" },
+  { kind: "Task", text: "Book the venue", who: "Maya" },
+  { kind: "Task", text: "Snacks", who: "Jay" },
+] as const;
+
+/** A week on the calendar: day tiles, today in ink, events as pills (solid when you're going). */
+const WEEK = [
+  { day: "Mon", date: 12 },
+  { day: "Tue", date: 13, today: true, event: "Build night", going: true },
+  { day: "Wed", date: 14 },
+  { day: "Thu", date: 15, event: "GBM", going: true },
+  { day: "Fri", date: 16, event: "Social" },
+] as const;
+
+/** Seats on the sample event, one tick per five. */
+const SEAT_TICKS = 20;
+const SEATS_TAKEN = 17;
+
+/** A few rows of a club database: tags in team colours, numbers on the right. */
+const ROSTER = [
+  { name: "Maya Patel", team: "Build", tone: "bg-butter text-honey-deep", visits: 12 },
+  { name: "Jay Ortiz", team: "Events", tone: "bg-leaf text-leaf-ink", visits: 9 },
+  { name: "Sam Lee", team: "Treasury", tone: "bg-sand text-ink-soft", visits: 7 },
 ] as const;
 
 const RSVPS: readonly Avatar[] = [
@@ -49,12 +72,20 @@ const DATA_SOURCES = [
   "CSV import",
 ] as const;
 
-/** The club theme picker: the first swatch is the one chosen. */
-const THEME_SWATCHES = ["bg-banana", "bg-pine", "bg-brick", "bg-navy", "bg-ink"] as const;
+/** Theme presets as small cards: the first is the one chosen (Moonstone, with its banana glow). */
+const THEME_PRESETS = [
+  { name: "Moonstone", tone: "bg-ink", glow: true },
+  { name: "Harbor", tone: "bg-navy" },
+  { name: "Evergreen", tone: "bg-pine" },
+  { name: "Coral", tone: "bg-brick" },
+] as const;
 
 const PINNED = ["Budget", "Showcase tasks", "Meeting notes"] as const;
 
-const TEAMS = ["Events", "Treasury"] as const;
+const TEAMS = [
+  { team: "Events", initial: "J" },
+  { team: "Treasury", initial: "S" },
+] as const;
 
 /** The white tiles: paper, a hairline and the soft card shadow. */
 const PAPER_TILE = "rounded-[28px] border border-ink/8 bg-paper shadow-card";
@@ -198,8 +229,8 @@ function OverviewTile() {
         next meeting and pinned notes. Every Friday a weekly pulse sums up what got done.
       </p>
       <Screenshot
-        src="/marketing/overview-widgets.webp"
-        alt="Overview widgets: my week at a glance, open polls and upcoming events"
+        src="/marketing/app-weekly-pulse.webp"
+        alt="The weekly pulse: tasks finished each week, events held and new members"
         sizes="(min-width: 1240px) 760px, (min-width: 640px) 60vw, 80vw"
         className="border-ink/10 mt-auto -mr-[clamp(24px,3vw,40px)] -mb-[clamp(24px,3vw,40px)] ml-[clamp(12px,3vw,40px)] aspect-[16/8] rounded-tl-[14px] border-t border-l max-sm:aspect-[4/3]"
       />
@@ -254,6 +285,30 @@ function CalendarTile() {
   return (
     <div className={cn(PAPER_TILE, SLIDE, "flex flex-[1_0_auto] flex-col gap-2.5 p-6 sm:p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
+      <div className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden="true">
+        {WEEK.map((d) => (
+          <div
+            key={d.day}
+            className={cn(
+              "flex min-h-[78px] flex-col gap-1 rounded-[14px] p-2",
+              "today" in d ? "bg-ink text-cream" : "bg-cream",
+            )}
+          >
+            <span className="text-[11px] font-semibold opacity-70">{d.day}</span>
+            <span className="text-[16px] leading-none font-bold">{d.date}</span>
+            {"event" in d && (
+              <span
+                className={cn(
+                  "mt-auto truncate rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                  "going" in d ? "bg-banana text-ink" : "bg-butter text-honey-deep",
+                )}
+              >
+                {d.event}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
       <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
         Find a time, then put it on everyone&apos;s calendar.
       </div>
@@ -278,24 +333,46 @@ function EventsTile() {
           your member list, so you can see who keeps coming back.
         </p>
       </div>
-      <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[20px] border p-[18px] max-sm:gap-3 max-sm:p-3.5">
-        <div className="bg-event-cover flex h-24 items-end rounded-xl p-3 max-sm:hidden">
-          <span className="bg-paper/85 rounded-md px-2 py-[3px] font-mono text-[11px] font-medium">
-            FRI · 7:00 PM
+      <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[24px] border p-[18px] max-sm:gap-3 max-sm:p-3.5">
+        <div className="bg-event-cover flex h-24 items-end rounded-[16px] p-3 max-sm:hidden">
+          <span className="bg-paper/85 rounded-full px-2.5 py-[3px] text-[12px] font-semibold">
+            Fri · 7:00 PM
           </span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-[17px] font-bold">Spring Showcase</span>
           <span className="text-ink-soft text-[13px]">Student Union, Room 204</span>
         </div>
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <AvatarStack avatars={RSVPS} itemClassName="border-cream size-6" overlap="-ml-2" />
-          <span className="text-[13px] font-semibold whitespace-nowrap">86 going</span>
-          <span className="text-ink-soft text-[13px] whitespace-nowrap">· 12 on waitlist</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex gap-[3px]" aria-hidden="true">
+            {Array.from({ length: SEAT_TICKS }, (_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-3 flex-1 rounded-full",
+                  i < SEATS_TAKEN ? "bg-banana" : "bg-straw",
+                )}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <AvatarStack
+              avatars={RSVPS.slice(0, 3)}
+              itemClassName="border-cream size-6"
+              overlap="-ml-2"
+            />
+            <span className="text-[13px] font-semibold whitespace-nowrap">86 of 100 going</span>
+            <span className="text-ink-soft text-[13px] whitespace-nowrap">· 12 on waitlist</span>
+          </div>
         </div>
-        <span className="bg-ink text-cream rounded-full p-[11px] text-center text-[14px] font-semibold">
-          RSVP
-        </span>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-ink-soft text-[12px] font-semibold">Your answer</span>
+          <div className="bg-sand flex gap-1 rounded-full p-1 text-[13px] font-semibold">
+            <span className="bg-ink text-cream flex-1 rounded-full py-2 text-center">Going</span>
+            <span className="text-ink-soft flex-1 py-2 text-center">Maybe</span>
+            <span className="text-ink-soft flex-1 py-2 text-center">Can&apos;t</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -324,9 +401,17 @@ function AiTile() {
         </span>
         <div className="border-cream/10 bg-cream/8 flex w-[90%] flex-col gap-1.5 self-start rounded-[16px_16px_16px_4px] border p-3">
           {CHAT_RESULTS.map((result) => (
-            <span key={result} className="flex items-center gap-2 text-[13px]">
-              <span className="text-banana">✓</span>
-              {result}
+            <span key={result.text} className="flex items-center gap-2 text-[13px]">
+              <span className="bg-banana text-ink grid size-[18px] flex-none place-items-center rounded-full text-[10px] font-bold">
+                ✓
+              </span>
+              <span className="bg-cream/12 rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                {result.kind}
+              </span>
+              <span className="truncate">{result.text}</span>
+              {"who" in result && (
+                <span className="text-dusk whitespace-nowrap">→ {result.who}</span>
+              )}
             </span>
           ))}
         </div>
@@ -349,12 +434,30 @@ function NotesTile() {
       )}
     >
       <TileTitle replaces="Google Drive">Files and notes</TileTitle>
-      <AvatarStack
-        avatars={EDITORS}
-        itemClassName="border-paper grid size-[34px] place-items-center text-[13px] font-bold"
-        overlap="-ml-2.5"
-        className="mt-2"
-      />
+      <div
+        aria-hidden="true"
+        className="border-ink/8 bg-cream mt-2 flex flex-col gap-2.5 rounded-[18px] border p-3.5"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="bg-sand flex gap-0.5 rounded-full p-0.5 text-[11px] font-semibold">
+            <span className="bg-paper shadow-segment rounded-full px-2.5 py-1">Page</span>
+            <span className="text-ink-soft px-2.5 py-1">Document</span>
+          </div>
+          <AvatarStack
+            avatars={EDITORS}
+            itemClassName="border-cream grid size-6 place-items-center text-[10px] font-bold"
+            overlap="-ml-1.5"
+          />
+        </div>
+        <span className="text-[14px] font-bold">GBM agenda</span>
+        <span className="text-[12px] leading-[1.5]">
+          Book the venue <span className="bg-butter rounded px-0.5">by Friday</span>, then send the
+          flyer.
+        </span>
+        <span className="border-ink/8 bg-paper self-end rounded-[12px_12px_4px_12px] border px-2.5 py-1.5 text-[12px]">
+          <b>Jay</b> On it, asking the SU today
+        </span>
+      </div>
       <div className="font-heading mt-auto text-[clamp(36px,3.8vw,50px)] leading-[0.98] tracking-[-0.03em]">
         Edit together, live.
       </div>
@@ -380,6 +483,27 @@ function DatabasesTile() {
       <h3 className="font-heading max-w-[460px] text-[clamp(26px,2.4vw,32px)] leading-[1.1] tracking-[-0.025em] text-balance">
         Attendance, sign-ups and ballots, connected to the data you already have.
       </h3>
+      <div aria-hidden="true" className="bg-paper rounded-[18px] p-1 text-[12px] max-sm:hidden">
+        <div className="bg-oat text-ink-soft grid grid-cols-[1.4fr_1fr_0.6fr] gap-2 rounded-[14px] px-3 py-1.5 font-semibold">
+          <span>Name</span>
+          <span>Team</span>
+          <span className="text-right">Visits</span>
+        </div>
+        {ROSTER.map((row) => (
+          <div
+            key={row.name}
+            className="border-ink/6 grid grid-cols-[1.4fr_1fr_0.6fr] items-center gap-2 border-b px-3 py-2 last:border-b-0"
+          >
+            <span className="font-semibold">{row.name}</span>
+            <span
+              className={cn("justify-self-start rounded-full px-2 py-0.5 font-semibold", row.tone)}
+            >
+              {row.team}
+            </span>
+            <span className="text-right font-semibold tabular-nums">{row.visits}</span>
+          </div>
+        ))}
+      </div>
       <div className="mt-auto flex flex-wrap gap-2">
         {DATA_SOURCES.map((source) => (
           <span
@@ -415,12 +539,23 @@ function CustomizationTile() {
       <div className="flex flex-col gap-3.5">
         <div className="bg-cream flex flex-col gap-2 rounded-[18px] p-4">
           <span className="text-ink-soft text-[12px] font-bold">Club theme</span>
-          <div className="flex gap-2">
-            {THEME_SWATCHES.map((swatch, i) => (
+          <div className="grid grid-cols-4 gap-2">
+            {THEME_PRESETS.map((preset, i) => (
               <span
-                key={swatch}
-                className={cn("size-9 rounded-full", swatch, i === 0 && "shadow-ring-ink")}
-              />
+                key={preset.name}
+                className={cn(
+                  "bg-paper flex flex-col gap-1.5 rounded-[12px] p-1.5",
+                  i === 0 && "shadow-ring-ink",
+                )}
+              >
+                <span className={cn("relative h-9 overflow-hidden rounded-[8px]", preset.tone)}>
+                  {"glow" in preset && (
+                    <span className="bg-glow-banana absolute -top-3 -right-3 size-9 rounded-full" />
+                  )}
+                  <span className="bg-paper/90 absolute bottom-1.5 left-1.5 h-1.5 w-6 rounded-full" />
+                </span>
+                <span className="truncate text-[11px] font-semibold">{preset.name}</span>
+              </span>
             ))}
           </div>
         </div>
@@ -452,8 +587,15 @@ function PeopleTile() {
       )}
     >
       <TileTitle tone="butter">People</TileTitle>
-      <div className="mt-5 flex flex-col items-center">
-        <span className="bg-ink text-cream rounded-full px-3 py-1.5 text-[13px] font-bold">
+      <span className="bg-paper/70 text-ink-soft mt-2 flex items-center gap-2 rounded-full px-3 py-2 text-[12px]">
+        <Search className="size-3.5" aria-hidden="true" />
+        Search 120 members
+      </span>
+      <div className="mt-3 flex flex-col items-center">
+        <span className="bg-ink text-cream flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-[13px] font-bold">
+          <span className="bg-banana text-ink grid size-6 place-items-center rounded-full text-[11px]">
+            M
+          </span>
           President
         </span>
         <span className="bg-ink/30 h-3.5 w-px" />
@@ -461,7 +603,7 @@ function PeopleTile() {
             centre toward the middle, so the bar always ends exactly over
             each team's line, however wide the names are. */}
         <div className="grid w-full max-w-[240px] grid-cols-2">
-          {TEAMS.map((team, i) => (
+          {TEAMS.map(({ team, initial }, i) => (
             <span key={team} className="relative flex flex-col items-center pt-3">
               <span
                 className={cn(
@@ -470,7 +612,10 @@ function PeopleTile() {
                 )}
               />
               <span className="bg-ink/30 absolute top-0 left-1/2 h-3 w-px" />
-              <span className="bg-paper rounded-full px-2.5 py-[5px] text-[12px] font-semibold whitespace-nowrap">
+              <span className="bg-paper flex items-center gap-1.5 rounded-full py-[3px] pr-2.5 pl-[3px] text-[12px] font-semibold whitespace-nowrap">
+                <span className="bg-wheat grid size-5 place-items-center rounded-full text-[10px] font-bold">
+                  {initial}
+                </span>
                 {team}
               </span>
             </span>
