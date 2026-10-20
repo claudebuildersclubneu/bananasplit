@@ -347,11 +347,11 @@ export function RsvpSettings({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium">Background</p>
+            <p className="text-sm font-medium">Page glow</p>
             <div
               className="grid grid-cols-4 gap-2 sm:grid-cols-8"
               role="radiogroup"
-              aria-label="Background"
+              aria-label="Page glow"
             >
               {RSVP_BACKGROUNDS.map((b) => {
                 const active = value.background === b.id;

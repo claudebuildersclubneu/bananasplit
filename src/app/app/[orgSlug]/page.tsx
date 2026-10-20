@@ -6,7 +6,8 @@ import { EmptyState } from "@/components/empty-state";
 import { PersonalHome } from "@/components/personal/personal-home";
 import { JoinCodeCard } from "@/components/onboarding/join-code-card";
 import { CardControls, OpenLink } from "@/components/overview/bits";
-import { GettingStartedBlock, RsvpGoalBlock } from "@/components/overview/goal-blocks";
+import { GettingStarted } from "@/components/overview/getting-started";
+import { RsvpGoalBlock } from "@/components/overview/goal-blocks";
 import { MyTasksCard } from "@/components/overview/my-tasks-card";
 import { OverviewBoard } from "@/components/overview/overview-board";
 import { OverviewStats } from "@/components/overview/overview-stats";
@@ -36,7 +37,8 @@ import { spaceIncludes } from "@/lib/billing/space";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { visibleSidebar } from "@/lib/nav/sidebar";
-import { dayWordOfKey, timeWord } from "@/lib/overview/format";
+import { timeWord } from "@/lib/overview/format";
+import { startedProgress } from "@/lib/overview/getting-started";
 import { overviewWidgetsFor, resolveOverview } from "@/lib/overview/widgets";
 import { DEFAULT_PULSE_DAY, DEFAULT_PULSE_HOUR } from "@/lib/pulse/settings";
 import { addDaysToKey, effectiveTimezone, fromDateKey, localDateKey } from "@/lib/tasks/dates";
@@ -66,6 +68,8 @@ import { loadSetupState } from "@/server/setup/progress";
 import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
 
 const MY_TASKS_LIMIT = 8;
+/** "Coming up in 14 days" in the stat strip. */
+const UPCOMING_DAYS = 14;
 const EVENTS_LIMIT = 6;
 const RECENT_LIMIT = 8;
 
@@ -81,10 +85,11 @@ function greeting(now: Date, timeZone: string): string {
 
 /**
  * The Overview (redesign guide 9): each member's own board of widgets,
- * arranged to answer "what needs me?". The greeting and the stat strip
- * head it; Up next, My tasks, the RSVP goal, open polls and the Weekly
- * pulse come first on a new board. Nothing about the club's money is on it.
- * The setup checklist is an admin-only widget.
+ * arranged to answer "what needs me?". Always on top, whatever the board:
+ * the greeting, the stat strip (due this week, overdue, coming up in two
+ * weeks, as on the Personal home), Up next, and for owners and admins
+ * "Get your club started" until every step is done or checked off. Then
+ * the member's widgets. Nothing about the club's money is on it.
  */
 export default async function OrgOverviewPage({
   params,
@@ -126,7 +131,7 @@ export default async function OrgOverviewPage({
     const mine = taskFilterWhere(org.id, { assigneeId: user.id, status: "open" });
     const events = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "events");
     const meetings = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "meetings");
-    const weekEvents = await getUpcomingEvents(db, org.id, now, 60);
+    const weekEvents = await getUpcomingEvents(db, org.id, now, 100);
     const myTasks = await getMyOpenTasks(db, org.id, user.id, { limit: MY_TASKS_LIMIT, today });
     const memberCount = await db.membership.count({ where: { organizationId: org.id } });
     const polls = await listOpenPolls(db, org.id, now, 5);
@@ -136,12 +141,20 @@ export default async function OrgOverviewPage({
       todayKey: dayKey,
       firstName: me?.name?.trim().split(/\s+/)[0] ?? null,
       myTasks,
-      taskExtras: await loadTaskExtras(db, org.id, myTasks.tasks.map((t) => t.id)),
+      taskExtras: await loadTaskExtras(
+        db,
+        org.id,
+        myTasks.tasks.map((t) => t.id),
+      ),
       stats: {
-        open: await db.task.count({ where: mine }),
+        // Due today through the sixth day from now: "this week".
+        dueSoon: await db.task.count({
+          where: {
+            AND: [mine, { dueDate: { gte: today, lte: fromDateKey(addDaysToKey(dayKey, 6)) } }],
+          },
+        }),
         today: await db.task.count({ where: { AND: [mine, { dueDate: today }] } }),
         overdue: await db.task.count({ where: { AND: [mine, { dueDate: { lt: today } }] } }),
-        blocked: await db.task.count({ where: { AND: [mine, { status: "BLOCKED" }] } }),
       },
       events,
       meetings,
@@ -152,7 +165,11 @@ export default async function OrgOverviewPage({
         user.id,
         [...events, ...meetings].map((e) => e.id),
       ),
-      going: await loadEventGoing(db, org.id, [...events, ...meetings].map((e) => e.id)),
+      going: await loadEventGoing(
+        db,
+        org.id,
+        [...events, ...meetings].map((e) => e.id),
+      ),
       pins: await listPins(db, org.id, org.slug, user.id),
       recent: await listRecent(db, org.id, org.slug, user.id, RECENT_LIMIT),
       notes: await getRecentNotes(db, org.id, user.id, 6),
@@ -185,14 +202,20 @@ export default async function OrgOverviewPage({
           : null,
       started: isAdmin
         ? {
-            members: memberCount > 1,
+            // Every club is named when it's made; the step is there to
+            // check the name, and starts the list with one done.
+            name: org.name.trim().length > 0,
             picture: org.logo != null,
+            members: memberCount > 1,
             event:
               (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
+            // Epics and stories are tasks too.
             task: (await db.task.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
             budget: (await db.budgetPeriod.count({ where: { organizationId: org.id } })) > 0,
-            note: (await db.note.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
-            sections: settings?.sidebar != null,
+            database:
+              (await db.databaseDefinition.count({
+                where: { organizationId: org.id, kind: "CUSTOM" },
+              })) > 0,
           }
         : null,
     };
@@ -211,8 +234,7 @@ export default async function OrgOverviewPage({
 
   // Seats for the RSVP goal: counted on the service path (the page's own number).
   const goal = data.goal;
-  const seats =
-    goal && (!goal.hideCount || isAdmin) ? await rsvpSeatsTaken(org.id, goal.id) : null;
+  const seats = goal && (!goal.hideCount || isAdmin) ? await rsvpSeatsTaken(org.id, goal.id) : null;
 
   // "This week": the next seven days in the viewer's timezone.
   const weekdayFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
@@ -234,22 +256,14 @@ export default async function OrgOverviewPage({
     };
   });
 
-  const nextMeeting = data.meetings[0];
+  const upcomingUntil = new Date(now.getTime() + UPCOMING_DAYS * 24 * 60 * 60 * 1000);
   const stats = (
     <OverviewStats
-      className="sm:gap-x-8"
-      stats={data.stats}
-      nextMeeting={
-        nextMeeting
-          ? {
-              time: nextMeeting.allDay ? "All day" : timeWord(nextMeeting.startsAt, timeZone),
-              label: `${nextMeeting.title}, ${dayWordOfKey(
-                localDateKey(nextMeeting.startsAt, nextMeeting.allDay ? orgZone : timeZone),
-                todayKey,
-              ).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase())}`,
-            }
-          : null
-      }
+      dueSoon={data.stats.dueSoon}
+      dueToday={data.stats.today}
+      overdue={data.stats.overdue}
+      upcoming={data.weekEvents.filter((e) => e.startsAt < upcomingUntil).length}
+      upcomingDays={UPCOMING_DAYS}
     />
   );
 
@@ -293,7 +307,6 @@ export default async function OrgOverviewPage({
     : null;
 
   const bodies = {
-    "up-next": <UpNext slots={upNext} calendarHref={calendarHref} />,
     pinned: <PinnedGrid orgId={org.id} pins={data.pins} />,
     "my-tasks": (
       <MyTasksCard
@@ -304,7 +317,6 @@ export default async function OrgOverviewPage({
         todayKey={todayKey}
       />
     ),
-    "task-stats": stats,
     recent: <RecentList items={data.recent} now={now} />,
     meetings: (
       <UpcomingEventsCard
@@ -364,19 +376,26 @@ export default async function OrgOverviewPage({
         archiveHref={pulseHref}
         issueHref={data.pulse ? `${pulseHref}/${data.pulse.weekStart}` : null}
         nextSend={pulseOn ? nextPulseLabel(now, orgZone, pulseDay, pulseHour) : null}
-        draftHref={
-          data.draft && !data.draft.sentAt ? `${pulseHref}/${data.draft.weekStart}` : null
-        }
+        draftHref={data.draft && !data.draft.sentAt ? `${pulseHref}/${data.draft.weekStart}` : null}
       />
     ),
     notes: <NoteList orgSlug={orgSlug} notes={data.notes} />,
     files: <FileList orgSlug={orgSlug} files={data.files} />,
     people: <PeopleList orgSlug={orgSlug} people={data.people} total={data.memberCount} />,
     shortcuts: <Shortcuts links={shortcuts} />,
-    ...(data.started
-      ? { "getting-started": <GettingStartedBlock orgSlug={orgSlug} state={data.started} /> }
-      : {}),
   };
+
+  // Shown until every step is done or checked off, then gone by itself.
+  const startedSkipped = settings?.startedSkipped ?? [];
+  const started =
+    data.started && !startedProgress(data.started, startedSkipped).complete ? (
+      <GettingStarted
+        orgId={org.id}
+        orgSlug={orgSlug}
+        state={data.started}
+        skipped={startedSkipped}
+      />
+    ) : null;
 
   const { total, overdue } = data.myTasks;
   const headerActions = {
@@ -441,7 +460,7 @@ export default async function OrgOverviewPage({
         {data.firstName ? `, ${data.firstName}` : ""}
       </h1>
       <p className="text-muted-foreground mt-2 text-[15px]">
-        {dateLine} · {org.name}
+        {dateLine}, {org.name}
       </p>
     </div>
   );
@@ -456,6 +475,13 @@ export default async function OrgOverviewPage({
         bodies={bodies}
         headerActions={headerActions}
         intro={greetingBlock}
+        stats={
+          <div className="space-y-[30px]">
+            {stats}
+            <UpNext slots={upNext} calendarHref={calendarHref} />
+            {started}
+          </div>
+        }
         notice={
           data.joinCode || data.setup ? (
             <>

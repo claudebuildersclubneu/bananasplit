@@ -1,14 +1,13 @@
-import { ArrowUpRight, Check, Ticket } from "lucide-react";
+import { ArrowUpRight, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { BlockCard } from "@/components/ui/block-card";
 import { Gauge } from "@/components/ui/meters";
-import { cn } from "@/lib/utils";
 
 /**
- * The Overview's goal blocks (tone "goal": progress toward something):
- * seats taken for the next RSVP event (redesign guide 8.4) and a new
- * club's first steps (9.2, "3 of 7 steps").
+ * The Overview's RSVP goal block (tone "goal": progress toward something):
+ * seats taken for the next RSVP event (redesign guide 8.4). A new club's
+ * first steps are their own card (getting-started.tsx).
  */
 
 function OpenCircle({ href, label }: { href: string; label: string }) {
@@ -82,85 +81,6 @@ export function RsvpGoalBlock({
               : `${taken} of ${event.capacity} seats taken`}
           </p>
         </div>
-      </div>
-    </BlockCard>
-  );
-}
-
-export interface GettingStartedState {
-  members: boolean;
-  picture: boolean;
-  event: boolean;
-  task: boolean;
-  budget: boolean;
-  note: boolean;
-  /** The club chose its sidebar sections (Admin panel › Sidebar). */
-  sections: boolean;
-}
-
-const STEPS: { key: keyof GettingStartedState; label: string; href: (slug: string) => string }[] = [
-  { key: "members", label: "Invite your members", href: (s) => `/app/${s}/settings/members` },
-  { key: "picture", label: "Add a club picture", href: (s) => `/app/${s}/settings/general` },
-  { key: "event", label: "Put your first meeting on the calendar", href: (s) => `/app/${s}/calendar` },
-  { key: "sections", label: "Pick your club's sections", href: (s) => `/app/${s}/settings/sidebar` },
-  { key: "task", label: "Create a task", href: (s) => `/app/${s}/tasks?new=1` },
-  { key: "budget", label: "Set up the budget", href: (s) => `/app/${s}/finance/budget` },
-  { key: "note", label: "Write or import a note", href: (s) => `/app/${s}/notes` },
-];
-
-/**
- * A new club's first steps, for owners and admins, worked out from what
- * the club has: a goal block with a gauge and the steps as links.
- */
-export function GettingStartedBlock({
-  orgSlug,
-  state,
-}: {
-  orgSlug: string;
-  state: GettingStartedState;
-}) {
-  const done = STEPS.filter((s) => state[s.key]).length;
-  return (
-    <BlockCard tone="goal" kicker="Get your club started" className="min-h-0">
-      <div className="mt-3 flex flex-col gap-5 md:flex-row md:items-center">
-        <div className="flex items-center gap-4">
-          <Gauge value={(done / STEPS.length) * 100} caption="done" size={116} />
-          <div>
-            <h3 className="display-title text-[23px]">
-              {done} of {STEPS.length} steps
-            </h3>
-            <p className="mt-1 text-sm text-(--meta)">
-              {done === STEPS.length ? "All set up. You can remove this widget." : "Pick up where you left off."}
-            </p>
-          </div>
-        </div>
-        <ul className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-2">
-          {STEPS.map((step) => {
-            const complete = state[step.key];
-            return (
-              <li key={step.key} className="relative z-10">
-                <Link
-                  href={step.href(orgSlug)}
-                  className="flex items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-sm font-medium transition-colors hover:bg-[color-mix(in_oklab,currentColor_10%,transparent)]"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] border-current",
-                      complete && "bg-current",
-                    )}
-                  >
-                    {complete && <Check className="size-3 text-(--ring-bg)" strokeWidth={3} />}
-                  </span>
-                  <span className={cn(complete && "line-through opacity-70")}>
-                    {step.label}
-                    <span className="sr-only">{complete ? " (done)" : " (to do)"}</span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
       </div>
     </BlockCard>
   );

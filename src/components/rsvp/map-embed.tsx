@@ -16,7 +16,7 @@ export function MapEmbed({ src, title }: { src: string; title: string }) {
 
   if (shown) {
     return (
-      <div className="border-border rounded-tile overflow-hidden border bg-(--rsvp-tile)">
+      <div className="rounded-tile bg-muted overflow-hidden">
         <iframe
           title={title}
           src={src}
@@ -27,8 +27,8 @@ export function MapEmbed({ src, title }: { src: string; title: string }) {
     );
   }
   return (
-    <div className="rounded-tile flex h-[120px] flex-col items-center justify-center gap-2 border border-(--rsvp-tile-line) bg-(--rsvp-tile)">
-      <MapPin className="size-5 text-(--rsvp-soft)" aria-hidden="true" />
+    <div className="rounded-tile bg-muted/60 flex h-[132px] flex-col items-center justify-center gap-2.5">
+      <MapPin className="text-muted-foreground size-5" aria-hidden="true" />
       <button
         type="button"
         onClick={() => setShown(true)}

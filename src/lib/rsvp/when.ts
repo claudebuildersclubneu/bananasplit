@@ -55,3 +55,20 @@ export function whenLine(start: Date, end: Date, timeZone: string, allDay = fals
 export function startTime(start: Date, timeZone: string): string {
   return parts(start, timeZone, { hour: "numeric", minute: "2-digit" });
 }
+
+/**
+ * When it starts, short: "Today, 7:00 PM",
+ * "Tomorrow, 7:00 PM", "Thu, Oct 15, 7:00 PM" ("All day" for an all-day
+ * event). `now` is passed in so the page and its tests agree on the day.
+ */
+export function startShort(start: Date, timeZone: string, allDay: boolean, now: Date): string {
+  const day = dayKey(start, timeZone);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const label =
+    day === dayKey(now, timeZone)
+      ? "Today"
+      : day === dayKey(tomorrow, timeZone)
+        ? "Tomorrow"
+        : parts(start, timeZone, { weekday: "short", month: "short", day: "numeric" });
+  return `${label}, ${allDay ? "All day" : startTime(start, timeZone)}`;
+}

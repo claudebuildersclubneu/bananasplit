@@ -10,7 +10,7 @@ import { pill } from "@/components/brand/pill";
 export default function EventNotFound() {
   return (
     <BrandRoot>
-      <div className="rsvp-page rsvp-bg-banana flex min-h-svh flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="flex min-h-svh flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
         <Logo size={32} textSize={22} />
         <h1 className="font-heading text-[40px] leading-[1.05] tracking-[-0.03em]">
           This event isn&apos;t here

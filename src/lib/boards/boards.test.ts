@@ -39,15 +39,23 @@ describe("boards", () => {
 
 describe("overview widgets", () => {
   it("never offers anything about the club's money", () => {
-    const text = OVERVIEW_WIDGETS.map((w) => `${w.type} ${w.title} ${w.description}`).join(" ").toLowerCase();
+    const text = OVERVIEW_WIDGETS.map((w) => `${w.type} ${w.title} ${w.description}`)
+      .join(" ")
+      .toLowerCase();
     expect(text).not.toMatch(/balance|finance|budget|money|owed/);
   });
 
-  it("keeps admin widgets to admins, even on a saved board", () => {
-    expect(overviewWidgetsFor(false).map((w) => w.type)).not.toContain("getting-started");
-    const saved = [{ id: "getting-started", type: "getting-started", w: 4, h: null }];
-    expect(resolveOverview(saved, false)).toEqual([]);
-    expect(resolveOverview(saved, true)).toEqual(saved);
+  it("drops what now always heads the page from a saved board", () => {
+    const saved = [
+      { id: "up-next", type: "up-next", w: 4, h: null },
+      { id: "getting-started", type: "getting-started", w: 4, h: null },
+      { id: "task-stats", type: "task-stats", w: 1, h: null },
+      { id: "pinned", type: "pinned", w: 2, h: null },
+    ];
+    expect(resolveOverview(saved, true)).toEqual([{ id: "pinned", type: "pinned", w: 2, h: null }]);
+    const offered = overviewWidgetsFor(true).map((w) => w.type);
+    expect(offered).not.toContain("up-next");
+    expect(offered).not.toContain("getting-started");
     expect(resolveOverview(null, false).map((w) => w.type)).toContain("pinned");
   });
 });

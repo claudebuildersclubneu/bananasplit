@@ -1,46 +1,51 @@
 "use client";
 
-import { Ban, CircleAlert, Clock, SquareCheckBig } from "lucide-react";
+import { CalendarDays, CircleAlert, SquareCheckBig, Ticket } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Stat, StatStrip } from "@/components/ui/stat";
 
 /**
- * "My week at a glance" as the stat strip in the Overview's header
- * (redesign guide 7.4, 9): open tasks with what's due today, overdue (or
- * "All clear"), blocked, and when the next meeting is. A client component
- * so it can hand Lucide icons to Stat; the page passes plain numbers.
+ * The stat strip under the greeting on every Overview, a club's and the
+ * Personal home alike (redesign guide 7.4, 9): your tasks due this week
+ * (with what's due today), overdue (or "All clear"), what's on the
+ * calendar in the next two weeks and, at home, your RSVPs. A client
+ * component so it can hand Lucide icons to Stat; pages pass plain numbers.
  */
 export function OverviewStats({
-  stats,
-  nextMeeting,
+  dueSoon,
+  dueToday,
+  overdue,
+  upcoming,
+  upcomingDays,
+  rsvps,
   className,
 }: {
-  stats: { open: number; today: number; overdue: number; blocked: number };
-  /** "7:00 PM" and "Officer meeting, tomorrow"; null when none is coming. */
-  nextMeeting: { time: string; label: string } | null;
+  dueSoon: number;
+  dueToday: number;
+  overdue: number;
+  upcoming: number;
+  upcomingDays: number;
+  /** The Personal home only. */
+  rsvps?: number;
   className?: string;
 }) {
   return (
     <StatStrip className={className}>
       <Stat
         icon={SquareCheckBig}
-        value={stats.open}
-        label="Open tasks"
-        chip={stats.today > 0 ? <Badge variant="accent">{stats.today} due today</Badge> : undefined}
+        value={dueSoon}
+        label="Due this week"
+        chip={dueToday > 0 ? <Badge variant="accent">{dueToday} due today</Badge> : undefined}
       />
       <Stat
         icon={CircleAlert}
-        value={stats.overdue}
+        value={overdue}
         label="Overdue"
-        chip={stats.overdue === 0 ? <Badge variant="success">All clear</Badge> : undefined}
+        chip={overdue === 0 ? <Badge variant="success">All clear</Badge> : undefined}
       />
-      <Stat icon={Ban} value={stats.blocked} label="Blocked" />
-      <Stat
-        icon={Clock}
-        value={nextMeeting?.time ?? "None"}
-        label={nextMeeting?.label ?? "No meetings coming up"}
-      />
+      <Stat icon={CalendarDays} value={upcoming} label={`Coming up in ${upcomingDays} days`} />
+      {rsvps !== undefined && <Stat icon={Ticket} value={rsvps} label="RSVPs" />}
     </StatStrip>
   );
 }

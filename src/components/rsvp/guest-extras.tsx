@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 /**
  * What a signed-up guest does after "You're going": pay their share, show
  * their ticket, bring friends with their own link, and grab something off
- * the bring list. Paper and ink, inside the registration card (the bring
+ * the bring list. Inset tiles inside the registration card (the bring
  * list sits on the page itself).
  */
 
@@ -48,10 +48,12 @@ function Block({
   aside?: React.ReactNode;
 }) {
   return (
-    <div className="border-border flex flex-col gap-3 border-t pt-4">
+    <div className="bg-muted/60 rounded-tile flex flex-col gap-3 p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-[15px] font-bold">
-          <span className="text-muted-foreground">{icon}</span>
+        <h3 className="flex items-center gap-3 text-[15px] font-semibold">
+          <span className="bg-card text-foreground grid size-9 flex-none place-items-center rounded-full [&_svg]:size-[18px]">
+            {icon}
+          </span>
           {title}
         </h3>
         {aside}
@@ -114,7 +116,7 @@ export function ChipIn({
       icon={<Banknote className="size-4" aria-hidden="true" />}
       title={
         <>
-          Chip in <span className="font-heading text-[17px]">{formatCents(owes)}</span>
+          Chip in <span className="numeral text-[18px]">{formatCents(owes)}</span>
         </>
       }
       aside={badge}
@@ -200,7 +202,7 @@ export function TicketStub({
       <div className="flex items-center gap-4">
         <a
           href={ticketUrl}
-          className="border-border rounded-field block size-[92px] flex-none overflow-hidden border bg-white p-1"
+          className="rounded-field block size-[92px] flex-none overflow-hidden bg-white p-1.5"
           aria-label="Open your ticket full screen"
         >
           {qr}
@@ -265,7 +267,7 @@ export function InviteFriends({
       <p className="text-muted-foreground m-0 text-[14px] leading-[1.5]">
         Your own link. Friends who open it see you invited them, and the host sees who brought who.
       </p>
-      <div className="border-border bg-muted flex items-center gap-2 rounded-full border py-1 pr-1 pl-4">
+      <div className="bg-card flex items-center gap-2 rounded-full py-1 pr-1 pl-4">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
           {inviteUrl.replace(/^https?:\/\//, "")}
         </span>
@@ -332,16 +334,14 @@ export function BringList({
             <li
               key={item.id}
               className={cn(
-                "rounded-tile flex items-center gap-3 border px-4 py-3",
-                item.mine
-                  ? "border-input bg-tint-accent text-foreground"
-                  : "border-(--rsvp-tile-line) bg-(--rsvp-tile)",
+                "rounded-tile flex items-center gap-3 px-4 py-3",
+                item.mine ? "bg-tint-accent text-foreground" : "bg-muted/60",
               )}
             >
               <Gift
                 className={cn(
                   "size-[18px] flex-none",
-                  item.mine ? "text-tint-accent-foreground" : "text-(--rsvp-soft)",
+                  item.mine ? "text-tint-accent-foreground" : "text-muted-foreground",
                 )}
                 aria-hidden="true"
               />
@@ -349,12 +349,7 @@ export function BringList({
                 <span className="text-[15px] leading-[1.35] font-semibold break-words">
                   {item.label}
                 </span>
-                <span
-                  className={cn(
-                    "text-[13px] leading-[1.4]",
-                    item.mine ? "text-muted-foreground" : "text-(--rsvp-muted)",
-                  )}
-                >
+                <span className={cn("text-[13px] leading-[1.4]", "text-muted-foreground")}>
                   {item.mine
                     ? "You're bringing this"
                     : item.names.length > 0
@@ -379,14 +374,17 @@ export function BringList({
                   {busy === item.id ? "…" : item.mine ? "Never mind" : "I'll bring it"}
                 </button>
               ) : full && !item.mine ? (
-                <Check className="size-[18px] flex-none text-(--rsvp-soft)" aria-label="Covered" />
+                <Check
+                  className="text-muted-foreground size-[18px] flex-none"
+                  aria-label="Covered"
+                />
               ) : null}
             </li>
           );
         })}
       </ul>
       {!canClaim && (
-        <p className="m-0 text-[13px] text-(--rsvp-muted)">
+        <p className="text-muted-foreground m-0 text-[13px]">
           Sign up to grab something off the list.
         </p>
       )}

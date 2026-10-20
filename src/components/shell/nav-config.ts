@@ -37,7 +37,7 @@ export interface NavSection {
 
 /**
  * A Personal space's sidebar: Home (the Personal dashboard), Tasks,
- * Calendar, Notes and Files (the one library at /notes, one kind each),
+ * Calendar, Files (notes and uploads together, the one library at /notes),
  * Find a time (availability polls anyone answers from a link) and RSVPs (its
  * event pages and your tickets). No question polls: only members vote on
  * those, and Personal has one. Not arrangeable: there is no team to arrange
@@ -55,16 +55,8 @@ export const PERSONAL_NAV: readonly {
   { id: "home", label: "Home", icon: "House", path: "", exact: true },
   { id: "tasks", label: "Tasks", icon: "CheckSquare", path: "/tasks", exact: false },
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", exact: false },
-  { id: "notes", label: "Notes", icon: "NotebookText", path: "/notes?tab=notes", exact: false },
-  {
-    id: "files",
-    label: "Files",
-    icon: "FolderOpen",
-    path: "/notes?tab=files",
-    // A file's own page.
-    also: ["/notes/files"],
-    exact: false,
-  },
+  // Notes and uploads together, as in a club: one library at /notes.
+  { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", exact: false },
   {
     id: "find-a-time",
     label: "Find a time",

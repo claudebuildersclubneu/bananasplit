@@ -5,21 +5,14 @@ import { parseBoard, type BoardWidget, type WidgetMeta } from "@/lib/boards";
  * (src/lib/boards). Nothing about the club's money is here: finance lives
  * on the Finance page, for finance roles. "admin" widgets are offered only
  * to owners and admins. "bare" widgets draw their own surface (block cards).
+ * The stat strip, Up next and "Get your club started" aren't widgets: they
+ * always head the page (src/app/app/[orgSlug]/page.tsx), so a saved board
+ * that still lists them simply drops them.
  */
 
 type OverviewWidgetMeta = WidgetMeta & { admin?: boolean };
 
 export const OVERVIEW_WIDGETS: readonly OverviewWidgetMeta[] = [
-  {
-    type: "up-next",
-    title: "Up next",
-    description: "Up to four things that need you: tasks due, votes, meetings and events.",
-    group: "You",
-    icon: "Zap",
-    w: 4,
-    h: null,
-    frame: "bare",
-  },
   {
     type: "pinned",
     title: "Pinned",
@@ -36,15 +29,6 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetMeta[] = [
     group: "You",
     icon: "CheckSquare",
     w: 2,
-    h: null,
-  },
-  {
-    type: "task-stats",
-    title: "My week at a glance",
-    description: "Open, due today, overdue and blocked.",
-    group: "You",
-    icon: "ListChecks",
-    w: 1,
     h: null,
   },
   {
@@ -147,17 +131,6 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetMeta[] = [
     w: 1,
     h: null,
   },
-  {
-    type: "getting-started",
-    title: "Get your club started",
-    description: "A new club's first steps.",
-    group: "Admin",
-    icon: "Rocket",
-    w: 4,
-    h: null,
-    admin: true,
-    frame: "bare",
-  },
 ];
 
 export const OVERVIEW_WIDGET_TYPES = OVERVIEW_WIDGETS.map((w) => w.type);
@@ -167,20 +140,17 @@ export function overviewWidgetsFor(isAdmin: boolean): OverviewWidgetMeta[] {
 }
 
 /**
- * Up next always leads: what needs you, straight under the greeting. Then
- * rows that each fill the four columns: your work (tasks, and the week's
- * numbers), what's waiting on an answer (open polls, the next RSVP event),
- * the club's next seven days, the weekly pulse, and where you were beside
- * what you pinned. Meetings and Events feed Up next, so they're offered,
- * not placed. A new club's admin sees its first steps right after Up next.
+ * Up next always leads, under the stat strip, and isn't a widget (nor is
+ * the stat strip or "Get your club started"; see page.tsx). Then rows that
+ * each fill the four columns: your work and what's waiting on an answer
+ * (my tasks, the next RSVP event, open polls), the club's next seven days,
+ * the weekly pulse, and where you were beside what you pinned. Meetings and
+ * Events feed Up next, so they're offered, not placed.
  */
 const DEFAULT_LAYOUT: readonly BoardWidget[] = [
-  { id: "up-next", type: "up-next", w: 4, h: null },
-  { id: "getting-started", type: "getting-started", w: 4, h: null },
   { id: "my-tasks", type: "my-tasks", w: 2, h: null },
-  { id: "task-stats", type: "task-stats", w: 2, h: null },
-  { id: "polls", type: "polls", w: 2, h: null },
-  { id: "rsvp-goal", type: "rsvp-goal", w: 2, h: null },
+  { id: "rsvp-goal", type: "rsvp-goal", w: 1, h: null },
+  { id: "polls", type: "polls", w: 1, h: null },
   { id: "week", type: "week", w: 4, h: null },
   { id: "weekly-pulse", type: "weekly-pulse", w: 4, h: null },
   { id: "recent", type: "recent", w: 2, h: null },
@@ -189,8 +159,8 @@ const DEFAULT_LAYOUT: readonly BoardWidget[] = [
 
 /**
  * The member's saved Overview, or the default one. A saved board keeps its
- * own order: widgets added since (Up next, Weekly pulse) are offered in Add
- * widget, never pushed onto it.
+ * own order: widgets added since (Weekly pulse) are offered in Add widget,
+ * never pushed onto it.
  */
 export function resolveOverview(saved: unknown, isAdmin: boolean): BoardWidget[] {
   const allowed = overviewWidgetsFor(isAdmin).map((w) => w.type);

@@ -142,7 +142,7 @@ describe("dates in the club's timezone", () => {
 
 describe("backgrounds", () => {
   it("falls back to banana for an unknown one, or a cover background with no cover", () => {
-    expect(resolveRsvpBackground("night", false)).toMatchObject({ id: "night", tone: "dark" });
+    expect(resolveRsvpBackground("night", false)).toMatchObject({ id: "night", label: "None" });
     expect(resolveRsvpBackground("cover", false).id).toBe("banana");
     expect(resolveRsvpBackground("cover", true).id).toBe("cover");
     expect(resolveRsvpBackground("lava", true).id).toBe("banana");
