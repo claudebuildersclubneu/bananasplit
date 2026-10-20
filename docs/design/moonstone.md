@@ -73,7 +73,7 @@ screen. The full rationale, mocks and decisions live in the redesign guide
   `variant="outline" size="icon-sm"` (••• and ↗ in card headers).
 - `ui/badge`: chips: `default | secondary (counts) | accent | success | info
   | destructive | outline`.
-- `ui/chip`: `TagChip` (tag/project colour mixed into the card; optional
+- `ui/chip`: `TagChip` (tag/epic colour mixed into the card; optional
   remove button) and `StatusDot` (dot + word, never a dot alone).
 - `ui/block-card`: `BlockCard tone="quiet|alert|answer|goal"` with kicker,
   title, subtitle, figure, figureLabel, aside (avatar stack), action, href.
@@ -97,7 +97,7 @@ screen. The full rationale, mocks and decisions live in the redesign guide
   spacer, then controls in this order: Segmented, ••• (`ItemMenu`/outline
   icon button), ↗ (open the full page).
 - **Task rows:** 22px circle checkbox (fills `bg-block-goal` on done),
-  title, meta row (TagChip project, due label), priority chip on the right
+  title, meta row (TagChip epic, due label), priority chip on the right
   (Urgent = `destructive` + flag icon, High = `accent`, Normal = nothing).
 - **Toasts:** `toast({ title: "Done: Creative brief draft", tone: "success",
   action: { label: "Undo", run } })`. Verb first.

@@ -5,11 +5,10 @@ import { TaskPageEditor } from "@/components/tasks/task-page-editor";
 import { TasksProvider } from "@/components/tasks/tasks-context";
 import { can } from "@/lib/auth/permissions";
 import { effectiveTimezone, localDateKey } from "@/lib/tasks/dates";
-import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
-import { getComments, getOrgLabels, getOrgProjects, getTaskDetail } from "@/server/tasks/queries";
+import { getComments, getOrgLabels, getOrgParents, getTaskDetail } from "@/server/tasks/queries";
 
 /**
  * A task's own page: the target of every email link
@@ -29,11 +28,10 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
     if (!task) return null;
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
     const labels = await getOrgLabels(db, org.id);
-    // Live projects only: an archived one can't be picked (the field still
-    // shows the task's own project, archived or not, from task.project).
-    const projects = await getOrgProjects(db, org.id);
+    // What it can be part of (the editor's Part of).
+    const parents = await getOrgParents(db, org.id);
     const comments = await getComments(db, org.id, taskId);
-    return { task, labels, projects, comments, tz: effectiveTimezone(me, org) };
+    return { task, labels, parents, comments, tz: effectiveTimezone(me, org) };
   });
   if (!data) notFound();
 
@@ -56,8 +54,7 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
       }}
       members={members}
       labels={data.labels}
-      projects={data.projects}
-      can={creationRights(can({ role }, "tasks.manageAll"), settings)}
+      parents={data.parents}
     >
       <div className="mx-auto max-w-2xl space-y-4">
         <BackLink href={`/app/${orgSlug}/tasks`} label="Tasks" />

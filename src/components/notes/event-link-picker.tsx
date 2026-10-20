@@ -16,6 +16,12 @@ export interface EventOption {
   startsAt: Date;
 }
 
+const EVENT_DAY = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+
 export function EventLinkPicker({
   events,
   value,
@@ -33,7 +39,7 @@ export function EventLinkPicker({
       onValueChange={(v) => onChange(v === "none" ? null : v)}
       disabled={disabled}
     >
-      <SelectTrigger size="sm" className="w-56" aria-label="Linked event">
+      <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="Linked event">
         <CalendarDays className="text-muted-foreground size-4" aria-hidden="true" />
         <SelectValue placeholder="Link an event" />
       </SelectTrigger>
@@ -41,7 +47,10 @@ export function EventLinkPicker({
         <SelectItem value="none">No linked event</SelectItem>
         {events.map((event) => (
           <SelectItem key={event.id} value={event.id}>
-            {event.title} — {event.startsAt.toLocaleDateString()}
+            <span className="truncate">{event.title}</span>
+            <span className="text-muted-foreground ms-2 shrink-0 text-xs">
+              {EVENT_DAY.format(event.startsAt)}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

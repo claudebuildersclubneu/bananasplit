@@ -305,13 +305,13 @@ const taskSelect = {
   dueDate: true,
   visibility: true,
   parentTaskId: true,
-  project: { select: { name: true } },
+  parentTask: { select: { title: true } },
   owner: { select: { name: true } },
   labels: { select: { label: { select: { name: true } } } },
 } satisfies Prisma.TaskSelect;
 
 /**
- * Tasks by title, description, project, label or owner. Private tasks
+ * Tasks by title, description, the epic or story they're in, tag or owner. Private tasks
  * reach only their own people and admins (RLS). Title matches are read
  * first, so an exact name is never pushed out by newer tasks that merely
  * mention the words.
@@ -340,7 +340,7 @@ async function searchTasks(ctx: Ctx): Promise<SearchGroup> {
         ...everyWord<Prisma.TaskWhereInput>(q.terms, (c) => [
           { title: c },
           { description: c },
-          { project: { name: c } },
+          { parentTask: { is: { title: c } } },
           { labels: { some: { label: { name: c } } } },
           { owner: { name: c } },
         ]),
@@ -358,7 +358,7 @@ async function searchTasks(ctx: Ctx): Promise<SearchGroup> {
       [
         { text: t.title, weight: 3 },
         { text: t.description, weight: 1 },
-        { text: t.project?.name, weight: 1 },
+        { text: t.parentTask?.title, weight: 1 },
         { text: labels, weight: 1 },
         { text: t.owner?.name, weight: 1 },
       ],
@@ -369,12 +369,7 @@ async function searchTasks(ctx: Ctx): Promise<SearchGroup> {
       href: `${ctx.base}/tasks/${t.id}`,
       detail:
         excerptAround(t.description, q.folded) ??
-        join(
-          t.project?.name,
-          t.owner?.name,
-          t.parentTaskId && "Subtask",
-          t.visibility === "PRIVATE" && "Private",
-        ),
+        join(t.parentTask?.title, t.owner?.name, t.visibility === "PRIVATE" && "Private"),
       meta:
         t.status === "COMPLETED"
           ? "Done"
@@ -392,16 +387,18 @@ async function searchTasks(ctx: Ctx): Promise<SearchGroup> {
   );
 }
 
-async function searchProjects(ctx: Ctx): Promise<SearchGroup> {
+/** Epics (their whole workspace) and tags: the two ways to see a slice of the work. */
+async function searchEpics(ctx: Ctx): Promise<SearchGroup> {
   const { db, viewer, q } = ctx;
-  const projects = await db.project.findMany({
+  const epics = await db.task.findMany({
     where: {
       organizationId: viewer.orgId,
-      archivedAt: null,
-      ...everyWord<Prisma.ProjectWhereInput>(q.terms, (c) => [{ name: c }, { description: c }]),
+      deletedAt: null,
+      type: "EPIC",
+      ...everyWord<Prisma.TaskWhereInput>(q.terms, (c) => [{ title: c }, { description: c }]),
     },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, description: true },
+    orderBy: { title: "asc" },
+    select: { id: true, title: true, description: true },
     take: ctx.pool,
   });
   const labels = await db.label.findMany({
@@ -414,15 +411,15 @@ async function searchProjects(ctx: Ctx): Promise<SearchGroup> {
     take: ctx.pool,
   });
   const hits = [
-    ...projects.map((p) =>
-      hit("project", p.id, {
-        title: p.name,
-        href: `${ctx.base}/tasks?view=board&scope=all&project=${p.id}`,
+    ...epics.map((p) =>
+      hit("epic", p.id, {
+        title: p.title,
+        href: `${ctx.base}/tasks?view=list&scope=all&epic=${p.id}`,
         detail: excerptAround(p.description, q.folded) ?? openingLine(p.description, 100) ?? null,
-        meta: "Project",
+        meta: "Epic",
         score: scoreFields(
           [
-            { text: p.name, weight: 3 },
+            { text: p.title, weight: 3 },
             { text: p.description, weight: 1 },
           ],
           q,
@@ -433,8 +430,8 @@ async function searchProjects(ctx: Ctx): Promise<SearchGroup> {
       hit("label", l.id, {
         title: l.name,
         href: `${ctx.base}/tasks?view=table&scope=all&label=${l.id}`,
-        detail: "Tasks with this label",
-        meta: "Label",
+        detail: "Tasks with this tag",
+        meta: "Tag",
         score: scoreFields([{ text: l.name, weight: 3 }], q),
       }),
     ),
@@ -925,7 +922,7 @@ const SEARCHERS: Record<ServerGroupId, (ctx: Ctx) => Promise<SearchGroup>> = {
   folders: searchFolders,
   files: searchFiles,
   tasks: searchTasks,
-  projects: searchProjects,
+  projects: searchEpics,
   events: searchEvents,
   polls: searchPolls,
   people: searchPeople,

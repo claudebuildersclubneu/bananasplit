@@ -75,6 +75,7 @@ function sheet() {
     joinedAt: "2026-01-15T12:00:00.000Z",
     email: null,
     busy: ["0-9", "0-10"],
+    availabilityShared: true,
     freeNow: false,
     timezone: "America/New_York",
     team: { key: "p_ops", name: "Ops & Programs", slot: 2 },

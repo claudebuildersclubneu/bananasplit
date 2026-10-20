@@ -164,6 +164,14 @@ backstop cron, they arrive late.
 - Turning a page off keeps its sign-ups. Deleting the event soft-deletes
   it, and its guests are emailed that it's cancelled.
 
+## The RSVPs page
+
+The sidebar's RSVPs lists event pages as cards in a grid, like Files: the
+event's cover (or its first letter on its kind's tint) with a calendar-leaf
+date, the kind and time, and the head count (hosts) or your status. The next
+upcoming one is a wide **Next up** card. Your tickets are cards too, the
+event's picture on the left like a stub, with **Show ticket**.
+
 ## Part of every club
 
 RSVP pages come with every club, the Free plan included; there is no

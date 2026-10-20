@@ -1,6 +1,13 @@
 import { TaskStatus, TaskType } from "@/generated/prisma/client";
+import { epicOf } from "@/lib/tasks/epic";
 import type { PulseIssueData } from "@/lib/pulse/data";
-import { addDaysToKey, dueDateKey, fromDateKey, localDateKey, zonedInstant } from "@/lib/tasks/dates";
+import {
+  addDaysToKey,
+  dueDateKey,
+  fromDateKey,
+  localDateKey,
+  zonedInstant,
+} from "@/lib/tasks/dates";
 import type { TxClient } from "@/server/db/context";
 
 /**
@@ -25,16 +32,17 @@ export interface PulseRange {
 
 export interface PulseRaw {
   range: PulseRange;
-  projects: { id: string; name: string; color: string | null }[];
-  /** ORG tasks completed in the range (epics, stories and tasks). */
+  /** The club's live epics (they took over from projects). */
+  epics: { id: string; name: string; color: string | null }[];
+  /** ORG tasks completed in the range (epics, stories and tasks), with the epic each is in. */
   done: {
     id: string;
     type: TaskType;
     title: string;
-    projectId: string | null;
+    epicId: string | null;
   }[];
-  /** Open ORG tasks at compile time, per project (null: no project). */
-  openByProject: { projectId: string | null; open: number }[];
+  /** Open ORG stories and tasks at compile time, per epic (null: outside one). */
+  openByEpic: { epicId: string | null; open: number }[];
   events: { id: string; title: string; startsAt: Date; checkIns: number }[];
   members: { userId: string; name: string | null; joinedAt: Date }[];
   signups: { contactId: string; name: string | null; joinedAt: Date }[];
@@ -60,13 +68,19 @@ const MAX_EPICS = 6;
 
 /** The stored shape from the raw reads. Pure. */
 export function shapePulseData(raw: PulseRaw): PulseIssueData {
+  // Work done per epic (an epic's own completion counts in the epics
+  // finished, not here).
   const doneBy = new Map<string | null, number>();
-  for (const t of raw.done) doneBy.set(t.projectId, (doneBy.get(t.projectId) ?? 0) + 1);
-  const openBy = new Map(raw.openByProject.map((p) => [p.projectId, p.open]));
-  const projectName = new Map(raw.projects.map((p) => [p.id, p.name]));
+  for (const t of raw.done) {
+    if (t.type === TaskType.EPIC) continue;
+    doneBy.set(t.epicId, (doneBy.get(t.epicId) ?? 0) + 1);
+  }
+  const openBy = new Map(raw.openByEpic.map((p) => [p.epicId, p.open]));
 
+  // Stored as byProject (the issue's shape predates epics taking over);
+  // each line is an epic now.
   const byProject: PulseIssueData["byProject"] = [];
-  for (const p of [...raw.projects].sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const p of [...raw.epics].sort((a, b) => a.name.localeCompare(b.name))) {
     const done = doneBy.get(p.id) ?? 0;
     const open = openBy.get(p.id) ?? 0;
     if (done || open) byProject.push({ projectId: p.id, name: p.name, color: p.color, done, open });
@@ -74,7 +88,13 @@ export function shapePulseData(raw: PulseRaw): PulseIssueData {
   const looseDone = doneBy.get(null) ?? 0;
   const looseOpen = openBy.get(null) ?? 0;
   if (looseDone || looseOpen) {
-    byProject.push({ projectId: null, name: "No project", color: null, done: looseDone, open: looseOpen });
+    byProject.push({
+      projectId: null,
+      name: "Not in an epic",
+      color: null,
+      done: looseDone,
+      open: looseOpen,
+    });
   }
 
   const newMembers: PulseIssueData["newMembers"] = [
@@ -127,7 +147,7 @@ export function shapePulseData(raw: PulseRaw): PulseIssueData {
       .map((t) => ({
         id: t.id,
         title: t.title,
-        project: t.projectId ? (projectName.get(t.projectId) ?? null) : null,
+        project: null,
       })),
     events: [...raw.events]
       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
@@ -151,7 +171,11 @@ export function shapePulseData(raw: PulseRaw): PulseIssueData {
 }
 
 /** [start, end) instants of the range in `tz`, the end cut at `now` (nothing from the future). */
-export function rangeInstants(range: PulseRange, tz: string, now: Date): { start: Date; end: Date } {
+export function rangeInstants(
+  range: PulseRange,
+  tz: string,
+  now: Date,
+): { start: Date; end: Date } {
   const start = zonedInstant(range.from, 0, tz);
   const end = zonedInstant(addDaysToKey(range.to, 1), 0, tz);
   return { start, end: end.getTime() > now.getTime() ? now : end };
@@ -170,25 +194,56 @@ export async function collectPulseRaw(
   const { start, end } = rangeInstants(range, timeZone, now);
   const live = { organizationId, deletedAt: null, visibility: "ORG" as const };
 
-  const projects = await db.project.findMany({
-    where: { organizationId, archivedAt: null },
-    select: { id: true, name: true, color: true },
-    take: 200,
-  });
-  const done = await db.task.findMany({
+  const epics = (
+    await db.task.findMany({
+      where: { ...live, type: TaskType.EPIC, status: { not: TaskStatus.COMPLETED } },
+      select: { id: true, title: true, color: true },
+      take: 200,
+    })
+  ).map((e) => ({ id: e.id, name: e.title, color: e.color }));
+  const chain = {
+    id: true,
+    type: true,
+    title: true,
+    parentTask: {
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        parentTask: { select: { id: true, type: true, title: true } },
+      },
+    },
+  } as const;
+  const doneRows = await db.task.findMany({
     where: { ...live, status: TaskStatus.COMPLETED, completedAt: { gte: start, lt: end } },
-    select: { id: true, type: true, title: true, projectId: true },
+    select: chain,
     orderBy: { completedAt: "asc" },
     take: 2000,
   });
-  const open = await db.task.groupBy({
-    by: ["projectId"],
-    where: { ...live, status: { not: TaskStatus.COMPLETED } },
-    _count: { _all: true },
+  const done = doneRows.map((t) => ({
+    id: t.id,
+    type: t.type,
+    title: t.title,
+    epicId: epicOf(t)?.id ?? null,
+  }));
+  const openRows = await db.task.findMany({
+    where: { ...live, type: { not: TaskType.EPIC }, status: { not: TaskStatus.COMPLETED } },
+    select: chain,
+    take: 5000,
   });
+  const openCount = new Map<string | null, number>();
+  for (const t of openRows) {
+    const id = epicOf(t)?.id ?? null;
+    openCount.set(id, (openCount.get(id) ?? 0) + 1);
+  }
 
   const events = await db.event.findMany({
-    where: { organizationId, deletedAt: null, mergedIntoId: null, startsAt: { gte: start, lt: end } },
+    where: {
+      organizationId,
+      deletedAt: null,
+      mergedIntoId: null,
+      startsAt: { gte: start, lt: end },
+    },
     select: {
       id: true,
       title: true,
@@ -219,7 +274,10 @@ export async function collectPulseRaw(
   const closed = await db.poll.findMany({
     where: {
       organizationId,
-      OR: [{ closedAt: { gte: start, lt: end } }, { closedAt: null, closesAt: { gte: start, lt: end } }],
+      OR: [
+        { closedAt: { gte: start, lt: end } },
+        { closedAt: null, closesAt: { gte: start, lt: end } },
+      ],
     },
     select: { id: true, question: true, options: { select: { id: true, label: true } } },
     orderBy: { createdAt: "asc" },
@@ -296,7 +354,10 @@ export async function collectPulseRaw(
       organizationId,
       deletedAt: null,
       mergedIntoId: null,
-      startsAt: { gte: zonedInstant(nextFrom, 0, timeZone), lt: zonedInstant(nextEnd, 0, timeZone) },
+      startsAt: {
+        gte: zonedInstant(nextFrom, 0, timeZone),
+        lt: zonedInstant(nextEnd, 0, timeZone),
+      },
     },
     select: { id: true, title: true, startsAt: true },
     orderBy: { startsAt: "asc" },
@@ -306,9 +367,9 @@ export async function collectPulseRaw(
   return {
     range,
     timeZone,
-    projects,
+    epics,
     done,
-    openByProject: open.map((g) => ({ projectId: g.projectId, open: g._count._all })),
+    openByEpic: [...openCount].map(([epicId, open]) => ({ epicId, open })),
     events: events.map((e) => ({
       id: e.id,
       title: e.title,

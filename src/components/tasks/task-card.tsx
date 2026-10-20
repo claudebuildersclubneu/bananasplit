@@ -1,10 +1,10 @@
-import { Layers, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { TagChip } from "@/components/ui/chip";
 import { UserAvatar } from "@/components/user-avatar";
 import { rollUp } from "@/lib/tasks/hierarchy";
-import { projectColor } from "@/lib/tasks/project-color";
+import { epicColor, epicOf } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 
 import {
@@ -35,14 +35,13 @@ export type TaskCardData = Pick<
   | "subtasks"
   | "blockedReason"
   | "parentTask"
-  | "project"
   | "_count"
 >;
 
 /**
- * A board card (Moonstone 10.1): a rounded tile with the project chip (and
- * the priority chip), the parent epic, the title, the subtask bar in the
- * project's colour with "2/3", and a meta row of date, comments and faces.
+ * A board card (Moonstone 10.1): a rounded tile with the epic chip (and
+ * the priority chip), the title, the subtask bar in the epic's colour with
+ * "2/3", and a meta row of date, comments and faces.
  * Plain and presentational: inside a sortable list the wrapper owns click,
  * focus and drag. A private task gets a dashed edge as well as the badge
  * (nothing else on the board is dashed). `dragging` is the lifted copy.
@@ -66,13 +65,8 @@ export function TaskCard({
   const flagged = isTaskFlagged(task);
   const priv = isTaskPrivate(task);
   const progress = rollUp(task.subtasks);
-  const color = projectColor(task.project);
-  const epic =
-    task.parentTask?.type === "EPIC"
-      ? task.parentTask
-      : task.parentTask?.parentTask?.type === "EPIC"
-        ? task.parentTask.parentTask
-        : null;
+  const epic = epicOf(task);
+  const color = epicColor(epic);
   const people = [
     ...(task.owner ? [task.owner] : []),
     ...task.assignees.map((a) => a.user).filter((u) => u.id !== task.ownerId),
@@ -88,18 +82,12 @@ export function TaskCard({
           "shadow-e2 outline-brand-accent scale-[1.02] rotate-[2.5deg] outline-2 -outline-offset-1 motion-reduce:rotate-0",
       )}
     >
-      {(task.project || task.priority === "HIGH" || task.type === "STORY") && !done && (
+      {((showEpic && epic) || task.priority === "HIGH" || task.type === "STORY") && !done && (
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 pe-7">
-          {task.project && <TagChip color={color}>{task.project.name}</TagChip>}
+          {showEpic && epic && <TagChip color={color}>{epic.title}</TagChip>}
           {task.type === "STORY" && <TaskTypeChip type="STORY" />}
           {task.priority === "HIGH" && <Badge variant="accent">High</Badge>}
         </div>
-      )}
-      {showEpic && epic && !done && (
-        <p className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs font-medium">
-          <Layers className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{epic.title}</span>
-        </p>
       )}
       <div className="flex min-w-0 items-start gap-2">
         {check}

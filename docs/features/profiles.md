@@ -30,8 +30,11 @@ chart are "Not on the chart".
   (typos: "jakson" finds Jackson).
 - **Filters**: Free now, Team, Role and Year. **Free now** comes from the
   busy times members already share (Privacy decides who sees them): a member
-  is free when the current hour in their own time zone is between 8 am and
-  11 pm and not marked busy.
+  is free when they have shared their availability at all, the current hour
+  in their own time zone is between 8 am and 11 pm, and it is not marked
+  busy. A member who never filled it in is never shown as free
+  (`app.member_availability_shared`, under the same rule as
+  `app.member_busy_hours`), and their profile says they haven't shared it.
 - **Sort** by team, name (with an A-Z rail) or newest, as a **grid** or a
   dense **list**. Big clubs load as you scroll.
 - **The profile sheet**: pick anyone to open their profile beside the list

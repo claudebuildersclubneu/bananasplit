@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import { Button } from "@/components/ui/button";
 import { addDaysToKey, mondayOfKey } from "@/lib/tasks/dates";
-import { projectColor } from "@/lib/tasks/project-color";
+import { epicColor } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 import type { RoadmapEpic } from "@/server/tasks/queries";
 
@@ -19,8 +19,9 @@ const weeksBetween = (a: string, b: string) =>
   Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / (7 * 864e5));
 
 /**
- * The Roadmap: epics on a week timeline, grouped by project. Each bar runs
- * from the epic's start to its due date with its progress filled in, and
+ * The Roadmap: epics on a week timeline, the ones still going first. Each bar runs
+ * from the epic's start (its start date, else when it was made or its
+ * earliest dated work) to its due date with its progress filled in, and
  * this week's column is marked. An epic with no date anywhere shows from its
  * start for two weeks, dashed, saying so.
  */
@@ -36,10 +37,7 @@ export function RoadmapView({ epics }: { epics: RoadmapEpic[] }) {
           title={ws.filterCount > 0 ? "No epics match that" : "No epics yet"}
           description="An epic is a big outcome that spans weeks, like “Venue and logistics”. Its stories and tasks roll up into it."
           action={
-            <Button
-              variant="create"
-              onClick={() => newTask({ type: "EPIC", projectId: ws.query.projectId ?? null })}
-            >
+            <Button variant="create" onClick={() => newTask({ type: "EPIC" })}>
               New epic
             </Button>
           }
@@ -64,20 +62,16 @@ export function RoadmapView({ epics }: { epics: RoadmapEpic[] }) {
   const clampCol = (key: string) =>
     Math.max(0, Math.min(weeks.length - 1, weeksBetween(first, key)));
 
-  const groups = new Map<string, { name: string; color: string; epics: RoadmapEpic[] }>();
-  for (const e of epics) {
-    const key = e.project?.id ?? "none";
-    const g = groups.get(key) ?? {
-      name: e.project?.name ?? "No project",
-      color: projectColor(e.project),
-      epics: [],
-    };
-    g.epics.push(e);
-    groups.set(key, g);
-  }
-  const ordered = [...groups.entries()].sort(([a, x], [b, y]) =>
-    a === "none" ? 1 : b === "none" ? -1 : x.name.localeCompare(y.name),
-  );
+  // Epics still going first, the finished ones under them.
+  const going = epics.filter((e) => e.status !== "COMPLETED");
+  const finishedEpics = epics.filter((e) => e.status === "COMPLETED");
+  const ordered: [string, { name: string; color: string; epics: RoadmapEpic[] }][] = [
+    ["going", { name: "In progress", color: "var(--brand-accent)", epics: going }],
+    ["done", { name: "Done", color: "var(--success)", epics: finishedEpics }],
+  ].filter(([, g]) => (g as { epics: RoadmapEpic[] }).epics.length > 0) as [
+    string,
+    { name: string; color: string; epics: RoadmapEpic[] },
+  ][];
 
   const grid: CSSProperties = {
     gridTemplateColumns: `minmax(140px, 200px) repeat(${weeks.length}, minmax(56px, 1fr))`,
@@ -145,7 +139,7 @@ export function RoadmapView({ epics }: { epics: RoadmapEpic[] }) {
               const endCol = clampCol(mondayOfKey(e.end ?? addDaysToKey(e.start, 13)));
               const pct = e.total > 0 ? Math.round((e.done / e.total) * 100) : 0;
               const finished = e.status === "COMPLETED" || (e.total > 0 && e.done === e.total);
-              const color = projectColor(e.project);
+              const color = epicColor(e);
               return (
                 <div key={e.id} role="row" className="contents">
                   <span role="cell" style={{ gridColumn: 1 }} className="min-w-0 pe-3">

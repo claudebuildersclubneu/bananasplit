@@ -140,16 +140,19 @@ export function overviewWidgetsFor(isAdmin: boolean): OverviewWidgetMeta[] {
 }
 
 /**
- * Under the fixed Up next: your work, then the club's week. Meetings and
+ * Up next always leads, under the stat strip, and isn't a widget (nor is
+ * the stat strip or "Get your club started"; see page.tsx). Then rows that
+ * each fill the four columns: your work and what's waiting on an answer
+ * (my tasks, the next RSVP event, open polls), the club's next seven days,
+ * the weekly pulse, and where you were beside what you pinned. Meetings and
  * Events feed Up next, so they're offered, not placed.
- * Pinned and Recent, empty on day one, come last.
  */
 const DEFAULT_LAYOUT: readonly BoardWidget[] = [
   { id: "my-tasks", type: "my-tasks", w: 2, h: null },
   { id: "rsvp-goal", type: "rsvp-goal", w: 1, h: null },
   { id: "polls", type: "polls", w: 1, h: null },
-  { id: "weekly-pulse", type: "weekly-pulse", w: 4, h: null },
   { id: "week", type: "week", w: 4, h: null },
+  { id: "weekly-pulse", type: "weekly-pulse", w: 4, h: null },
   { id: "recent", type: "recent", w: 2, h: null },
   { id: "pinned", type: "pinned", w: 2, h: null },
 ];

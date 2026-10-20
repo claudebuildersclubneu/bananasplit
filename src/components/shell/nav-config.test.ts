@@ -318,7 +318,6 @@ describe("Admin panel navigation", () => {
       "Sidebar",
       "Theme",
       "Weekly pulse",
-      "Tags",
       "Members",
       "Privacy",
       "Integrations",

@@ -64,7 +64,7 @@ export function buildUpNext(input: {
             : due.text
           : `Due ${due.text === "Tomorrow" ? "tomorrow" : due.text}`,
       title: task.title,
-      subtitle: task.project?.name ?? (task.parentTask ? `Part of ${task.parentTask.title}` : null),
+      subtitle: task.parentTask ? `Part of ${task.parentTask.title}` : null,
       ...(subs && subs.total > 0
         ? { figure: `${subs.done} of ${subs.total}`, figureLabel: "subtasks done" }
         : {}),
@@ -96,7 +96,10 @@ export function buildUpNext(input: {
         title: event.title,
         subtitle: event.location,
         ...(count > 0
-          ? { figure: String(count), figureLabel: rsvp === "YES" ? "going, including you" : "going" }
+          ? {
+              figure: String(count),
+              figureLabel: rsvp === "YES" ? "going, including you" : "going",
+            }
           : {}),
         faces: going?.faces ?? [],
         facesTotal: count,

@@ -19,12 +19,11 @@ export interface PersonFace {
 
 export interface TaskExtras {
   priority: TaskPriority;
-  projectColor: string | null;
   subtasks: { done: number; total: number };
   people: PersonFace[];
 }
 
-/** Priority, project colour, subtask progress and faces for the viewer's task rows. */
+/** Priority, subtask progress and faces for the viewer's task rows. */
 export async function loadTaskExtras(
   db: TxClient,
   organizationId: string,
@@ -35,16 +34,8 @@ export async function loadTaskExtras(
   // which the page's single transaction connection can't do.
   const tasks = await db.task.findMany({
     where: { organizationId, id: { in: [...taskIds] } },
-    select: { id: true, priority: true, projectId: true, owner: { select: userPublicSelect } },
+    select: { id: true, priority: true, owner: { select: userPublicSelect } },
   });
-  const projectIds = [...new Set(tasks.map((t) => t.projectId).filter((p): p is string => !!p))];
-  const projects =
-    projectIds.length > 0
-      ? await db.project.findMany({
-          where: { organizationId, id: { in: projectIds } },
-          select: { id: true, color: true },
-        })
-      : [];
   const assignees = await db.taskAssignee.findMany({
     where: { organizationId, taskId: { in: [...taskIds] } },
     select: { taskId: true, user: { select: userPublicSelect } },
@@ -52,7 +43,6 @@ export async function loadTaskExtras(
   });
   const rows = (tasks ?? []).map((t) => ({
     ...t,
-    project: projects.find((p) => p.id === t.projectId) ?? null,
     assignees: (assignees ?? []).filter((a) => a.taskId === t.id).slice(0, 4),
   }));
   const subtasks = await db.task.groupBy({
@@ -69,7 +59,6 @@ export async function loadTaskExtras(
     }
     out.set(row.id, {
       priority: row.priority,
-      projectColor: row.project?.color ?? null,
       subtasks: {
         total: mine.reduce((n, s) => n + s._count._all, 0),
         done: mine.filter((s) => s.status === "COMPLETED").reduce((n, s) => n + s._count._all, 0),

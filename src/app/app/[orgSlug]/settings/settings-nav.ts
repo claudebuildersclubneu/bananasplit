@@ -89,15 +89,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     feature: "overview",
   },
   {
-    label: "Tags",
-    segment: "labels",
-    description: "Tags for tasks, and who can create tags and projects.",
-    icon: "Tags",
-    group: "Club",
-    permission: "labels.write",
-    feature: "labels",
-  },
-  {
     label: "Members",
     segment: "members",
     description: "The roster, roles, titles and invitations.",

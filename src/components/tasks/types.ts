@@ -1,13 +1,13 @@
 import type { ViewerChart } from "@/lib/tasks/assignment";
 import type { OrgMemberOption } from "@/server/members";
-import type { ProjectOption, TaskListItem } from "@/server/tasks/queries";
+import type { ParentOption, TaskListItem } from "@/server/tasks/queries";
 
 /** Client-side shapes for the task views (type-only imports of server read shapes). */
 
 export type TaskItem = TaskListItem;
 export type SubtaskItem = TaskListItem["subtasks"][number];
 export type MemberOption = OrgMemberOption;
-export type { ProjectOption };
+export type { ParentOption };
 
 export interface LabelOption {
   id: string;
@@ -25,8 +25,6 @@ export interface TasksViewer {
 
 /** What the viewer may make on the spot, from the club's creation rules. */
 export interface TasksCan {
-  /** OrgSettings.memberCanCreateProjects, or an owner/admin. */
-  createProjects: boolean;
   /** OrgSettings.memberCanCreateTags, or an owner/admin. */
   createTags: boolean;
 }

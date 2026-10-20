@@ -8,7 +8,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-import { ProjectMenu } from "./project-menu";
+import { ParentMenu } from "./epic-menu";
 import { HashTagHint } from "./tag-menu";
 import { DueMenu, longDue, menuItemClass, PRIORITY_LABEL } from "./task-fields";
 import { STATUS_LABEL } from "./layout-ui";
@@ -26,8 +26,8 @@ export function TaskSentence({
   onOwner,
   dueDate,
   onDue,
-  projectId,
-  onProject,
+  parentTaskId,
+  onParent,
   priority,
   onPriority,
   status,
@@ -44,8 +44,9 @@ export function TaskSentence({
   onOwner: (v: string | null) => void;
   dueDate: string;
   onDue: (v: string) => void;
-  projectId: string | null;
-  onProject: (v: string | null) => void;
+  /** The epic (or story) it goes in. */
+  parentTaskId: string | null;
+  onParent: (v: string | null) => void;
   priority: TaskPriority;
   onPriority: (v: TaskPriority) => void;
   status: TaskStatus;
@@ -57,14 +58,14 @@ export function TaskSentence({
   onMore: () => void;
   onSubmit: () => void;
 }) {
-  const { members, memberById, projectById, viewer } = useTasks();
+  const { members, memberById, parentById, viewer } = useTasks();
   const owner = ownerId ? memberById.get(ownerId) : undefined;
   const ownerText = owner
     ? ownerId === viewer.userId
       ? "You"
       : (owner.name?.split(/\s+/)[0] ?? "Someone")
     : "Nobody";
-  const project = projectId ? projectById.get(projectId) : undefined;
+  const parent = parentTaskId ? parentById.get(parentTaskId) : undefined;
 
   return (
     <div className="flex flex-col gap-[18px] pt-4">
@@ -119,9 +120,15 @@ export function TaskSentence({
         <Slot label="Due date" text={dueDate ? longDue(dueDate) : "whenever"} empty={!dueDate}>
           {(close) => <DueMenu value={dueDate} onPick={(k) => (onDue(k), close())} />}
         </Slot>
-        , for{" "}
-        <Slot label="Project" text={project?.name ?? "any project"} empty={!project}>
-          {(close) => <ProjectMenu value={projectId} onPick={(id) => (onProject(id), close())} />}
+        , in{" "}
+        <Slot label="Part of" text={parent?.title ?? "no epic"} empty={!parent}>
+          {(close) => (
+            <ParentMenu
+              value={parentTaskId}
+              types={["EPIC", "STORY"]}
+              onPick={(id) => (onParent(id), close())}
+            />
+          )}
         </Slot>
         . It&apos;s{" "}
         <Slot label="Priority" text={PRIORITY_LABEL[priority].toLowerCase()}>

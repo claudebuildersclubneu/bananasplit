@@ -90,7 +90,6 @@ const GRANTS = {
   PollResponse: ["SIUD", "SIUD", ""],
   PollSlot: ["SIUD", "SIUD", ""],
   PollVote: ["SID", "S", ""],
-  Project: ["SIUD", "SIUD", ""],
   // The weekly pulse: members read it, OWNER/ADMIN write the note (a column
   // grant); the pulse job writes the rest on the service path.
   PulseIssue: ["Su", "SIUD", ""],
@@ -1917,7 +1916,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P6-05",
-    "task owner and project lead must be members; BLOCKED is a status",
+    "task owner must be a member; BLOCKED is a status",
     "app_user",
     A("u_memberA"),
     async (q) => ({
@@ -1929,10 +1928,6 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `UPDATE "Task" SET "status" = 'BLOCKED', "blockedReason" = 'room', "blockedAt" = now() WHERE "id" = 't_A'`,
       ),
-      non_member_lead: await tryq(
-        q,
-        `UPDATE "Project" SET "leadId" = 'u_memberB' WHERE "id" = 'p_A'`,
-      ),
       foreign_notification_task: await tryq(
         q,
         `INSERT INTO "Notification" ("id","organizationId","userId","type","title","taskId") VALUES ('nt','org_A','u_adminA','TASK_MENTIONED','x','t_B')`,
@@ -1942,7 +1937,6 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       value: {
         non_member_owner: "23514",
         blocked: 1,
-        non_member_lead: "23514",
         foreign_notification_task: "23503",
       },
     },
@@ -2336,52 +2330,32 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-B9-02",
-    "projects: OWNER/ADMIN create (members too only while the org allows it) and delete; a member may still clear a lead and write tasks",
+    "projects became epics: no Project table; an epic is a task with a colour (#rrggbb) members write like any task",
     "app_user",
     A("u_memberA"),
     async (q) => {
       const s = {};
-      // Members may create projects only while memberCanCreateProjects is
-      // on (P-MOON-10 covers the setting); off, it is OWNER/ADMIN's alone.
-      await q(`SELECT app.set_context('u_adminA','org_A')`);
-      await q(`UPDATE "OrgSettings" SET "memberCanCreateProjects" = false`);
-      await q(`UPDATE "Project" SET "leadId" = 'u_memberA' WHERE "id" = 'p_A'`);
-      await q(`SELECT app.set_context('u_memberA','org_A')`);
-      s.member_insert = await tryq(
+      s.project_table = await tryq(q, `SELECT count(*) FROM "Project"`);
+      s.member_epic = await tryq(
         q,
-        `INSERT INTO "Project" ("id","organizationId","name") VALUES ('p_m','org_A','Member project')`,
+        `INSERT INTO "Task" ("id","organizationId","type","title","color","rank","createdById","updatedAt")
+         VALUES ('t_ep','org_A','EPIC','Fall Showcase','#a1B2c3','a0','u_memberA', now())`,
       );
-      s.member_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
-      // The documented carve-out: untieDepartingMember runs as the member
-      // who is leaving and clears their own lead.
-      s.member_clears_lead = await rc(q, `UPDATE "Project" SET "leadId" = NULL WHERE "id" = 'p_A'`);
-      // Members still own the task board itself.
-      s.member_task = await tryq(
+      s.bad_color = await tryq(q, `UPDATE "Task" SET "color" = 'red' WHERE "id" = 't_ep'`);
+      s.under_epic = await rc(q, `UPDATE "Task" SET "parentTaskId" = 't_ep' WHERE "id" = 't_A'`);
+      s.foreign_parent = await tryq(
         q,
-        `INSERT INTO "Task" ("id","organizationId","title","rank","createdById","updatedAt")
-         VALUES ('t_m','org_A','Member task','a0','u_memberA', now())`,
-      );
-      await q(`SELECT app.set_context('u_adminA','org_A')`);
-      s.admin_insert = await tryq(
-        q,
-        `INSERT INTO "Project" ("id","organizationId","name") VALUES ('p_a','org_A','Admin project')`,
-      );
-      s.admin_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_a'`);
-      s.admin_foreign_insert = await tryq(
-        q,
-        `INSERT INTO "Project" ("id","organizationId","name") VALUES ('p_x','org_B','Wrong org')`,
+        `UPDATE "Task" SET "parentTaskId" = 't_B' WHERE "id" = 't_A'`,
       );
       return s;
     },
     {
       value: {
-        member_insert: "42501",
-        member_delete: 0,
-        member_clears_lead: 1,
-        member_task: 1,
-        admin_insert: 1,
-        admin_delete: 1,
-        admin_foreign_insert: "42501",
+        project_table: "42P01",
+        member_epic: 1,
+        bad_color: "23514",
+        under_epic: 1,
+        foreign_parent: "23503",
       },
     },
   );
@@ -3777,11 +3751,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       ('qp_PA','org_PA','Tacos?','u_adminA',now());
     INSERT INTO "PollOption" ("id","organizationId","pollId","label") VALUES ('po_PA','org_PA','qp_PA','Yes');
     INSERT INTO "PollVote" ("id","organizationId","pollId","optionId","userId") VALUES ('pv_PA','org_PA','qp_PA','po_PA','u_adminA');
-    INSERT INTO "Project" ("id","organizationId","name") VALUES ('pj_PA','org_PA','Errands');
-    INSERT INTO "Task" ("id","organizationId","projectId","parentTaskId","type","title","rank","createdById","ownerId","updatedAt") VALUES
-      ('t_PA','org_PA','pj_PA',NULL,'STORY','Book the room','a0','u_adminA','u_adminA',now());
-    INSERT INTO "Task" ("id","organizationId","projectId","parentTaskId","title","rank","createdById","ownerId","updatedAt") VALUES
-      ('t_PA_sub','org_PA',NULL,'t_PA','Call them','a1','u_adminA','u_adminA',now());
+    INSERT INTO "Task" ("id","organizationId","parentTaskId","type","title","rank","createdById","ownerId","updatedAt") VALUES
+      ('t_PA','org_PA',NULL,'STORY','Book the room','a0','u_adminA','u_adminA',now());
+    INSERT INTO "Task" ("id","organizationId","parentTaskId","title","rank","createdById","ownerId","updatedAt") VALUES
+      ('t_PA_sub','org_PA','t_PA','Call them','a1','u_adminA','u_adminA',now());
     INSERT INTO "Label" ("id","organizationId","name","color") VALUES
       ('l_PA','org_PA','label a','#000000'),
       ('l_PA2','org_PA','Urgent','#ff0000');
@@ -3822,8 +3795,6 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.subtask = await orgOf("Task", "t_PA_sub");
       s.sub_parent =
         (await q(`SELECT "parentTaskId" p FROM "Task" WHERE "id" = 't_PA_sub'`)).rows[0]?.p ?? null;
-      s.project =
-        (await q(`SELECT "projectId" p FROM "Task" WHERE "id" = 't_PA'`)).rows[0]?.p ?? null;
       // "label a" matches org A's "Label A"; "Urgent" is made in org A.
       s.labels = (
         await q(
@@ -3855,7 +3826,6 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         task: "org_A",
         subtask: "org_A",
         sub_parent: "t_PA",
-        project: null,
         labels: ["Label A", "Urgent"],
         comment: "org_A",
         visibility: "INTERNAL",
@@ -4527,7 +4497,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       s.day_7 = await tryq(q, `UPDATE "OrgSettings" SET "pulseDay" = 7`);
       s.hour_24 = await tryq(q, `UPDATE "OrgSettings" SET "pulseHourLocal" = 24`);
       s.defaults = (
-        await q(`SELECT "pulseEnabled", "pulseInApp", "memberCanCreateProjects", "memberCanCreateTags"
+        await q(`SELECT "pulseEnabled", "pulseInApp", "memberCanCreateTags"
                    FROM "OrgSettings" WHERE "organizationId" = 'org_A'`)
       ).rows[0];
       return s;
@@ -4541,7 +4511,6 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         defaults: {
           pulseEnabled: true,
           pulseInApp: true,
-          memberCanCreateProjects: true,
           memberCanCreateTags: true,
         },
       },
@@ -4549,34 +4518,17 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-MOON-13",
-    "projects and tags: members create them while the org allows it (tags as themselves); OWNER/ADMIN always; leads are members, colours #rrggbb",
+    "tags: members create them while the org allows it (as themselves); OWNER/ADMIN always",
     "app_user",
     A("u_memberA"),
     async (q) => {
       const s = {};
-      const project = (id, extra = "", values = "") =>
-        tryq(
-          q,
-          `INSERT INTO "Project" ("id","organizationId","name"${extra}) VALUES ('${id}','org_A','${id}'${values})`,
-        );
       const tag = (id, by) =>
         tryq(
           q,
           `INSERT INTO "Label" ("id","organizationId","name","color","createdById") VALUES ($1,'org_A',$1,'#000000',$2)`,
           [id, by],
         );
-      s.member_project = await project(
-        "p_m",
-        `,"color","leadId","status","startDate","targetDate"`,
-        `,'#a1B2c3','u_memberA','ON_HOLD','2026-10-01','2026-12-01'`,
-      );
-      s.bad_color = await project("p_c", `,"color"`, `,'red'`);
-      s.short_color = await project("p_c2", `,"color"`, `,'#abc'`);
-      s.outsider_lead = await project("p_o", `,"leadId"`, `,'u_memberB'`);
-      s.member_edits_project = await rc(
-        q,
-        `UPDATE "Project" SET "status" = 'DONE', "targetDate" = '2026-11-30' WHERE "id" = 'p_A'`,
-      );
       s.member_tag = await tag("l_m", "u_memberA");
       s.member_tag_unsigned = await tag("l_m2", null);
       s.member_tag_forged = await tag("l_m3", "u_adminA");
@@ -4590,39 +4542,22 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         `UPDATE "Label" SET "createdById" = 'u_adminA' WHERE "id" = 'l_m'`,
       );
       s.admin_tag_forged = await tag("l_a1", "u_memberA");
-      await q(
-        `UPDATE "OrgSettings" SET "memberCanCreateProjects" = false, "memberCanCreateTags" = false`,
-      );
-      s.admin_project_off = await project("p_a");
+      await q(`UPDATE "OrgSettings" SET "memberCanCreateTags" = false`);
       s.admin_tag_off = await tag("l_a2", null);
       await q(`SELECT app.set_context('u_memberA','org_A')`);
-      s.member_project_off = await project("p_m2");
       s.member_tag_off = await tag("l_m4", "u_memberA");
-      await q(`SELECT app.set_context('u_memberB','org_B')`);
-      s.other_org_project = await tryq(
-        q,
-        `INSERT INTO "Project" ("id","organizationId","name") VALUES ('p_x','org_A','Wrong org')`,
-      );
       return s;
     },
     {
       value: {
-        member_project: 1,
-        bad_color: "23514",
-        short_color: "23514",
-        outsider_lead: "23514",
-        member_edits_project: 1,
         member_tag: 1,
         member_tag_unsigned: "42501",
         member_tag_forged: "42501",
         member_renames_tag: 0,
         admin_reattributes: "42501",
         admin_tag_forged: "42501",
-        admin_project_off: 1,
         admin_tag_off: 1,
-        member_project_off: "42501",
         member_tag_off: "42501",
-        other_org_project: "42501",
       },
     },
   );
@@ -4672,5 +4607,127 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       ).rows.map((r) => r.name),
     { value: ["Member A"] },
   );
+
+  // ============ Moonstone gaps (20261019150000_moonstone_gaps) ============
+  await tcase(
+    "P-GAPS-01",
+    "Task.startDate: a calendar date any task writer sets",
+    "app_user",
+    A("u_memberA"),
+    async (q) => {
+      const s = {};
+      s.type = (
+        await q(`SELECT data_type FROM information_schema.columns
+                  WHERE table_name = 'Task' AND column_name = 'startDate'`)
+      ).rows[0]?.data_type;
+      s.member_sets = await rc(
+        q,
+        `UPDATE "Task" SET "startDate" = '2026-10-05', "type" = 'EPIC' WHERE "id" = 't_A'`,
+      );
+      s.value = (await q(`SELECT "startDate"::text v FROM "Task" WHERE "id" = 't_A'`)).rows[0]?.v;
+      await q(`SELECT app.set_context('u_memberB','org_B')`);
+      s.other_org = await rc(q, `UPDATE "Task" SET "startDate" = '2026-10-05' WHERE "id" = 't_A'`);
+      return s;
+    },
+    { value: { type: "date", member_sets: 1, value: "2026-10-05", other_org: 0 } },
+  );
+  await tcase(
+    "P-GAPS-02",
+    "Label names are unique per org ignoring case (two orgs may share one)",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      const tag = (id, org, name) =>
+        tryq(
+          q,
+          `INSERT INTO "Label" ("id","organizationId","name","color","createdById") VALUES ($1,$2,$3,'#000000',app.user_id())`,
+          [id, org, name],
+        );
+      s.same_case = await tag("l_g1", "org_A", "Label A");
+      s.other_case = await tag("l_g2", "org_A", "LABEL a");
+      s.new_name = await tag("l_g3", "org_A", "Catering");
+      s.rename_clash = await tryq(q, `UPDATE "Label" SET "name" = 'catering' WHERE "id" = 'l_A'`);
+      await q(`SELECT app.set_context('u_ownerB','org_B')`);
+      s.other_org = await tag("l_g4", "org_B", "label a");
+      return s;
+    },
+    {
+      value: {
+        same_case: "23505",
+        other_case: "23505",
+        new_name: 1,
+        rename_clash: "23505",
+        other_org: 1,
+      },
+    },
+  );
+  await tcase(
+    "P-GAPS-04",
+    "Note.headerText and footerText: whoever edits the note sets them, 200 characters at most",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      s.admin_sets = await rc(
+        q,
+        `UPDATE "Note" SET "headerText" = 'Board minutes', "footerText" = 'Confidential' WHERE "id" = 'n_A_priv'`,
+      );
+      s.too_long = await tryq(
+        q,
+        `UPDATE "Note" SET "headerText" = repeat('x', 201) WHERE "id" = 'n_A_priv'`,
+      );
+      s.at_limit = await rc(
+        q,
+        `UPDATE "Note" SET "footerText" = repeat('x', 200) WHERE "id" = 'n_A_priv'`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_private = await rc(
+        q,
+        `UPDATE "Note" SET "headerText" = 'Mine' WHERE "id" = 'n_A_priv'`,
+      );
+      return s;
+    },
+    { value: { admin_sets: 1, too_long: "23514", at_limit: 1, member_private: 0 } },
+  );
+  await tcase(
+    "P-GAPS-05",
+    "app.member_availability_shared: whether a member saved availability, only where their busy hours may be seen",
+    "owner",
+    null,
+    async (q) => {
+      await q(
+        `INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_memberA','{"secret":"Therapy"}',ARRAY[]::text[])`,
+      );
+      const shared = async (user, org, target) => {
+        await q(`SELECT app.set_context($1, $2)`, [user, org]);
+        return (
+          (await q(`SELECT app.member_availability_shared($1) AS v`, [target])).rows[0]?.v ?? null
+        );
+      };
+      const s = {};
+      s.saved_empty = await shared("u_treasA", "org_A", "u_memberA");
+      s.never = await shared("u_treasA", "org_A", "u_adminA");
+      s.self_never = await shared("u_adminA", "org_A", "u_adminA");
+      s.other_org = await shared("u_memberB", "org_B", "u_memberA");
+      await q(
+        `UPDATE "OrgSettings" SET "showMemberAvailability" = false WHERE "organizationId" = 'org_A'`,
+      );
+      s.hidden_member = await shared("u_treasA", "org_A", "u_memberA");
+      s.hidden_admin = await shared("u_adminA", "org_A", "u_memberA");
+      return s;
+    },
+    {
+      value: {
+        saved_empty: true,
+        never: false,
+        self_never: false,
+        other_org: null,
+        hidden_member: null,
+        hidden_admin: true,
+      },
+    },
+  );
+
   await own(`DELETE FROM "Organization" WHERE "id" IN ('org_PA','org_PB','org_PM')`);
 });

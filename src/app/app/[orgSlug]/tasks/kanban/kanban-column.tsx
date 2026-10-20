@@ -4,6 +4,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 
+import { ClearCompletedButton } from "@/components/tasks/clear-completed";
 import { STATUS_TOKEN } from "@/components/tasks/layout-ui";
 import type { TaskItem } from "@/components/tasks/types";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ export function KanbanColumn({
             {tasks.length}
           </Badge>
           <span className="flex-1" />
+          {status === "COMPLETED" && <ClearCompletedButton tasks={tasks} />}
           {status !== "COMPLETED" && (
             <button
               type="button"

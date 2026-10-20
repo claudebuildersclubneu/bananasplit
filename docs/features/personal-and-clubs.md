@@ -140,7 +140,7 @@ had hidden Polls (Find a time) or Calendar (RSVPs).
 The last club setup step (`/onboarding/organization/{slug}/bring`, B7)
 lists the creator's Personal event pages, other calendar events (upcoming
 and the last month), availability and question polls, and open top-level
-tasks (by project), none ticked; skipped when there's nothing to bring.
+tasks and epics in one list, none ticked; skipped when there's nothing to bring.
 `?bring={id}`, or the item remembered by "Start a club" on
 `/app/{personal slug}/move?item={id}` (Move to a club), starts ticked.
 `/app/{personal slug}/move` also lists the clubs you own or run, each
@@ -154,4 +154,5 @@ sign-ups, tickets, bring list and pending RSVP jobs, and become INTERNAL
 (nothing lands on the club's public feed by itself). Polls move with slots,
 responses, options and votes; a poll's scheduled event comes along. Tasks
 move with subtasks, comments, activity and reminders; labels are matched in
-the club by name or made there, Personal projects are dropped.
+the club by name or made there. (Projects became epics, which move like
+any top-level task.)

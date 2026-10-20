@@ -52,8 +52,8 @@ a particular month or week is shareable.
   once, and are part of the URL. The header says how many events the
   current window holds.
 - **Reading an event:** selecting one opens a card anchored to it with the
-  time, place, visibility and your RSVP, plus **Open** (the full page) and
-  **Edit**. Escape closes it.
+  time, place, visibility and your RSVP, plus a solid **View event** (the
+  full page) and, for whoever runs it, **Edit event**. Escape closes it.
 - **Creating one:** **New event**, or the **+** on a day cell, which starts
   the event at 6pm that day. The form asks for a title, a time, a type, a
   visibility and a place; everything else is behind **More details**.

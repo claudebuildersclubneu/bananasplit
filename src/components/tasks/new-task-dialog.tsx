@@ -1,0 +1,549 @@
+"use client";
+
+import { ChevronDown } from "lucide-react";
+import { useId, useRef, useState, useTransition } from "react";
+
+import { createTask } from "@/app/app/[orgSlug]/tasks/actions";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toaster";
+import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
+import { LABEL_COLOR_PALETTE } from "@/lib/label-colors";
+import { relationFor } from "@/lib/tasks/assignment";
+import { epicColor, parentTypesFor } from "@/lib/tasks/epic";
+import { allowedTypes, TASK_TYPES, typeLabel, type TaskTypeValue } from "@/lib/tasks/hierarchy";
+import { MAX_BLOCKED_REASON } from "@/lib/tasks/status";
+import { cn } from "@/lib/utils";
+
+import { useConfirmFlagged } from "./prompts";
+import { HashTagHint } from "./tag-menu";
+import { LabelsField, PeopleField, PRIORITY_OPTIONS, STATUS_OPTIONS } from "./task-fields";
+import type { TaskEditorDefaults } from "./task-editor";
+import { useTasks } from "./tasks-context";
+import { useHashTags } from "./use-hash-tags";
+
+const NONE = "__none";
+
+/**
+ * New task, as a centred dialog built like New event
+ * (src/components/calendar/event-form-dialog.tsx): a title and a due date
+ * are all it takes; the type, owner, priority and where it sits share a
+ * row each; description, tags, who else is involved, the status and who
+ * can see it fold under More details. Editing an existing task keeps the
+ * side panel (TaskDetailSheet), where its subtasks and comments live.
+ */
+export function NewTaskDialog({
+  open,
+  onOpenChange,
+  defaults,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaults?: TaskEditorDefaults;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] gap-4 overflow-x-hidden overflow-y-auto sm:max-w-lg">
+        {open && (
+          <NewTaskForm
+            key={`${defaults?.parentTaskId ?? "top"}-${defaults?.type ?? ""}-${defaults?.status ?? ""}`}
+            defaults={defaults}
+            onOpenChange={onOpenChange}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NewTaskForm({
+  defaults,
+  onOpenChange,
+}: {
+  defaults?: TaskEditorDefaults;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { org, viewer, members, memberById, labels, parents, parentById, announce } = useTasks();
+  const hashTags = useHashTags();
+  const [confirmElement, confirmFlagged] = useConfirmFlagged();
+  const [isPending, startTransition] = useTransition();
+  const saving = useRef(false);
+  const moreId = useId();
+
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<TaskTypeValue>(defaults?.type ?? "TASK");
+  const [parentTaskId, setParentTaskId] = useState<string | null>(defaults?.parentTaskId ?? null);
+  const [ownerId, setOwnerId] = useState<string | null>(
+    defaults?.ownerId !== undefined && defaults.ownerId !== null ? defaults.ownerId : viewer.userId,
+  );
+  const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [dueDate, setDueDate] = useState(defaults?.dueDate ?? "");
+  const [startDate, setStartDate] = useState("");
+  const [color, setColor] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
+  const [description, setDescription] = useState("");
+  const [labelIds, setLabelIds] = useState<string[]>([]);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [status, setStatus] = useState<TaskStatus>(defaults?.status ?? TaskStatus.NOT_STARTED);
+  const [blockedReason, setBlockedReason] = useState("");
+  const [visibility, setVisibility] = useState<TaskVisibility>(
+    defaults?.visibility ?? TaskVisibility.ORG,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const parent = parentTaskId ? parentById.get(parentTaskId) : undefined;
+  const parentType = parentTaskId
+    ? ((parent?.type as TaskTypeValue | undefined) ?? defaults?.parentType ?? "STORY")
+    : null;
+  const typeChoices = TASK_TYPES.filter((t) =>
+    allowedTypes({ parentType, childTypes: [] }).includes(t.value),
+  );
+  const isEpic = type === "EPIC";
+  const hasStart = type === "EPIC" || type === "STORY";
+  const isTopLevel = isEpic || parentTaskId === null;
+  const ownerRequired = org.requireOwner && isTopLevel;
+  const dueRequired = org.requireDueDate && isTopLevel;
+  const parentChoices = parents.filter((p) =>
+    parentTypesFor(type).includes(p.type as "EPIC" | "STORY"),
+  );
+  const ownerAbove =
+    ownerId !== null && ownerId !== viewer.userId && relationFor(viewer.chart, ownerId) === "ABOVE";
+  const noun = typeLabel(type).toLowerCase();
+
+  function pickType(next: TaskTypeValue) {
+    setType(next);
+    // An epic sits at the top; a story only inside an epic.
+    if (next === "EPIC") setParentTaskId(null);
+    if (next === "STORY" && parent?.type === "STORY") setParentTaskId(null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      await save();
+    } finally {
+      saving.current = false;
+    }
+  }
+
+  async function save() {
+    setError(null);
+    if (status === TaskStatus.BLOCKED && !blockedReason.trim()) {
+      setShowMore(true);
+      setError("Say what it's blocked on.");
+      return;
+    }
+    const newcomers = [...(ownerId && ownerId !== viewer.userId ? [ownerId] : []), ...assigneeIds];
+    const above = newcomers.filter((id) => relationFor(viewer.chart, id) === "ABOVE");
+    let confirmed = false;
+    if (above.length > 0) {
+      confirmed = await confirmFlagged(above.map((id) => memberById.get(id)?.name ?? "Someone"));
+      if (!confirmed) return;
+    }
+    // `#tag` in the title tags the task (making new tags on the way).
+    let finalTitle = title;
+    let finalLabelIds = labelIds;
+    if (hashTags.preview(title).length > 0) {
+      const resolved = await hashTags.resolve(title);
+      if (resolved.error) {
+        setError(resolved.error);
+        return;
+      }
+      finalTitle = resolved.title;
+      finalLabelIds = [...new Set([...labelIds, ...resolved.labelIds])];
+    }
+    const input = {
+      title: finalTitle,
+      description: description.trim() ? description : null,
+      type,
+      status,
+      blockedReason: status === TaskStatus.BLOCKED ? blockedReason.trim() : null,
+      priority,
+      dueDate: dueDate || null,
+      ...(hasStart ? { startDate: startDate || null } : {}),
+      ...(isEpic ? { color } : {}),
+      parentTaskId: isEpic ? null : parentTaskId,
+      ownerId,
+      assigneeIds: assigneeIds.filter((id) => id !== ownerId),
+      labelIds: finalLabelIds,
+      ...(isTopLevel ? { visibility } : {}),
+    };
+    await new Promise<void>((done) =>
+      startTransition(async () => {
+        try {
+          let result = await createTask(org.id, { ...input, confirmFlagged: confirmed });
+          if ("confirm" in result && result.confirm) {
+            const ok = await confirmFlagged(result.confirm.flagged.map((f) => f.name ?? "Someone"));
+            if (!ok) return;
+            result = await createTask(org.id, { ...input, confirmFlagged: true });
+          }
+          if (result.error) {
+            setError(result.error);
+            return;
+          }
+          toast({ title: `Created: ${finalTitle}`, tone: "success" });
+          if ("droppedMentions" in result && result.droppedMentions?.length) {
+            announce(`Not mentioned (can't see this task): ${result.droppedMentions.join(", ")}`);
+          }
+          onOpenChange(false);
+        } finally {
+          done();
+        }
+      }),
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => void submit(e)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          void submit(e);
+        }
+      }}
+      className="contents"
+    >
+      <DialogHeader>
+        <DialogTitle>New {noun}</DialogTitle>
+        <DialogDescription>
+          {isEpic
+            ? "A big outcome that spans weeks. Its stories and tasks roll up into it."
+            : "A title is all it takes. Everything else has a sensible default."}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="grid content-start gap-1.5">
+          <Label htmlFor="task-title">Title</Label>
+          <Input
+            id="task-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            autoFocus
+            required
+            maxLength={200}
+            placeholder={isEpic ? "e.g. Fall Showcase" : "e.g. Book the room (#tag to tag it)"}
+          />
+          <HashTagHint title={title} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="task-type">Type</Label>
+            <Select value={type} onValueChange={(v) => pickType(v as TaskTypeValue)}>
+              <SelectTrigger id="task-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {typeChoices.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              {TASK_TYPES.find((t) => t.value === type)?.hint}
+            </p>
+          </div>
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="task-priority">Priority</Label>
+            <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+              <SelectTrigger id="task-priority" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+          <div className="grid content-start gap-1.5">
+            <Label htmlFor="task-owner">Owner</Label>
+            <Select
+              value={ownerId ?? NONE}
+              onValueChange={(v) => setOwnerId(v === NONE ? null : v)}
+            >
+              <SelectTrigger id="task-owner" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {!ownerRequired && <SelectItem value={NONE}>Nobody yet</SelectItem>}
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.id === viewer.userId ? `${m.name ?? "Me"} (you)` : (m.name ?? "Member")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {ownerAbove && (
+              <p className="text-warning text-xs">Above your level: this will be flagged.</p>
+            )}
+          </div>
+          {isEpic ? (
+            <div className="grid content-start gap-1.5">
+              <span className="text-sm leading-none font-medium">Colour</span>
+              <div
+                role="radiogroup"
+                aria-label="Epic colour"
+                className="flex flex-wrap gap-1.5 pt-1"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={color === null}
+                  aria-label="Theme colour"
+                  onClick={() => setColor(null)}
+                  className={cn(
+                    "focus-glow hatch bg-muted size-6 rounded-full",
+                    color === null && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                  )}
+                />
+                {LABEL_COLOR_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === c}
+                    aria-label={`Colour ${c}`}
+                    onClick={() => setColor(c)}
+                    className={cn(
+                      "focus-glow size-6 rounded-full",
+                      color === c && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                    )}
+                    style={{ background: c }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="grid content-start gap-1.5">
+              <Label htmlFor="task-parent">Part of</Label>
+              <Select
+                value={parentTaskId ?? NONE}
+                onValueChange={(v) => setParentTaskId(v === NONE ? null : v)}
+              >
+                <SelectTrigger id="task-parent" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Not in an epic</SelectItem>
+                  {parentChoices
+                    .filter((p) => p.type === "EPIC")
+                    .flatMap((epic) => [
+                      epic,
+                      ...parentChoices.filter(
+                        (s) => s.type === "STORY" && s.parentTaskId === epic.id,
+                      ),
+                    ])
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.type === "EPIC" ? (
+                          <span
+                            aria-hidden
+                            className="size-2 shrink-0 rounded-full"
+                            style={{ background: epicColor(p) }}
+                          />
+                        ) : (
+                          <span aria-hidden className="w-2 shrink-0" />
+                        )}
+                        <span
+                          className={cn("truncate", p.type === "STORY" && "text-muted-foreground")}
+                        >
+                          {p.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium">When</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {hasStart && (
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-start">Starts</Label>
+                <Input
+                  id="task-start"
+                  type="date"
+                  value={startDate}
+                  max={dueDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="grid content-start gap-1.5">
+              <Label htmlFor="task-due">Due</Label>
+              <Input
+                id="task-due"
+                type="date"
+                value={dueDate}
+                min={startDate || undefined}
+                required={dueRequired}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {dueRequired
+              ? "Every task in this club needs a due date."
+              : "Leave it blank for no due date."}
+          </p>
+        </fieldset>
+
+        <div>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 border-t pt-3 text-sm font-medium transition-colors"
+            aria-expanded={showMore}
+            aria-controls={moreId}
+            onClick={() => setShowMore((v) => !v)}
+          >
+            <ChevronDown
+              aria-hidden
+              className={cn("size-4 transition-transform", showMore && "rotate-180")}
+            />
+            {showMore ? "Fewer details" : "More details"}
+            {!showMore && (
+              <span className="text-muted-foreground/80 ml-1 text-xs font-normal">
+                description, tags, people, status, who can see it
+              </span>
+            )}
+          </button>
+        </div>
+
+        {showMore && (
+          <div id={moreId} className="space-y-4">
+            <div className="grid content-start gap-1.5">
+              <Label htmlFor="task-description">Description</Label>
+              <Textarea
+                id="task-description"
+                value={description}
+                rows={3}
+                maxLength={20000}
+                placeholder="Markdown works"
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="grid content-start gap-1.5">
+              <Label htmlFor="task-labels">Tags</Label>
+              <LabelsField
+                id="task-labels"
+                labels={labels}
+                value={labelIds}
+                onChange={setLabelIds}
+              />
+            </div>
+            <div className="grid content-start gap-1.5">
+              <Label htmlFor="task-involved">Also involved</Label>
+              <PeopleField
+                id="task-involved"
+                value={assigneeIds}
+                onChange={setAssigneeIds}
+                exclude={ownerId}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-status">Status</Label>
+                <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
+                  <SelectTrigger id="task-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.icon}
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-visibility">Who can see it</Label>
+                <Select
+                  value={visibility}
+                  disabled={!isTopLevel}
+                  onValueChange={(v) => setVisibility(v as TaskVisibility)}
+                >
+                  <SelectTrigger id="task-visibility" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TaskVisibility.ORG}>Everyone in the club</SelectItem>
+                    <SelectItem value={TaskVisibility.PRIVATE}>Only its people</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!isTopLevel && (
+                  <p className="text-muted-foreground text-xs">
+                    As private as the epic or story it&apos;s in.
+                  </p>
+                )}
+              </div>
+            </div>
+            {status === TaskStatus.BLOCKED && (
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-blocked">Blocked on</Label>
+                <Input
+                  id="task-blocked"
+                  value={blockedReason}
+                  maxLength={MAX_BLOCKED_REASON}
+                  placeholder="What is it waiting for?"
+                  onChange={(e) => setBlockedReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+
+      {confirmElement}
+      <DialogFooter className="flex items-center justify-end">
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isPending || !title.trim()}>
+            {isPending ? "Creating…" : `Create ${noun}`}
+          </Button>
+        </div>
+      </DialogFooter>
+    </form>
+  );
+}

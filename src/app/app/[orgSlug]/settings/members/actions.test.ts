@@ -75,7 +75,6 @@ function makeDb() {
     taskAssignee: { deleteMany: vi.fn() },
     eventAttendee: { deleteMany: vi.fn() },
     task: { updateMany: vi.fn() },
-    project: { updateMany: vi.fn() },
     orgChartPosition: { updateMany: vi.fn() },
     organization: { findUnique: vi.fn(async () => ({ name: "Org One", slug: "org-one" })) },
     notification: { createMany: vi.fn() },
@@ -217,7 +216,7 @@ describe("setMemberTitle", () => {
 });
 
 describe("removeMember", () => {
-  it("unties the member in the same transaction (assignments, events, task ownership, project lead, chart), audits before the delete, then cleans notifications after commit", async () => {
+  it("unties the member in the same transaction (assignments, events, task ownership, chart), audits before the delete, then cleans notifications after commit", async () => {
     locked = [
       { userId: "owner", role: Role.OWNER },
       { userId: "target", role: Role.MEMBER },
@@ -237,10 +236,6 @@ describe("removeMember", () => {
         deletedAt: null,
       },
       data: { ownerId: null, ownerRelation: null, ownerFlagged: false, ownerAssignedById: null },
-    });
-    expect(fake.db.project.updateMany).toHaveBeenCalledWith({
-      where: { organizationId: "org_1", leadId: "target" },
-      data: { leadId: null },
     });
     expect(fake.db.orgChartPosition.updateMany).toHaveBeenCalledWith({
       where,
