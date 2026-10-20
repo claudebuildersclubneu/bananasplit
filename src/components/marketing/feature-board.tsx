@@ -1,11 +1,19 @@
-import { Search } from "lucide-react";
+import {
+  CalendarDays,
+  ChartGantt,
+  Columns3,
+  Gauge,
+  ListTree,
+  type LucideIcon,
+  Search,
+  Table2,
+} from "lucide-react";
 
 import { ArrowRight } from "@/components/brand/arrows";
 import { CoreMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
 import { type Avatar, AvatarStack } from "./avatar-stack";
-import { Screenshot } from "./screenshot";
 import { SectionIntro } from "./section-title";
 
 /** The apps a club board juggles today, crossed out on the way in. */
@@ -19,8 +27,47 @@ const REPLACED_APPS = [
   "Google Drive",
 ] as const;
 
-/** Tasks' three layouts, plus due dates on the club calendar. */
-const TASK_VIEWS = ["Board", "Week", "List", "Table", "Roadmap", "Dashboard"] as const;
+/** Tasks' six layouts, each with what it is for. */
+const TASK_VIEWS: readonly { name: string; icon: LucideIcon; body: string }[] = [
+  { name: "Board", icon: Columns3, body: "Drag work from To do to Done and spot what's stuck." },
+  {
+    name: "Week",
+    icon: CalendarDays,
+    body: "Every deadline on a seven-day strip, so nothing sneaks up.",
+  },
+  {
+    name: "List",
+    icon: ListTree,
+    body: "Epics, stories and tasks nested, with progress rolling up.",
+  },
+  { name: "Table", icon: Table2, body: "Filter, sort and bulk-edit fifty tasks in one go." },
+  { name: "Roadmap", icon: ChartGantt, body: "The semester's plan on one timeline, epic by epic." },
+  { name: "Dashboard", icon: Gauge, body: "What's overdue, who's overloaded, what got done." },
+];
+
+/** The Overview sample's Up next row: one block per meaning (act now, your answer, coming up). */
+const UP_NEXT = [
+  {
+    kicker: "Due today",
+    title: "Send the GBM agenda",
+    tone: "bg-brick text-cream",
+    meta: "text-cream/75",
+  },
+  {
+    kicker: "Your vote",
+    title: "Showcase T-shirt colour",
+    tone: "bg-banana text-ink",
+    meta: "text-honey-deep",
+    ticks: 9,
+  },
+  {
+    kicker: "Thu · 6:00 PM",
+    title: "Build night",
+    tone: "bg-ink text-cream",
+    meta: "text-dusk",
+    going: true,
+  },
+] as const;
 
 /** What the AI made from one typed line: an event and two assigned tasks. */
 const CHAT_RESULTS = [
@@ -37,6 +84,14 @@ const WEEK = [
   { day: "Thu", date: 15, event: "GBM", going: true },
   { day: "Fri", date: 16, event: "Social" },
 ] as const;
+
+/** Find a time answers, morning to evening by weekday: 0 (nobody free) to 3 (most of the club). */
+const HEAT = [
+  [1, 0, 2, 1, 0],
+  [2, 1, 2, 2, 1],
+  [1, 2, 3, 3, 2],
+] as const;
+const HEAT_TONES = ["bg-sand", "bg-butter", "bg-lemon", "bg-gold"] as const;
 
 /** Seats on the sample event, one tick per five. */
 const SEAT_TICKS = 20;
@@ -188,10 +243,10 @@ export function FeatureBoard() {
       <div className="flex flex-col gap-4 max-sm:-mx-6 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-6 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-6 max-sm:pb-1">
         <div className={ROW}>
           <OverviewTile />
-          <div className="flex flex-[1_1_300px] flex-col gap-4 max-sm:contents">
-            <TasksTile />
-            <CalendarTile />
-          </div>
+          <CalendarTile />
+        </div>
+        <div className={ROW}>
+          <TasksTile />
         </div>
         <div className={ROW}>
           <EventsTile />
@@ -210,80 +265,174 @@ export function FeatureBoard() {
   );
 }
 
-/** The wide tile; its screenshot bleeds off the bottom-right corner. */
+/** The wide tile; a sample home board bleeds off its bottom-right corner. */
 function OverviewTile() {
   return (
     <div
       className={cn(
         PAPER_TILE,
         SLIDE,
-        "flex flex-[2_1_520px] flex-col gap-4 overflow-hidden p-[clamp(24px,3vw,40px)]",
+        "flex flex-[2_1_560px] flex-col gap-4 overflow-hidden p-[clamp(24px,3vw,40px)]",
       )}
     >
       <TileTitle>Overview</TileTitle>
-      <h3 className="font-heading max-w-[520px] text-[clamp(28px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
-        Everyone opens to what matters to them.
+      <h3 className="font-heading max-w-[560px] text-[clamp(28px,3.4vw,46px)] leading-[1.05] tracking-[-0.025em] text-balance">
+        Open the app and know what to do next.
       </h3>
-      <p className="text-ink-muted max-w-[460px] text-[15px] leading-[1.55] text-pretty sm:text-[16px]">
-        Each member arranges a home board of widgets: what needs them next, tasks due this week, the
-        next meeting and pinned notes. Every Friday a weekly pulse sums up what got done.
+      <p className="text-ink-muted max-w-[500px] text-[15px] leading-[1.55] text-pretty sm:text-[16px]">
+        Up next puts what needs you first: the task due today, the vote waiting on you, the next
+        meeting. Every Friday the weekly pulse tells the whole club what got done.
       </p>
-      <Screenshot
-        src="/marketing/app-weekly-pulse.webp"
-        alt="The weekly pulse: tasks finished each week, events held and new members"
-        sizes="(min-width: 1240px) 760px, (min-width: 640px) 60vw, 80vw"
-        className="border-ink/10 mt-auto -mr-[clamp(24px,3vw,40px)] -mb-[clamp(24px,3vw,40px)] ml-[clamp(12px,3vw,40px)] aspect-[16/8] rounded-tl-[14px] border-t border-l max-sm:aspect-[4/3]"
-      />
+      <HomeBoardSample />
     </div>
   );
 }
 
-function TasksTile() {
+/** A member's home board, drawn small: greeting, three numbers and the Up next row. */
+function HomeBoardSample() {
   return (
     <div
-      className={cn(
-        SLIDE,
-        "bg-banana relative flex flex-[1_0_auto] flex-col gap-2 overflow-hidden rounded-[28px] p-6 sm:p-8",
-      )}
+      aria-hidden="true"
+      className="border-ink/10 bg-cream mt-auto -mr-[clamp(24px,3vw,40px)] -mb-[clamp(24px,3vw,40px)] ml-[clamp(0px,2vw,24px)] flex flex-col gap-4 rounded-tl-[22px] border-t border-l p-[clamp(16px,2vw,24px)]"
     >
-      <span
-        aria-hidden="true"
-        className="bg-glow-cream absolute -top-10 -right-10 size-[180px] rounded-full"
-      />
-      <TileTitle tone="banana" replaces="Trello">
-        Tasks
-      </TileTitle>
-      <div className="relative mt-auto flex items-end gap-3.5">
-        <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
-          {TASK_VIEWS.length}
+      <div className="flex flex-col gap-0.5">
+        <span className="font-heading text-[22px] leading-tight tracking-[-0.02em]">
+          Good morning, Maya
         </span>
-        <span className="pb-0.5 text-[19px] leading-[1.25] font-semibold">
-          ways to see
-          <br />
-          the same work
+        <span className="text-ink-soft text-[12px]">Tuesday, October 13 · Riverside Robotics</span>
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
+        <span className="flex items-baseline gap-1.5">
+          <b className="font-heading text-[22px]">6</b> open tasks
+          <span className="bg-butter text-honey-deep rounded-full px-2 py-0.5 font-semibold">
+            1 due today
+          </span>
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <b className="font-heading text-[22px]">0</b> overdue
+          <span className="bg-leaf text-leaf-ink rounded-full px-2 py-0.5 font-semibold">
+            All clear
+          </span>
+        </span>
+        <span className="flex items-baseline gap-1.5 max-sm:hidden">
+          <b className="font-heading text-[22px]">7:00</b> GBM tonight
         </span>
       </div>
-      <p className="text-bark relative mt-2.5 text-[15px] leading-[1.5]">
-        Break big work into epics and stories, tag it as you type, and nothing slips between
-        meetings.
-      </p>
-      <div className="relative mt-[18px] flex flex-wrap gap-1.5">
-        {TASK_VIEWS.map((view) => (
-          <span
-            key={view}
-            className="bg-paper/60 rounded-full px-[11px] py-[5px] text-[13px] font-semibold"
+      <div className="grid grid-cols-3 gap-2.5 max-sm:grid-cols-2">
+        {UP_NEXT.map((block, i) => (
+          <div
+            key={block.title}
+            className={cn(
+              "flex min-h-[132px] flex-col gap-1.5 rounded-[18px] p-3.5",
+              block.tone,
+              i === 2 && "max-sm:hidden",
+            )}
           >
-            {view}
-          </span>
+            <span className={cn("text-[11px] font-semibold", block.meta)}>{block.kicker}</span>
+            <span className="font-heading text-[17px] leading-[1.15] tracking-[-0.015em]">
+              {block.title}
+            </span>
+            {"ticks" in block && (
+              <span className="mt-auto flex gap-[3px]">
+                {Array.from({ length: 12 }, (_, t) => (
+                  <span
+                    key={t}
+                    className={cn(
+                      "h-2 flex-1 rounded-full",
+                      t < block.ticks ? "bg-ink" : "bg-ink/20",
+                    )}
+                  />
+                ))}
+              </span>
+            )}
+            {"going" in block && (
+              <span className="mt-auto flex items-center gap-1.5 text-[11px]">
+                <AvatarStack
+                  avatars={RSVPS.slice(0, 3)}
+                  itemClassName="border-ink size-5"
+                  overlap="-ml-1.5"
+                />
+                <span className={block.meta}>12 going</span>
+              </span>
+            )}
+            {!("ticks" in block) && !("going" in block) && (
+              <span className={cn("mt-auto text-[11px]", block.meta)}>Club operations</span>
+            )}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
+/** The banana tile across the board: six layouts of one task list, each with what it's for. */
+function TasksTile() {
+  return (
+    <div
+      className={cn(
+        SLIDE,
+        "bg-banana relative grid flex-[1_1_100%] grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-x-10 gap-y-7 overflow-hidden rounded-[28px] p-6 sm:p-10",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className="bg-glow-cream absolute -top-16 -left-16 size-[260px] rounded-full"
+      />
+      <div className="relative flex flex-col gap-4">
+        <TileTitle tone="banana" replaces="Trello">
+          Tasks
+        </TileTitle>
+        <div className="flex items-end gap-3.5">
+          <span className="font-heading text-[clamp(96px,9vw,128px)] leading-[0.78] tracking-[-0.05em]">
+            {TASK_VIEWS.length}
+          </span>
+          <span className="pb-0.5 text-[19px] leading-[1.25] font-semibold">
+            ways to see
+            <br />
+            the same work
+          </span>
+        </div>
+        <p className="text-bark max-w-[420px] text-[16px] leading-[1.55] text-pretty">
+          Assign it once and everyone sees it the way they work best. Break big goals into epics and
+          stories, type <b>#tag</b> to tag as you go, and close a task with one tap (and Undo). Less
+          chasing, fewer meetings about meetings.
+        </p>
+        <div className="mt-auto flex flex-wrap gap-1.5 max-sm:hidden">
+          {[
+            "Projects with leads",
+            "Epics and stories",
+            "#tags as you type",
+            "Due-date reminders",
+          ].map((perk) => (
+            <span
+              key={perk}
+              className="bg-paper/60 rounded-full px-[11px] py-[5px] text-[13px] font-semibold"
+            >
+              {perk}
+            </span>
+          ))}
+        </div>
+      </div>
+      <ul className="relative m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-2.5 p-0">
+        {TASK_VIEWS.map(({ name, icon: Icon, body }) => (
+          <li key={name} className="bg-paper/55 flex flex-col gap-1.5 rounded-[18px] p-4">
+            <span className="flex items-center gap-2 text-[15px] font-bold">
+              <span className="bg-paper grid size-7 place-items-center rounded-full">
+                <Icon className="size-4" aria-hidden="true" />
+              </span>
+              {name}
+            </span>
+            <span className="text-bark text-[13.5px] leading-[1.45]">{body}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function CalendarTile() {
   return (
-    <div className={cn(PAPER_TILE, SLIDE, "flex flex-[1_0_auto] flex-col gap-2.5 p-6 sm:p-8")}>
+    <div className={cn(PAPER_TILE, SLIDE, "flex flex-[1_1_320px] flex-col gap-2.5 p-6 sm:p-8")}>
       <TileTitle replaces="When2meet">Calendar</TileTitle>
       <div className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden="true">
         {WEEK.map((d) => (
@@ -309,11 +458,34 @@ function CalendarTile() {
           </div>
         ))}
       </div>
+      <div aria-hidden="true" className="bg-cream flex flex-col gap-2 rounded-[18px] p-3.5">
+        <div className="flex items-center justify-between gap-2 text-[12px]">
+          <span className="font-semibold">Find a time · 14 answered</span>
+          <span className="bg-banana text-ink rounded-full px-2 py-0.5 font-bold">
+            Best: Thu 6 PM
+          </span>
+        </div>
+        <div className="grid grid-cols-5 gap-1">
+          {HEAT.flatMap((row, r) =>
+            row.map((level, c) => (
+              <span
+                key={`${r}-${c}`}
+                className={cn(
+                  "h-4 rounded-[5px]",
+                  HEAT_TONES[level],
+                  r === 2 && c === 3 && "outline-ink outline-2 outline-offset-1",
+                )}
+              />
+            )),
+          )}
+        </div>
+      </div>
       <div className="font-heading mt-auto text-[clamp(28px,2.6vw,36px)] leading-[1.05] tracking-[-0.025em]">
-        Find a time, then put it on everyone&apos;s calendar.
+        Find a time in one link. Book it for everyone.
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55] text-pretty">
-        Availability polls pick the time, and every meeting syncs both ways with Google Calendar.
+        Send a poll, watch the best time light up, and book it. Meetings sync both ways with Google
+        Calendar, and every member gets their own feed.
       </p>
     </div>
   );
@@ -324,13 +496,14 @@ function EventsTile() {
   return (
     <div className={cn(PAPER_TILE, SPLIT_TILE, SLIDE, "flex-[1.6_1_460px]")}>
       <div className="flex flex-col gap-3.5">
-        <TileTitle replaces="Luma">RSVPs and events</TileTitle>
+        <TileTitle>RSVPs and events</TileTitle>
         <h3 className="font-heading text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.025em] text-balance">
-          You don&apos;t need Luma anymore.
+          RSVPs, built right in.
         </h3>
         <p className="text-ink-muted text-[16px] leading-[1.55] text-pretty">
-          Public event pages with RSVPs, waitlists, reminders and QR check-in. Every guest lands in
-          your member list, so you can see who keeps coming back.
+          Publish an event page in a minute. Sign-ups fill to capacity, the waitlist moves up on its
+          own, reminders go out for you, and QR check-in at the door takes seconds. Every guest
+          joins your member list, so you see who keeps coming back.
         </p>
       </div>
       <div className="border-ink/8 bg-cream flex flex-col gap-3.5 rounded-[24px] border p-[18px] max-sm:gap-3 max-sm:p-3.5">
@@ -417,8 +590,8 @@ function AiTile() {
         </div>
       </div>
       <p className="text-dusk relative mt-auto text-[15px] leading-[1.55] text-pretty">
-        Create tasks and calendar events just by typing. AI also sorts your task lists, tidies
-        databases and lays out the org chart. Connect the model you prefer with your own API key.
+        Say what needs doing and it becomes events and assigned tasks. AI also turns a screenshot
+        into calendar events, tidies databases and drafts the org chart, with the model you choose.
       </p>
     </div>
   );
@@ -515,7 +688,8 @@ function DatabasesTile() {
         ))}
       </div>
       <p className="text-ink-muted text-[15px] leading-[1.55]">
-        Connect a source once and every member sees the same live list.
+        Connect a source once and every member sees the same live list, with reports that build
+        themselves.
       </p>
     </div>
   );
