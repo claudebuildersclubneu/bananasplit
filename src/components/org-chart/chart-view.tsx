@@ -24,6 +24,7 @@ const ChartCanvas = dynamic(() => import("./chart-canvas"), { ssr: false });
 export function ChartView({
   orgId,
   orgSlug,
+  orgName,
   nodes,
   mode,
   listFallback,
@@ -32,6 +33,8 @@ export function ChartView({
 }: {
   orgId: string;
   orgSlug: string;
+  /** Printed on the exported chart. */
+  orgName?: string;
   nodes: ChartNodeDTO[];
   mode: "chart" | "list";
   /** The server-rendered list (list view, and the canvas fallback). */
@@ -114,6 +117,8 @@ export function ChartView({
               rightInset={isDesktop && selected ? 448 : 0}
               onReady={() => setReady(true)}
               showMiniMap={nodes.length > 12}
+              exportName={`${orgSlug}-org-chart`}
+              exportTitle={orgName ? `${orgName} org chart` : "Org chart"}
             />
           </div>
         </div>

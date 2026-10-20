@@ -324,7 +324,6 @@ export function OutlineEditor({
             aria-describedby="outline-hint"
             aria-autocomplete="list"
             aria-controls={mention ? "outline-mentions" : undefined}
-            aria-expanded={Boolean(mention && matches.length)}
             placeholder={PLACEHOLDER}
             onChange={(e) => {
               apply(e.target.value);
