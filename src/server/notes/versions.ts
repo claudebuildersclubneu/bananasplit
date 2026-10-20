@@ -1,5 +1,5 @@
 import { historyCutoff, snapshotDue } from "@/lib/notes/history";
-import { withSystemOrgTx, type MemberContext, type TxClient } from "@/server/db/context";
+import type { MemberContext, TxClient } from "@/server/db/context";
 
 /**
  * Version history (NoteVersion, docs/features/notes-sharing.md "History").
@@ -44,7 +44,7 @@ export async function lastVersionAt(
  * transaction commits. An empty body is not worth keeping.
  */
 export async function snapshotBeforeSave(ctx: MemberContext, before: SnapshotSource) {
-  if (!before.contentText.trim()) return;
+  if (!before.contentText?.trim()) return;
   const last = await lastVersionAt(ctx.db, ctx.organizationId, before.id);
   if (!snapshotDue(last)) return;
   const { organizationId, userId } = ctx;
@@ -57,10 +57,13 @@ export async function snapshotBeforeSave(ctx: MemberContext, before: SnapshotSou
     createdAt: before.updatedAt,
   };
   ctx.afterCommit(() =>
-    withSystemOrgTx(organizationId, { userId }, async ({ db }) => {
-      await db.noteVersion.create({ data: snapshot });
-      await pruneSnapshots(db, organizationId, before.id);
-    }),
+    // Loaded here, not at the top: the save paths (and their tests) stay light.
+    import("@/server/db/context").then(({ withSystemOrgTx }) =>
+      withSystemOrgTx(organizationId, { userId }, async ({ db }) => {
+        await db.noteVersion.create({ data: snapshot });
+        await pruneSnapshots(db, organizationId, before.id);
+      }),
+    ),
   );
 }
 

@@ -81,7 +81,9 @@ describe("nonce policy (0A Fix 13)", () => {
     const connect = (vars: Record<string, string>) =>
       directives(buildNonceCsp("n", { env: env(vars) })).get("connect-src");
     expect(connect({ ...collab, COLLAB_ENABLED: "true" })).toBe("'self' wss://collab.example.org");
-    expect(connect(collab)).toBe("'self'");
+    // On whenever a server is configured; COLLAB_ENABLED="false" switches it off.
+    expect(connect(collab)).toBe("'self' wss://collab.example.org");
+    expect(connect({ ...collab, COLLAB_ENABLED: "false" })).toBe("'self'");
     // Enabled but unusable (no secret): collaboration stays off, and so does the origin.
     expect(connect({ ...collab, COLLAB_ENABLED: "true", COLLAB_SECRET: "" })).toBe("'self'");
   });

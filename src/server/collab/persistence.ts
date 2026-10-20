@@ -8,6 +8,7 @@ import {
 import { spaceRefusal } from "@/lib/billing/space";
 import { canEditNote, isNoteVisibleTo, noteAccessSelect, toNoteAccess } from "@/lib/notes/access";
 import type { MemberContext } from "@/server/db/context";
+import { snapshotBeforeSave } from "@/server/notes/versions";
 
 /**
  * Loading and saving a note's live document for the collaboration bridge
@@ -70,12 +71,16 @@ export async function storeNoteState(
   });
   if (space && spaceRefusal(space, { feature: "files" })) return { ok: false, reason: "forbidden" };
 
+  let snapshotted = false;
   for (let attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
     const row = await ctx.db.note.findFirst({
       where: { id: noteId, organizationId: ctx.organizationId, deletedAt: null },
       select: {
         ...noteAccessSelect(ctx.userId),
         contentJson: true,
+        contentText: true,
+        updatedAt: true,
+        updatedById: true,
         yjsState: true,
         version: true,
       },
@@ -100,6 +105,19 @@ export async function storeNoteState(
     // write, no version bump. The row's state stays an ancestor of the live
     // one, which is all a later merge needs.
     if (sameContent(content.json, note.contentJson)) return { ok: true, version: null, missing };
+
+    // Version history, as on the autosave path: the body as it was, if no
+    // version was taken lately (written after this save commits).
+    if (!snapshotted) {
+      snapshotted = true;
+      await snapshotBeforeSave(ctx, {
+        id: noteId,
+        contentJson: note.contentJson,
+        contentText: note.contentText,
+        updatedAt: note.updatedAt,
+        updatedById: note.updatedById,
+      });
+    }
 
     // The version guards the read-merge-write: if an autosave or another
     // live save landed in between, read again and merge that too.

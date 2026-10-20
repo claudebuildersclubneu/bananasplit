@@ -1,10 +1,12 @@
 /**
  * Live collaboration settings (docs/features/collaboration.md).
  *
- * OFF unless all three are set: COLLAB_ENABLED="true", COLLAB_SERVER_URL (a
+ * ON whenever a collaboration server is configured: COLLAB_SERVER_URL (a
  * wss:// URL, or ws:// on localhost) and COLLAB_SECRET (at least 32
- * characters, shared with the collaboration server). A half-configured
- * deployment keeps today's autosave editor instead of failing, and says why
+ * characters, shared with the collaboration server). COLLAB_ENABLED="false"
+ * turns it off anyway (an outage switch); COLLAB_ENABLED="true" without a
+ * usable URL and secret is a mistake worth a log line. A half-configured
+ * deployment keeps the autosave editor instead of failing, and says why
  * once in the server log. Read at request time by the note page, the note
  * actions, the bridge routes and the CSP; never inlined into the client
  * bundle (the browser receives the URL together with its token).
@@ -27,9 +29,15 @@ export const COLLAB_SECRET_MIN_LENGTH = 32;
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-/** Why an enabled configuration is unusable (empty when it is fine or off). */
+/** Whether collaboration is asked for: a server URL is set (or the flag says so), and not switched off. */
+function wanted(env: Env): boolean {
+  if (env.COLLAB_ENABLED === "false") return false;
+  return env.COLLAB_ENABLED === "true" || Boolean(env.COLLAB_SERVER_URL);
+}
+
+/** Why a wanted configuration is unusable (empty when it is fine or off). */
 export function collabConfigProblems(env: Env = process.env): string[] {
-  if (env.COLLAB_ENABLED !== "true") return [];
+  if (!wanted(env)) return [];
   const problems: string[] = [];
   if ((env.COLLAB_SECRET ?? "").length < COLLAB_SECRET_MIN_LENGTH) {
     problems.push(`COLLAB_SECRET must be at least ${COLLAB_SECRET_MIN_LENGTH} characters`);
@@ -52,12 +60,12 @@ let warned = false;
 
 /** The configuration when live collaboration is on and usable, else null. */
 export function collabConfig(env: Env = process.env): CollabConfig | null {
-  if (env.COLLAB_ENABLED !== "true") return null;
+  if (!wanted(env)) return null;
   const problems = collabConfigProblems(env);
   if (problems.length > 0) {
     if (!warned) {
       warned = true;
-      console.warn(`[collab] COLLAB_ENABLED is set but ignored: ${problems.join("; ")}`);
+      console.warn(`[collab] live collaboration is configured but off: ${problems.join("; ")}`);
     }
     return null;
   }

@@ -13,14 +13,25 @@ describe("collaboration configuration", () => {
     COLLAB_SECRET: SECRET,
   };
 
-  it("is off by default and when the flag is anything but true", () => {
+  it("is off without a collaboration server, and on whenever one is configured", () => {
     expect(collabConfig({})).toBeNull();
-    expect(collabConfig({ ...on, COLLAB_ENABLED: "" })).toBeNull();
-    expect(collabConfig({ ...on, COLLAB_ENABLED: "1" })).toBeNull();
     expect(collabConfigProblems({})).toEqual([]);
+    // No flag needed: a server URL and secret turn it on.
+    const { COLLAB_ENABLED: _flag, ...configured } = on;
+    expect(collabConfig(configured)?.url).toBe("wss://collab.example.org");
+    expect(collabConfig({ ...on, COLLAB_ENABLED: "" })?.url).toBe("wss://collab.example.org");
   });
 
-  it("stays off, and says why, when enabled but incomplete", () => {
+  it("stays off when switched off, whatever else is set", () => {
+    expect(collabConfig({ ...on, COLLAB_ENABLED: "false" })).toBeNull();
+    expect(collabConfigProblems({ ...on, COLLAB_ENABLED: "false" })).toEqual([]);
+  });
+
+  it("stays off, and says why, when wanted but incomplete", () => {
+    expect(collabConfigProblems({ COLLAB_ENABLED: "true" })).not.toEqual([]);
+    expect(collabConfigProblems({ COLLAB_SERVER_URL: "wss://collab.example.org" })[0]).toMatch(
+      /COLLAB_SECRET/,
+    );
     expect(collabConfig({ ...on, COLLAB_SECRET: "short" })).toBeNull();
     expect(collabConfig({ ...on, COLLAB_SERVER_URL: "" })).toBeNull();
     expect(collabConfigProblems({ ...on, COLLAB_SECRET: "short" })[0]).toMatch(/COLLAB_SECRET/);
