@@ -15,7 +15,6 @@ export interface TaskFacts {
   /** "Fri, Oct 3", or null for no due date. */
   dueLabel: string | null;
   priority?: string | null;
-  projectName?: string | null;
   parentTitle?: string | null;
   status?: string | null;
   blockedReason?: string | null;
@@ -26,7 +25,6 @@ function factRows(facts: TaskFacts): [string, string][] {
   if (facts.parentTitle) rows.push(["Part of", facts.parentTitle]);
   rows.push(["Due", facts.dueLabel ?? "No due date"]);
   if (facts.priority) rows.push(["Priority", facts.priority]);
-  if (facts.projectName) rows.push(["Project", facts.projectName]);
   if (facts.status) rows.push(["Status", facts.status]);
   if (facts.blockedReason) rows.push(["Blocked on", facts.blockedReason]);
   return rows;

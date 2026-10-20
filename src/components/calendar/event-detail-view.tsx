@@ -165,7 +165,7 @@ export function EventDetailView({
             <>
               <Button variant="outline" onClick={() => setEditOpen(true)}>
                 <Pencil aria-hidden className="size-4" />
-                Edit
+                Edit event
               </Button>
               <Button
                 variant="destructive"

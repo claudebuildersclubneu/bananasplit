@@ -64,7 +64,9 @@ In production an admin picks it on the Theme page.
 ## How it works (developers)
 
 - **Tokens.** `src/lib/theme/derive.ts` maps the five roles to the full token set:
-  the shadcn tokens in `globals.css` plus `--primary-hover`, `--brand-accent`
+  the shadcn tokens in `globals.css` plus `--primary-hover`, `--create` (the
+  create button: the accent, or the white surface where the accent is the
+  ink itself, as Moonstone's is in light), `--brand-accent`
   (`-foreground`), `--success` (`-foreground`), `--warning` (`-foreground`),
   `--destructive-foreground` and `--chart-1..5`. Tailwind exposes them as
   `bg-primary-hover`, `text-success`, `bg-warning/10`, `bg-brand-accent`,

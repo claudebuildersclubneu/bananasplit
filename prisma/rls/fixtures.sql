@@ -44,13 +44,10 @@ INSERT INTO "Membership" ("id", "userId", "organizationId", "role") VALUES
   ('m_bothA',   'u_bothAB',  'org_A', 'MEMBER'),
   ('m_bothB',   'u_bothAB',  'org_B', 'MEMBER');
 
-INSERT INTO "Project" ("id", "organizationId", "name") VALUES
-  ('p_A', 'org_A', 'Project A'), ('p_B', 'org_B', 'Project B');
-
-INSERT INTO "Task" ("id", "organizationId", "projectId", "title", "rank", "createdById", "ownerId", "updatedAt") VALUES
-  ('t_A',  'org_A', 'p_A', 'Task A', 'a0', 'u_memberA', 'u_memberA', CURRENT_TIMESTAMP),
-  ('t_A2', 'org_A', NULL,  'Task A2 by former member', 'a1', 'u_formerA', NULL, CURRENT_TIMESTAMP),
-  ('t_B',  'org_B', 'p_B', 'Task B', 'a0', 'u_memberB', 'u_memberB', CURRENT_TIMESTAMP);
+INSERT INTO "Task" ("id", "organizationId", "title", "rank", "createdById", "ownerId", "updatedAt") VALUES
+  ('t_A',  'org_A', 'Task A', 'a0', 'u_memberA', 'u_memberA', CURRENT_TIMESTAMP),
+  ('t_A2', 'org_A', 'Task A2 by former member', 'a1', 'u_formerA', NULL, CURRENT_TIMESTAMP),
+  ('t_B',  'org_B', 'Task B', 'a0', 'u_memberB', 'u_memberB', CURRENT_TIMESTAMP);
 
 INSERT INTO "Label" ("id", "organizationId", "name", "color") VALUES
   ('l_A', 'org_A', 'Label A', '#ef4444'), ('l_B', 'org_B', 'Label B', '#3b82f6');

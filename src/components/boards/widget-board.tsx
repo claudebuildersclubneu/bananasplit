@@ -135,6 +135,7 @@ export function WidgetBoard({
   notice,
   headerActions,
   belowIntro,
+  footer,
 }: {
   types: readonly WidgetMeta[];
   initialLayout: BoardWidget[];
@@ -155,6 +156,8 @@ export function WidgetBoard({
   headerActions?: Readonly<Record<string, ReactNode>>;
   /** A full-width line under the title row (the Overview's stat strip). */
   belowIntro?: ReactNode;
+  /** Below the widgets (the Overview's setup prompt, so Up next stays first). */
+  footer?: ReactNode;
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState(initialLayout);
@@ -509,6 +512,7 @@ export function WidgetBoard({
           )}
         </DialogContent>
       </Dialog>
+      {footer}
     </div>
   );
 }

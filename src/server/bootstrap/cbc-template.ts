@@ -441,28 +441,35 @@ export async function applyCbcTemplate(
       ).id;
   }
 
-  // The Design Requests project (an intake queue until Requests was
-  // retired; a plain project now, led by the VP Growth).
+  // The Design Requests epic (an intake queue until Requests was retired,
+  // then a project; projects became epics), owned by the VP Growth.
   const leadId = members[CBC_INTAKE_PROJECT.leadPerson] ?? null;
-  const existingProject = await db.project.findFirst({
-    where: { organizationId, name: CBC_INTAKE_PROJECT.name },
+  const existingEpic = await db.task.findFirst({
+    where: { organizationId, type: TaskType.EPIC, title: CBC_INTAKE_PROJECT.name, deletedAt: null },
     select: { id: true },
   });
-  const projectData = {
+  const epicData = {
     description: CBC_INTAKE_PROJECT.description,
-    leadId,
+    ownerId: leadId,
   };
-  const intakeProjectId = existingProject
+  const intakeProjectId = existingEpic
     ? (
-        await db.project.update({
-          where: { id: existingProject.id },
-          data: projectData,
+        await db.task.update({
+          where: { id: existingEpic.id },
+          data: epicData,
           select: { id: true },
         })
       ).id
     : (
-        await db.project.create({
-          data: { organizationId, name: CBC_INTAKE_PROJECT.name, ...projectData },
+        await db.task.create({
+          data: {
+            organizationId,
+            type: TaskType.EPIC,
+            title: CBC_INTAKE_PROJECT.name,
+            rank: "a0",
+            createdById: leadId ?? actorId,
+            ...epicData,
+          },
           select: { id: true },
         })
       ).id;
@@ -1968,7 +1975,6 @@ async function seedCbcTasks(db: Db, ctx: TaskSeedContext): Promise<number> {
     const created = await db.task.create({
       data: {
         organizationId,
-        projectId: t.intake ? ctx.intakeProjectId : null,
         type: parents.has(t.ref) ? TaskType.STORY : TaskType.TASK,
         title: t.title,
         description: t.description ?? null,
@@ -1979,7 +1985,8 @@ async function seedCbcTasks(db: Db, ctx: TaskSeedContext): Promise<number> {
         priority: t.priority,
         dueDate,
         rank,
-        parentTaskId: t.parent ? ids.get(t.parent)! : null,
+        // Intake work sits in the Design Requests epic.
+        parentTaskId: t.parent ? ids.get(t.parent)! : t.intake ? ctx.intakeProjectId : null,
         createdById: members[t.createdBy],
         ownerId: members[t.owner],
         ownerRelation: t.relation ?? (t.owner === t.createdBy ? "SELF" : "OUTSIDE_CHART"),

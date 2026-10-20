@@ -42,7 +42,6 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { model: "OrgIntegration", key: ID, omit: ["secretFingerprint"] },
   { model: "OrgAuditLog", key: ID },
   { model: "OrgExport", key: ID, omit: ["blobKey", "cursor"] },
-  { model: "Project", key: ID },
   { model: "Label", key: ID },
   { model: "Task", key: ID },
   { model: "TaskAssignee", key: ["taskId", "userId"] },

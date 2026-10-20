@@ -94,7 +94,7 @@ export function DashboardView({
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        The tasks in view, counted (top-level, as on the board). Click a number to see them.
+        The tasks in view, counted (stories and tasks, as on the board). Click a number to see them.
       </p>
 
       <div className="grid gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
@@ -163,16 +163,16 @@ export function DashboardView({
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">
-          <section aria-labelledby="dash-projects" className="space-y-2">
-            <SectionTitle id="dash-projects">Projects</SectionTitle>
-            {data.projects.length === 0 ? (
+          <section aria-labelledby="dash-epics" className="space-y-2">
+            <SectionTitle id="dash-epics">Epics</SectionTitle>
+            {data.epics.length === 0 ? (
               <Empty>No tasks yet.</Empty>
             ) : (
               <div className={TASK_PANEL}>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="ps-4">Project</TableHead>
+                      <TableHead className="ps-4">Epic</TableHead>
                       <TableHead className="w-40">Progress</TableHead>
                       <CountHead status="NOT_STARTED" />
                       <CountHead status="IN_PROGRESS" />
@@ -182,11 +182,11 @@ export function DashboardView({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.projects.map((p) => {
-                      const q = p.projectId ? { projectId: p.projectId } : null;
+                    {data.epics.map((p) => {
+                      const q = p.epicId ? { epicId: p.epicId } : null;
                       const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
                       return (
-                        <TableRow key={p.projectId ?? "none"}>
+                        <TableRow key={p.epicId ?? "none"}>
                           <TableCell className="max-w-56 ps-4 font-medium">
                             {q ? (
                               <Link
@@ -198,10 +198,10 @@ export function DashboardView({
                             ) : (
                               <span className="text-muted-foreground">{p.name}</span>
                             )}
-                            {p.archived && (
+                            {p.finished && (
                               <span className="text-muted-foreground text-xs font-normal">
                                 {" "}
-                                (archived)
+                                (done)
                               </span>
                             )}
                           </TableCell>
@@ -336,7 +336,9 @@ export function DashboardView({
                           <span>No owner</span>
                         )}
                         <DueLabel dueDate={t.dueDate} todayKey={span.todayKey} />
-                        {t.project && <span className="truncate">{t.project.name}</span>}
+                        {t.parentTask?.type === "EPIC" && (
+                          <span className="truncate">{t.parentTask.title}</span>
+                        )}
                       </span>
                     </button>
                   </li>

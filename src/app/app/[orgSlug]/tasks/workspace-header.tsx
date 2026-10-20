@@ -8,13 +8,12 @@ import {
   CircleCheck,
   CircleDot,
   ClipboardPaste,
-  FolderKanban,
   Layers,
   Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
@@ -72,10 +71,15 @@ export function WorkspaceHeader({
   const searchParams = useSearchParams();
   const [importing, setImporting] = useState(false);
   const inDestination = isDestination(ws.query.view);
-  const projectId = ws.query.projectId ?? null;
+  // Filtered to one epic: new work goes into it.
+  const epicId = ws.query.epicId ?? null;
+  const inEpic = useMemo(
+    () => (epicId ? { parentTaskId: epicId, parentType: "EPIC" as const } : undefined),
+    [epicId],
+  );
 
-  // The single keys (src/lib/shortcuts.ts, listed on the ⌘/ sheet): 1-4
-  // switch layout (4 is the dashboard), c starts a task, m / t / e pick
+  // The single keys (src/lib/shortcuts.ts, listed on the ⌘/ sheet): 1-6
+  // switch layout (1 is the dashboard, 2 the board), c starts a task, m / t / e pick
   // whose work, x clears the filters, u opens the weekly update. Typing in a
   // field never triggers them, nor does a key an open menu uses.
   useEffect(() => {
@@ -91,7 +95,7 @@ export function WorkspaceHeader({
       if (!ws.simple && index >= 1 && index <= TASK_LAYOUTS.length) {
         return run(() => ws.setView(TASK_LAYOUTS[index - 1]!.value as TaskLayout));
       }
-      if (key === TASK_KEYS.newTask) return run(() => newTask({ projectId }));
+      if (key === TASK_KEYS.newTask) return run(() => newTask(inEpic));
       if (teamwork && key === TASK_KEYS.updates) return run(() => ws.setView("updates"));
       // The rest narrow a layout; a destination has nothing to narrow.
       if (inDestination) return;
@@ -103,18 +107,18 @@ export function WorkspaceHeader({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ws, newTask, projectId, teamwork, inDestination, router, org.slug]);
+  }, [ws, newTask, inEpic, teamwork, inDestination, router, org.slug]);
 
   // `c` pressed elsewhere in the app lands here with ?new=1: start the task,
   // then drop the param so a reload or Back doesn't start another.
   const startNew = searchParams.get(NEW_TASK_PARAM) === "1";
   useEffect(() => {
     if (!startNew) return;
-    newTask({ projectId });
+    newTask(inEpic);
     const params = new URLSearchParams(searchParams.toString());
     params.delete(NEW_TASK_PARAM);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [startNew, newTask, projectId, searchParams, router, pathname]);
+  }, [startNew, newTask, inEpic, searchParams, router, pathname]);
 
   return (
     <div className="mb-[30px] space-y-[30px]">
@@ -129,20 +133,16 @@ export function WorkspaceHeader({
             </Button>
           ) : (
             <Button variant="outline" asChild>
-              <Link href={`/app/${org.slug}/tasks/projects`}>
-                <FolderKanban className="size-4" aria-hidden="true" />
-                Projects
+              <Link href={`/app/${org.slug}/tasks/epics`}>
+                <Layers className="size-4" aria-hidden="true" />
+                Epics
               </Link>
             </Button>
           )}
 
           {/* New task (the screen's one create), with more ways in its menu. */}
           {ws.simple ? (
-            <Button
-              variant="create"
-              title="New task (c)"
-              onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
-            >
+            <Button variant="create" title="New task (c)" onClick={() => newTask(inEpic)}>
               <Plus className="size-4" aria-hidden="true" />
               New task
             </Button>
@@ -152,7 +152,7 @@ export function WorkspaceHeader({
                 variant="create"
                 className="rounded-r-none pe-3"
                 title="New task (c)"
-                onClick={() => newTask({ projectId: ws.query.projectId ?? null })}
+                onClick={() => newTask(inEpic)}
               >
                 <Plus className="size-4" aria-hidden="true" />
                 New task
@@ -161,24 +161,18 @@ export function WorkspaceHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="create"
-                    className="border-brand-accent-foreground/20 rounded-l-none border-l ps-2.5 pe-3"
+                    className="border-create-foreground/15 rounded-l-none border-l ps-2.5 pe-3"
                     aria-label="More ways to add tasks"
                   >
                     <ChevronDown className="size-4" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuItem
-                    onSelect={() => newTask({ projectId: ws.query.projectId ?? null })}
-                  >
+                  <DropdownMenuItem onSelect={() => newTask(inEpic)}>
                     <Plus className="size-4" aria-hidden="true" />
                     New task
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      newTask({ type: "EPIC", projectId: ws.query.projectId ?? null })
-                    }
-                  >
+                  <DropdownMenuItem onSelect={() => newTask({ type: "EPIC" })}>
                     <Layers className="size-4" aria-hidden="true" />
                     New epic
                   </DropdownMenuItem>

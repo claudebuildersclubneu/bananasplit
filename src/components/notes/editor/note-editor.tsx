@@ -26,7 +26,7 @@ import {
 import { dismissToast, toast } from "@/components/ui/toaster";
 import { NOTE_FIELD, type CollabUser } from "@/lib/collab/protocol";
 import { uploadNoteFile } from "@/lib/files/upload";
-import { paperPx } from "@/lib/notes/paper";
+import { bandFooter, bandHeader, paperPx } from "@/lib/notes/paper";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { cn } from "@/lib/utils";
 
@@ -68,9 +68,11 @@ export interface NoteEditorPlace {
   members: MentionMember[];
   pages: MentionPage[];
   viewer: { id: string; name: string | null };
-  /** Document mode's header and footer. */
+  /** Document mode's header and footer: the title and club, unless the note has its own text. */
   title: string;
   orgName: string;
+  headerText?: string | null;
+  footerText?: string | null;
 }
 
 const DEFAULT_PLACE: NoteEditorPlace = {
@@ -117,6 +119,8 @@ export function NoteEditor({
 }) {
   const isDocument = layout === "DOCUMENT";
   const paper = paperPx(paperSize);
+  const bandTop = bandHeader(place);
+  const bandBottom = bandFooter(place);
   // Narrow screens get the sheet without page breaks (it no longer has its real width).
   const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
   const paginate = isDocument && !narrow;
@@ -161,8 +165,8 @@ export function NoteEditor({
         contentHeight: paper.contentHeight,
         margin: paper.margin,
         gap: 28,
-        header: [place.title.trim() || "Untitled note", place.orgName].filter(Boolean).join(" · "),
-        footer: place.title.trim() || "Untitled note",
+        header: bandTop,
+        footer: bandBottom,
       }),
       ...(collaboration
         ? [
@@ -176,10 +180,19 @@ export function NoteEditor({
           ]
         : []),
     ],
-    // The schema and plugins are fixed for an editor; a new layout or paper
-    // rebuilds it (the document stays: same content or the same Y.Doc).
+    // The schema and plugins are fixed for an editor; a new layout, paper or
+    // header and footer text rebuilds it (the document stays: same content or
+    // the same Y.Doc).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [collaboration?.doc, collaboration?.provider, isDocument, paginate, paper.contentHeight],
+    [
+      collaboration?.doc,
+      collaboration?.provider,
+      isDocument,
+      paginate,
+      paper.contentHeight,
+      place.headerText,
+      place.footerText,
+    ],
   );
 
   const editor = useEditor(
@@ -411,10 +424,10 @@ export function NoteEditor({
               }
             >
               <div className="note-page-band note-page-header note-first-header" aria-hidden="true">
-                {[place.title.trim() || "Untitled note", place.orgName].filter(Boolean).join(" · ")}
+                {bandTop}
               </div>
               {body}
-              <PageCount editor={editor} footer={place.title.trim() || "Untitled note"} />
+              <PageCount editor={editor} footer={bandBottom} />
             </div>
           </div>
         ) : (

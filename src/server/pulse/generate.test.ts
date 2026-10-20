@@ -10,7 +10,7 @@ import { rangeInstants, shapePulseData, type PulseRaw } from "./generate";
 /**
  * Pulse generation on a fixed fixture week: a Friday club in New York, the
  * week of Sat Oct 3 to Fri Oct 9, 2026. The reads are mocked out (shape is
- * pure), so this pins the rules: counts per project, epics finished, polls,
+ * pure), so this pins the rules: counts per epic, epics finished, polls,
  * next week's window, who gets it, and that money stays with finance roles.
  */
 
@@ -20,22 +20,23 @@ const at = (iso: string) => new Date(iso);
 const raw: PulseRaw = {
   range,
   timeZone: "America/New_York",
-  projects: [
+  epics: [
     { id: "p_show", name: "Fall Showcase", color: "#e9b41c" },
     { id: "p_rec", name: "Recruitment", color: null },
     { id: "p_idle", name: "Archive cleanup", color: null },
   ],
   done: [
-    { id: "t1", type: "TASK", title: "Book the ballroom", projectId: "p_show" },
-    { id: "t2", type: "TASK", title: "Approve the quote", projectId: "p_show" },
-    { id: "e1", type: "EPIC", title: "Venue and logistics", projectId: "p_show" },
-    { id: "t3", type: "STORY", title: "Tabling plan", projectId: "p_rec" },
-    { id: "t4", type: "TASK", title: "Order stickers", projectId: null },
+    { id: "t1", type: "TASK", title: "Book the ballroom", epicId: "p_show" },
+    { id: "t2", type: "TASK", title: "Approve the quote", epicId: "p_show" },
+    { id: "t5", type: "STORY", title: "Venue and logistics", epicId: "p_show" },
+    { id: "e1", type: "EPIC", title: "Spring kickoff", epicId: "e1" },
+    { id: "t3", type: "STORY", title: "Tabling plan", epicId: "p_rec" },
+    { id: "t4", type: "TASK", title: "Order stickers", epicId: null },
   ],
-  openByProject: [
-    { projectId: "p_show", open: 4 },
-    { projectId: "p_idle", open: 0 },
-    { projectId: null, open: 2 },
+  openByEpic: [
+    { epicId: "p_show", open: 4 },
+    { epicId: "p_idle", open: 0 },
+    { epicId: null, open: 2 },
   ],
   events: [
     { id: "ev2", title: "Officer meeting", startsAt: at("2026-10-06T23:00:00Z"), checkIns: 8 },
@@ -75,21 +76,19 @@ const raw: PulseRaw = {
 describe("shapePulseData", () => {
   const data = shapePulseData(raw);
 
-  it("counts everything finished, per project, with a line for loose tasks", () => {
+  it("counts everything finished, per epic, with a line for work outside one", () => {
     expect(data.v).toBe(1);
     expect(data.range).toEqual(range);
-    expect(data.doneCount).toBe(5);
+    expect(data.doneCount).toBe(6);
     expect(data.byProject).toEqual([
       { projectId: "p_show", name: "Fall Showcase", color: "#e9b41c", done: 3, open: 4 },
       { projectId: "p_rec", name: "Recruitment", color: null, done: 1, open: 0 },
-      { projectId: null, name: "No project", color: null, done: 1, open: 2 },
+      { projectId: null, name: "Not in an epic", color: null, done: 1, open: 2 },
     ]);
   });
 
-  it("names the epics that finished, with their project", () => {
-    expect(data.epicsFinished).toEqual([
-      { id: "e1", title: "Venue and logistics", project: "Fall Showcase" },
-    ]);
+  it("names the epics that finished", () => {
+    expect(data.epicsFinished).toEqual([{ id: "e1", title: "Spring kickoff", project: null }]);
   });
 
   it("lists events in order with check-ins, and new members and sign-ups by join time", () => {
@@ -130,11 +129,11 @@ describe("shapePulseData", () => {
   });
 
   it("reads as the guide's issue", () => {
-    expect(pulseHeadline(data)).toBe("5 things done · 32 at the General meeting · 3 new members");
+    expect(pulseHeadline(data)).toBe("6 things done · 32 at the General meeting · 3 new members");
     const rows = pulseRows(data).map((r) => r.title);
     expect(rows).toEqual([
-      "Venue and logistics is done",
-      "5 tasks finished",
+      "Spring kickoff is done",
+      "6 tasks finished",
       "32 came to the General meeting",
       "8 came to the Officer meeting",
       "T-shirt color: Midnight blue won",

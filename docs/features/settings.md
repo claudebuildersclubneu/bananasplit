@@ -34,7 +34,7 @@ Notifications and Calendar feed.
 
 The Claude Builders Club can then run **Danger zone > Bootstrap CBC workspace** (owners):
 it adds the task defaults (one owner and a due date per task), the "Needs President" and
-"Design" labels, the Design Requests project (led by the VP Growth), the published org chart,
+"Design" labels, the Design Requests epic (owned by the VP Growth), the published org chart,
 member titles and the CBC theme. You confirm which member is which person first (pre-filled by name). It adds no
 members, and running it again publishes a fresh chart version.
 
@@ -53,7 +53,7 @@ row (they become owner, you become admin), then may **Leave**.
 
 Removing a member (or a member leaving) takes away their task assignments and event
 invitations, makes the open tasks they owned unowned (completed ones keep their history),
-clears them as the lead of any project, turns their org chart position into a placeholder and
+turns their org chart position into a placeholder and
 drops them from draft chart suggestions. Notes and comments they wrote stay. Someone with an
 unreimbursed expense must settle it first.
 

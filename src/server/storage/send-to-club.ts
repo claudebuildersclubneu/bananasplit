@@ -74,7 +74,7 @@ export async function sendFileToClub(personalId: string, fileId: string, clubId:
 
 /** The club's side of a note copy: a write, so a paused club or a plan without notes refuses it. */
 const createClubNote = withOrgAction(
-  async (ctx, note: { title: string; contentJson: Prisma.InputJsonValue; contentText: string; yjsState: Uint8Array<ArrayBuffer> | null; icon: string | null; layout: "PAGE" | "DOCUMENT"; paperSize: "LETTER" | "A4" }) => {
+  async (ctx, note: { title: string; contentJson: Prisma.InputJsonValue; contentText: string; yjsState: Uint8Array<ArrayBuffer> | null; icon: string | null; layout: "PAGE" | "DOCUMENT"; paperSize: "LETTER" | "A4"; headerText: string | null; footerText: string | null }) => {
     const row = await ctx.db.note.create({
       data: {
         organizationId: ctx.organizationId,
@@ -97,7 +97,7 @@ export async function sendNoteToClub(personalId: string, noteId: string, clubId:
   const note = await withOrgTx(personalId, ({ db }) =>
     db.note.findFirst({
       where: { id: noteId, organizationId: personalId, deletedAt: null },
-      select: { title: true, contentJson: true, contentText: true, yjsState: true, icon: true, layout: true, paperSize: true },
+      select: { title: true, contentJson: true, contentText: true, yjsState: true, icon: true, layout: true, paperSize: true, headerText: true, footerText: true },
     }),
   );
   if (!note) throw new NotFoundError();

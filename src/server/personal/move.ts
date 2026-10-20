@@ -55,7 +55,7 @@ export interface BringableTask {
 }
 
 export interface BringableTaskGroup {
-  /** The Personal project, or null for tasks outside one. */
+  /** A heading for the group (null: none; projects, which named them, became epics). */
   project: string | null;
   tasks: BringableTask[];
 }
@@ -67,7 +67,7 @@ export interface Bringable {
   /** Other calendar events: upcoming ones and the last month's. */
   events: BringableEvent[];
   polls: BringablePoll[];
-  /** Open top-level tasks, by Personal project. */
+  /** Open top-level tasks and epics. */
   taskGroups: BringableTaskGroup[];
   /** Every item listed. */
   total: number;
@@ -131,7 +131,6 @@ export async function loadBringable(userId: string, now = new Date()): Promise<B
           id: true,
           title: true,
           dueDate: true,
-          project: { select: { name: true } },
           _count: { select: { subtasks: { where: { deletedAt: null } } } },
         },
       }),
@@ -173,17 +172,22 @@ export async function loadBringable(userId: string, now = new Date()): Promise<B
       })),
     ];
 
-    const groups = new Map<string | null, BringableTask[]>();
-    for (const t of taskRows) {
-      const key = t.project?.name ?? null;
-      const list = groups.get(key) ?? [];
-      list.push({ id: t.id, title: t.title, dueDate: t.dueDate, subtasks: t._count.subtasks });
-      groups.set(key, list);
-    }
-    // Tasks outside a project first, then projects by name.
-    const taskGroups = [...groups.entries()]
-      .sort(([a], [b]) => (a === null ? -1 : b === null ? 1 : a.localeCompare(b)))
-      .map(([project, tasks]) => ({ project, tasks }));
+    // One group: an epic is a top-level item like any task (projects,
+    // which used to group them, became epics).
+    const taskGroups: BringableTaskGroup[] =
+      taskRows.length > 0
+        ? [
+            {
+              project: null,
+              tasks: taskRows.map((t) => ({
+                id: t.id,
+                title: t.title,
+                dueDate: t.dueDate,
+                subtasks: t._count.subtasks,
+              })),
+            },
+          ]
+        : [];
 
     return {
       space: { id: space.id, slug: space.slug, name: space.name, timezone: space.timezone },

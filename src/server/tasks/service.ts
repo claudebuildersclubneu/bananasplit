@@ -128,7 +128,15 @@ const baseFields = {
   blockedReason: z.string().trim().max(MAX_BLOCKED_REASON).nullable().optional(),
   priority: z.enum(PRIORITY_VALUES).optional(),
   dueDate: dateKeySchema.nullable().optional(),
-  projectId: idSchema.nullable().optional(),
+  /** Where an epic or story starts (the Roadmap); on or before its due date. */
+  startDate: dateKeySchema.nullable().optional(),
+  /** Epics: their colour (strict #rrggbb; null takes a theme colour). */
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour.")
+    .transform((c) => c.toLowerCase())
+    .nullable()
+    .optional(),
   parentTaskId: idSchema.nullable().optional(),
   ownerId: idSchema.nullable().optional(),
   assigneeIds: z.array(idSchema).max(50).optional(),
@@ -238,7 +246,8 @@ const subjectSelect = {
   visibility: true,
   priority: true,
   dueDate: true,
-  projectId: true,
+  startDate: true,
+  color: true,
   type: true,
   parentTaskId: true,
   createdById: true,
@@ -632,15 +641,6 @@ async function syncMentions(
 
 // ---- Validation helpers ----------------------------------------------------------
 
-async function loadProject(env: TaskEnv, projectId: string) {
-  const project = await env.ctx.db.project.findFirst({
-    where: { id: projectId, organizationId: env.ctx.organizationId, archivedAt: null },
-    select: { id: true },
-  });
-  if (!project) throw new TaskError("That project doesn't exist in this organization.");
-  return project;
-}
-
 async function assertLabels(env: TaskEnv, labelIds: readonly string[]): Promise<void> {
   if (labelIds.length === 0) return;
   const count = await env.ctx.db.label.count({
@@ -744,13 +744,19 @@ async function nextSubtaskRank(env: TaskEnv, parentTaskId: string): Promise<stri
   return generateKeyBetween(last?.rank ?? null, null);
 }
 
+/** A start date after the due date is refused (either may be unset). */
+function assertStartBeforeDue(startKey: string | null, dueKey: string | null): void {
+  if (startKey && dueKey && startKey > dueKey) {
+    throw new TaskError("The start date is after the due date.");
+  }
+}
+
 // ---- Create ----------------------------------------------------------------------
 
 export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActionResult> {
   const d = parse(createTaskSchema, input);
   const { db, organizationId } = env.ctx;
 
-  const project = d.projectId ? await loadProject(env, d.projectId) : null;
   const parent = d.parentTaskId ? await loadParent(env, d.parentTaskId) : null;
   // Its type: what was asked for (TASK by default), fitted to the parent.
   const nesting = parent
@@ -767,6 +773,8 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   };
 
   const dueKey = d.dueDate ?? null;
+  const startKey = d.startDate ?? null;
+  assertStartBeforeDue(startKey, dueKey);
   if (!parent) {
     if (env.org.taskRequireOwner && !d.ownerId) {
       throw new TaskError("Every task needs an owner.");
@@ -811,7 +819,8 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
       visibility,
       priority,
       dueDate: dueKey ? fromDateKey(dueKey) : null,
-      projectId: project?.id ?? null,
+      startDate: startKey ? fromDateKey(startKey) : null,
+      color: nesting.childType === TaskType.EPIC ? (d.color ?? null) : null,
       parentTaskId: parent?.id ?? null,
       rank,
       createdById: env.actor.userId,
@@ -941,6 +950,18 @@ async function applyUpdate(
     activity.push({ type: "DUE_CHANGED", diffJson: { from: prevDueKey, to: d.dueDate ?? null } });
     fieldEdit = true;
   }
+  const prevStartKey = s.startDate ? dueDateKey(s.startDate) : null;
+  const startChanged = d.startDate !== undefined && (d.startDate ?? null) !== prevStartKey;
+  if (startChanged) {
+    data.startDate = d.startDate ? fromDateKey(d.startDate) : null;
+    fieldEdit = true;
+  }
+  if (startChanged || dueChanged) {
+    assertStartBeforeDue(
+      startChanged ? (d.startDate ?? null) : prevStartKey,
+      dueChanged ? (d.dueDate ?? null) : prevDueKey,
+    );
+  }
 
   const wantsStatus = d.status !== undefined ? d.status : undefined;
   const reasonChanged =
@@ -965,9 +986,8 @@ async function applyUpdate(
       activity.push({ type: "BLOCKED", diffJson: { reason: sf.blockedReason } });
   }
 
-  if (d.projectId !== undefined && d.projectId !== s.projectId) {
-    if (d.projectId) await loadProject(env, d.projectId);
-    data.projectId = d.projectId;
+  if (d.color !== undefined && d.color !== s.color) {
+    data.color = d.color;
     fieldEdit = true;
   }
 
