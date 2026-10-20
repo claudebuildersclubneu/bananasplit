@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { can } from "@/lib/auth/permissions";
 import { orgLogoSource } from "@/lib/theme/logo";
 import { resolveTheme } from "@/lib/theme/resolve";
@@ -38,15 +39,24 @@ export default async function ThemeSettingsPage({
       : (findPreset(personal.preset)?.name ?? "Default")
     : null;
 
+  // The live line: what everyone sees now.
+  const themeName =
+    theme.preset === CUSTOM_PRESET_ID ? "Custom" : (findPreset(theme.preset)?.name ?? "Moonstone");
+  const modeLine =
+    theme.mode === "LIGHT"
+      ? "opens in light"
+      : theme.mode === "DARK"
+        ? "opens in dark"
+        : "follows each device";
+  const summary = `${themeName} · ${modeLine}${theme.lockMode && theme.mode !== "SYSTEM" ? ", locked" : ""}`;
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="page-title">Theme</h1>
-        <p className="text-muted-foreground max-w-prose text-sm">
-          Colours, look and feel, logo and light or dark mode for everyone in {organization.name},
-          including the org&apos;s public poll and invite pages. Changes apply as soon as you save.
-        </p>
-      </div>
+      <PageHeader title="Theme" description={summary} />
+      <p className="text-muted-foreground -mt-2 max-w-prose text-sm">
+        Colours, look and feel, logo and light or dark mode for everyone in {organization.name},
+        including the club&apos;s public poll and invite pages. Changes apply as soon as you save.
+      </p>
       {personalName && (
         <PersonalThemeNotice
           themeName={personalName}

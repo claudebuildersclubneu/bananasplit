@@ -14,8 +14,7 @@ vi.mock("@/server/storage", () => ({
   randomKeyId: () => "k",
 }));
 
-const { docxToHtml, fetchGoogleDocAsDocx, FileRejectedError, titleFromFilename } =
-  await import("./files");
+const { docxToHtml, fetchGoogleDocAsDocx, FileRejectedError, titleFromFilename } = await import("./files");
 
 const fixture = readFileSync(path.resolve("src/lib/org-chart/__fixtures__/cbc-fall-2026.docx"));
 
@@ -23,16 +22,14 @@ describe("Word to note", () => {
   it("turns a .docx into HTML the editor can read", async () => {
     const html = await docxToHtml(fixture);
     expect(html).toMatch(/<p>|<h\d>/);
-    expect(await docxToHtml(buildDocx(["Weekly minutes", "Budget approved"]))).toContain(
-      "Budget approved",
-    );
+    expect(await docxToHtml(buildDocx(["Weekly minutes", "Budget approved"]))).toContain("Budget approved");
   });
 
   it("refuses anything that is not a Word document", async () => {
     await expect(docxToHtml(Buffer.from("%PDF-1.7"))).rejects.toBeInstanceOf(FileRejectedError);
-    await expect(
-      docxToHtml(buildZip([{ name: "a.txt", data: Buffer.from("x") }])),
-    ).rejects.toBeInstanceOf(FileRejectedError);
+    await expect(docxToHtml(buildZip([{ name: "a.txt", data: Buffer.from("x") }]))).rejects.toBeInstanceOf(
+      FileRejectedError,
+    );
   });
 
   it("names the note after the file", () => {
@@ -71,20 +68,11 @@ describe("Google Docs import", () => {
   it("stops at a redirect off Google, and at a sign-in page", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(null, { status: 302, headers: { location: "https://evil.example/x" } }),
-        ),
+      vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: "https://evil.example/x" } })),
     );
     await expect(fetchGoogleDocAsDocx(link)).rejects.toThrow(/Anyone with the link/);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response("<html>Sign in</html>", { status: 200 })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>Sign in</html>", { status: 200 })));
     await expect(fetchGoogleDocAsDocx(link)).rejects.toThrow(/Anyone with the link/);
-    await expect(fetchGoogleDocAsDocx("https://example.com/doc")).rejects.toThrow(
-      /Google Docs link/,
-    );
+    await expect(fetchGoogleDocAsDocx("https://example.com/doc")).rejects.toThrow(/Google Docs link/);
   });
 });

@@ -34,12 +34,7 @@ let longGone = "";
 
 async function makeUser(local: string) {
   const row = await authDb.user.create({
-    data: {
-      email: `${local}-${tag}@example.edu`,
-      name: `${local} ${tag}`,
-      emailVerified: new Date(),
-      onboardedAt: new Date(),
-    },
+    data: { email: `${local}-${tag}@example.edu`, name: `${local} ${tag}`, emailVerified: new Date(), onboardedAt: new Date() },
     select: { id: true, email: true, name: true },
   });
   return { id: row.id, email: row.email, name: row.name ?? local };
@@ -56,44 +51,19 @@ beforeAll(async () => {
   try {
     owner = await makeUser("trash-owner");
     member = await makeUser("trash-member");
-    const made = await createOrganization(owner, {
-      name: `Trash ${tag}`,
-      slug: `trash-${tag}`,
-      timezone: "UTC",
-    });
+    const made = await createOrganization(owner, { name: `Trash ${tag}`, slug: `trash-${tag}`, timezone: "UTC" });
     if (!made.ok) throw new Error(JSON.stringify(made));
     org = { id: made.orgId, slug: made.slug };
-    await ownerDb.membership.create({
-      data: { organizationId: org.id, userId: member.id, role: "MEMBER" },
-    });
-    const note = (
-      authorId: string,
-      title: string,
-      visibility: "PRIVATE" | "ORGANIZATION",
-      deletedAt: Date,
-    ) =>
+    await ownerDb.membership.create({ data: { organizationId: org.id, userId: member.id, role: "MEMBER" } });
+    const note = (authorId: string, title: string, visibility: "PRIVATE" | "ORGANIZATION", deletedAt: Date) =>
       ownerDb.note.create({
-        data: {
-          organizationId: org.id,
-          title,
-          contentJson: {},
-          contentText: "",
-          visibility,
-          authorId,
-          updatedById: authorId,
-          deletedAt,
-        },
+        data: { organizationId: org.id, title, contentJson: {}, contentText: "", visibility, authorId, updatedById: authorId, deletedAt },
       });
     const now = new Date();
     await note(member.id, `Mine ${tag}`, "PRIVATE", now);
     await note(owner.id, `Shared ${tag}`, "ORGANIZATION", now);
     await note(owner.id, `Owner private ${tag}`, "PRIVATE", now);
-    await note(
-      member.id,
-      `Ancient ${tag}`,
-      "ORGANIZATION",
-      new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
-    );
+    await note(member.id, `Ancient ${tag}`, "ORGANIZATION", new Date(Date.now() - 40 * 24 * 60 * 60 * 1000));
     const file = (uploadedById: string, name: string, deletedAt: Date | null) =>
       ownerDb.orgFile.create({
         data: {
@@ -109,9 +79,7 @@ beforeAll(async () => {
         select: { id: true },
       });
     memberFile = (await file(member.id, `notes-${tag}.txt`, null)).id;
-    longGone = (
-      await file(member.id, `old-${tag}.txt`, new Date(Date.now() - 40 * 24 * 60 * 60 * 1000))
-    ).id;
+    longGone = (await file(member.id, `old-${tag}.txt`, new Date(Date.now() - 40 * 24 * 60 * 60 * 1000))).id;
   } catch (error) {
     console.warn("[trash.db.test] skipped:", error instanceof Error ? error.message : error);
     reachable = false;
@@ -136,24 +104,18 @@ describe("Recently deleted", () => {
     const memberSees = await as(member, ({ db }) => getDeletedNotes(db, org.id, member.id, false));
     expect(memberSees.map((n) => n.title)).toEqual([`Mine ${tag}`]);
     const ownerSees = await as(owner, ({ db }) => getDeletedNotes(db, org.id, owner.id, true));
-    expect(ownerSees.map((n) => n.title).sort()).toEqual(
-      [`Owner private ${tag}`, `Shared ${tag}`].sort(),
-    );
+    expect(ownerSees.map((n) => n.title).sort()).toEqual([`Owner private ${tag}`, `Shared ${tag}`].sort());
   });
 
   it("a deleted file waits in the trash and comes back on restore", async () => {
     if (!reachable) return;
-    expect(await as(member, ({ db }) => removeNoteFile(db, org.id, memberFile))).toMatch(
-      /^files\//,
-    );
+    expect(await as(member, ({ db }) => removeNoteFile(db, org.id, memberFile))).toMatch(/^files\//);
     const trash = await as(member, ({ db }) => listDeletedNoteFiles(db, org.id, member.id, false));
     expect(trash.map((f) => f.name)).toEqual([`notes-${tag}.txt`]);
     expect(await as(member, ({ db }) => countDeleted(db, org.id, member.id, false))).toBe(2);
 
     expect(await as(member, ({ db }) => restoreNoteFile(db, org.id, memberFile))).toBe(true);
-    expect(
-      await as(member, ({ db }) => listDeletedNoteFiles(db, org.id, member.id, false)),
-    ).toEqual([]);
+    expect(await as(member, ({ db }) => listDeletedNoteFiles(db, org.id, member.id, false))).toEqual([]);
     // Past the window, it can't be brought back.
     expect(await as(member, ({ db }) => restoreNoteFile(db, org.id, longGone))).toBe(false);
   });

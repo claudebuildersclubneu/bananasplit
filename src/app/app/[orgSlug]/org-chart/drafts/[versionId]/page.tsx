@@ -36,10 +36,10 @@ export default async function DraftPage({
     : null;
 
   const header = (
-    <div className="space-y-1">
+    <div className="space-y-3">
       <BackLink href={base} label="Org chart" />
-      <h1 className="page-title">Review draft v{version.number}</h1>
-      <p className="text-muted-foreground text-sm">
+      <h1 className="page-title">Draft v{version.number}</h1>
+      <p className="text-muted-foreground text-[15px]">
         {version.source === "UPLOAD" && version.sourceFilename ? (
           <>
             Imported from{" "}
@@ -53,7 +53,7 @@ export default async function DraftPage({
             . Check every position before publishing.
           </>
         ) : (
-          "Edit the positions, then publish when the chart is right."
+          "Type the chart or edit positions. Drafts save as you go; publish when it's right."
         )}
       </p>
     </div>
@@ -140,6 +140,8 @@ export default async function DraftPage({
             openItems: version.openItems,
           }}
           positions={positions}
+          canInvite={can({ role }, "members.invite")}
+          canSetTitles={can({ role }, "members.setTitle")}
           members={members.map((m) => ({
             id: m.id,
             name: m.name,

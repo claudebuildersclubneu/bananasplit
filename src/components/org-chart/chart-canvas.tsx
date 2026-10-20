@@ -9,26 +9,36 @@ import {
   Controls,
   MarkerType,
   MiniMap,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useNodesInitialized,
   useReactFlow,
   type Edge,
 } from "@xyflow/react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronsDownUp, ChevronsUpDown, Download, Printer } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { layoutOrgChart, NODE_HEIGHT, NODE_WIDTH } from "@/lib/org-chart/layout";
-import type { ChartNodeDTO } from "@/lib/org-chart/types";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toaster";
+import type { ExportNode } from "@/lib/org-chart/export";
+import { effectiveParents, layoutOrgChart, NODE_HEIGHT, NODE_WIDTH } from "@/lib/org-chart/layout";
+import { chartTeams } from "@/lib/org-chart/teams";
+import { nodeVariant, type ChartNodeDTO } from "@/lib/org-chart/types";
 import { cn } from "@/lib/utils";
 
-import { PositionNode, type PositionFlowNode } from "./position-node";
+import { downloadChartPng, printChart, resolveColor } from "./export-chart";
+import { PositionNode, subtitleFor, type PositionFlowNode } from "./position-node";
 
 /**
  * The interactive org chart canvas (@xyflow/react with the d3-hierarchy
- * layout from src/lib/org-chart/layout.ts). Loaded only through
+ * tidy layout from src/lib/org-chart/layout.ts). Loaded only through
  * next/dynamic with ssr: false, so its JavaScript ships only to the org
  * chart pages. Pan by dragging, zoom with the wheel, pinch on touch, and
- * the controls fit the view. `focus` centers a node (side-panel links).
+ * the controls zoom and fit the view. Positions are pill tiles coloured by
+ * their team (the chart's top-level branches, chart slots 1..5); a branch
+ * folds away with the toggle under its lead. With `exportName` the corner
+ * offers Download PNG and Print (Save as PDF). `focus` centers a node.
  */
 
 export interface ChartCanvasProps {
@@ -46,9 +56,28 @@ export interface ChartCanvasProps {
   showMiniMap?: boolean;
   className?: string;
   ariaLabel?: string;
+  /** Branches can be folded (default on). */
+  collapsible?: boolean;
+  /** The builder's preview: flag named people who are not members. */
+  flagUnknown?: boolean;
+  /** Offer PNG and PDF export, saved as `${exportName}.png`. */
+  exportName?: string;
+  /** The heading printed on the exported chart. */
+  exportTitle?: string;
 }
 
 const nodeTypes = { position: PositionNode };
+
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
 
 function Canvas({
   nodes,
@@ -61,13 +90,68 @@ function Canvas({
   showMiniMap,
   className,
   ariaLabel = "Org chart",
+  collapsible = true,
+  flagUnknown = false,
+  exportName,
+  exportTitle,
 }: ChartCanvasProps) {
   const flow = useReactFlow();
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+
+  // Teams (colour slots) and each position's descendants, on the whole chart.
+  const { colorOf, descendantsOf, parents, teamLeads } = useMemo(() => {
+    const teams = chartTeams(nodes);
+    const slotOf = new Map(teams.teams.map((t) => [t.key, t.slot]));
+    const colorOf = new Map<string, string>();
+    for (const [positionId, teamKey] of teams.teamOfPosition) {
+      const slot = slotOf.get(teamKey);
+      if (slot) colorOf.set(positionId, `var(--chart-${slot})`);
+    }
+    const parents = effectiveParents(nodes.map((n) => ({ id: n.id, reportsToId: n.reportsToId, isAdvisor: n.isAdvisor, rank: n.rank })));
+    const descendantsOf = new Map<string, number>();
+    for (const n of nodes) {
+      const seen = new Set<string>();
+      let cur = parents.get(n.id) ?? null;
+      while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        descendantsOf.set(cur, (descendantsOf.get(cur) ?? 0) + 1);
+        cur = parents.get(cur) ?? null;
+      }
+    }
+    // "Collapse teams" folds each team under its lead (Leadership stays open).
+    const teamLeads = teams.teams
+      .filter((t) => t.key !== "leadership" && t.leadId && (descendantsOf.get(t.leadId) ?? 0) > 0)
+      .map((t) => t.leadId as string);
+    return { colorOf, descendantsOf, parents, teamLeads };
+  }, [nodes]);
+
+  const visible = useMemo(() => {
+    if (collapsed.size === 0) return nodes;
+    return nodes.filter((n) => {
+      const seen = new Set<string>();
+      let cur = parents.get(n.id) ?? null;
+      while (cur && !seen.has(cur)) {
+        if (collapsed.has(cur)) return false;
+        seen.add(cur);
+        cur = parents.get(cur) ?? null;
+      }
+      return true;
+    });
+  }, [nodes, collapsed, parents]);
+
   const layout = useMemo(
-    () =>
-      layoutOrgChart(nodes.map((n) => ({ id: n.id, reportsToId: n.reportsToId, isAdvisor: n.isAdvisor, rank: n.rank }))),
-    [nodes],
+    () => layoutOrgChart(visible.map((n) => ({ id: n.id, reportsToId: n.reportsToId, isAdvisor: n.isAdvisor, rank: n.rank }))),
+    [visible],
   );
+
+  const toggle = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const flowNodes = useMemo<PositionFlowNode[]>(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -80,9 +164,17 @@ function Canvas({
       draggable: false,
       connectable: false,
       selectable: false,
-      data: { node: byId.get(p.id) as ChartNodeDTO, selected: p.id === selectedId },
+      data: {
+        node: byId.get(p.id) as ChartNodeDTO,
+        selected: p.id === selectedId,
+        color: colorOf.get(p.id) ?? null,
+        descendants: collapsible ? (descendantsOf.get(p.id) ?? 0) : 0,
+        collapsed: collapsed.has(p.id),
+        onToggle: collapsible ? toggle : undefined,
+        flagUnknown,
+      },
     }));
-  }, [layout, nodes, selectedId]);
+  }, [layout, nodes, selectedId, colorOf, descendantsOf, collapsed, collapsible, toggle, flagUnknown]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -106,10 +198,11 @@ function Canvas({
               type: "smoothstep",
               selectable: false,
               focusable: false,
+              style: colorOf.get(e.target) ? { stroke: `color-mix(in oklab, ${colorOf.get(e.target)} 70%, transparent)` } : undefined,
               markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
             },
       ),
-    [layout],
+    [layout, colorOf],
   );
 
   const [flowReady, setFlowReady] = useState(false);
@@ -138,6 +231,22 @@ function Canvas({
     return () => window.clearTimeout(id);
   }, [layout, refitOnChange, initialized, flow]);
 
+  const exportNodes = useCallback((): Map<string, ExportNode> => {
+    const map = new Map<string, ExportNode>();
+    for (const n of visible) {
+      const variant = nodeVariant(n);
+      map.set(n.id, {
+        id: n.id,
+        title: n.title,
+        subtitle: subtitleFor(n, flagUnknown),
+        initials: initials(n.user?.name ?? n.personName ?? n.title),
+        color: resolveColor(colorOf.get(n.id) ?? null),
+        dashed: variant === "open" || variant === "empty" || n.isAdvisor,
+      });
+    }
+    return map;
+  }, [visible, colorOf, flagUnknown]);
+
   return (
     <div className={cn("org-chart-flow h-full w-full", className)} role="region" aria-label={ariaLabel}>
       <ReactFlow
@@ -163,6 +272,44 @@ function Canvas({
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
         <Controls showInteractive={false} position="bottom-left" />
+        {(exportName || (collapsible && teamLeads.length > 0)) && (
+          <Panel position="top-right" className="!m-3 flex flex-wrap justify-end gap-1.5">
+            {collapsible && teamLeads.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="bg-card"
+                onClick={() => setCollapsed(collapsed.size > 0 ? new Set() : new Set(teamLeads))}
+              >
+                {collapsed.size > 0 ? <ChevronsUpDown aria-hidden="true" /> : <ChevronsDownUp aria-hidden="true" />}
+                {collapsed.size > 0 ? "Expand all" : "Collapse teams"}
+              </Button>
+            )}
+            {exportName && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="bg-card"
+                  onClick={() =>
+                    void downloadChartPng(layout, exportNodes(), `${exportName}.png`, exportTitle).catch((e: unknown) =>
+                      toast({ title: e instanceof Error ? e.message : "The PNG could not be made.", tone: "error" }),
+                    )
+                  }
+                >
+                  <Download aria-hidden="true" />
+                  PNG
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="bg-card" onClick={() => printChart(layout, exportNodes(), exportTitle)}>
+                  <Printer aria-hidden="true" />
+                  PDF
+                </Button>
+              </>
+            )}
+          </Panel>
+        )}
         {showMiniMap && (
           <MiniMap pannable zoomable position="bottom-right" className="hidden md:block" ariaLabel="Chart overview" />
         )}

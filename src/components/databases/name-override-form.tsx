@@ -33,11 +33,14 @@ export function NameOverrideForm({
         />
         <Button
           variant="outline"
-          size="sm"
           disabled={pending || value === (current ?? "")}
           onClick={() =>
             start(async () => {
-              const r = await setAttendanceNameAction(organizationId, attendanceId, value.trim() || null);
+              const r = await setAttendanceNameAction(
+                organizationId,
+                attendanceId,
+                value.trim() || null,
+              );
               if (r.error) setError(r.error);
               else {
                 setError(null);
@@ -50,7 +53,7 @@ export function NameOverrideForm({
         </Button>
       </div>
       {error && (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className="text-tint-danger-foreground text-xs">
           {error}
         </p>
       )}

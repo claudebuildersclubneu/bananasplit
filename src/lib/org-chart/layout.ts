@@ -11,9 +11,9 @@ import { stratify, tree, type HierarchyPointNode } from "d3-hierarchy";
  */
 
 export const NODE_WIDTH = 240;
-export const NODE_HEIGHT = 96;
+export const NODE_HEIGHT = 60;
 export const H_GAP = 40;
-export const V_GAP = 72;
+export const V_GAP = 64;
 
 export interface LayoutInput {
   id: string;

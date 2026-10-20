@@ -11,6 +11,7 @@ import { StartDraftButton } from "@/components/org-chart/start-draft-button";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { sectionLabel } from "@/lib/nav/sidebar";
+import { chartTeams } from "@/lib/org-chart/teams";
 import type { ChartNodeDTO } from "@/lib/org-chart/types";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getPublishedOrgChart } from "@/server/org-chart/queries";
@@ -74,18 +75,23 @@ export default async function OrgChartPage({
   const hrefFor = (key: string) =>
     `${base}?${mode === "list" ? "view=list&" : ""}position=${encodeURIComponent(key)}`;
 
+  const teamCount = chartTeams(nodes).teams.length;
+  const openCount = nodes.filter((n) => n.isOpen).length;
   const published =
     chart &&
     [
-      `Version ${chart.number}`,
-      chart.publishedAt &&
-        `published ${new Date(chart.publishedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          timeZone: organization.timezone,
-        })}`,
-      `${nodes.length} positions`,
+      `${nodes.length} ${nodes.length === 1 ? "position" : "positions"}`,
+      teamCount > 0 && `${teamCount} ${teamCount === 1 ? "team" : "teams"}`,
+      openCount > 0 && `${openCount} open`,
+      `version ${chart.number}${
+        chart.publishedAt
+          ? `, published ${new Date(chart.publishedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              timeZone: organization.timezone,
+            })}`
+          : ""
+      }`,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -113,6 +119,7 @@ export default async function OrgChartPage({
           <ChartView
             orgId={organization.id}
             orgSlug={orgSlug}
+            orgName={organization.name}
             nodes={nodes}
             mode={mode}
             canEdit={canEdit}
@@ -131,7 +138,7 @@ export default async function OrgChartPage({
           action={
             canEdit ? (
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm">
+                <Button asChild variant="outline" size="sm">
                   <Link href={`${base}/import`}>
                     <FileUp className="size-4" aria-hidden="true" />
                     Import a document
@@ -143,16 +150,14 @@ export default async function OrgChartPage({
                   </Button>
                 ) : (
                   <>
+                    <StartDraftButton orgId={organization.id} orgSlug={orgSlug} from="blank" variant="create">
+                      Type the chart
+                    </StartDraftButton>
+                    <StartDraftButton orgId={organization.id} orgSlug={orgSlug} from="members">
+                      Start from members
+                    </StartDraftButton>
                     <StartDraftButton orgId={organization.id} orgSlug={orgSlug} from="starter">
                       Start from the club template
-                    </StartDraftButton>
-                    <StartDraftButton
-                      orgId={organization.id}
-                      orgSlug={orgSlug}
-                      from="blank"
-                      variant="ghost"
-                    >
-                      Start from scratch
                     </StartDraftButton>
                   </>
                 )}

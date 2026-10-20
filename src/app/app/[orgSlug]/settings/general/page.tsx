@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { appOrigin } from "@/lib/app-url";
 import { can } from "@/lib/auth/permissions";
 import { spaceIncludes } from "@/lib/billing/space";
@@ -21,31 +22,37 @@ export default async function GeneralSettingsPage({
     return <SettingsNoAccess title="General" who="owners and admins" />;
   }
   const canWrite = can({ role }, "settings.general.write");
+  const host = appOrigin().replace(/^https?:\/\//, "");
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <h1 className="page-title">General</h1>
-      <LogoForm
-        orgId={organization.id}
-        orgName={organization.name}
-        logoUrl={orgLogoUrl(organization.logo, 256)}
-        canEdit={can({ role }, "org.logo.write")}
+    <div className="max-w-3xl space-y-7.5">
+      <PageHeader
+        title="General"
+        description={`${host}/app/${organization.slug} · ${organization.timezone}`}
       />
-      <NameForm orgId={organization.id} name={organization.name} canEdit={canWrite} />
-      <SlugForm
-        orgId={organization.id}
-        slug={organization.slug}
-        canEdit={can({ role }, "org.slug.write")}
-        appOrigin={appOrigin()}
-      />
-      <TimezoneForm orgId={organization.id} timezone={organization.timezone} canEdit={canWrite} />
-      {spaceIncludes(organization, "teamwork") && (
-        <WeeklyUpdateDayForm
+      <div className="space-y-4.5">
+        <LogoForm
           orgId={organization.id}
-          day={settings?.weeklyUpdateDay ?? 0}
-          canEdit={canWrite}
+          orgName={organization.name}
+          logoUrl={orgLogoUrl(organization.logo, 256)}
+          canEdit={can({ role }, "org.logo.write")}
         />
-      )}
+        <NameForm orgId={organization.id} name={organization.name} canEdit={canWrite} />
+        <SlugForm
+          orgId={organization.id}
+          slug={organization.slug}
+          canEdit={can({ role }, "org.slug.write")}
+          appOrigin={appOrigin()}
+        />
+        <TimezoneForm orgId={organization.id} timezone={organization.timezone} canEdit={canWrite} />
+        {spaceIncludes(organization, "teamwork") && (
+          <WeeklyUpdateDayForm
+            orgId={organization.id}
+            day={settings?.weeklyUpdateDay ?? 0}
+            canEdit={canWrite}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { MajorInput } from "@/components/onboarding/major-input";
 import { gradYearChoices } from "@/lib/onboarding/steps";
 import { PROFILE_LIMITS, profileDetailsSchema, profileFieldErrors } from "@/lib/profile/schema";
 
+import { nativeSelectClass, SettingsCard } from "../settings/settings-card";
+
 import { saveProfileDetails } from "./actions";
 import { TimezoneSelect } from "./timezone-select";
 
@@ -79,122 +81,130 @@ export function DetailsForm({
     [errors[key] ? `${key}-error` : null, extra].filter(Boolean).join(" ") || undefined;
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="profile-name">Name</Label>
-          <Input
-            id="profile-name"
-            value={values.name}
-            onChange={(e) => set("name", e.target.value)}
-            maxLength={PROFILE_LIMITS.name}
-            autoComplete="name"
-            required
-            aria-invalid={Boolean(errors.name) || undefined}
-            aria-describedby={describedBy("name")}
-          />
-          <FieldError id="name-error" message={errors.name} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="profile-pronouns">
-            Pronouns <span className="text-muted-foreground font-normal">(optional)</span>
-          </Label>
-          <Input
-            id="profile-pronouns"
-            value={values.pronouns}
-            onChange={(e) => set("pronouns", e.target.value)}
-            maxLength={PROFILE_LIMITS.pronouns}
-            placeholder="she/her, they/them…"
-            aria-invalid={Boolean(errors.pronouns) || undefined}
-            aria-describedby={describedBy("pronouns")}
-          />
-          <FieldError id="pronouns-error" message={errors.pronouns} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="profile-timezone">Timezone</Label>
-          <TimezoneSelect
-            id="profile-timezone"
-            value={values.timezone}
-            orgTimezone={orgTimezone}
-            onChange={(tz) => set("timezone", tz)}
-            invalid={Boolean(errors.timezone)}
-          />
-          <FieldError id="timezone-error" message={errors.timezone} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="profile-major">Major</Label>
-          <MajorInput
-            id="profile-major"
-            value={values.major}
-            onChange={(major) => set("major", major)}
-            maxLength={PROFILE_LIMITS.major}
-            aria-invalid={Boolean(errors.major) || undefined}
-            aria-describedby={describedBy("major")}
-          />
-          <FieldError id="major-error" message={errors.major} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="profile-year">Graduation year</Label>
-          <select
-            id="profile-year"
-            value={values.gradYear}
-            onChange={(e) => set("gradYear", e.target.value)}
-            aria-invalid={Boolean(errors.gradYear) || undefined}
-            aria-describedby={describedBy("gradYear")}
-            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 w-full rounded-lg border bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3"
-          >
-            <option value="">Not set</option>
-            {/* A year already on the profile stays selectable, even once it has passed. */}
-            {values.gradYear && !yearOptions.includes(Number(values.gradYear)) && (
-              <option value={values.gradYear}>{values.gradYear}</option>
-            )}
-            {yearOptions.map((y) => (
-              <option key={y} value={String(y)}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <FieldError id="gradYear-error" message={errors.gradYear} />
-        </div>
-
-        <div className="space-y-2 sm:col-span-2">
-          <div className="flex items-baseline justify-between gap-2">
-            <Label htmlFor="profile-bio">Bio</Label>
-            <span id="bio-count" className="text-muted-foreground text-xs tabular-nums">
-              {values.bio.length}/{PROFILE_LIMITS.bio}
-            </span>
-          </div>
-          <Textarea
-            id="profile-bio"
-            value={values.bio}
-            onChange={(e) => set("bio", e.target.value)}
-            maxLength={PROFILE_LIMITS.bio}
-            rows={4}
-            placeholder="What you work on, what you're learning, what people can ask you about."
-            aria-invalid={Boolean(errors.bio) || undefined}
-            aria-describedby={describedBy("bio", "bio-count")}
-          />
-          <FieldError id="bio-error" message={errors.bio} />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-          Save details
-        </Button>
-        <p aria-live="polite" className="text-sm">
-          {errors.form ? (
-            <span className="text-destructive">{errors.form}</span>
+    <form onSubmit={submit} noValidate>
+      <SettingsCard
+        title="Details"
+        description="Your name and a little about you. The same in every organization."
+        status={
+          errors.form ? (
+            <p role="status" aria-live="polite" className="text-destructive text-sm">
+              {errors.form}
+            </p>
           ) : saved ? (
-            <span className="text-muted-foreground">Saved.</span>
-          ) : null}
-        </p>
-      </div>
+            <p role="status" aria-live="polite" className="text-success text-sm">
+              Saved.
+            </p>
+          ) : null
+        }
+        footer={
+          <Button type="submit" disabled={pending}>
+            {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            Save details
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="profile-name">Name</Label>
+            <Input
+              id="profile-name"
+              value={values.name}
+              onChange={(e) => set("name", e.target.value)}
+              maxLength={PROFILE_LIMITS.name}
+              autoComplete="name"
+              required
+              aria-invalid={Boolean(errors.name) || undefined}
+              aria-describedby={describedBy("name")}
+            />
+            <FieldError id="name-error" message={errors.name} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-pronouns">
+              Pronouns <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="profile-pronouns"
+              value={values.pronouns}
+              onChange={(e) => set("pronouns", e.target.value)}
+              maxLength={PROFILE_LIMITS.pronouns}
+              placeholder="she/her, they/them…"
+              aria-invalid={Boolean(errors.pronouns) || undefined}
+              aria-describedby={describedBy("pronouns")}
+            />
+            <FieldError id="pronouns-error" message={errors.pronouns} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-timezone">Timezone</Label>
+            <TimezoneSelect
+              id="profile-timezone"
+              value={values.timezone}
+              orgTimezone={orgTimezone}
+              onChange={(tz) => set("timezone", tz)}
+              invalid={Boolean(errors.timezone)}
+            />
+            <FieldError id="timezone-error" message={errors.timezone} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-major">Major</Label>
+            <MajorInput
+              id="profile-major"
+              value={values.major}
+              onChange={(major) => set("major", major)}
+              maxLength={PROFILE_LIMITS.major}
+              aria-invalid={Boolean(errors.major) || undefined}
+              aria-describedby={describedBy("major")}
+            />
+            <FieldError id="major-error" message={errors.major} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="profile-year">Graduation year</Label>
+            <select
+              id="profile-year"
+              value={values.gradYear}
+              onChange={(e) => set("gradYear", e.target.value)}
+              aria-invalid={Boolean(errors.gradYear) || undefined}
+              aria-describedby={describedBy("gradYear")}
+              className={nativeSelectClass}
+            >
+              <option value="">Not set</option>
+              {/* A year already on the profile stays selectable, even once it has passed. */}
+              {values.gradYear && !yearOptions.includes(Number(values.gradYear)) && (
+                <option value={values.gradYear}>{values.gradYear}</option>
+              )}
+              {yearOptions.map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <FieldError id="gradYear-error" message={errors.gradYear} />
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="profile-bio">Bio</Label>
+              <span id="bio-count" className="text-muted-foreground text-xs tabular-nums">
+                {values.bio.length}/{PROFILE_LIMITS.bio}
+              </span>
+            </div>
+            <Textarea
+              id="profile-bio"
+              value={values.bio}
+              onChange={(e) => set("bio", e.target.value)}
+              maxLength={PROFILE_LIMITS.bio}
+              rows={4}
+              placeholder="What you work on, what you're learning, what people can ask you about."
+              aria-invalid={Boolean(errors.bio) || undefined}
+              aria-describedby={describedBy("bio", "bio-count")}
+            />
+            <FieldError id="bio-error" message={errors.bio} />
+          </div>
+        </div>
+      </SettingsCard>
     </form>
   );
 }

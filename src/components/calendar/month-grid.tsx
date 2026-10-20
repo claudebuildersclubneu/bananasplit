@@ -8,8 +8,9 @@ import { type CalendarItem, chipTime, itemLabel } from "./item";
 import { itemStyle, KIND_META, VISIBILITY_META } from "./kinds";
 
 /**
- * The month view: a real <table>, Sunday first, one full-width chip per
- * event, and a tonal step on the days that carry something.
+ * The month view: a real <table>, Sunday first, each day a rounded tile
+ * (separate cells, gaps instead of rules), one tinted pill per event, and
+ * solid pills for the events the viewer is going to.
  *
  * A TABLE RATHER THAN A GRID OF DIVS, which is what the club website
  * settled on too: a screen reader can then announce the weekday for a cell
@@ -214,6 +215,7 @@ function EventChip({
       style={itemStyle(item)}
       data-internal={item.visibility === "INTERNAL" && !item.task ? "true" : undefined}
       data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
+      data-rsvp={item.rsvp === "YES" ? "yes" : undefined}
       data-dragging={dragging ? "true" : undefined}
       aria-expanded={open}
       aria-label={itemLabel(item, kind.label, visibility.label)}

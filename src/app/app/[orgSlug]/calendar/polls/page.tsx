@@ -1,4 +1,4 @@
-import { CalendarClock, Plus } from "lucide-react";
+import { CalendarClock, Plus, Vote } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
@@ -40,13 +40,19 @@ export default async function PollsListPage({
       item: questionItem(p, base, now, timeZone, p.createdById === user.id || isAdmin),
     }));
 
+  const openCount = all.filter((p) => p.open).length;
+  const votes = questions.filter((p) => isPollOpen(p, now)).reduce((n, p) => n + p.voterCount, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <PageHeader
         title={sectionLabel(settings?.sidebar, "polls")}
         description={
           <>
-            Ask the club a question and let people vote. Picking a meeting time?{" "}
+            {all.length > 0
+              ? `${openCount} open · ${votes === 1 ? "1 person" : `${votes} people`} voted so far. `
+              : "Ask the club a question and let people vote. "}
+            Picking a meeting time?{" "}
             <Link
               href={`${base}/calendar/find-a-time`}
               className="text-foreground underline underline-offset-2"
@@ -57,7 +63,7 @@ export default async function PollsListPage({
           </>
         }
         actions={
-          <Button size="sm" asChild>
+          <Button variant="create" asChild>
             <Link href={`${base}/calendar/polls/ask`}>
               <Plus aria-hidden className="size-4" />
               Ask a question
@@ -69,6 +75,7 @@ export default async function PollsListPage({
       {all.length === 0 ? (
         // Ask a question is in the header; this points at the other kind of poll.
         <EmptyState
+          icon={Vote}
           title="No polls yet"
           description="Ask a question, give a few options, and let the club vote: where to eat, which date, who should run the table."
           action={

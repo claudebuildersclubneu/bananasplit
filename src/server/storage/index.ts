@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { assertNoTx } from "@/server/db/context";
 
-import { driverFor, type PutOptions, type StoredBlob } from "./drivers";
+import { bufferStream, driverFor, type BlobStream, type PutOptions, type StoredBlob } from "./drivers";
 import {
   assertBlobAllowed,
   ORG_SCOPED_KINDS,
@@ -40,7 +40,7 @@ export {
   storageKey,
   type StorageKindName,
 } from "./kinds";
-export { StorageConfigError, blobStoreIdFromToken, type StoredBlob } from "./drivers";
+export { StorageConfigError, blobStoreIdFromToken, type BlobStream, type StoredBlob } from "./drivers";
 
 /** What an upload route tells the user when no Blob store is configured. */
 export const STORAGE_NOT_SET_UP =
@@ -84,6 +84,20 @@ export async function getBlob(key: string): Promise<{ body: Buffer; contentType:
   assertNoTx("getBlob");
   const store = storeOf(key);
   return driverFor(store).get(store, key);
+}
+
+/**
+ * Opens a blob as a stream (server-side only; check the permission first):
+ * big Notes files are streamed to the browser instead of read whole, since
+ * a function's buffered response is capped like its request.
+ */
+export async function openBlob(key: string): Promise<BlobStream | null> {
+  assertNoTx("openBlob");
+  const store = storeOf(key);
+  const driver = driverFor(store);
+  if (driver.stream) return driver.stream(store, key);
+  const found = await driver.get(store, key);
+  return found ? bufferStream(found) : null;
 }
 
 /** Deletes blobs (idempotent). Keys may span kinds and stores. */

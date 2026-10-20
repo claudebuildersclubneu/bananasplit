@@ -61,8 +61,8 @@ export function SpaceBanner({
       >
         <Clock className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
         <p className="min-w-0 flex-1">
-          Your club&apos;s free trial ends in {days} {days === 1 ? "day" : "days"}. Choose Club or
-          Society to keep going without a pause.
+          Your club&apos;s free trial ends in {days} {days === 1 ? "day" : "days"}. Choose Team or
+          Team Advanced to keep going without a pause.
         </p>
         <Button asChild size="sm" variant="outline">
           <Link href={planHref}>See plans</Link>

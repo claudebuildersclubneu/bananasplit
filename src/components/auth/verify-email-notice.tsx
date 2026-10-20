@@ -19,12 +19,14 @@ export function VerifyEmailNotice({ email, action }: { email: string; action: st
   );
 
   return (
-    <div className="bg-muted/40 space-y-3 rounded-md border p-4" role="status">
+    <div className="bg-muted rounded-tile space-y-3.5 p-4" role="status">
       <div className="flex items-start gap-3">
-        <MailCheck className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden="true" />
+        <span className="bg-card grid size-9 shrink-0 place-items-center rounded-full">
+          <MailCheck className="size-[18px]" aria-hidden="true" />
+        </span>
         <div className="space-y-1">
-          <p className="text-sm font-medium">Check your email</p>
-          <p className="text-muted-foreground text-sm">
+          <p className="heading text-[15px]">Check your email</p>
+          <p className="text-muted-foreground text-sm leading-[1.5]">
             Your email address isn&apos;t verified yet. We sent a verification link to{" "}
             <span className="font-medium">{email}</span>. Verify your address to {action}.
           </p>

@@ -20,9 +20,9 @@ export function StartDraftButton({
 }: {
   orgId: string;
   orgSlug: string;
-  from: "blank" | "current" | "starter";
+  from: "blank" | "current" | "starter" | "members";
   children: React.ReactNode;
-  variant?: "default" | "outline" | "secondary" | "ghost";
+  variant?: "default" | "create" | "outline" | "secondary" | "ghost";
   size?: "default" | "sm";
 }) {
   const router = useRouter();

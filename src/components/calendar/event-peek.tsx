@@ -1,6 +1,15 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CalendarX2, Globe, Lock, MapPin, Pencil, Ticket } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  CalendarX2,
+  Globe,
+  Lock,
+  MapPin,
+  Pencil,
+  Ticket,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -9,7 +18,7 @@ import { Button } from "@/components/ui/button";
 
 import { type CalendarItem, timeRange } from "./item";
 import { KIND_META, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
-import { longDate } from "./month-grid";
+import { shortDay } from "./day-label";
 
 /**
  * Event detail, anchored to the chip you opened it from.
@@ -89,7 +98,11 @@ export function EventPeek({
       const node = ref.current;
       if (!node) return;
       const target = event.target as Node | null;
-      if (target && !node.contains(target) && !(target as HTMLElement).closest?.("[aria-expanded]")) {
+      if (
+        target &&
+        !node.contains(target) &&
+        !(target as HTMLElement).closest?.("[aria-expanded]")
+      ) {
         onClose();
       }
     }
@@ -115,14 +128,18 @@ export function EventPeek({
       aria-label={`${item.title}, detail`}
     >
       <p className="cal-pop__kind">
-        <span aria-hidden className="cal-chip__dot" style={{ ["--kind" as string]: `var(${kind.token})` }} />
+        <span
+          aria-hidden
+          className="cal-chip__dot"
+          style={{ ["--kind" as string]: `var(${kind.token})` }}
+        />
         {kind.label}
       </p>
 
-      <h3 className="mt-1.5 text-base leading-snug font-semibold break-words">{item.title}</h3>
+      <h3 className="heading mt-2 text-[17px] leading-snug break-words">{item.title}</h3>
 
       <p className="mt-1 text-sm font-medium">
-        {longDate(dayKey)}
+        {shortDay(dayKey)}
         {!item.allDay && ` · ${timeRange(item)}`}
         {item.allDay && " · All day"}
       </p>
@@ -135,12 +152,17 @@ export function EventPeek({
       )}
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Badge variant={item.visibility === "PUBLIC" ? "secondary" : "outline"} title={visibility.hint}>
+        <Badge
+          variant={item.visibility === "PUBLIC" ? "secondary" : "outline"}
+          title={visibility.hint}
+        >
           <VisIcon aria-hidden className="size-3" />
           {visibility.label}
         </Badge>
         {item.rsvp && (
-          <Badge variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}>
+          <Badge
+            variant={item.rsvp === "YES" ? "success" : item.rsvp === "NO" ? "outline" : "secondary"}
+          >
             <Ticket aria-hidden className="size-3" />
             {RSVP_META[item.rsvp].label}
           </Badge>
@@ -160,7 +182,7 @@ export function EventPeek({
       </div>
 
       <div className="mt-4 flex items-center gap-2">
-        <Button size="sm" className="flex-1" asChild>
+        <Button size="sm" variant="secondary" className="flex-1" asChild>
           <Link href={`/app/${orgSlug}/calendar/${item.id}`}>
             Open
             <ArrowRight aria-hidden className="size-3.5" />

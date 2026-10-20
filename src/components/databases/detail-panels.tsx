@@ -1,3 +1,4 @@
+import { CircleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -30,9 +31,11 @@ import {
   STATUS_LABELS,
   termLabel,
 } from "@/server/databases/format";
+import { cn } from "@/lib/utils";
 import { signupLabel } from "@/server/sync/supabase-map";
 
 import { ActionButton, ActionMenu } from "./action-button";
+import { notice } from "./styles";
 import { ContactActions } from "./contact-actions";
 import { NameOverrideForm } from "./name-override-form";
 import type { SessionFormInitial } from "./session-form-dialog";
@@ -53,9 +56,15 @@ export interface PanelContext {
   members: { id: string; name: string | null }[];
 }
 
+const LINK =
+  "decoration-foreground/25 hover:decoration-foreground font-medium underline underline-offset-4 transition-colors";
+
+/** A list row in the drawer: hairlines between, a soft tile on hover. */
+const ROW = "hover:bg-muted/60 rounded-field flex items-center justify-between gap-3 px-3 py-2.5";
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr] gap-2 text-sm">
+    <div className="grid grid-cols-[9rem_1fr] gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-words">{children ?? "—"}</dd>
     </div>
@@ -64,8 +73,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">{title}</h3>
+    <section className="space-y-3">
+      <h3 className="heading text-[15px]">{title}</h3>
       {children}
     </section>
   );
@@ -78,7 +87,7 @@ function PersonHeader({ panel }: { panel: ContactPanel }) {
     <div className="flex items-center gap-3">
       <UserAvatar user={c.user ?? { name }} size="lg" />
       <div className="min-w-0">
-        <p className="truncate font-medium">{name}</p>
+        <p className="heading truncate text-[15px]">{name}</p>
         <p className="text-muted-foreground text-xs">
           {c.emails[0]?.emailNormalized ?? c.emailMasked ?? "No email on file"}
           {c.userId && " · member account"}
@@ -107,8 +116,8 @@ export function StampStrip({
           title={`${s.title} · ${fmtDate(s.startsAt, timezone)}`}
           className={
             s.stamped
-              ? "bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-full text-xs font-semibold"
-              : "text-muted-foreground flex size-9 items-center justify-center rounded-full border border-dashed text-xs"
+              ? "bg-block-goal text-block-goal-foreground flex size-9 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
+              : "hatch bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-full text-xs tabular-nums"
           }
         >
           {s.slot}
@@ -123,14 +132,11 @@ function History({ panel, ctx }: { panel: ContactPanel; ctx: PanelContext }) {
   if (panel.history.length === 0)
     return <p className="text-muted-foreground text-sm">No check-ins visible to you.</p>;
   return (
-    <ul className="divide-y rounded-xl border text-sm">
+    <ul className="divide-border/70 -mx-3 divide-y text-sm">
       {panel.history.map((h) => (
-        <li
-          key={h.id}
-          className={`flex items-center justify-between gap-2 px-3 py-1.5 ${h.suppressed ? "opacity-60" : ""}`}
-        >
+        <li key={h.id} className={cn(ROW, h.suppressed && "opacity-60")}>
           <Link
-            className="min-w-0 truncate underline-offset-4 hover:underline"
+            className="min-w-0 truncate font-medium underline-offset-4 hover:underline"
             href={`/app/${ctx.orgSlug}/databases/sessions?row=${encodeURIComponent(h.eventId)}`}
           >
             {h.eventTitle}
@@ -151,7 +157,7 @@ function Terms({ panel }: { panel: ContactPanel }) {
   return (
     <div className="flex flex-wrap gap-2">
       {panel.terms.map((t) => (
-        <Badge key={t.term} variant="outline">
+        <Badge key={t.term} variant="secondary">
           {termLabel(t.term)}: {t.sessionsAttended} sessions, {t.stampCount} stamps
         </Badge>
       ))}
@@ -191,7 +197,7 @@ export function SessionPanel({
   const e = detail.event;
   return (
     <>
-      <dl className="space-y-1.5">
+      <dl className="divide-border/70 divide-y">
         <Field label="Type">{EVENT_KIND_LABELS[e.kind] ?? e.kind}</Field>
         <Field label="When">
           {fmtDateTime(e.startsAt, ctx.timezone)} – {fmtDateTime(e.endsAt, ctx.timezone)}
@@ -214,32 +220,19 @@ export function SessionPanel({
         <Field label="Stamp slot">{e.stampSlot}</Field>
         <Field label="RSVP">
           {e.rsvpUrl && (
-            <a
-              href={e.rsvpUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline-offset-4 hover:underline"
-            >
+            <a href={e.rsvpUrl} target="_blank" rel="noopener noreferrer" className={LINK}>
               {e.rsvpUrl}
             </a>
           )}
         </Field>
         <Field label="Calendar event">
-          <Link
-            className="text-primary underline-offset-4 hover:underline"
-            href={`/app/${ctx.orgSlug}/calendar/${e.id}`}
-          >
+          <Link className={LINK} href={`/app/${ctx.orgSlug}/calendar/${e.id}`}>
             Open in Calendar
           </Link>
           {e.googleHtmlLink && (
             <>
               {" · "}
-              <a
-                href={e.googleHtmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline-offset-4 hover:underline"
-              >
+              <a href={e.googleHtmlLink} target="_blank" rel="noopener noreferrer" className={LINK}>
                 Google Calendar
               </a>
             </>
@@ -251,9 +244,12 @@ export function SessionPanel({
         {e.description && <Field label="Description">{e.description}</Field>}
       </dl>
       {e.needsReview && (
-        <p className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
-          The website sync found more than one possible match for this session. Merge it into the
-          right one (in the … menu), or mark it as not a duplicate.
+        <p className="bg-muted/60 rounded-tile flex items-start gap-2 p-3 text-sm">
+          <CircleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            The website sync found more than one possible match for this session. Merge it into the
+            right one (in the … menu), or mark it as not a duplicate.
+          </span>
         </p>
       )}
       {ctx.canEdit && (
@@ -270,7 +266,7 @@ export function SessionPanel({
         {detail.attendees.length === 0 ? (
           <p className="text-muted-foreground text-sm">No check-ins visible to you.</p>
         ) : (
-          <ul className="divide-y rounded-xl border text-sm">
+          <ul className="divide-border/70 -mx-3 divide-y text-sm">
             {detail.attendees.map((a) => {
               const name =
                 a.nameOverride ??
@@ -279,15 +275,12 @@ export function SessionPanel({
                 a.contact.emailMasked ??
                 "Unknown";
               return (
-                <li
-                  key={a.id}
-                  className={`flex items-center justify-between gap-2 px-3 py-1.5 ${a.suppressedAt ? "opacity-60" : ""}`}
-                >
+                <li key={a.id} className={cn(ROW, a.suppressedAt && "opacity-60")}>
                   <Link
                     href={`/app/${ctx.orgSlug}/databases/attendance?row=${encodeURIComponent(a.id)}`}
-                    className="flex min-w-0 items-center gap-2 underline-offset-4 hover:underline"
+                    className="flex min-w-0 items-center gap-2.5 font-medium underline-offset-4 hover:underline"
                   >
-                    <UserAvatar user={a.contact.user ?? { name }} size="xs" />
+                    <UserAvatar user={a.contact.user ?? { name }} size="sm" />
                     <span className="truncate">{name}</span>
                   </Link>
                   <span className="text-muted-foreground shrink-0 text-xs">
@@ -326,10 +319,10 @@ export function AttendancePanel({ detail, ctx }: { detail: AttendanceDetail; ctx
   return (
     <>
       <PersonHeader panel={detail.panel} />
-      <dl className="space-y-1.5">
+      <dl className="divide-border/70 divide-y">
         <Field label="Session">
           <Link
-            className="text-primary underline-offset-4 hover:underline"
+            className={LINK}
             href={`/app/${ctx.orgSlug}/databases/sessions?row=${encodeURIComponent(r.event.id)}`}
           >
             {r.event.title}
@@ -342,7 +335,11 @@ export function AttendancePanel({ detail, ctx }: { detail: AttendanceDetail; ctx
           {r.stampNumber
             ? `#${r.stampNumber} of ${r.termStampTotal} in ${termLabel(r.term)}`
             : "No stamp (suppressed)"}
-          {r.isFirstVisit && <Badge className="ml-2">First visit</Badge>}
+          {r.isFirstVisit && (
+            <Badge variant="success" className="ml-2">
+              First visit
+            </Badge>
+          )}
         </Field>
         <Field label="Name as entered">{r.nameAsEntered}</Field>
         {r.nameOverride && <Field label="Name override">{r.nameOverride}</Field>}
@@ -415,7 +412,7 @@ export function SignupPanel({ detail, ctx }: { detail: SignupDetail; ctx: PanelC
   return (
     <>
       <PersonHeader panel={detail.panel} />
-      <dl className="space-y-1.5">
+      <dl className="divide-border/70 divide-y">
         <Field label="Status">{STATUS_LABELS[s.status] ?? s.status}</Field>
         <Field label="Signed up">{fmtDateTime(s.signedUpAt, ctx.timezone)}</Field>
         <Field label="Source">{CHANNEL_LABELS[s.channel] ?? s.channel}</Field>
@@ -486,7 +483,7 @@ export function PersonPanel({ detail, ctx }: { detail: PersonDetail; ctx: PanelC
   return (
     <>
       <PersonHeader panel={detail.panel} />
-      <dl className="space-y-1.5">
+      <dl className="divide-border/70 divide-y">
         <Field label="Term">{termLabel(detail.stats.term)}</Field>
         <Field label="Sessions">{detail.stats.sessionsAttended}</Field>
         <Field label="Stamps">{detail.stats.stampCount}</Field>
@@ -522,11 +519,11 @@ export function BallotPanel({ detail, ctx }: { detail: BallotDetail; ctx: PanelC
     : "Anonymous";
   return (
     <>
-      <p className="text-muted-foreground rounded-xl border p-3 text-xs">
+      <p className={notice.info}>
         You can see individual votes under Admin panel › Privacy. Opening this ballot was recorded
         in the audit log.
       </p>
-      <dl className="space-y-1.5">
+      <dl className="divide-border/70 divide-y">
         <Field label="Poll">{b.ballotDefinition?.title ?? b.pollSlug}</Field>
         <Field label="Cast at">
           {fmtDateTime(b.castAt, ctx.timezone)} (rounded to the hour at the source)

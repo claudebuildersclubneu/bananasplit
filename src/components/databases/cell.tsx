@@ -1,26 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ExternalLink, Minus } from "lucide-react";
+import { ArrowUpRight, Check, CircleAlert, Minus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { TagChip } from "@/components/ui/chip";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 
 import type { Cell } from "./column-config";
+import { chartColor } from "./styles";
 
-const TONE_CLASS: Record<string, string> = {
-  success: "bg-success/15 text-success border-transparent",
-  warning: "bg-warning/15 text-warning border-transparent",
-};
+const LINK =
+  "decoration-foreground/25 hover:decoration-foreground underline underline-offset-4 transition-colors";
 
-/** Renders one database cell (server-formatted value). Works in server and client components. */
+/**
+ * Renders one database cell (server-formatted value). Works in server and
+ * client components. Values are chips (Moonstone): a category (a check-in
+ * method, a source) is a TagChip in a stable chart colour, a state is a
+ * Badge: success, a warning (secondary with the warning icon), or neutral.
+ */
 export function CellView({ cell }: { cell: Cell }) {
   if (cell === null || cell === undefined) return <span className="text-muted-foreground">—</span>;
   switch (cell.t) {
     case "text":
       return (
-        <span className={cn("line-clamp-2", cell.muted && "text-muted-foreground")} title={cell.title}>
+        <span
+          className={cn("line-clamp-2", cell.muted && "text-muted-foreground")}
+          title={cell.title}
+        >
           {cell.v}
         </span>
       );
@@ -38,9 +46,16 @@ export function CellView({ cell }: { cell: Cell }) {
       );
     case "badge": {
       const tone = cell.tone ?? "secondary";
-      const variant = tone === "success" || tone === "warning" ? "outline" : tone;
+      if (tone === "outline") return <TagChip color={chartColor(cell.v)}>{cell.v}</TagChip>;
+      if (tone === "warning")
+        return (
+          <Badge variant="secondary" className="text-foreground">
+            <CircleAlert className="text-warning" aria-hidden="true" />
+            {cell.v}
+          </Badge>
+        );
       return (
-        <Badge variant={variant} className={TONE_CLASS[tone]}>
+        <Badge variant={tone === "default" ? "info" : tone === "success" ? "success" : tone}>
           {cell.v}
         </Badge>
       );
@@ -51,18 +66,18 @@ export function CellView({ cell }: { cell: Cell }) {
       ) : (
         <span className="flex flex-wrap gap-1">
           {cell.v.map((v) => (
-            <Badge key={v} variant="outline">
+            <TagChip key={v} color={chartColor(v)}>
               {v}
-            </Badge>
+            </TagChip>
           ))}
         </span>
       );
     case "person":
       return (
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2.5">
           <UserAvatar user={cell.user ?? { name: cell.name }} size="sm" />
           <span className="min-w-0">
-            <span className="block truncate">{cell.name}</span>
+            <span className="block truncate font-medium">{cell.name}</span>
             {cell.sub && <span className="text-muted-foreground block text-xs">{cell.sub}</span>}
           </span>
         </span>
@@ -73,16 +88,16 @@ export function CellView({ cell }: { cell: Cell }) {
           href={cell.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary inline-flex items-center gap-1 underline-offset-4 hover:underline"
+          className={cn("inline-flex items-center gap-1", LINK)}
           onClick={(e) => e.stopPropagation()}
         >
           {cell.label}
-          <ExternalLink className="size-3" aria-hidden="true" />
+          <ArrowUpRight className="text-muted-foreground size-3.5" aria-hidden="true" />
         </a>
       ) : (
         <Link
           href={cell.href}
-          className="text-primary line-clamp-2 underline-offset-4 hover:underline"
+          className={cn("line-clamp-2", LINK)}
           onClick={(e) => e.stopPropagation()}
         >
           {cell.label}

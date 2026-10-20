@@ -27,9 +27,7 @@ import { createNote, deleteNote, restoreNote, updateNote } from "./actions";
 /** The note ids the palette's search returns for `query`, as the mocked session user. */
 async function noteHits(orgId: string, query: string): Promise<string[]> {
   const res = await searchWorkspaceAction(orgId, { query, scope: "notes" });
-  return (res.groups.find((g) => g.id === "notes")?.hits ?? []).map((h) =>
-    h.key.replace(/^note:/, ""),
-  );
+  return (res.groups.find((g) => g.id === "notes")?.hits ?? []).map((h) => h.key.replace(/^note:/, ""));
 }
 
 interface Person {
@@ -69,13 +67,7 @@ try {
     select: { id: true, email: true, name: true },
   });
   const by = (n: string) => users.find((u) => u.email === `${n}@example.edu`);
-  const [jackson, oliver, kristine, alex, alice] = [
-    "jackson",
-    "oliver",
-    "kristine",
-    "alex",
-    "alice",
-  ].map(by);
+  const [jackson, oliver, kristine, alex, alice] = ["jackson", "oliver", "kristine", "alex", "alice"].map(by);
   if (cbcId && roboticsId && jackson && oliver && kristine && alex && alice) {
     seeded = { cbcId, roboticsId, jackson, oliver, kristine, alex, alice };
   }
@@ -107,13 +99,7 @@ describe.skipIf(!seeded)("notes and search on the RLS path (seeded CBC)", () => 
     const res = await updateNote(
       s.cbcId,
       noteId!,
-      {
-        title: `Minutes ${WORD}`,
-        contentJson: doc,
-        contentText: "budget",
-        visibility,
-        eventId: null,
-      },
+      { title: `Minutes ${WORD}`, contentJson: doc, contentText: "budget", visibility, eventId: null },
       1,
     );
     expect(res.error).toBeUndefined();
@@ -127,13 +113,7 @@ describe.skipIf(!seeded)("notes and search on the RLS path (seeded CBC)", () => 
     const res = await updateNote(
       s.cbcId,
       id,
-      {
-        title: "hijack",
-        contentJson: doc,
-        contentText: "",
-        visibility: "ORGANIZATION",
-        eventId: null,
-      },
+      { title: "hijack", contentJson: doc, contentText: "", visibility: "ORGANIZATION", eventId: null },
       2,
     );
     expect(res.error).toMatch(/not found/i);

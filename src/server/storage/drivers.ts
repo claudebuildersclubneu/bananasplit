@@ -44,8 +44,17 @@ export interface BlobDriver {
   readonly name: "vercel-blob" | "local" | "database";
   put(store: StoreName, key: string, body: Buffer, options: PutOptions): Promise<StoredBlob>;
   get(store: StoreName, key: string): Promise<{ body: Buffer; contentType: string } | null>;
+  /** A stream instead of a buffer (big Notes files); drivers without one are read whole. */
+  stream?(store: StoreName, key: string): Promise<BlobStream | null>;
   delete(store: StoreName, keys: readonly string[]): Promise<void>;
   list(store: StoreName, prefix: string, cursor?: string): Promise<{ keys: string[]; cursor?: string }>;
+}
+
+export interface BlobStream {
+  stream: ReadableStream<Uint8Array>;
+  contentType: string;
+  /** Bytes, when the store says. */
+  size: number | null;
 }
 
 export class StorageConfigError extends Error {
@@ -101,6 +110,16 @@ export function vercelBlobDriver(env: Env = process.env): BlobDriver {
         chunks.push(Buffer.from(chunk));
       }
       return { body: Buffer.concat(chunks), contentType: result.blob.contentType };
+    },
+    async stream(store, key) {
+      const { get } = await import("@vercel/blob");
+      const result = await get(key, { access: store === "public" ? "public" : "private", token: token(store) });
+      if (!result || result.statusCode !== 200 || !result.stream) return null;
+      return {
+        stream: result.stream as ReadableStream<Uint8Array>,
+        contentType: result.blob.contentType,
+        size: result.blob.size ?? null,
+      };
     },
     async delete(store, keys) {
       if (keys.length === 0) return;
@@ -236,6 +255,15 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A buffered blob as a BlobStream (drivers that only read whole). */
+export function bufferStream(blob: { body: Buffer; contentType: string }): BlobStream {
+  return {
+    stream: new Blob([new Uint8Array(blob.body)]).stream(),
+    contentType: blob.contentType,
+    size: blob.body.length,
+  };
+}
+
 /**
  * Vercel Blob first, the database behind it. A put the store refuses goes
  * to the database instead (unless the key exists or the caller gave up);
@@ -268,6 +296,16 @@ export function withDatabaseFallback(primary: BlobDriver, fallback: BlobDriver =
         console.warn(`[storage] ${primary.name} read failed for ${key}; trying the database:`, message(error));
       }
       return hit ?? fallback.get(store, key);
+    },
+    async stream(store, key) {
+      try {
+        const hit = primary.stream ? await primary.stream(store, key) : null;
+        if (hit) return hit;
+      } catch (error) {
+        console.warn(`[storage] ${primary.name} read failed for ${key}; trying the database:`, message(error));
+      }
+      const found = await fallback.get(store, key);
+      return found ? bufferStream(found) : null;
     },
     async delete(store, keys) {
       if (keys.length === 0) return;

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { CsvImportForm } from "@/components/databases/csv-import-form";
 import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NotFoundError } from "@/lib/auth/errors";
 import { getDatabase } from "@/server/databases/views";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -46,16 +47,36 @@ export default async function ImportPage({
   const help = HELP[database.kind];
   const back = `/app/${orgSlug}/databases/${dbKey}`;
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
+    <div className="max-w-3xl space-y-7.5">
+      <div className="space-y-3">
         <BackLink href={back} label={database.name} />
         <PageHeader
           title={`Import ${database.name.toLowerCase()} from CSV`}
-          description={`Up to 5,000 rows and 4 MB. Columns: ${help.columns} People are matched by email; someone already checked in to a session, or already signed up that term, is skipped. Imported rows can be edited and deleted later.`}
+          description="Up to 5,000 rows and 4 MB. Nothing is saved until you import."
         />
       </div>
-      <pre className="bg-muted overflow-x-auto rounded-xl p-3 text-xs">{help.example}</pre>
-      <CsvImportForm uploadUrl={`${back}/import/upload`} backHref={back} />
+      <CsvImportForm
+        uploadUrl={`${back}/import/upload`}
+        backHref={back}
+        backLabel={database.name}
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2>What the file needs</h2>
+          </CardTitle>
+          <CardDescription>
+            People are matched by email; someone already checked in to a session, or already signed
+            up that term, is skipped. Imported rows can be edited and deleted later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm">Columns: {help.columns}</p>
+          <pre className="bg-muted/60 rounded-tile overflow-x-auto p-4 font-mono text-xs leading-relaxed">
+            {help.example}
+          </pre>
+        </CardContent>
+      </Card>
     </div>
   );
 }
