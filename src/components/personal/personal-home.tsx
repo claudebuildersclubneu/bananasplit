@@ -47,6 +47,7 @@ import type {
 } from "@/server/personal/home";
 
 import { TileIcon, TileText, tileClass } from "@/components/overview/bits";
+import { OverviewStats } from "@/components/overview/overview-stats";
 import { UpNext } from "@/components/overview/up-next";
 import { FILE_ICONS } from "@/components/notes/file-card";
 import { familyOf } from "@/lib/files/types";
@@ -57,7 +58,6 @@ import { orgInitials } from "@/lib/theme/logo";
 
 import { DueTaskRow } from "./due-task-row";
 import { PersonalShortcuts } from "./personal-shortcuts";
-import { PersonalStats } from "./personal-stats";
 
 /**
  * The Personal space's home (/app/{personal slug}): the Personal dashboard
@@ -102,7 +102,7 @@ export function PersonalHome({
       </header>
 
       <div className="pt-1 pb-2">
-        <PersonalStats
+        <OverviewStats
           dueSoon={data.dueSoonTotal}
           dueToday={data.dueSoon.filter((t) => t.bucket === "today").length}
           overdue={data.dueSoon.filter((t) => t.bucket === "overdue").length}

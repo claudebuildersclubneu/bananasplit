@@ -171,13 +171,12 @@ describe("the sidebar in each space", () => {
   const nav = (space: Space, showLocked = false) =>
     navSections("me", visibleSidebar(null), { space, showLocked }).flatMap((s) => s.items);
 
-  it("gives Personal its own seven: Home, Tasks, Calendar, Notes, Files, Find a time and RSVPs", () => {
+  it("gives Personal its own six: Home, Tasks, Calendar, Files, Find a time and RSVPs", () => {
     const items = nav(PERSONAL, true);
     expect(items.map((i) => i.label)).toEqual([
       "Home",
       "Tasks",
       "Calendar",
-      "Notes",
       "Files",
       "Find a time",
       "RSVPs",
@@ -186,8 +185,7 @@ describe("the sidebar in each space", () => {
       "/app/me",
       "/app/me/tasks",
       "/app/me/calendar",
-      "/app/me/notes?tab=notes",
-      "/app/me/notes?tab=files",
+      "/app/me/notes",
       "/app/me/calendar/find-a-time",
       "/app/me/calendar/rsvp",
     ]);
@@ -206,19 +204,14 @@ describe("the sidebar in each space", () => {
     expect(is("Home", "/app/me/tasks")).toBe(false);
   });
 
-  it("tells Personal's Notes and Files apart on the one library they share", () => {
+  it("puts Personal's notes and uploads under one Files", () => {
     const all = nav(PERSONAL);
     const active = (path: string, search = "") =>
       all.filter((i) => isLinkActive(i, path, all, search)).map((i) => i.label);
-    expect(active("/app/me/notes", "tab=notes")).toEqual(["Notes"]);
+    expect(active("/app/me/notes")).toEqual(["Files"]);
     expect(active("/app/me/notes", "tab=files&folder=f1")).toEqual(["Files"]);
-    // A bare /notes, or a note's own page: Notes (the first of the two).
-    expect(active("/app/me/notes")).toEqual(["Notes"]);
-    expect(active("/app/me/notes/n1")).toEqual(["Notes"]);
-    // A file's own page.
+    expect(active("/app/me/notes/n1")).toEqual(["Files"]);
     expect(active("/app/me/notes/files/f1")).toEqual(["Files"]);
-    expect(isExactPage("/app/me/notes?tab=files", "/app/me/notes", "tab=files&q=x")).toBe(true);
-    expect(isExactPage("/app/me/notes?tab=files", "/app/me/notes", "tab=notes")).toBe(false);
     expect(isExactPage("/app/me", "/app/me")).toBe(true);
   });
 
