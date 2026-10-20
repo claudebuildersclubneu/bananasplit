@@ -7,8 +7,7 @@ vi.mock("@/server/db/context", async () =>
 
 const { fake, resetFake } = await import("@/test/fake-context");
 const { Role } = await import("@/generated/prisma/enums");
-const { createTag, updateLabel, mergeLabels, deleteLabel, setCreationRules } =
-  await import("./actions");
+const { createTag } = await import("./actions");
 
 function makeDb(
   opts: { membersCanCreate?: boolean; existing?: { id: string; name: string } } = {},
@@ -137,100 +136,5 @@ describe("createTag (inline, from any tag field)", () => {
   it("refuses an empty or over-long name", async () => {
     expect(await createTag("org_1", { name: " # " })).toEqual({ error: "Name the tag." });
     expect(fake.db.label.create).not.toHaveBeenCalled();
-  });
-});
-
-describe("rename, recolour, merge and delete are for owners and admins", () => {
-  it.each([Role.MEMBER, Role.TREASURER])("refuses a %s", async (role) => {
-    fake.role = role;
-    const denied = { error: "Only owners and admins can manage tags." };
-    expect(await updateLabel("org_1", "a", { name: "x" })).toEqual(denied);
-    expect(await mergeLabels("org_1", "a", "b")).toEqual(denied);
-    expect(await deleteLabel("org_1", "a")).toEqual(denied);
-    expect(fake.db.label.updateMany).not.toHaveBeenCalled();
-    expect(fake.db.label.deleteMany).not.toHaveBeenCalled();
-    expect(fake.db.taskLabel.createMany).not.toHaveBeenCalled();
-  });
-
-  it("renames and recolours, refusing a name another tag has", async () => {
-    fake.role = Role.ADMIN;
-    expect(await updateLabel("org_1", "a", { name: "Venue", color: "#ABCDEF" })).toEqual({});
-    expect(fake.db.label.updateMany).toHaveBeenCalledWith({
-      where: { id: "a", organizationId: "org_1" },
-      data: { name: "Venue", color: "#abcdef" },
-    });
-
-    fake.db = makeDb({ existing: { id: "b", name: "Design" } });
-    expect(await updateLabel("org_1", "a", { name: "design" })).toEqual({
-      error: "There's already a tag called “Design”. Merge them instead.",
-    });
-    expect(fake.db.label.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ id: { not: "a" } }) }),
-    );
-  });
-
-  it("merges: every task with the first tag gets the second, then the first goes", async () => {
-    fake.role = Role.OWNER;
-    expect(await mergeLabels("org_1", "a", "b")).toEqual({ moved: 2 });
-    expect(fake.db.taskLabel.createMany).toHaveBeenCalledWith({
-      data: [
-        { organizationId: "org_1", taskId: "t1", labelId: "b" },
-        { organizationId: "org_1", taskId: "t2", labelId: "b" },
-      ],
-      skipDuplicates: true,
-    });
-    expect(fake.db.taskLabel.deleteMany).toHaveBeenCalledWith({
-      where: { organizationId: "org_1", labelId: "a" },
-    });
-    expect(fake.db.label.deleteMany).toHaveBeenCalledWith({
-      where: { id: "a", organizationId: "org_1" },
-    });
-  });
-
-  it("won't merge a tag into itself", async () => {
-    fake.role = Role.ADMIN;
-    expect(await mergeLabels("org_1", "a", "a")).toEqual({
-      error: "Pick a different tag to merge into.",
-    });
-  });
-
-  it("deletes scoped to the caller's org", async () => {
-    fake.role = Role.OWNER;
-    await deleteLabel("org_1", "label_1");
-    expect(fake.db.taskLabel.deleteMany).toHaveBeenCalledWith({
-      where: { labelId: "label_1", organizationId: "org_1" },
-    });
-    expect(fake.db.label.deleteMany).toHaveBeenCalledWith({
-      where: { id: "label_1", organizationId: "org_1" },
-    });
-  });
-});
-
-describe("setCreationRules", () => {
-  it("is for owners and admins", async () => {
-    fake.role = Role.MEMBER;
-    expect(await setCreationRules("org_1", { memberCanCreateTags: false })).toEqual({
-      error: "Only owners and admins can manage tags.",
-    });
-    expect(fake.db.orgSettings.upsert).not.toHaveBeenCalled();
-  });
-
-  it("writes the two switches", async () => {
-    fake.role = Role.ADMIN;
-    expect(
-      await setCreationRules("org_1", {
-        memberCanCreateTags: false,
-        memberCanCreateProjects: true,
-      }),
-    ).toEqual({});
-    expect(fake.db.orgSettings.upsert).toHaveBeenCalledWith({
-      where: { organizationId: "org_1" },
-      create: {
-        organizationId: "org_1",
-        memberCanCreateTags: false,
-        memberCanCreateProjects: true,
-      },
-      update: { memberCanCreateTags: false, memberCanCreateProjects: true },
-    });
   });
 });

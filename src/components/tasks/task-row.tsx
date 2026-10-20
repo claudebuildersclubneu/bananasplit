@@ -30,8 +30,9 @@ import type { TaskItem } from "./types";
  * Personal home all use it, so a task reads the same wherever you meet it.
  * The circle, the title, a meta row (project chip, due date, tags, progress,
  * comments), then the priority chip, the owner and the ••• on the right.
- * Rows become a soft tile on hover; the hairline between rows starts past
- * the circle. `depth` indents a story's tasks under it in the List.
+ * Rows become a soft tile on hover; a full-width line ends each task.
+ * `depth` hangs a story's tasks under it in the List, on a rail from the
+ * story's circle.
  */
 export function TaskRow({
   task,
@@ -68,9 +69,15 @@ export function TaskRow({
     <li
       className={cn(
         "group hover:bg-muted/60 focus-within:bg-muted/60 rounded-field relative flex items-center gap-3 px-3 py-3 transition-colors duration-150 sm:gap-3.5",
-        "[li+&]:before:bg-border [li+&]:before:absolute [li+&]:before:start-12 [li+&]:before:end-3 [li+&]:before:top-0 [li+&]:before:h-px",
-        depth === 1 && "ps-9 [li+&]:before:start-[4.5rem]",
-        depth === 2 && "ps-16 [li+&]:before:start-24",
+        // A full-width line between tasks, so each one visibly ends.
+        depth === 0 &&
+          "[li+&]:before:bg-border [li+&]:before:absolute [li+&]:before:inset-x-3 [li+&]:before:top-0 [li+&]:before:h-px",
+        // A task under a story hangs off a rail from the story's circle
+        // instead, so the two read as one group.
+        depth > 0 &&
+          "after:bg-border after:absolute after:inset-y-0 after:start-[23px] after:w-0.5 after:rounded-full",
+        depth === 1 && "ps-11",
+        depth === 2 && "ps-16 after:start-[3.25rem]",
         done && "opacity-80",
         className,
       )}

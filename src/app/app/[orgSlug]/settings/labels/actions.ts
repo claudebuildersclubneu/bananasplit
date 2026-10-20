@@ -1,6 +1,5 @@
 "use server";
 
-import { refresh } from "next/cache";
 import { z } from "zod";
 
 import { can } from "@/lib/auth/permissions";
@@ -18,14 +17,12 @@ const tagsAction: typeof withOrgAction = (handler, options) =>
 /**
  * Tags (stored as Label), on app_user through withOrgAction.
  *
- * - createTag: anyone, from any tag field, while the club's
- *   `memberCanCreateTags` is on (the default; the Label INSERT policy reads
- *   the same flag and pins createdById to the maker); otherwise owners and
- *   admins. A name that already exists in any case is reused, never doubled:
- *   the unique index on ("organizationId", lower("name")) settles a race
- *   between two people making the same tag, and the loser gets the winner's.
- * - Rename, recolour, merge and delete: owners and admins (Settings > Tags).
- * - setCreationRules: the "Who can create tags / projects" switches.
+ * createTag is the only one: anyone makes a tag from a task's tag field (or
+ * `#tag` in a title) while adding or editing it. The Label INSERT policy
+ * still reads OrgSettings.memberCanCreateTags, which nothing turns off any
+ * more. A name that already exists in any case is reused, never doubled:
+ * the unique index on ("organizationId", lower("name")) settles a race
+ * between two people making the same tag, and the loser gets the winner's.
  */
 
 export interface TagOption {
@@ -33,8 +30,6 @@ export interface TagOption {
   name: string;
   color: string;
 }
-
-const DENIED = "Only owners and admins can manage tags.";
 
 const nameSchema = z
   .string()
@@ -44,14 +39,8 @@ const colorSchema = z
   .string()
   .regex(HEX_RE, "Pick a colour.")
   .transform((c) => c.toLowerCase());
-const idSchema = z
-  .string()
-  .min(1)
-  .max(100)
-  .regex(/^[A-Za-z0-9_-]+$/);
 
 const createSchema = z.object({ name: nameSchema, color: colorSchema.optional() });
-const updateSchema = z.object({ name: nameSchema.optional(), color: colorSchema.optional() });
 
 const tagSelect = { id: true, name: true, color: true } as const;
 
@@ -138,136 +127,3 @@ export const createTag = tagsAction(async (ctx, input: unknown): Promise<CreateR
   }
   return { tag, created: true };
 });
-
-/** Rename and/or recolour (owners and admins). */
-export const updateLabel = tagsAction(
-  async (ctx, labelId: string, input: unknown): Promise<{ error?: string }> => {
-    if (!isAdmin(ctx)) return { error: DENIED };
-    const id = idSchema.safeParse(labelId);
-    if (!id.success) return { error: "Tag not found." };
-    const parsed = updateSchema.safeParse(input);
-    if (!parsed.success) return { error: firstIssue(parsed.error) };
-    const { name, color } = parsed.data;
-    if (name) {
-      const clash = await sameName(ctx, name, id.data);
-      if (clash)
-        return { error: `There's already a tag called “${clash.name}”. Merge them instead.` };
-    }
-    const { count } = await ctx.db.label.updateMany({
-      where: { id: id.data, organizationId: ctx.organizationId },
-      data: { ...(name ? { name } : {}), ...(color ? { color } : {}) },
-    });
-    if (count === 0) return { error: "Tag not found." };
-    if (name) {
-      await writeOrgAuditLog(ctx.db, {
-        organizationId: ctx.organizationId,
-        action: "label.renamed",
-        targetType: "Label",
-        targetId: id.data,
-        diff: { name },
-      });
-    }
-    return {};
-  },
-);
-
-/**
- * Merge one tag into another (owners and admins): every task tagged with
- * the first is tagged with the second, then the first is deleted.
- */
-export const mergeLabels = tagsAction(
-  async (ctx, sourceId: string, targetId: string): Promise<{ error?: string; moved?: number }> => {
-    if (!isAdmin(ctx)) return { error: DENIED };
-    const source = idSchema.safeParse(sourceId);
-    const target = idSchema.safeParse(targetId);
-    if (!source.success || !target.success) return { error: "Tag not found." };
-    if (source.data === target.data) return { error: "Pick a different tag to merge into." };
-    const both = await ctx.db.label.findMany({
-      where: { organizationId: ctx.organizationId, id: { in: [source.data, target.data] } },
-      select: { id: true, name: true },
-    });
-    if (both.length !== 2) return { error: "Tag not found." };
-    const tagged = await ctx.db.taskLabel.findMany({
-      where: { organizationId: ctx.organizationId, labelId: source.data },
-      select: { taskId: true },
-    });
-    if (tagged.length > 0) {
-      await ctx.db.taskLabel.createMany({
-        data: tagged.map((t) => ({
-          organizationId: ctx.organizationId,
-          taskId: t.taskId,
-          labelId: target.data,
-        })),
-        skipDuplicates: true,
-      });
-    }
-    await ctx.db.taskLabel.deleteMany({
-      where: { organizationId: ctx.organizationId, labelId: source.data },
-    });
-    await ctx.db.label.deleteMany({
-      where: { id: source.data, organizationId: ctx.organizationId },
-    });
-    await writeOrgAuditLog(ctx.db, {
-      organizationId: ctx.organizationId,
-      action: "label.merged",
-      targetType: "Label",
-      targetId: target.data,
-      diff: { from: both.find((l) => l.id === source.data)?.name ?? null },
-    });
-    return { moved: tagged.length };
-  },
-);
-
-export const deleteLabel = tagsAction(async (ctx, labelId: string): Promise<{ error?: string }> => {
-  if (!isAdmin(ctx)) return { error: DENIED };
-  const id = idSchema.safeParse(labelId);
-  if (!id.success) return { error: "Tag not found." };
-  await ctx.db.taskLabel.deleteMany({
-    where: { labelId: id.data, organizationId: ctx.organizationId },
-  });
-  const { count } = await ctx.db.label.deleteMany({
-    where: { id: id.data, organizationId: ctx.organizationId },
-  });
-  if (count > 0) {
-    await writeOrgAuditLog(ctx.db, {
-      organizationId: ctx.organizationId,
-      action: "label.deleted",
-      targetType: "Label",
-      targetId: id.data,
-    });
-  }
-  return {};
-});
-
-const rulesSchema = z.object({
-  memberCanCreateTags: z.boolean().optional(),
-  memberCanCreateProjects: z.boolean().optional(),
-});
-
-/** Who can create tags and projects: everyone (the default) or owners and admins. */
-const setCreationRulesTx = withOrgAction(
-  async (ctx, input: unknown): Promise<{ error?: string }> => {
-    if (!can(ctx, "settings.general.write")) return { error: DENIED };
-    const parsed = rulesSchema.safeParse(input);
-    if (!parsed.success) return { error: firstIssue(parsed.error) };
-    await ctx.db.orgSettings.upsert({
-      where: { organizationId: ctx.organizationId },
-      create: { organizationId: ctx.organizationId, ...parsed.data },
-      update: parsed.data,
-    });
-    await writeOrgAuditLog(ctx.db, {
-      organizationId: ctx.organizationId,
-      action: "settings.creation_rules",
-      targetType: "OrgSettings",
-      targetId: ctx.organizationId,
-      diff: parsed.data,
-    });
-    return {};
-  },
-);
-
-export async function setCreationRules(orgId: string, input: unknown) {
-  const result = await setCreationRulesTx(orgId, input);
-  if (!result.error) refresh();
-  return result;
-}

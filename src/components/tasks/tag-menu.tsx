@@ -1,7 +1,6 @@
 "use client";
 
-import { Check, Plus, Search, SlidersHorizontal } from "lucide-react";
-import Link from "next/link";
+import { Check, Plus, Search } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { createTag } from "@/app/app/[orgSlug]/settings/labels/actions";
@@ -49,7 +48,7 @@ export function TagMenu({
   onChange: (ids: string[]) => void;
   autoFocus?: boolean;
 }) {
-  const { org, labels, can, viewer, addLabel } = useTasks();
+  const { org, labels, can, addLabel } = useTasks();
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -152,15 +151,6 @@ export function TagMenu({
         <p role="alert" className="text-destructive px-2 py-1 text-xs">
           {error}
         </p>
-      )}
-      {viewer.isAdmin && (
-        <>
-          <div className="bg-border mx-2 my-1 h-px" />
-          <Link href={`/app/${org.slug}/settings/labels`} className={menuItemClass()}>
-            <SlidersHorizontal className="text-muted-foreground size-4" aria-hidden="true" />
-            Manage tags
-          </Link>
-        </>
       )}
     </div>
   );

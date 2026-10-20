@@ -182,16 +182,24 @@ export function EventPeek({
       </div>
 
       <div className="mt-4 flex items-center gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" asChild>
+        {/* One solid action (the event's page: details, RSVPs, notes) and,
+            for whoever runs it, a plainly labelled edit beside it. */}
+        <Button size="sm" className="flex-1" asChild>
           <Link href={`/app/${orgSlug}/calendar/${item.id}`}>
-            Open
+            View event
             <ArrowRight aria-hidden className="size-3.5" />
           </Link>
         </Button>
         {canManage && (
-          <Button size="sm" variant="outline" onClick={() => onEdit(item)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onEdit(item)}
+            aria-label={`Edit ${item.title}`}
+          >
             <Pencil aria-hidden className="size-3.5" />
-            Edit
+            Edit event
           </Button>
         )}
       </div>

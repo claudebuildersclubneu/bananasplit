@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 
 import { createTask } from "@/app/app/[orgSlug]/tasks/actions";
 import { EmptyState } from "@/components/empty-state";
+import { ClearCompletedButton } from "@/components/tasks/clear-completed";
 import { TASK_PANEL } from "@/components/tasks/layout-ui";
 import { HashTagHint } from "@/components/tasks/tag-menu";
 import { TaskRow } from "@/components/tasks/task-row";
@@ -167,19 +168,23 @@ export function ListView({
 
       {completed.length > 0 && (
         <section>
-          <button
-            type="button"
-            onClick={() => setShowDone((v) => !v)}
-            aria-expanded={showDone}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full py-1 text-sm font-medium transition-colors"
-          >
-            <ChevronRight
-              className={cn("size-4 transition-transform duration-150", showDone && "rotate-90")}
-              aria-hidden="true"
-            />
-            Done in the last 7 days
-            <Badge variant="secondary">{completed.length}</Badge>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDone((v) => !v)}
+              aria-expanded={showDone}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full py-1 text-sm font-medium transition-colors"
+            >
+              <ChevronRight
+                className={cn("size-4 transition-transform duration-150", showDone && "rotate-90")}
+                aria-hidden="true"
+              />
+              Done in the last 7 days
+              <Badge variant="secondary">{completed.length}</Badge>
+            </button>
+            <span className="flex-1" />
+            <ClearCompletedButton tasks={completed} />
+          </div>
           {showDone && (
             <ul className={cn("mt-2", TASK_PANEL)}>
               {completed.map((task) => (
