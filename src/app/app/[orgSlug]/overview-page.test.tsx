@@ -19,6 +19,27 @@ const mocks = vi.hoisted(() => ({
   listRecent: vi.fn(),
   loadSetupState: vi.fn(),
   loadSavedBoard: vi.fn(),
+  latestSentPulse: vi.fn(),
+  weeklyDoneTrend: vi.fn(),
+  nextRsvpGoalEvent: vi.fn(),
+}));
+
+vi.mock("@/server/overview/queries", () => ({
+  loadTaskExtras: vi.fn(async () => new Map()),
+  loadEventGoing: vi.fn(async () => new Map()),
+  loadPollStats: vi.fn(
+    async (_db: unknown, _org: string, _user: string, polls: { id: string }[], n: number) =>
+      polls.map((p) => ({ ...p, voters: 0, eligible: n, mine: false, faces: [] })),
+  ),
+  nextRsvpGoalEvent: mocks.nextRsvpGoalEvent,
+  rsvpSeatsTaken: vi.fn(async () => 64),
+}));
+vi.mock("@/app/app/[orgSlug]/tasks/actions", () => ({ setTaskStatus: vi.fn() }));
+vi.mock("@/server/pulse/queries", () => ({
+  latestSentPulse: mocks.latestSentPulse,
+  weeklyDoneTrend: mocks.weeklyDoneTrend,
+  getPulseIssue: vi.fn(async () => null),
+  nextPulseLabel: () => "Fri, Oct 9 at 5:00 PM",
 }));
 
 const db = {
@@ -115,7 +136,26 @@ beforeEach(() => {
   db.poll.findMany.mockResolvedValue([]);
   db.membership.findMany.mockResolvedValue([]);
   db.membership.count.mockResolvedValue(1);
+  mocks.latestSentPulse.mockResolvedValue(null);
+  mocks.weeklyDoneTrend.mockResolvedValue([
+    { weekStart: "2026-09-26", label: "Sep 26", done: 3 },
+    { weekStart: "2026-10-03", label: "Oct 3", done: 0 },
+  ]);
+  mocks.nextRsvpGoalEvent.mockResolvedValue(null);
 });
+
+const meeting = {
+  id: "e_meet",
+  title: "Officer meeting",
+  startsAt: new Date("2026-10-06T02:00:00Z"),
+  endsAt: new Date("2026-10-06T03:00:00Z"),
+  allDay: false,
+  kind: "BOARD_MEETING",
+  visibility: "INTERNAL",
+  location: "Engineering Hall 112",
+  googleSyncState: "NOT_APPLICABLE",
+  needsReview: false,
+};
 
 afterEach(() => {
   vi.useRealTimers();
@@ -209,6 +249,7 @@ describe("org overview", () => {
   });
 
   it("puts events in the viewer's timezone with their own RSVP", async () => {
+    mocks.loadSavedBoard.mockResolvedValue([{ id: "events", type: "events", w: 2, h: null }]);
     mocks.getUpcomingEvents.mockResolvedValue([
       {
         id: "e_1",
@@ -292,7 +333,79 @@ describe("org overview", () => {
   it("shows a next step when there is nothing pinned or coming up", async () => {
     const html = await render();
     expect(html).toContain("Nothing pinned yet");
-    expect(html).toContain("No meetings coming up");
-    expect(html).toContain("No events coming up");
+    expect(html).toContain("Nothing needs you this week");
+    mocks.loadSavedBoard.mockResolvedValue([
+      { id: "meetings", type: "meetings", w: 2, h: null },
+      { id: "events", type: "events", w: 2, h: null },
+    ]);
+    const lists = await render();
+    expect(lists).toContain("No meetings coming up");
+    expect(lists).toContain("No events coming up");
+  });
+});
+
+describe("the Moonstone Overview", () => {
+  it("greets in the display face with the date and club on a plain line", async () => {
+    const html = await render();
+    expect(html).toContain("Monday, October 5 · Claude Builders Club");
+    expect(html).not.toContain('class="eyebrow');
+  });
+
+  it("puts the week at a glance in the header, with the next meeting's time", async () => {
+    mocks.getUpcomingEvents.mockImplementation(
+      async (_db: unknown, _org: string, _now: Date, _n: number, only?: string) =>
+        only === "meetings" ? [meeting] : [],
+    );
+    db.task.count.mockResolvedValue(0);
+    const html = await render();
+    expect(html).toContain("Open tasks");
+    expect(html).toContain("All clear");
+    // 7pm in Los Angeles, the same day.
+    expect(html).toContain("7:00 PM");
+    expect(html).toContain("Officer meeting, today");
+  });
+
+  it("starts a new board with Up next and the Weekly pulse", async () => {
+    mocks.getUpcomingEvents.mockImplementation(
+      async (_db: unknown, _org: string, _now: Date, _n: number, only?: string) =>
+        only === "meetings" ? [meeting] : [],
+    );
+    mocks.getViewerRsvps.mockResolvedValue(new Map([["e_meet", "PENDING"]]));
+    const html = await render();
+    expect(html).toContain('aria-label="Up next"');
+    expect(html).toContain('aria-label="Weekly pulse"');
+    // The RSVP waiting on the viewer is an answer block.
+    expect(html).toContain("Your RSVP · Today · 7:00 PM");
+    expect(html.indexOf('aria-label="Up next"')).toBeLessThan(html.indexOf('aria-label="My tasks"'));
+    expect(html).toContain("The first pulse goes out Fri, Oct 9 at 5:00 PM.");
+  });
+
+  it("shows the latest pulse's figure and tiles, and keeps a saved board's order", async () => {
+    mocks.latestSentPulse.mockResolvedValue({
+      id: "pi_1",
+      weekStart: "2026-09-26",
+      note: null,
+      sentAt: new Date("2026-10-02T21:00:00Z"),
+      data: {
+        v: 1,
+        range: { from: "2026-09-26", to: "2026-10-02" },
+        doneCount: 9,
+        byProject: [{ projectId: "p", name: "Fall Showcase", color: null, done: 9, open: 2 }],
+        events: [{ eventId: "e", title: "General meeting", startsAt: "2026-09-30T22:00:00Z", checkIns: 32 }],
+        newMembers: [],
+        pollResults: [],
+        nextWeek: [],
+      },
+    });
+    mocks.loadSavedBoard.mockResolvedValue([
+      { id: "weekly-pulse", type: "weekly-pulse", w: 4, h: null },
+    ]);
+    const html = await render();
+    expect(html).toContain("Sent Fri, Oct 2");
+    expect(html).toContain("tasks done last week");
+    expect(html).toContain("32 at the General meeting");
+    expect(html).toContain('href="/app/cbc/pulse/2026-09-26"');
+    // A saved board isn't given the new widgets.
+    expect(html).not.toContain('aria-label="Up next"');
   });
 });

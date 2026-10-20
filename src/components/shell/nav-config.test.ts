@@ -324,6 +324,7 @@ describe("Admin panel navigation", () => {
       "Plan and storage",
       "Sidebar",
       "Theme",
+      "Weekly pulse",
       "Tags",
       "Members",
       "Privacy",

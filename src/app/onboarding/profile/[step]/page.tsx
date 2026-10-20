@@ -113,7 +113,7 @@ export default async function ProfileStepPage({
             </button>
           </form>
         ) : (
-          <SignOutButton className="text-ink-muted hover:text-ink h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
+          <SignOutButton className="text-muted-foreground hover:text-foreground h-auto p-0 text-[14px] font-semibold hover:bg-transparent" />
         )
       }
     >
@@ -163,22 +163,22 @@ function ProfilePreview({ profile }: { profile: OnboardingProfile }) {
           />
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate text-[16px] font-bold">{profile.name ?? profile.email}</span>
-            {subtitle && <span className="text-ink-soft text-[13px]">{subtitle}</span>}
+            {subtitle && <span className="text-muted-foreground text-[13px]">{subtitle}</span>}
           </span>
         </div>
-        {school && <span className="text-ink-muted text-[14px]">{school}</span>}
+        {school && <span className="text-muted-foreground text-[14px]">{school}</span>}
         {profile.bio && (
-          <p className="text-ink-muted m-0 text-[14px] leading-[1.5] whitespace-pre-line">
+          <p className="text-muted-foreground m-0 text-[14px] leading-[1.5] whitespace-pre-line">
             {profile.bio}
           </p>
         )}
         {profile.links.length > 0 && (
-          <span className="text-ink-soft text-[13px]">
+          <span className="text-muted-foreground text-[13px]">
             {profile.links.length} {profile.links.length === 1 ? "link" : "links"}
           </span>
         )}
       </PreviewTile>
-      <p className="text-ink-faint m-0 mt-auto text-[12px] leading-[1.5]">
+      <p className="text-muted-foreground m-0 mt-auto text-[12px] leading-[1.5]">
         Your card fills in as you go. Change any of it later on your profile.
       </p>
     </>
@@ -265,7 +265,7 @@ function Review({ profile }: { profile: OnboardingProfile }) {
 
   return (
     <div className="flex flex-1 flex-col gap-5">
-      <div className="bg-muted/40 flex items-center gap-3.5 rounded-xl border p-3.5">
+      <div className="bg-muted/40 flex items-center gap-3.5 rounded-field border p-3.5">
         <UserAvatar
           user={{
             name: profile.name,
@@ -288,7 +288,7 @@ function Review({ profile }: { profile: OnboardingProfile }) {
         </Link>
       </div>
 
-      <dl className="divide-y rounded-xl border">
+      <dl className="divide-y rounded-field border">
         {rows.map((row) => (
           <div key={row.label} className="group flex items-center gap-3 px-3.5 py-2.5 text-sm">
             <row.icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />

@@ -128,10 +128,10 @@ export async function completeProfileSetup(page: Page, next: "join" | "create"):
   await page.getByRole("button", { name: "Finish later" }).click();
   // Personal's home (docs/features/personal-and-clubs.md).
   await page.waitForURL(/\/app\/me-[a-z0-9]+$/);
-  await page
-    .getByRole("main")
-    .getByRole("link", { name: next === "join" ? "Join a club" : "Start a club" })
-    .click();
+  // "Start a club" is a link on Personal's home; joining is a code field
+  // there, so the join flow opens its page (where emailed invites list too).
+  if (next === "join") await page.goto("/onboarding/join");
+  else await page.getByRole("main").getByRole("link", { name: "Start a club" }).click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
 }
 
@@ -149,7 +149,7 @@ export async function chooseClubRole(page: Page, orgSlug: string, role?: string)
 
 /**
  * Org setup (onboarding Flow B) with the defaults: name the club, keep the
- * suggested labels, finance and starter teams, invite no one, skip the
+ * suggested labels, finance, starter teams and pulse, invite no one, skip the
  * connections, and land on the new club's home as its OWNER. Returns the slug.
  */
 export async function createOrgViaOnboarding(page: Page, orgName: string): Promise<string> {
@@ -163,6 +163,9 @@ export async function createOrgViaOnboarding(page: Page, orgName: string): Promi
   await page.waitForURL(/\/finance$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/teams$/);
+  await page.getByRole("button", { name: "Continue" }).click();
+  // The weekly pulse, with its defaults (Fridays at 5 PM, to everyone).
+  await page.waitForURL(/\/pulse$/);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL(/\/invite$/);
   await page.getByRole("button", { name: "Continue" }).click();

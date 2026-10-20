@@ -47,6 +47,8 @@ const empty: PersonalHomeData = {
   hosting: [],
   profileGaps: [],
   finishProfileHref: null,
+  yourWeek: { done: 0, bySpace: [] },
+  recentFiles: [],
 };
 
 function render(data: PersonalHomeData) {
@@ -255,5 +257,42 @@ describe("PersonalHome", () => {
     expect(html).toContain('href="/app/robotics/calendar/polls/a1"');
     expect(html).toContain("Mark when you&#x27;re free");
     expect(html).toContain("4 answered");
+  });
+
+  it("speaks the Overview's language: stats, Up next, Your week and Recent files", () => {
+    const html = render({
+      ...empty,
+      dueSoon: [
+        {
+          space: personal,
+          id: "t9",
+          title: "Renew passport",
+          status: "NOT_STARTED",
+          dueKey: "2026-10-13",
+          bucket: "today",
+          href: "/app/me-abc/tasks/t9",
+        },
+      ],
+      dueSoonTotal: 1,
+      yourWeek: { done: 5, bySpace: [{ space: robotics, done: 3 }, { space: personal, done: 2 }] },
+      recentFiles: [
+        {
+          id: "f1",
+          name: "Resume.pdf",
+          contentType: "application/pdf",
+          createdAt: new Date("2026-10-13T13:00:00Z"),
+          href: "/app/me-abc/notes/files/f1",
+        },
+      ],
+    });
+    expect(html).toContain("Due this week");
+    expect(html).toContain("1 due today");
+    expect(html).toContain('aria-labelledby="up-next-heading"');
+    expect(html).toContain("Due today");
+    expect(html).toContain("Your week");
+    expect(html).toContain("tasks finished in the last 7 days");
+    expect(html).toContain("Robotics");
+    expect(html).toContain('href="/app/me-abc/notes/files/f1"');
+    expect(html).toContain("Resume.pdf");
   });
 });
