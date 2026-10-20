@@ -22,6 +22,7 @@ import {
   saveSetupCalendarsAction,
   type SetupResult,
 } from "./actions";
+import { nativeSelectClass } from "../settings/settings-card";
 import type { SetupStepView } from "./view";
 
 /**
@@ -36,8 +37,7 @@ import type { SetupStepView } from "./view";
  * thing to change (src/server/setup/diagnose), and the field to go back to.
  */
 
-const selectClass =
-  "border-input bg-background focus-visible:ring-ring h-8 w-full rounded-lg border px-2.5 text-sm focus-visible:ring-2 focus-visible:outline-none";
+const selectClass = nativeSelectClass;
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -117,7 +117,7 @@ function SecretField({
             : placeholder
         }
       />
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-[13px]">
         {help ? `${help} ` : ""}Encrypted before it is stored; never shown again.
       </p>
     </div>
@@ -169,7 +169,7 @@ export function DataSourceForm({ orgId, view, onConnected }: FormProps) {
             aria-invalid={fieldInvalid(failure, "projectRef") || undefined}
             onChange={(e) => setProjectRef(e.target.value)}
           />
-          <p className="text-muted-foreground text-xs">20 lowercase letters.</p>
+          <p className="text-muted-foreground text-[13px]">20 lowercase letters.</p>
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="setup-sb-role">Database role</Label>
@@ -180,7 +180,7 @@ export function DataSourceForm({ orgId, view, onConnected }: FormProps) {
             spellCheck={false}
             onChange={(e) => setRoleName(e.target.value)}
           />
-          <p className="text-muted-foreground text-xs">The one suite-export.sql created.</p>
+          <p className="text-muted-foreground text-[13px]">The one suite-export.sql created.</p>
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="setup-sb-region">Pooler region</Label>
@@ -211,7 +211,7 @@ export function DataSourceForm({ orgId, view, onConnected }: FormProps) {
           </select>
         </div>
       </div>
-      <p className="text-muted-foreground bg-muted/40 rounded-md border p-2.5 text-xs">
+      <p className="text-muted-foreground bg-muted/60 rounded-field px-3.5 py-2.5 text-[13px]">
         Connects to <span className="font-mono">{host}</span> as{" "}
         <span className="font-mono">
           {roleName || "role"}.{projectRef || "ref"}
@@ -270,7 +270,7 @@ export function CalendarForm({
           {signedIn ? "Reconnect Google Calendar" : "Connect Google Calendar"}
         </Button>
         {!configured ? (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-[13px]">
             Not available in this environment: the platform has no Google OAuth client
             (GOOGLE_CALENDAR_CLIENT_ID). Everything else on this page works; ask whoever runs the
             deployment to add one, then come back.
@@ -280,7 +280,7 @@ export function CalendarForm({
 
       {signedIn && calendars.length > 0 ? (
         <form
-          className="space-y-4 border-t pt-4"
+          className="rounded-tile bg-muted/40 space-y-4 p-4"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
             submit(() =>
@@ -380,7 +380,7 @@ export function ClaudeForm({ orgId, view, onConnected }: FormProps) {
             </option>
           ))}
         </select>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-[13px]">
           The test checks your key can actually use this one. Haiku is the cheapest and is usually
           enough for a one-page chart.
         </p>
@@ -388,7 +388,7 @@ export function ClaudeForm({ orgId, view, onConnected }: FormProps) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <Label htmlFor="setup-claude-fallbacks">Retry a declined document</Label>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-[13px]">
             If Claude declines to read a document, Anthropic re-runs it once on its recommended
             fallback model. That second run is billed too.
           </p>

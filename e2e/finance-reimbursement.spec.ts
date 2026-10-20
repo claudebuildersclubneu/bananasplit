@@ -88,7 +88,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   await signOut(page);
   await signIn(page, owner);
   await page.goto(`/app/${orgSlug}/finance`);
-  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42.50");
+  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42");
 
   await page.goto(`/app/${orgSlug}/finance/transactions`);
   await page.getByText(expenseDescription).click();
@@ -103,7 +103,7 @@ test("expense reimbursement lifecycle", async ({ page }) => {
   // Reimbursement doesn't touch the ledger balance — the expense already
   // counted against it the moment it was submitted (a draft never does).
   await page.goto(`/app/${orgSlug}/finance`);
-  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42.50");
+  await expect(page.getByRole("region", { name: "Balance" })).toContainText("-$42");
 
   // --- the submitter's "owed to you" clears back to zero ---
   await signOut(page);

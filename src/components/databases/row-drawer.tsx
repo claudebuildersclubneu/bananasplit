@@ -2,7 +2,13 @@
 
 import type { ReactNode } from "react";
 
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 import { useViewParams } from "./view-params";
 
@@ -28,12 +34,12 @@ export function RowDrawer({
         if (!open) view.update((p) => p.delete("row"), { keepPage: true });
       }}
     >
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
+      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-xl">
+        <SheetHeader className="gap-1 px-6 pt-6 pr-14 pb-5">
+          <SheetTitle className="text-[19px]">{title}</SheetTitle>
           {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
-        <div className="space-y-6 px-4 pb-6">{children}</div>
+        <div className="space-y-7 px-6 pb-8">{children}</div>
       </SheetContent>
     </Sheet>
   );

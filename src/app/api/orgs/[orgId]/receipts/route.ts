@@ -15,6 +15,14 @@ import { deleteReceiptBlobs } from "@/lib/finance/receipt-storage";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { withOrgAction, withOrgTx } from "@/server/db/context";
 import { putBlob } from "@/server/storage";
+import {
+  checkUpload,
+  confirmFits,
+  crossedWarning,
+  UploadRefusedError,
+  uploadRefusalResponse,
+  warnStorage,
+} from "@/server/storage/quota";
 import { readUpload, UploadError } from "@/server/storage/upload";
 import { isCrossSite } from "@/lib/http/cross-site";
 
@@ -62,13 +70,22 @@ interface ReceiptRow {
   sizeBytes: number;
 }
 
-/** Step 4: the row, as app_user (the Receipt INSERT policy re-checks the attach rule). */
+/**
+ * Step 4: the row, as app_user (the Receipt INSERT policy re-checks the
+ * attach rule), with the storage quota re-checked once the database has
+ * counted it (confirmFits rolls the row back when the club is now over),
+ * and the owners and admins told if it took the club past 80%.
+ */
 const createReceiptRow = withOrgAction(
   async (ctx, row: ReceiptRow) => {
     const receipt = await ctx.db.receipt.create({
       data: { organizationId: ctx.organizationId, uploadedById: ctx.userId, ...row },
       select: { id: true },
     });
+    const fit = await confirmFits(ctx.db, ctx.organizationId, row.sizeBytes, ctx.role);
+    if (crossedWarning(fit.space, fit)) {
+      await warnStorage(ctx.db, fit.space, fit.after, `receipt:${receipt.id}`);
+    }
     return receipt.id;
   },
   { feature: "finance" },
@@ -86,8 +103,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     return json(401, { error: "Sign in to upload receipts." });
   }
 
+  // The upload gate (src/server/storage/quota.ts) before the body is read:
+  // a member (a non-member gets 404), finance on the plan, not paused, room left.
+  const gateOptions = { feature: "finance", routeMaxBytes: MAX_RECEIPT_BYTES } as const;
   try {
-    await withOrgTx(orgId, async () => undefined);
+    const refusal = await checkUpload(orgId, 0, gateOptions);
+    if (refusal) return uploadRefusalResponse(refusal);
   } catch (error) {
     // Not "forbidden": a non-member cannot learn whether the org exists.
     if (error instanceof NotFoundError) return json(404, { error: "Not found." });
@@ -137,6 +158,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     return json(415, { error: "Only image and PDF receipts are supported." });
   }
 
+  // The gate again with the real size: does it fit?
+  const refusal = await checkUpload(orgId, bytes.length, gateOptions);
+  if (refusal) return uploadRefusalResponse(refusal);
+
   const stored = await putBlob(
     "receipts",
     orgId,
@@ -156,6 +181,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     return json(201, { receiptId });
   } catch (error) {
     await deleteReceiptBlobs([stored.key]);
+    if (error instanceof UploadRefusedError) return uploadRefusalResponse(error.refusal);
     throw error;
   }
 }

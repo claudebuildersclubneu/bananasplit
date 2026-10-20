@@ -43,3 +43,6 @@ export function SectionIntro({
     </div>
   );
 }
+
+/** The page's column: 1240px with a 24px gutter, as every section uses. */
+export const CONTAINER = "mx-auto w-full max-w-[1240px] px-6";

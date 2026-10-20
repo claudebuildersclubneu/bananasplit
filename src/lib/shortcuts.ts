@@ -78,6 +78,17 @@ export function isShortcutSheetKey(
   return event.key === "/" || event.code === "Slash";
 }
 
+/**
+ * ⌘\ or Ctrl \ on any platform (Ctrl works on a Mac too): collapse the
+ * sidebar to its rail, or dock it again. Works in fields too, like ⌘/.
+ */
+export function isSidebarToggleKey(
+  event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey">,
+): boolean {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+  return event.key === "\\" || event.code === "Backslash";
+}
+
 /** A menu, popover or dialog is open: single keys belong to it. */
 export function overlayOpen(): boolean {
   return (
@@ -105,7 +116,7 @@ export interface ShortcutSheetInput {
   sections: readonly { id: string; label: string }[];
   /** Owners and admins: the Admin panel. */
   isAdmin: boolean;
-  /** Board, Week, Table and Dashboard (not on the Free plan, which has the List). */
+  /** Board, Week, List, Table, Roadmap and Dashboard (not on the Free plan, which has a plain list). */
   taskViews?: boolean;
   /** The weekly update (not in a Personal space). */
   teamwork?: boolean;
@@ -120,6 +131,7 @@ export function shortcutGroups(input: ShortcutSheetInput): ShortcutGroup[] {
   const anywhere: ShortcutRow[] = [
     { keys: [[mod, "K"]], label: "Search everything" },
     { keys: [[mod, "/"], ["?"]], label: "Show keyboard shortcuts" },
+    { keys: [[mod, "\\"]], label: "Collapse or expand the sidebar" },
   ];
   if (has("tasks")) anywhere.push({ keys: [[upper(TASK_KEYS.newTask)]], label: "New task" });
 
@@ -139,7 +151,10 @@ export function shortcutGroups(input: ShortcutSheetInput): ShortcutGroup[] {
   if (has("tasks")) {
     const tasks: ShortcutRow[] = [];
     if (input.taskViews) {
-      tasks.push({ keys: [["1"], ["2"], ["3"], ["4"]], label: "Board, Week, Table or Dashboard" });
+      tasks.push({
+        keys: [["1"], ["2"], ["3"], ["4"], ["5"], ["6"]],
+        label: "Board, Week, List, Table, Roadmap or Dashboard",
+      });
     }
     tasks.push(
       { keys: [["/"]], label: "Search tasks" },

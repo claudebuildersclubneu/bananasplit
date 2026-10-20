@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { NOTE_FILE_ACCEPT } from "@/lib/files/types";
+import { uploadNoteFile } from "@/lib/files/upload";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { NOTE_TEMPLATES } from "@/lib/notes/templates";
 import { cn } from "@/lib/utils";
@@ -257,19 +258,13 @@ export function NotesNewMenu({
     vis: Visibility,
     folder: string | null,
   ): Promise<string | null> {
-    const form = new FormData();
-    form.set("file", file);
-    form.set("visibility", vis);
-    if (folder) form.set("folderId", folder);
-    const res = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/files`, {
-      method: "POST",
-      body: form,
-    });
-    if (!res.ok) {
-      setError(await readError(res, "The upload failed."));
+    // The route or a direct upload by size, with the plan's quota errors.
+    const result = await uploadNoteFile(orgId, file, { visibility: vis, folderId: folder });
+    if (!result.ok) {
+      setError(result.error);
       return null;
     }
-    return ((await res.json()) as { file: { id: string } }).file.id;
+    return result.file.id;
   }
 
   async function createDraft() {
@@ -382,7 +377,7 @@ export function NotesNewMenu({
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" size="sm" disabled={pending}>
+          <Button type="button" variant="create" size="sm" disabled={pending}>
             {pending ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             ) : (

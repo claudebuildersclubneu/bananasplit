@@ -17,7 +17,7 @@ import pg from "pg";
  * violation with the theme <style> present.
  */
 
-const HARBOR_LIGHT_PRIMARY = "#1d4ed8";
+const HARBOR_DARK_PRIMARY = "#7fb0ff";
 const HARBOR_DARK_BACKGROUND = "#0b1220";
 const EVERGREEN_LIGHT_PRIMARY = "#1f6b43";
 
@@ -122,22 +122,31 @@ test("a preset restyles the whole app, portals included, with no CSP violation",
   try {
     await resetTheme(admin.page, "debate-society");
     await openTheme(admin.page, "debate-society");
-    // next-themes' inline script ran under the nonce: it set the class and color-scheme.
+    // next-themes' inline script ran under the nonce: it set the class and
+    // color-scheme (dark, Moonstone's default mode).
     expect(await admin.page.evaluate(() => document.documentElement.style.colorScheme)).toBe(
-      "light",
+      "dark",
     );
 
     await admin.page.getByText("Harbor", { exact: true }).click();
     await save(admin.page);
-    await expect.poll(() => token(admin.page, "primary")).toBe(HARBOR_LIGHT_PRIMARY);
+    await expect.poll(() => token(admin.page, "primary")).toBe(HARBOR_DARK_PRIMARY);
 
     // A fresh load renders the org <style> on the server.
     await admin.page.goto("/app/debate-society/calendar");
     expect(await admin.page.locator("style[data-org-theme]").count()).toBe(1);
-    expect(await token(admin.page, "primary")).toBe(HARBOR_LIGHT_PRIMARY);
-    // The calendar's primary button is painted with the theme's primary.
+    expect(await token(admin.page, "primary")).toBe(HARBOR_DARK_PRIMARY);
+    // The calendar's create button (New event) is painted with the theme's accent.
     const newEvent = admin.page.getByRole("button", { name: "New event" }).first();
-    await expect(newEvent).toHaveCSS("background-color", "rgb(29, 78, 216)");
+    const accent = await admin.page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = "var(--brand-accent)";
+      document.body.appendChild(probe);
+      const value = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return value;
+    });
+    await expect(newEvent).toHaveCSS("background-color", accent);
 
     // A Radix portal on <body> picks up the theme.
     await admin.page.getByRole("button", { name: /Open user menu/ }).click();

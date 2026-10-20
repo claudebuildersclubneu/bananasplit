@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Stat } from "@/components/reports/stat";
+import { MixBar } from "@/components/ui/meters";
 import { STATUS_LABEL, STATUS_TOKEN, TASK_PANEL } from "@/components/tasks/layout-ui";
 import { BlockedNote, DueLabel } from "@/components/tasks/task-badges";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
@@ -97,30 +97,68 @@ export function DashboardView({
         The tasks in view, counted (top-level, as on the board). Click a number to see them.
       </p>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-        <Stat label="Open" value={totals.open} href={link({ status: "open" }, "table")} />
-        <Stat
-          label="In progress"
-          value={totals.inProgress}
-          href={link({ status: "IN_PROGRESS" })}
-        />
-        <Stat
-          label="Blocked"
-          value={<Tone n={totals.blocked}>{totals.blocked}</Tone>}
-          href={link({ status: "BLOCKED" })}
-        />
-        <Stat
-          label="Overdue"
-          value={<Tone n={totals.overdue}>{totals.overdue}</Tone>}
-          href={link(overdueQuery, "table")}
-        />
-        <Stat
-          label="Due in 7 days"
-          value={totals.dueSoon}
-          href={link({ status: "open", dueFrom: span.todayKey, dueTo: span.dueSoonKey }, "table")}
-        />
-        <Stat label="Done this week" value={totals.doneRecently} detail="Last 7 days" />
-        <Stat label="No owner" value={totals.unowned} detail="Open, unassigned" />
+      <div className="grid gap-[18px] lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        {/* Chart kit 8.5: how the work in view splits, to scale. */}
+        <section
+          className="bg-card edge rounded-card p-6 max-sm:p-[18px]"
+          aria-labelledby="dash-mix"
+        >
+          <h2 id="dash-mix" className="heading">
+            Where the work stands
+          </h2>
+          <div className="mt-4 mb-4 flex items-baseline gap-2.5">
+            <b className="numeral text-[32px]">
+              {totals.notStarted + totals.inProgress + totals.blocked + totals.done}
+            </b>
+            <span className="text-muted-foreground text-sm">tasks in view</span>
+          </div>
+          <MixBar
+            label={`${totals.notStarted} not started, ${totals.inProgress} in progress, ${totals.blocked} blocked, ${totals.done} done`}
+            segments={[
+              { label: "Not started", value: totals.notStarted, hatch: true },
+              {
+                label: "In progress",
+                value: totals.inProgress,
+                color: "var(--chart-2)",
+              },
+              {
+                label: "Blocked",
+                value: totals.blocked,
+                color: "var(--destructive)",
+              },
+              { label: "Done", value: totals.done, color: "var(--chart-4)" },
+            ]}
+          />
+        </section>
+        <section
+          className="bg-card edge rounded-card p-6 max-sm:p-[18px]"
+          aria-labelledby="dash-next"
+        >
+          <h2 id="dash-next" className="heading">
+            Worth a look
+          </h2>
+          <ul className="mt-3 space-y-1">
+            <Line
+              label="Blocked"
+              value={<Tone n={totals.blocked}>{totals.blocked}</Tone>}
+              href={link({ status: "BLOCKED" })}
+            />
+            <Line
+              label="Overdue"
+              value={<Tone n={totals.overdue}>{totals.overdue}</Tone>}
+              href={link(overdueQuery, "table")}
+            />
+            <Line
+              label="Due in 7 days"
+              value={totals.dueSoon}
+              href={link(
+                { status: "open", dueFrom: span.todayKey, dueTo: span.dueSoonKey },
+                "table",
+              )}
+            />
+            <Line label="No owner" value={totals.unowned} detail="Open, unassigned" />
+          </ul>
+        </section>
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -376,12 +414,46 @@ function WeeklyUpdates({
 
 function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h3
-      id={id}
-      className="text-muted-foreground flex items-baseline text-xs font-medium tracking-wide uppercase"
-    >
+    <h3 id={id} className="heading flex items-baseline gap-2">
       {children}
     </h3>
+  );
+}
+
+/** One count in "Worth a look": the label, the number, a link to those tasks. */
+function Line({
+  label,
+  value,
+  href,
+  detail,
+}: {
+  label: string;
+  value: React.ReactNode;
+  href?: string;
+  detail?: string;
+}) {
+  const body = (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-medium">{label}</span>
+        {detail && <span className="text-muted-foreground block text-xs">{detail}</span>}
+      </span>
+      <span className="numeral text-[22px]">{value}</span>
+    </>
+  );
+  return (
+    <li>
+      {href ? (
+        <Link
+          href={href}
+          className="hover:bg-muted/60 rounded-field flex items-center gap-3 px-3 py-2.5 transition-colors"
+        >
+          {body}
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3 px-3 py-2.5">{body}</div>
+      )}
+    </li>
   );
 }
 

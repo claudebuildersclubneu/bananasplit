@@ -51,8 +51,9 @@ export function SessionRowActions({
               label: "Delete session",
               action: deleteSessionAction,
               args: [organizationId, initial.id],
-              confirm:
-                "Delete this session? It also disappears from the calendar. Check-ins stay attached.",
+              confirm: "Delete this session?",
+              confirmDescription:
+                "It also disappears from the calendar. Its check-ins stay attached.",
               destructive: true,
             },
           ]}

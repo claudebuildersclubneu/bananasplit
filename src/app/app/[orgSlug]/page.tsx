@@ -5,23 +5,27 @@ import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/empty-state";
 import { PersonalHome } from "@/components/personal/personal-home";
 import { JoinCodeCard } from "@/components/onboarding/join-code-card";
-import { GettingStartedCard } from "@/components/overview/getting-started-card";
+import { CardControls, OpenLink } from "@/components/overview/bits";
+import { GettingStartedBlock, RsvpGoalBlock } from "@/components/overview/goal-blocks";
 import { MyTasksCard } from "@/components/overview/my-tasks-card";
 import { OverviewBoard } from "@/components/overview/overview-board";
+import { OverviewStats } from "@/components/overview/overview-stats";
 import { PinnedGrid } from "@/components/overview/pinned-grid";
+import { Shortcuts } from "@/components/overview/shortcuts";
+import { UpNext } from "@/components/overview/up-next";
 import { UpcomingEventsCard } from "@/components/overview/upcoming-events-card";
+import { WeeklyPulseCard } from "@/components/overview/weekly-pulse-card";
 import {
   FileList,
   NoteList,
   PeopleList,
   PollList,
   RecentList,
-  Shortcuts,
-  TaskStats,
   WeekStrip,
   type WeekDay,
 } from "@/components/overview/widget-bodies";
 import { SetupPrompt } from "@/components/setup/setup-prompt";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUpcomingEvents, getViewerRsvps } from "@/app/app/[orgSlug]/calendar/queries";
@@ -32,15 +36,32 @@ import { spaceIncludes } from "@/lib/billing/space";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { visibleSidebar } from "@/lib/nav/sidebar";
+import { dayWordOfKey, timeWord } from "@/lib/overview/format";
 import { overviewWidgetsFor, resolveOverview } from "@/lib/overview/widgets";
+import { DEFAULT_PULSE_DAY, DEFAULT_PULSE_HOUR } from "@/lib/pulse/settings";
 import { addDaysToKey, effectiveTimezone, fromDateKey, localDateKey } from "@/lib/tasks/dates";
 import { loadSavedBoard } from "@/server/boards";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listNoteFiles } from "@/server/notes/files";
 import { getOrCreateJoinCode } from "@/server/onboarding/join-code";
+import {
+  loadEventGoing,
+  loadPollStats,
+  loadTaskExtras,
+  nextRsvpGoalEvent,
+  rsvpSeatsTaken,
+} from "@/server/overview/queries";
+import { buildUpNext } from "@/server/overview/up-next";
 import { listPins, listRecent } from "@/server/pins";
-import { loadPersonalHome } from "@/server/personal/home";
 import { listOpenPolls } from "@/server/polls/open-polls";
+import {
+  getPulseIssue,
+  latestSentPulse,
+  nextPulseLabel,
+  weeklyDoneTrend,
+} from "@/server/pulse/queries";
+import { upcomingPulseSend } from "@/server/pulse/schedule";
+import { loadPersonalHome } from "@/server/personal/home";
 import { loadSetupState } from "@/server/setup/progress";
 import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
 
@@ -59,9 +80,11 @@ function greeting(now: Date, timeZone: string): string {
 }
 
 /**
- * The Overview: each member's own board of widgets (their tasks, meetings,
- * events, pins, recent pages, notes, files, people...). Nothing about the
- * club's money is on it. The setup checklist is an admin-only widget.
+ * The Overview (redesign guide 9): each member's own board of widgets,
+ * arranged to answer "what needs me?". The greeting and the stat strip
+ * head it; Up next, My tasks, the RSVP goal, open polls and the Weekly
+ * pulse come first on a new board. Nothing about the club's money is on it.
+ * The setup checklist is an admin-only widget.
  */
 export default async function OrgOverviewPage({
   params,
@@ -84,6 +107,10 @@ export default async function OrgOverviewPage({
   const canSetUp = can({ role }, "integrations.write");
   const isAdmin = can({ role }, "settings.view");
   const canAddEvents = can({ role }, "events.write");
+  const orgZone = safeTimeZone(org.timezone);
+  const pulseOn = settings?.pulseEnabled ?? true;
+  const pulseDay = settings?.pulseDay ?? DEFAULT_PULSE_DAY;
+  const pulseHour = settings?.pulseHourLocal ?? DEFAULT_PULSE_HOUR;
 
   // One transaction as the member: the reads run one after another on its
   // connection, and RLS bounds each to the org.
@@ -100,11 +127,16 @@ export default async function OrgOverviewPage({
     const events = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "events");
     const meetings = await getUpcomingEvents(db, org.id, now, EVENTS_LIMIT, "meetings");
     const weekEvents = await getUpcomingEvents(db, org.id, now, 60);
+    const myTasks = await getMyOpenTasks(db, org.id, user.id, { limit: MY_TASKS_LIMIT, today });
+    const memberCount = await db.membership.count({ where: { organizationId: org.id } });
+    const polls = await listOpenPolls(db, org.id, now, 5);
+    const upcomingSend = upcomingPulseSend(now, orgZone, pulseDay, pulseHour);
     return {
       timeZone: tz,
       todayKey: dayKey,
       firstName: me?.name?.trim().split(/\s+/)[0] ?? null,
-      myTasks: await getMyOpenTasks(db, org.id, user.id, { limit: MY_TASKS_LIMIT, today }),
+      myTasks,
+      taskExtras: await loadTaskExtras(db, org.id, myTasks.tasks.map((t) => t.id)),
       stats: {
         open: await db.task.count({ where: mine }),
         today: await db.task.count({ where: { AND: [mine, { dueDate: today }] } }),
@@ -120,12 +152,20 @@ export default async function OrgOverviewPage({
         user.id,
         [...events, ...meetings].map((e) => e.id),
       ),
+      going: await loadEventGoing(db, org.id, [...events, ...meetings].map((e) => e.id)),
       pins: await listPins(db, org.id, org.slug, user.id),
       recent: await listRecent(db, org.id, org.slug, user.id, RECENT_LIMIT),
       notes: await getRecentNotes(db, org.id, user.id, 6),
       files: (await listNoteFiles(db, org.id)).slice(0, 6),
       // Questions and find-a-time polls still taking answers, newest first.
-      polls: await listOpenPolls(db, org.id, now, 5),
+      polls: await loadPollStats(db, org.id, user.id, polls, memberCount),
+      goal: await nextRsvpGoalEvent(db, org.id, now),
+      pulse: await latestSentPulse(db, org.id),
+      trend: await weeklyDoneTrend(db, org.id, { timeZone: orgZone, pulseDay, now }),
+      draft:
+        isAdmin && pulseOn
+          ? await getPulseIssue(db, org.id, upcomingSend.weekStart, { drafts: true })
+          : null,
       people: await db.membership.findMany({
         where: { organizationId: org.id },
         select: {
@@ -134,9 +174,9 @@ export default async function OrgOverviewPage({
           user: { select: { id: true, name: true, email: true, image: true, avatar: true } },
         },
         orderBy: { joinedAt: "desc" },
-        take: 6,
+        take: 12,
       }),
-      memberCount: await db.membership.count({ where: { organizationId: org.id } }),
+      memberCount,
       saved: await loadSavedBoard(db, org.id, user.id, "overview"),
       setup: canSetUp ? await loadSetupState(db, org.id) : null,
       joinCode:
@@ -145,7 +185,7 @@ export default async function OrgOverviewPage({
           : null,
       started: isAdmin
         ? {
-            members: (await db.membership.count({ where: { organizationId: org.id } })) > 1,
+            members: memberCount > 1,
             picture: org.logo != null,
             event:
               (await db.event.count({ where: { organizationId: org.id, deletedAt: null } })) > 0,
@@ -159,46 +199,63 @@ export default async function OrgOverviewPage({
   }).catch(handleAuthErrorInPage);
 
   const { timeZone, todayKey } = data;
-  const zones = { viewer: timeZone, org: safeTimeZone(org.timezone) };
+  const zones = { viewer: timeZone, org: orgZone };
+  const base = `/app/${orgSlug}`;
+  const calendarHref = `${base}/calendar`;
   const dateLine = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     timeZone,
   }).format(now);
-  const calendarHref = `/app/${orgSlug}/calendar`;
+
+  // Seats for the RSVP goal: counted on the service path (the page's own number).
+  const goal = data.goal;
+  const seats =
+    goal && (!goal.hideCount || isAdmin) ? await rsvpSeatsTaken(org.id, goal.id) : null;
 
   // "This week": the next seven days in the viewer's timezone.
-  const dayFmt = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-  const timeFmt = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-  });
+  const weekdayFmt = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
   const week: WeekDay[] = Array.from({ length: 7 }, (_, i) => {
     const key = addDaysToKey(todayKey, i);
+    const date = new Date(`${key}T00:00:00Z`);
     return {
       key,
-      label: i === 0 ? "Today" : dayFmt.format(new Date(`${key}T00:00:00Z`)),
+      weekday: weekdayFmt.format(date),
+      date: String(date.getUTCDate()),
       isToday: i === 0,
       events: data.weekEvents
-        .filter((e) => localDateKey(e.startsAt, timeZone) === key)
+        .filter((e) => localDateKey(e.startsAt, e.allDay ? orgZone : timeZone) === key)
         .map((e) => ({
           id: e.id,
           title: e.title,
-          time: e.allDay ? "All day" : timeFmt.format(e.startsAt),
+          time: e.allDay ? "All day" : timeWord(e.startsAt, timeZone),
         })),
     };
   });
 
-  const shortcuts = visibleSidebar(settings?.sidebar)
-    .flatMap((g) => g.items)
+  const nextMeeting = data.meetings[0];
+  const stats = (
+    <OverviewStats
+      stats={data.stats}
+      nextMeeting={
+        nextMeeting
+          ? {
+              time: nextMeeting.allDay ? "All day" : timeWord(nextMeeting.startsAt, timeZone),
+              label: `${nextMeeting.title}, ${dayWordOfKey(
+                localDateKey(nextMeeting.startsAt, nextMeeting.allDay ? orgZone : timeZone),
+                todayKey,
+              ).replace(/^(Today|Tomorrow)$/, (w) => w.toLowerCase())}`,
+            }
+          : null
+      }
+    />
+  );
+
+  const sidebarIcons = visibleSidebar(settings?.sidebar).flatMap((g) => g.items);
+  const shortcuts = sidebarIcons
     .filter((i) => i.id !== "overview")
-    .map((i) => ({ id: i.id, label: i.label, href: `/app/${orgSlug}${i.path}` }));
+    .map((i) => ({ id: i.id, label: i.label, icon: i.icon, href: `${base}${i.path}` }));
 
   const eventEmpty = (title: string, description: string, cta: string) => (
     <EmptyState
@@ -215,19 +272,38 @@ export default async function OrgOverviewPage({
     />
   );
 
+  const upNext = buildUpNext({
+    orgSlug,
+    now,
+    todayKey,
+    zones,
+    tasks: data.myTasks.tasks,
+    taskExtras: data.taskExtras,
+    meetings: data.meetings,
+    events: data.events,
+    rsvps: data.rsvps,
+    going: data.going,
+    polls: data.polls,
+  });
+
+  const pulseHref = `${base}/pulse`;
+  const sentLabel = data.pulse?.sentAt
+    ? `Sent ${new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: orgZone }).format(data.pulse.sentAt)}`
+    : null;
+
   const bodies = {
+    "up-next": <UpNext slots={upNext} calendarHref={calendarHref} />,
     pinned: <PinnedGrid orgId={org.id} pins={data.pins} />,
     "my-tasks": (
       <MyTasksCard
-        bare
+        orgId={org.id}
         orgSlug={orgSlug}
         tasks={data.myTasks.tasks}
-        total={data.myTasks.total}
-        overdue={data.myTasks.overdue}
+        extras={data.taskExtras}
         todayKey={todayKey}
       />
     ),
-    "task-stats": <TaskStats orgSlug={orgSlug} stats={data.stats} />,
+    "task-stats": <OverviewStats stats={data.stats} nextMeeting={null} className="sm:gap-x-8" />,
     recent: <RecentList items={data.recent} now={now} />,
     meetings: (
       <UpcomingEventsCard
@@ -260,24 +336,112 @@ export default async function OrgOverviewPage({
         )}
       />
     ),
+    "rsvp-goal": (
+      <RsvpGoalBlock
+        event={goal}
+        when={
+          goal
+            ? new Intl.DateTimeFormat("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                timeZone: goal.allDay ? orgZone : timeZone,
+              }).format(goal.startsAt)
+            : null
+        }
+        taken={seats}
+        href={goal ? `${base}/calendar/${goal.id}` : null}
+        createHref={canAddEvents ? `${base}/calendar/rsvp` : null}
+      />
+    ),
     week: <WeekStrip orgSlug={orgSlug} days={week} />,
-    polls: <PollList orgSlug={orgSlug} polls={data.polls} now={now} />,
+    polls: <PollList orgSlug={orgSlug} polls={data.polls} now={now} timeZone={timeZone} />,
+    "weekly-pulse": (
+      <WeeklyPulseCard
+        issue={data.pulse}
+        trend={data.trend}
+        archiveHref={pulseHref}
+        issueHref={data.pulse ? `${pulseHref}/${data.pulse.weekStart}` : null}
+        nextSend={pulseOn ? nextPulseLabel(now, orgZone, pulseDay, pulseHour) : null}
+        draftHref={
+          data.draft && !data.draft.sentAt ? `${pulseHref}/${data.draft.weekStart}` : null
+        }
+      />
+    ),
     notes: <NoteList orgSlug={orgSlug} notes={data.notes} />,
     files: <FileList orgSlug={orgSlug} files={data.files} />,
     people: <PeopleList orgSlug={orgSlug} people={data.people} total={data.memberCount} />,
     shortcuts: <Shortcuts links={shortcuts} />,
     ...(data.started
-      ? { "getting-started": <GettingStartedCard orgSlug={orgSlug} state={data.started} /> }
+      ? { "getting-started": <GettingStartedBlock orgSlug={orgSlug} state={data.started} /> }
       : {}),
+  };
+
+  const { total, overdue } = data.myTasks;
+  const headerActions = {
+    "my-tasks": (
+      <CardControls
+        count={`${total} open`}
+        chips={overdue > 0 ? <Badge variant="destructive">{overdue} overdue</Badge> : null}
+      >
+        <OpenLink
+          href={`${base}/tasks?view=mine`}
+          label={total > data.myTasks.tasks.length ? `View all ${total}` : "View all"}
+        />
+      </CardControls>
+    ),
+    polls: (
+      <CardControls count={data.polls.length || undefined}>
+        <OpenLink href={`${base}/calendar/polls`} label="Open polls" />
+      </CardControls>
+    ),
+    "weekly-pulse": (
+      <CardControls count={sentLabel ?? undefined}>
+        <OpenLink href={pulseHref} label="Open the pulse archive" />
+      </CardControls>
+    ),
+    meetings: (
+      <CardControls>
+        <OpenLink href={calendarHref} label="Open the calendar" />
+      </CardControls>
+    ),
+    events: (
+      <CardControls>
+        <OpenLink href={calendarHref} label="Open the calendar" />
+      </CardControls>
+    ),
+    week: (
+      <CardControls>
+        <OpenLink href={`${calendarHref}?view=week`} label="Open the week on the calendar" />
+      </CardControls>
+    ),
+    people: (
+      <CardControls count={data.memberCount}>
+        <OpenLink href={`${base}/people`} label="Open People" />
+      </CardControls>
+    ),
+    pinned: <CardControls count={data.pins.length || undefined} />,
+    notes: (
+      <CardControls>
+        <OpenLink href={`${base}/notes`} label="Open Files" />
+      </CardControls>
+    ),
+    files: (
+      <CardControls>
+        <OpenLink href={`${base}/notes`} label="Open Files" />
+      </CardControls>
+    ),
   };
 
   const greetingBlock = (
     <div>
-      <p className="eyebrow text-muted-foreground mb-2">{dateLine}</p>
       <h1 className="page-title">
         {greeting(now, timeZone)}
         {data.firstName ? `, ${data.firstName}` : ""}
       </h1>
+      <p className="text-muted-foreground mt-2 text-[15px]">
+        {dateLine} · {org.name}
+      </p>
     </div>
   );
 
@@ -289,12 +453,14 @@ export default async function OrgOverviewPage({
         initialLayout={resolveOverview(data.saved, isAdmin)}
         customized={data.saved !== null}
         bodies={bodies}
+        headerActions={headerActions}
         intro={greetingBlock}
+        stats={stats}
         notice={
           data.joinCode || data.setup ? (
             <>
               {data.joinCode && (
-                <Card className="border-primary/30 bg-primary/5">
+                <Card>
                   <CardHeader className="space-y-3">
                     <div>
                       <CardTitle>{org.name} is ready</CardTitle>
@@ -302,7 +468,7 @@ export default async function OrgOverviewPage({
                         Invite your members: share this code or link. They set up their profile,
                         enter it, and see {org.name} before they join. Manage it any time in{" "}
                         <Link
-                          href={`/app/${orgSlug}/settings/members`}
+                          href={`${base}/settings/members`}
                           className="underline underline-offset-4"
                         >
                           Admin panel › Members

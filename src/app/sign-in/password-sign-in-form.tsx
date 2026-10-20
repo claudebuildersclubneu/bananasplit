@@ -31,7 +31,10 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
         id="password"
         label="Password"
         aside={
-          <Link href="/forgot-password" className="text-honey font-medium">
+          <Link
+            href="/forgot-password"
+            className="text-muted-foreground hover:text-foreground text-[13px] font-medium transition-colors"
+          >
             Forgot?
           </Link>
         }
@@ -49,13 +52,13 @@ export function PasswordSignInForm({ callbackUrl }: { callbackUrl?: string | nul
       <PrimaryButton type="submit" disabled={isPending}>
         {isPending ? "Logging in…" : "Log in"}
       </PrimaryButton>
-      <p className="text-ink-muted m-0 text-center text-[14px]">
+      <p className="text-muted-foreground m-0 text-center text-[14px]">
         New to Bananasplit?{" "}
         <Link
           href={
             callbackUrl ? `/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/sign-up"
           }
-          className="font-bold"
+          className="text-foreground font-semibold underline decoration-current/30 underline-offset-2 hover:decoration-current"
         >
           Create an account
         </Link>

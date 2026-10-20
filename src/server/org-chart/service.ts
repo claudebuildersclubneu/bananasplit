@@ -12,6 +12,7 @@ import {
 } from "@/generated/prisma/client";
 import { requirePermission } from "@/lib/auth/permissions";
 import { LIMITS, normalizeOpenItems, type NormalizedChart } from "@/lib/org-chart/normalize";
+import { applyOutline, draftFromMembers, parseOutline } from "@/lib/org-chart/outline";
 import { starterChart } from "@/lib/org-chart/starter";
 import { clamp, cleanBullets, cleanLine, positionKeyFromTitle, uniqueKey } from "@/lib/org-chart/text";
 import type { ChartWarning, MatchState, OpenItem, ParseReport } from "@/lib/org-chart/types";
@@ -351,7 +352,7 @@ export async function retryParse(ctx: Ctx, versionId: string, claudeKeySaved: bo
 
 // ------------------------------------------------------------------ drafts
 
-export const DRAFT_SOURCES = ["blank", "current", "starter"] as const;
+export const DRAFT_SOURCES = ["blank", "current", "starter", "members"] as const;
 export type DraftSource = (typeof DRAFT_SOURCES)[number];
 
 /**
@@ -360,7 +361,10 @@ export type DraftSource = (typeof DRAFT_SOURCES)[number];
  *   current  a copy of the published chart, to edit;
  *   starter  the common club roles already laid out and written up
  *            (src/lib/org-chart/starter.ts), with nobody in them - what an
- *            org uses when it has no document to import.
+ *            org uses when it has no document to import;
+ *   members  positions drafted from the titles members already have
+ *            (draftFromMembers in src/lib/org-chart/outline.ts), each
+ *            linked to its member; untitled members wait in the tray.
  */
 export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
   requirePermission(ctx, "orgchart.write");
@@ -381,6 +385,31 @@ export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
     const members = await memberIndex(db, organizationId);
     writes = rowsToWrites(source.positions, { memberIds: members.ids, userNames: members.names });
     openItems = source.openItems as Prisma.InputJsonValue;
+  } else if (from === "members") {
+    const rows = await db.membership.findMany({
+      where: { organizationId },
+      select: { userId: true, role: true, title: true, user: { select: { name: true } } },
+    });
+    const members = rows.map((r) => ({ id: r.userId, name: r.user.name, title: r.title, role: r.role }));
+    const drafted = applyOutline([], parseOutline(draftFromMembers(members)), members);
+    const taken = new Set<string>();
+    writes = drafted.map((p) => ({
+      ref: p.id,
+      key: uniqueKey(positionKeyFromTitle(p.title || "position"), taken),
+      title: clamp(cleanLine(p.title), LIMITS.title),
+      personName: p.personName,
+      userId: p.userId,
+      matchState: p.matchState,
+      matchScore: p.matchScore,
+      suggestedUserIds: p.suggestedUserIds,
+      reportsToRef: p.reportsTo,
+      isOpen: p.isOpen,
+      isAdvisor: p.isAdvisor,
+      responsibilities: [],
+      decidesAlone: [],
+      sourceQuote: [],
+      rank: p.rank,
+    }));
   } else if (from === "starter") {
     const chart = starterChart();
     writes = chartToWrites(chart, await memberCandidates(db, organizationId));

@@ -138,7 +138,7 @@ export function LabelsStep({
                 {task.label ? (
                   <DotChip color={task.label.color}>{task.label.name}</DotChip>
                 ) : (
-                  <span className="text-ink-faint text-[12px]">No label</span>
+                  <span className="text-muted-foreground text-[12px]">No label</span>
                 )}
                 <span
                   aria-hidden="true"
@@ -151,7 +151,7 @@ export function LabelsStep({
             </PreviewTile>
           ))}
           {setup.tasks.length === 0 && (
-            <p className="text-ink-faint m-0 mt-auto text-[12px]">
+            <p className="text-muted-foreground m-0 mt-auto text-[12px]">
               Sample tasks, to show how labels look.
             </p>
           )}
@@ -169,7 +169,7 @@ export function LabelsStep({
           {rows.map((row) => (
             <li
               key={row.key}
-              className="bg-paper border-ink/10 focus-within-banana flex h-[50px] items-center gap-3 rounded-xl border px-4"
+              className="bg-card border-foreground/10 focus-within-banana flex h-10 items-center gap-3 rounded-field border px-4"
             >
               <button
                 type="button"
@@ -194,7 +194,7 @@ export function LabelsStep({
                 onChange={(e) => update(row.key, { name: e.target.value })}
                 className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold outline-none"
               />
-              <span className="text-ink-soft flex-none text-[13px]">
+              <span className="text-muted-foreground flex-none text-[13px]">
                 {row.taskCount === null
                   ? "New"
                   : `${row.taskCount} ${row.taskCount === 1 ? "item" : "items"}`}

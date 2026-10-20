@@ -68,10 +68,10 @@ export default async function TransactionsPage({
 
   // Add transaction is in the Finance header; Show deleted is one of the filters.
   return (
-    <div className="space-y-4">
+    <div className="space-y-4.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <TransactionFiltersBar periods={periods} categories={categories} members={members} />
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" asChild>
           <a href={`/app/${orgSlug}/finance/transactions/export?${exportQuery}`}>
             <Download className="size-4" aria-hidden="true" />
             Export CSV

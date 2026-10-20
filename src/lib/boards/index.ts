@@ -29,6 +29,12 @@ export interface WidgetMeta {
   icon: string;
   w: number;
   h: number | null;
+  /**
+   * "card" (the default): the board frames it as a surface card with its
+   * title. "bare": the body draws its own surface (a row of block cards, a
+   * goal block), so the board only adds the edit controls while customizing.
+   */
+  frame?: "card" | "bare";
 }
 
 export interface BoardWidget {

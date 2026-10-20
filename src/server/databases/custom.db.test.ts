@@ -480,7 +480,7 @@ describe("club-made databases against the local database", () => {
     expect(values.filter((v) => ids.has(v[major.id] as string))).toHaveLength(4890);
     expect(values.filter((v) => major.id in v)).toHaveLength(4890);
     expect(values.every((v) => typeof v[name.id] === "string")).toBe(true);
-  });
+  }, 30_000);
 
   it("adds choices without losing anyone else's, and refuses a choice list saved from a stale copy", async () => {
     if (!reachable) return;

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
+import { PageHeader } from "@/components/page-header";
 
 import { SyncPanel } from "@/components/calendar/sync-panel";
 import { appUrl } from "@/lib/app-url";
@@ -36,20 +37,23 @@ export default async function CalendarSyncPage({
   const status = await withOrgTx(org.id, (ctx) => getGoogleSyncStatus(ctx));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <Link
-          href={`/app/${orgSlug}/calendar`}
-          className="text-muted-foreground text-sm hover:underline"
-        >
-          ← Back to calendar
-        </Link>
-        <h1 className="page-title mt-1">Sync and website feed</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          The suite is the source of truth for events. Public events are mirrored to Google Calendar
-          and published to the website feed; internal events never are.
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-7">
+      <BackLink href={`/app/${orgSlug}/calendar`} label="Calendar" />
+      <PageHeader
+        title="Sync and website feed"
+        description={[
+          status.google?.status === "CONNECTED"
+            ? "Mirroring public events to Google Calendar"
+            : status.google?.status === "ERROR"
+              ? "Google Calendar needs attention"
+              : "Google Calendar isn't connected",
+          status.publicEventsEnabled ? "website feed on" : "website feed off",
+        ].join(" · ")}
+      />
+      <p className="text-muted-foreground -mt-3 text-sm">
+        The suite is the source of truth for events. Public events are mirrored to Google Calendar
+        and published to the website feed; internal events never are.
+      </p>
       <SyncPanel
         orgId={org.id}
         orgSlug={orgSlug}

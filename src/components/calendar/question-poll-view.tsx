@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { TickMeter } from "@/components/ui/meters";
 import { toast } from "@/components/ui/toaster";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -100,12 +101,15 @@ export function QuestionPoll({
   orgId,
   orgSlug,
   timeZone,
+  memberCount,
 }: {
   poll: QuestionPollView;
   orgId: string;
   orgSlug: string;
   /** The org's zone: what the server renders times in, before the viewer's own. */
   timeZone: string;
+  /** Members who can vote: the open poll's turnout meter, one tick each. */
+  memberCount?: number;
 }) {
   const router = useRouter();
   const zone = useViewerTimeZone(timeZone);
@@ -295,8 +299,29 @@ export function QuestionPoll({
         </div>
       </header>
 
+      {poll.isOpen && memberCount !== undefined && memberCount > 0 && (
+        <div className="bg-card text-card-foreground ring-foreground/6 edge rounded-card space-y-3 p-5 ring-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="heading text-[15px]">Turnout</p>
+            <p className="text-muted-foreground text-[13px] tabular-nums">
+              <span className="text-foreground font-semibold">
+                {Math.min(live.voters, memberCount)}
+              </span>{" "}
+              of {memberCount} members voted
+            </p>
+          </div>
+          <TickMeter
+            total={memberCount}
+            filled={live.voters}
+            height={22}
+            color="var(--chart-1)"
+            label={`${live.voters} of ${memberCount} members voted`}
+          />
+        </div>
+      )}
+
       {!poll.isOpen && (
-        <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
+        <div className="bg-muted rounded-tile flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
           <span className="flex items-center gap-2">
             <Lock aria-hidden className="text-muted-foreground size-4 shrink-0" />
             <span>
@@ -324,7 +349,7 @@ export function QuestionPoll({
       {/* ----------------------------------------------------------- options */}
       <section className="space-y-3" aria-label="Options">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="text-sm font-medium">
+          <h2 className="heading text-[17px]">
             {poll.canVote ? (poll.multiple ? "Pick as many as you like" : "Pick one") : "Results"}
           </h2>
           <p className="text-muted-foreground inline-flex items-center gap-1.5 text-sm tabular-nums">
@@ -342,6 +367,7 @@ export function QuestionPoll({
                 pollId={poll.id}
                 option={option}
                 row={rows.get(option.id)}
+                voterTotal={live.voters}
                 voters={votersOf(option)}
                 selected={mine.includes(option.id)}
                 multiple={poll.multiple}
@@ -417,6 +443,7 @@ function OptionRow({
   pollId,
   option,
   row,
+  voterTotal,
   voters,
   selected,
   multiple,
@@ -429,6 +456,8 @@ function OptionRow({
   pollId: string;
   option: QuestionPollOptionView;
   row: TallyRow | undefined;
+  /** Everyone who has voted: the meter has one tick per voter. */
+  voterTotal: number;
   voters: PollVoter[] | null;
   selected: boolean;
   multiple: boolean;
@@ -469,10 +498,10 @@ function OptionRow({
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium break-words">{option.label}</span>
             {selected && (
-              <span className="text-primary inline-flex items-center gap-1 text-xs font-medium">
-                <Check aria-hidden className="size-3.5" />
+              <Badge variant="success">
+                <Check aria-hidden />
                 You voted
-              </span>
+              </Badge>
             )}
           </span>
           {resultsVisible && row && (
@@ -488,20 +517,26 @@ function OptionRow({
         </span>
         {resultsVisible && row && (
           <>
-            <span aria-hidden className="bg-muted block h-2 overflow-hidden rounded-full">
-              <span
-                className={cn(
-                  "block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none",
-                  leading ? "bg-primary" : "bg-primary/35",
-                )}
-                style={{ width: `${row.percent}%` }}
+            {voterTotal > 0 ? (
+              <TickMeter
+                total={voterTotal}
+                filled={row.votes}
+                height={14}
+                color={
+                  leading
+                    ? "var(--chart-1)"
+                    : "color-mix(in oklab, var(--chart-1) 45%, var(--muted-strong))"
+                }
+                label={`${voteCount(row.votes)} of ${voterTotal} voters`}
               />
-            </span>
+            ) : (
+              <span aria-hidden className="bg-muted hatch block h-3.5 rounded-[3px]" />
+            )}
             <span className="text-muted-foreground flex min-h-5 items-center justify-between gap-3 text-xs">
               <span className="flex items-center gap-1.5 tabular-nums">
                 {voteCount(row.votes)}
                 {leading && (
-                  <span className="text-primary inline-flex items-center gap-1 font-medium">
+                  <span className="text-foreground inline-flex items-center gap-1 font-semibold">
                     <span aria-hidden>·</span>
                     {!isOpen && <Trophy aria-hidden className="size-3.5" />}
                     {isOpen ? "Leading" : "Top choice"}
@@ -519,19 +554,20 @@ function OptionRow({
   return (
     <li
       className={cn(
-        "group/option bg-card relative flex items-start rounded-xl border transition-colors",
+        "group/option bg-card ring-foreground/6 edge rounded-tile relative flex items-start ring-1 transition-[box-shadow,background-color,transform] duration-200",
         selected
-          ? "border-primary/60 bg-primary/5"
-          : canVote && "hover:border-foreground/20 hover:bg-muted/30",
-        canVote && "has-[input:focus-visible]:ring-ring/50 has-[input:focus-visible]:ring-3",
+          ? "ring-foreground ring-2"
+          : canVote && "hover:shadow-e2 hover:-translate-y-px motion-reduce:hover:translate-y-0",
+        canVote &&
+          "has-[input:focus-visible]:outline-foreground has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2",
       )}
     >
       {canVote ? (
-        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3.5 py-3">
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-4 py-3.5">
           {body}
         </label>
       ) : (
-        <div className="flex min-w-0 flex-1 items-start gap-3 px-3.5 py-3">{body}</div>
+        <div className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3.5">{body}</div>
       )}
       {menu && <div className="py-2.5 pe-2">{menu}</div>}
     </li>

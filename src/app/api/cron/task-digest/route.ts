@@ -3,13 +3,15 @@ import { NextResponse } from "next/server";
 import { assertCronAuth } from "@/server/cron/auth";
 import { serviceDb } from "@/server/db/clients";
 import { sanitize } from "@/server/jobs/sanitize";
+import { schedulePulse } from "@/server/pulse/schedule";
 import { scheduleOrgTaskJobs, type TriggerMode } from "@/server/tasks/schedule";
 
 /**
  * Enqueues the daily task digests, the weekly-update reminders and the
- * due-today and overdue reminders (src/server/tasks/schedule.ts). It never
- * sends anything itself: the job drain (/api/cron/jobs) runs the
- * task-digest, weekly-update-reminder and task-reminder jobs.
+ * due-today and overdue reminders (src/server/tasks/schedule.ts), and each
+ * club's weekly pulse (src/server/pulse/schedule.ts). It never sends
+ * anything itself: the job drain (/api/cron/jobs) runs the task-digest,
+ * weekly-update-reminder, task-reminder and weekly-pulse jobs.
  *
  *   GET /api/cron/task-digest              hourly trigger (Vercel Pro cron,
  *                                          or the GitHub Actions pinger)
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
   let digests = 0;
   let weeklyReminders = 0;
   let dueReminders = 0;
+  let pulses = 0;
   let failed = 0;
   for (const { id: orgId } of orgIds) {
     try {
@@ -44,10 +47,16 @@ export async function GET(request: Request) {
       failed += 1;
       console.error("[cron] task-digest failed for one org", sanitize(error));
     }
+    try {
+      pulses += (await schedulePulse(orgId, now, mode)).pulses;
+    } catch (error) {
+      failed += 1;
+      console.error("[cron] weekly pulse scheduling failed for one org", sanitize(error));
+    }
   }
 
   return NextResponse.json(
-    { mode, orgs: orgIds.length, digests, weeklyReminders, dueReminders, failed },
+    { mode, orgs: orgIds.length, digests, weeklyReminders, dueReminders, pulses, failed },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

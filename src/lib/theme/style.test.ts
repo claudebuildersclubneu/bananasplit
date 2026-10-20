@@ -27,7 +27,8 @@ const INPUT = { ...ROW };
 
 const FULL: ThemeStyle = {
   accent: "#2e8b57",
-  radius: "round",
+  glow: null,
+  radius: "sharp",
   textSize: "large",
   headingFont: "sans",
   bodyFont: "system",
@@ -106,15 +107,21 @@ describe("theme style: CSS", () => {
   it("maps every option to a fixed value", () => {
     const css = lookStyleSheet(FULL);
     expect(css.startsWith("html:root{")).toBe(true);
-    expect(css).toContain("--radius:0.8125rem");
+    expect(css).toContain("--radius:0.25rem");
+    expect(css).toContain("--radius-scale:0.4");
     expect(css).toContain("font-size:106.25%");
     expect(css).toContain("--heading-weight:700");
     expect(css).toContain("--font-hanken:ui-sans-serif");
     // The accent never goes through this sheet (it is a token, checked as hex in css.ts).
     expect(css).not.toContain("2e8b57");
     expect(lookStyleSheet({ ...DEFAULT_THEME_STYLE, headingFont: "sans" })).toContain(
-      "--font-young-serif:var(--font-hanken)",
+      "--font-display:var(--font-hanken)",
     );
+    expect(lookStyleSheet({ ...DEFAULT_THEME_STYLE, headingFont: "young-serif" })).toContain(
+      "--font-display:var(--font-young-serif)",
+    );
+    // The default look (round corners, Bricolage) sets nothing.
+    expect(lookStyleSheet(DEFAULT_THEME_STYLE)).toBe("");
   });
 });
 
@@ -123,7 +130,7 @@ describe("theme style: personal themes", () => {
     const org = resolveTheme({ ...ROW, tokens: { style: FULL } });
     const harbor = THEME_PRESETS.find((p) => p.id === "harbor")!;
     const mine = applyPersonalTheme(org, { preset: "harbor", mode: "system", custom: null });
-    expect(mine.style).toEqual({ ...FULL, accent: null });
+    expect(mine.style).toEqual({ ...FULL, accent: null, glow: null });
     expect(mine.tokens.light["brand-accent"]).toBe(harbor.light.accent);
   });
 });

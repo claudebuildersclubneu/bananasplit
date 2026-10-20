@@ -1,9 +1,10 @@
 # Org Chart: setup
 
 The **Org Chart** section shows who holds each role, who they report to,
-what they own and what they can decide alone. Owners and admins build it by
-importing a document, by starting from the club template, or by hand; they
-review everything and publish. Every member can browse the published chart.
+what they own and what they can decide alone. Any member can build or change
+it, by importing a document, by starting from the club template, or by hand,
+then review everything and publish. Every version is kept, so any publish can
+be undone from **Versions**. Every member can browse the published chart.
 
 **You do not need a Claude API key.** The portal reads org-chart documents
 itself, for nothing. A key is only a backup for a document it cannot make
@@ -11,7 +12,37 @@ sense of, and for PDFs.
 
 ## For an org
 
-### 1. Get the chart in (three ways)
+### 1. Get the chart in (four ways)
+
+**Type it.** **Org Chart > Type the chart** (or **Import > Type or paste an
+outline**) opens a draft on **Type it**: one position per line, an outline
+beside a live chart.
+
+```
+President — @Maya Patel
+  Advisor: Faculty advisor — Dr. Lee
+  VP Events — @Ana Kim
+    Open: Events coordinator
+```
+
+- Indent a line under another to make it report to it. **Tab** indents,
+  **Shift+Tab** outdents, **Esc then Tab** leaves the field, Enter keeps the
+  indent. Any consistent indent works, and pasted bullets, numbered lists,
+  drawn trees (`├──`, `|--`) and markdown headings keep their shape.
+- The person follows a dash (— – - or --), a colon or a bar. **@** suggests
+  members; `@Name` links the member with exactly that name. A plain name is
+  a suggestion to confirm, and a name that isn't a member is flagged with
+  **Invite**.
+- **Open:** (or a person of Open, TBD, Vacant) marks an open role;
+  **Advisor:** or `(advisor)` an advisor.
+- **Not on the chart yet** lists members without a position: click one (or
+  drag it into the outline) to add them.
+- **Start from members** drafts positions from the titles members already
+  have (the top title at the top, advisors beside it, leads under it, and
+  the rest under the lead whose title shares a word with theirs).
+
+Typing keeps each position's responsibilities, decisions and confirmed
+link. **Edit positions** is the full editor below, on the same draft.
 
 **Import a document.** **Org Chart > Import**, then drop a file on the drop
 zone (or choose one).
@@ -94,15 +125,22 @@ Below that, the editor lists every position in an outline:
   top positions, unconfirmed matches, placeholders), plus notes from reading
   the document. **Open items** are questions the document left open.
 - **Preview** shows the chart as members will see it.
-- **Save draft** keeps your work; if someone else saved the same draft in the
-  meantime you are asked to reload instead of overwriting them.
+- Drafts **save themselves** a moment after each change (the same
+  editVersion check: if someone else saved the same draft in the meantime
+  you are asked to reload instead of overwriting them). **Undo** (or ⌘Z
+  outside a text field) steps back through your changes; **Save now** saves
+  at once.
+- **Titles to sync** lists linked members whose position and member title
+  differ: **Update member title** copies the position's title to Settings >
+  Members, **Use "..."** copies the member's title into the position.
 
 ### 4. Publish
 
 **Review and publish** saves, checks everything again on the server and
-publishes. Tick **Also set each linked member's title** to copy each
-member's position title into their workspace title. The org-chart position
-never changes anyone's permission role.
+publishes. Owners and admins can also tick **Also set each linked member's
+title** to copy each member's position title into their workspace title
+(members don't see the option). The org-chart position never changes
+anyone's permission role.
 
 ### 5. Add a Claude API key (optional)
 
@@ -142,9 +180,12 @@ who have left since show as placeholders in the restored chart.
 
 ### Browsing the chart (every member)
 
-- **Chart** is a zoomable, pannable tree (pinch and drag on a phone; the
-  buttons zoom and fit). **List** is the same chart as an accessible nested
-  list.
+- **Chart** is a zoomable, pannable tidy tree (pinch and drag on a phone;
+  the buttons zoom and fit) of pill tiles coloured by team (the chart's
+  top-level branches, in the theme's chart colours). The toggle under a
+  lead folds its branch; **Collapse teams** folds them all. **PNG**
+  downloads the chart as an image and **PDF** prints it (choose Save as
+  PDF). **List** is the same chart as an accessible nested list.
 - Click a position (or press Enter on it) to open its panel: title, person,
   reports to and manages (click to jump to them), advisors, responsibilities,
   decides alone, a link to the person's profile and their open tasks. The
@@ -156,7 +197,7 @@ who have left since show as placeholders in the restored chart.
 - A document sent to Anthropic travels under your org's API key, as data:
   the request has no tools and instructions inside the document are ignored.
   Member emails are never sent; matching happens in the portal.
-- The original upload is stored privately and only owners and admins can
+- The original upload is stored privately and only members of the club can
   download it from the draft page.
 - An org may send 20 documents a day to Claude, one at a time. Documents the
   portal reads itself are not limited.
@@ -166,15 +207,16 @@ who have left since show as placeholders in the restored chart.
 | Piece | Where |
 |---|---|
 | Pages | `src/app/app/[orgSlug]/org-chart/` (chart, `import`, `drafts/[versionId]`, `versions`, `versions/[versionId]`) and `actions.ts` |
-| Upload route | `POST /api/orgs/[orgId]/org-chart/imports`; the original is served to admins by `GET .../imports/[versionId]/source` |
+| Upload route | `POST /api/orgs/[orgId]/org-chart/imports`; the original is served to the club's members by `GET .../imports/[versionId]/source` |
 | **Built-in parser** | `src/server/org-chart/parse/` - `index.ts` (the shape readers, assembly and the confidence score), `document.ts` (line model and segmentation), `fields.ts` (labels, role lines, lists), `diagram.ts` (the ASCII grid reader) |
 | Parse job (Claude) | `claude-parse` in `src/server/jobs/registry.ts` (heavy; runs only from `/api/cron/jobs` or its kick) -> `src/server/org-chart/parse-job.ts` |
 | Claude call | `src/server/org-chart/claude.ts` (`parseWithClaude`, `claudeConnectionTest` for Settings); models, prices and per-model request rules in `src/lib/org-chart/models.ts` |
 | Extraction | `src/server/org-chart/extract.ts` (sniffing, DOCX zip-bomb guards, PDF page cap) |
 | Starter structure | `src/lib/org-chart/starter.ts` |
 | Services | `src/server/org-chart/service.ts` (upload, drafts, publish, rollback, reads); `queries.ts` (cached published chart, `getReportingSubtree`) |
-| Pure logic | `src/lib/org-chart/` (schema, normalize, match, validate, layout, diff, draft operations) and `__fixtures__/` |
-| UI | `src/components/org-chart/` (canvas, list, side panel, editor, `editor/parse-report.tsx`) |
+| Who edits | `orgchart.write` is every role (`src/lib/auth/permissions.ts`). RLS lets every member write versions and positions in their own org (`20261019150000_org_chart_member_edits`); publishing moves `Organization.activeOrgChartVersionId` through `app.set_active_org_chart`, since Organization UPDATE stays owner/admin. Setting titles on publish is `members.setTitle` |
+| Pure logic | `src/lib/org-chart/` (schema, normalize, match, validate, layout, diff, draft operations, `outline.ts` for the typed chart, `teams.ts`, `export.ts`) and `__fixtures__/` |
+| UI | `src/components/org-chart/` (canvas, list, side panel, editor, `editor/outline-editor.tsx`, `editor/title-sync.tsx`, `export-chart.ts`, `editor/parse-report.tsx`) |
 
 ### How the two readers fit together
 
@@ -211,7 +253,7 @@ prose scores 0. Those figures are asserted in
 
 `OrgChartVersion` records the outcome: `parseMethod`
 (`BUILTIN | CLAUDE | TEMPLATE | MANUAL`), `parseConfidence`, and
-`parseReport` (the counts, notes and unplaced lines the admin sees).
+`parseReport` (the counts, notes and unplaced lines the editor sees).
 `parseUsage.costUsd` holds what a Claude parse cost.
 
 ### Local development

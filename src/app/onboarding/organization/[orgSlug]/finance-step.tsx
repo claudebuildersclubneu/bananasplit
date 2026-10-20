@@ -105,12 +105,12 @@ export function FinanceStep({
           <PreviewTile className="gap-4">
             <div className="flex items-start justify-between gap-3">
               <span className="flex flex-col gap-1">
-                <span className="text-ink-soft text-[13px]">Left this term</span>
+                <span className="text-muted-foreground text-[13px]">Left this term</span>
                 <span className="font-heading text-[36px] leading-none tracking-[-0.03em] tabular-nums">
                   $0
                 </span>
               </span>
-              <span className="bg-oat text-ink-muted rounded-full px-2.5 py-1 text-[11px] font-bold">
+              <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-bold">
                 {fy.label}
               </span>
             </div>
@@ -118,7 +118,7 @@ export function FinanceStep({
               {BARS.map((h, i) => (
                 <span
                   key={i}
-                  className={cn("flex-1 rounded-md", i === 4 ? "bg-banana" : "bg-straw")}
+                  className={cn("flex-1 rounded-md", i === 4 ? "bg-brand-accent" : "bg-muted")}
                   style={{ height: `${h}%` }}
                 />
               ))}
@@ -127,11 +127,11 @@ export function FinanceStep({
           {shown.map((card) => (
             <PreviewTile key={card.id} className="gap-1">
               <span className="text-[14px] font-semibold">{card.title}</span>
-              <span className="text-ink-soft text-[12px] leading-normal">{card.detail}</span>
+              <span className="text-muted-foreground text-[12px] leading-normal">{card.detail}</span>
             </PreviewTile>
           ))}
           {shown.length === 0 && (
-            <p className="text-ink-faint m-0 text-[12px]">
+            <p className="text-muted-foreground m-0 text-[12px]">
               Pick at least one report for the board.
             </p>
           )}
@@ -158,18 +158,18 @@ export function FinanceStep({
                 aria-checked={on}
                 onClick={() => toggle(card.id)}
                 className={cn(
-                  "bg-paper flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
-                  on ? "border-ink" : "border-ink/10 hover:border-ink/25",
+                  "bg-card flex cursor-pointer items-start gap-3 rounded-field border px-4 py-3 text-left transition-colors",
+                  on ? "border-foreground" : "border-foreground/10 hover:border-foreground/25",
                 )}
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-[15px] font-semibold">{card.title}</span>
-                  <span className="text-ink-soft text-[13px] leading-snug">{card.detail}</span>
+                  <span className="text-muted-foreground text-[13px] leading-snug">{card.detail}</span>
                 </span>
                 <span
                   className={cn(
                     "mt-0.5 grid size-5 flex-none place-items-center rounded-full border-[1.5px]",
-                    on ? "bg-ink border-ink text-cream" : "border-ink/22",
+                    on ? "bg-primary border-foreground text-primary-foreground" : "border-foreground/22",
                   )}
                 >
                   {on && <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />}
@@ -196,9 +196,9 @@ export function FinanceStep({
                 </option>
               ))}
             </select>
-            <span className="bg-oat rounded-full px-3 py-1.5 text-[13px] font-semibold">
+            <span className="bg-muted rounded-full px-3 py-1.5 text-[13px] font-semibold">
               {fy.label}
-              <span className="text-ink-soft font-normal">
+              <span className="text-muted-foreground font-normal">
                 {" "}
                 · {formatDay(fy.startsOn)} – {formatDay(fy.endsOn)}
               </span>
@@ -207,11 +207,11 @@ export function FinanceStep({
         </div>
 
         {state.activePeriod ? (
-          <p className="text-ink-soft m-0 text-[13px]">
+          <p className="text-muted-foreground m-0 text-[13px]">
             Budget period in use: {state.activePeriod.label}. Change it on the Budget page.
           </p>
         ) : state.canManageFinance ? (
-          <label className="bg-oat flex cursor-pointer items-start gap-3 rounded-[14px] px-4 py-3">
+          <label className="bg-muted flex cursor-pointer items-start gap-3 rounded-[14px] px-4 py-3">
             <Checkbox
               checked={createPeriod}
               onCheckedChange={(v) => setCreatePeriod(v === true)}
@@ -219,13 +219,13 @@ export function FinanceStep({
             />
             <span className="flex flex-col gap-0.5">
               <span className="text-[14px] font-semibold">Start the {fy.label} budget now</span>
-              <span className="text-ink-soft text-[13px]">
+              <span className="text-muted-foreground text-[13px]">
                 With the usual categories at $0. The treasurer sets the amounts on the Budget page.
               </span>
             </span>
           </label>
         ) : (
-          <p className="text-ink-soft m-0 text-[13px]">
+          <p className="text-muted-foreground m-0 text-[13px]">
             The owner or treasurer starts the budget period.
           </p>
         )}

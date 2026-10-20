@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bell,
   Building2,
   CalendarSync,
@@ -16,6 +17,7 @@ import {
 
 /** The icon for each settings section (settings-nav.ts names them). */
 export const SETTINGS_ICONS: Record<string, LucideIcon> = {
+  Activity,
   Bell,
   Building2,
   CalendarSync,

@@ -16,10 +16,10 @@ export interface BarListItem {
 }
 
 /**
- * Horizontal bars in plain HTML: one series, so every bar wears the slot-1
- * chart token (--chart-1), grows from one baseline, is at most 12px thick
- * with a 4px rounded end, and has its value as text beside it (the value
- * never relies on the bar). Labels and values use text tokens.
+ * Horizontal bars in plain HTML (the chart kit's ranked list): one series,
+ * so every bar wears slot 1 (--chart-1), grows from one baseline on a soft
+ * track, with rounded ends, and has its value as text beside it (the value
+ * never relies on the bar). Rows become a soft tile on hover when they link.
  */
 export function BarList({
   items,
@@ -36,20 +36,26 @@ export function BarList({
 }) {
   const top = max ?? Math.max(0, ...items.map((i) => i.value ?? 0));
   return (
-    <ul aria-label={label} className={cn("flex flex-col gap-2.5", className)}>
+    <ul aria-label={label} className={cn("flex flex-col gap-1.5", className)}>
       {items.map((item) => {
-        const width = item.value !== null && top > 0 ? Math.max(0, Math.min(1, item.value / top)) : 0;
+        const width =
+          item.value !== null && top > 0 ? Math.max(0, Math.min(1, item.value / top)) : 0;
         const row = (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 gap-y-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 gap-y-1.5">
             <div className="min-w-0">
-              <div className="truncate text-sm">{item.label}</div>
-              {item.detail ? <div className="text-muted-foreground truncate text-xs">{item.detail}</div> : null}
+              <div className="truncate text-sm font-medium">{item.label}</div>
+              {item.detail ? (
+                <div className="text-muted-foreground truncate text-xs">{item.detail}</div>
+              ) : null}
             </div>
-            <div className="text-sm font-medium tabular-nums">{item.display}</div>
-            <div className="bg-muted col-span-2 h-3 overflow-hidden rounded-r-[4px]" aria-hidden="true">
+            <div className="text-sm font-semibold tabular-nums">{item.display}</div>
+            <div
+              className="bg-muted col-span-2 h-2.5 overflow-hidden rounded-full"
+              aria-hidden="true"
+            >
               {width > 0 ? (
                 <div
-                  className="h-full rounded-r-[4px]"
+                  className="h-full min-w-2.5 rounded-full"
                   style={{ width: `${(width * 100).toFixed(2)}%`, background: "var(--chart-1)" }}
                 />
               ) : null}
@@ -61,12 +67,12 @@ export function BarList({
             {item.href ? (
               <Link
                 href={item.href}
-                className="hover:bg-muted/60 focus-visible:ring-ring/50 -mx-2 block rounded-md px-2 py-1 outline-none focus-visible:ring-3"
+                className="hover:bg-muted/60 focus-glow rounded-field -mx-2.5 block px-2.5 py-2 transition-colors outline-none"
               >
                 {row}
               </Link>
             ) : (
-              <div className="py-1">{row}</div>
+              <div className="py-2">{row}</div>
             )}
           </li>
         );

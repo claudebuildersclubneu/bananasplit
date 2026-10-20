@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -13,6 +14,8 @@ import { spaceIncludes } from "@/lib/billing/space";
 import { getSession, requireUser } from "@/lib/auth/session";
 import { resolveSidebar, visibleSidebar } from "@/lib/nav/sidebar";
 import { orgLogoUrl } from "@/lib/org-logo";
+import { sidebarCookieName } from "@/lib/sidebar-mode";
+import { getSidebarMode } from "@/lib/sidebar-mode-cookie";
 import { applyPersonalTheme, parsePersonalTheme } from "@/lib/theme/personal";
 import { resolveTheme } from "@/lib/theme/resolve";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -54,6 +57,12 @@ async function deepRedirectTarget(error: unknown, orgSlug: string): Promise<stri
   const rest = pathname.slice(prefix.length);
   return /^[A-Za-z0-9/_.~-]*$/.test(rest) && !rest.includes("..") ? `${target}${rest}` : null;
 }
+
+/**
+ * The page runs under the phone's notch and home indicator, so the tab bar
+ * can float clear of the indicator (env(safe-area-inset-*) in the shell).
+ */
+export const viewport: Viewport = { viewportFit: "cover" };
 
 function isNotFound(error: unknown): boolean {
   const digest = (error as { digest?: unknown } | null)?.digest;
@@ -119,6 +128,8 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
   const pins = await withOrgTx(ctx.organization.id, ({ db }) =>
     listPins(db, ctx.organization.id, ctx.organization.slug, ctx.user.id),
   );
+  // Docked or rail, as the member left it, so the first paint is right.
+  const sidebarMode = await getSidebarMode(ctx.user.id);
 
   return (
     <OrgThemeRoot key={ctx.organization.id} theme={theme}>
@@ -150,6 +161,9 @@ export default async function OrgLayout({ params, children }: LayoutProps<"/app/
         canInvite={
           ctx.organization.kind !== "PERSONAL" && can({ role: ctx.role }, "members.invite")
         }
+        canCreateEvents={can({ role: ctx.role }, "events.write")}
+        sidebarMode={sidebarMode}
+        sidebarCookie={sidebarCookieName(ctx.user.id)}
         taskViews={spaceIncludes(ctx.organization, "taskViews")}
         teamwork={spaceIncludes(ctx.organization, "teamwork")}
         banner={

@@ -13,6 +13,8 @@ import { PIN_ICONS, PIN_KIND_LABELS } from "@/components/shell/pin-icons";
 import type { PinKind } from "@/lib/pins/pages";
 import { cn } from "@/lib/utils";
 
+import { TileIcon, TileText, tileClass } from "./bits";
+
 /**
  * The Overview's Pinned widget: shortcuts to what the member pinned. Drag a
  * page from the sidebar (or any link) onto it to pin it, drag pins to
@@ -36,12 +38,12 @@ export function PinnedGrid({
   return (
     <div
       {...zone}
-      className={cn("-m-1 rounded-lg p-1 transition-colors", over && "bg-primary/5 ring-primary/40 ring-2")}
+      className={cn("-m-1 rounded-tile p-1 transition-colors", over && "ring-foreground/30 bg-muted/40 ring-2")}
     >
       {pins.length === 0 ? (
         <div
           className={cn(
-            "text-muted-foreground flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center text-sm",
+            "text-muted-foreground bg-muted hatch rounded-tile flex flex-col items-center gap-2 px-4 py-6 text-center text-sm",
             over && "border-primary text-foreground",
           )}
         >
@@ -58,7 +60,7 @@ export function PinnedGrid({
           )}
         </div>
       ) : (
-        <ul className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(13rem,1fr))]">
+        <ul className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(12.5rem,1fr))]">
           {pins.map((pin) => {
             const Icon = PIN_ICONS[pin.kind] ?? FileText;
             return (
@@ -66,13 +68,12 @@ export function PinnedGrid({
                 <Link
                   href={pin.href}
                   draggable={false}
-                  className="hover:bg-accent/60 hover:border-foreground/15 flex cursor-grab items-center gap-3 rounded-lg border p-2.5 pr-9 transition-colors active:cursor-grabbing"
+                  className={cn(tileClass, "cursor-grab pr-10 active:cursor-grabbing")}
                 >
-                  <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{pin.label}</span>
-                    <span className="text-muted-foreground block text-xs">{PIN_KIND_LABELS[pin.kind]}</span>
-                  </span>
+                  <TileIcon>
+                    <Icon />
+                  </TileIcon>
+                  <TileText title={pin.label} sub={PIN_KIND_LABELS[pin.kind]} />
                 </Link>
                 <button
                   type="button"
@@ -96,7 +97,7 @@ export function PinnedGrid({
               type="button"
               onClick={() => pinsCtx?.openPicker()}
               className={cn(
-                "text-muted-foreground hover:text-foreground hover:bg-muted/50 flex size-full min-h-14 items-center justify-center gap-1.5 rounded-lg border border-dashed p-2.5 text-xs",
+                "text-muted-foreground hover:text-foreground hover:bg-muted/50 bg-muted hatch rounded-tile flex size-full min-h-16 items-center justify-center gap-1.5 p-3 text-xs font-medium",
                 over && "border-primary text-foreground",
               )}
             >

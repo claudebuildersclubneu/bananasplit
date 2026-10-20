@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { CalendarClock, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
@@ -42,17 +42,24 @@ export default async function FindATimePage({
     item: availabilityItem(p, base, now, p.createdById === user.id || isAdmin),
   }));
 
+  const about = personal
+    ? "Offer some days and hours and share the link: anyone marks when they're free, no account needed, and you pick the time."
+    : "Offer some days and hours: members and guests mark when they're free, and an owner or admin schedules the best time.";
+  // The live line: what's still taking answers, and how many came in.
+  const openPolls = polls.filter((p) => availabilityOpen(p, now));
+  const answered = openPolls.reduce((n, p) => n + p.respondentCount, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <PageHeader
         title={sectionLabel(settings?.sidebar, "find-a-time")}
-        description={`${
-          personal
-            ? "Offer some days and hours and share the link: anyone marks when they're free, no account needed, and you pick the time."
-            : "Offer some days and hours: members and guests mark when they're free, and an owner or admin schedules the best time."
-        } Each poll deletes itself ${FIND_A_TIME_KEEP_DAYS} days after its last date.`}
+        description={
+          items.length === 0
+            ? about
+            : `${openPolls.length} open · ${answered === 1 ? "1 answer" : `${answered} answers`} so far`
+        }
         actions={
-          <Button size="sm" asChild>
+          <Button variant="create" asChild>
             <Link href={`${base}/calendar/find-a-time/new`}>
               <Plus aria-hidden className="size-4" />
               Offer times
@@ -63,6 +70,7 @@ export default async function FindATimePage({
 
       {items.length === 0 ? (
         <EmptyState
+          icon={CalendarClock}
           title="No meeting times to pick yet"
           description="Press Offer times: choose the days, the hours and how long the meeting is, then send the link. You'll see the best times as answers come in."
         />
@@ -72,6 +80,12 @@ export default async function FindATimePage({
           open={items.filter((p) => p.open).map((p) => p.item)}
           closed={items.filter((p) => !p.open).map((p) => p.item)}
         />
+      )}
+
+      {items.length > 0 && (
+        <p className="text-muted-foreground text-[13px]">
+          {about} Each poll deletes itself {FIND_A_TIME_KEEP_DAYS} days after its last date.
+        </p>
       )}
 
       {questionCount > 0 && (

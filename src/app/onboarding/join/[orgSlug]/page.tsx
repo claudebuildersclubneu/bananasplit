@@ -82,9 +82,9 @@ function AvailabilityLine({
       ? `Members of ${clubName} see your ${blockedHours} busy hours a week, never why.`
       : `You haven't marked when you can't meet. Members of ${clubName} will see busy hours only, never why.`;
   return (
-    <div className="border-ink/10 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[14px]">
-      <CalendarX className="text-ink-muted mt-0.5 size-4 flex-none" aria-hidden="true" />
-      <span className="text-ink-muted flex flex-col gap-0.5">
+    <div className="border-foreground/10 flex items-start gap-2.5 rounded-field border px-3.5 py-3 text-[14px]">
+      <CalendarX className="text-muted-foreground mt-0.5 size-4 flex-none" aria-hidden="true" />
+      <span className="text-muted-foreground flex flex-col gap-0.5">
         <span>{text}</span>
         {shared && (
           <Link href={profileStepHref("availability")} className="w-fit font-semibold underline">

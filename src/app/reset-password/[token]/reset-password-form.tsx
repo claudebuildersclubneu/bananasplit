@@ -22,7 +22,7 @@ export function ResetPasswordForm({
     return (
       <>
         {state.error && <FormMessage>{state.error}</FormMessage>}
-        <Link href="/forgot-password" className={cn(pill({ raised: true }), "w-full")}>
+        <Link href="/forgot-password" className={cn(pill(), "w-full")}>
           Send a new link
         </Link>
       </>
@@ -36,7 +36,7 @@ export function ResetPasswordForm({
       <PrimaryButton type="submit" disabled={isPending}>
         {isPending ? "Saving…" : "Set new password"}
       </PrimaryButton>
-      <p className="text-ink-soft m-0 text-center text-[13px] leading-normal">
+      <p className="text-muted-foreground m-0 text-center text-[13px] leading-[1.5]">
         You&apos;ll be signed out everywhere, then log in with the new password.
       </p>
     </form>

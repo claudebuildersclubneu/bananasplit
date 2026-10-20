@@ -1,6 +1,6 @@
 import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
-import { Lock } from "lucide-react";
+import { EyeOff, Lock, Vote } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
@@ -25,8 +25,13 @@ import {
   SessionFormDialog,
   type SessionFormInitial,
 } from "@/components/databases/session-form-dialog";
+import { notice } from "@/components/databases/styles";
 import { PollPicker, ViewSwitch } from "@/components/databases/view-switch";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { NotFoundError } from "@/lib/auth/errors";
 import { parseDbViewParams } from "@/lib/databases/href";
 import {
@@ -76,6 +81,16 @@ const DATE_LABELS: Record<string, string> = {
   SIGNUPS: "Signup date",
   BALLOTS: "Cast",
   PEOPLE: "Last check-in",
+};
+
+/** What a row of each database is, for the summary under the title ("401 check-ins"). */
+const ROW_NOUNS: Record<string, [string, string]> = {
+  SESSIONS: ["session", "sessions"],
+  ATTENDANCE: ["check-in", "check-ins"],
+  SIGNUPS: ["signup", "signups"],
+  PEOPLE: ["person", "people"],
+  BALLOTS: ["choice", "choices"],
+  BALLOT_VIEW: ["ballot", "ballots"],
 };
 
 /** Under the title when members can't open this database (Admin panel › Privacy decides). */
@@ -203,25 +218,43 @@ export default async function DatabaseViewPage({
     }
   }
 
+  // The live summary under the title: how many rows this view holds (or,
+  // for poll results, how many ballots were counted), then who may see it.
+  let summary: string | null = null;
+  if (view === "results") {
+    summary = results
+      ? `${results.turnout.toLocaleString()} counted ${results.turnout === 1 ? "ballot" : "ballots"}`
+      : null;
+  } else if (table) {
+    const n = table.total;
+    const [one, many] = ROW_NOUNS[ballotView === "ballots" ? "BALLOT_VIEW" : kind] ?? [
+      "row",
+      "rows",
+    ];
+    const filtered =
+      table.query.filters.some((f) => !f.isDefault) ||
+      Boolean(table.query.q || table.query.from || table.query.to);
+    summary = `${n.toLocaleString()} ${n === 1 ? one : many}${filtered ? " match this view" : ""}`;
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-7.5">
+      <div className="space-y-3">
         <BackLink href={`/app/${orgSlug}/databases`} label="Databases" />
         <PageHeader
           title={database.name}
           description={
-            restricted || anonymous ? (
-              <>
+            summary || restricted ? (
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                {summary && <span className="tabular-nums">{summary}</span>}
+                {summary && restricted && <span aria-hidden="true">·</span>}
                 {restricted && (
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5">
                     <Lock className="size-3.5" aria-hidden="true" />
-                    {restricted}.
+                    {restricted}
                   </span>
                 )}
-                {restricted && anonymous && " "}
-                {anonymous &&
-                  "Votes are anonymous. You see totals; individual ballots are visible only as Admin panel › Privacy allows."}
-              </>
+              </span>
             ) : undefined
           }
           actions={
@@ -262,25 +295,36 @@ export default async function DatabaseViewPage({
         />
       </div>
 
+      {anonymous && (
+        <p className={cn(notice.info, "flex items-start gap-2")}>
+          <EyeOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          Votes are anonymous. You see totals; individual ballots are visible only as Admin panel ›
+          Privacy allows.
+        </p>
+      )}
+
       {view === "results" ? (
         results ? (
           <BallotResultsView results={results} />
         ) : (
-          <p className="text-muted-foreground rounded-xl border p-6 text-center text-sm">
-            No polls yet.
-            {admin && (
-              <>
-                {" "}
-                <Link
-                  href={`${base}/definitions`}
-                  className="hover:text-foreground underline underline-offset-2"
-                >
-                  Import a poll definition
-                </Link>{" "}
-                to see its results.
-              </>
-            )}
-          </p>
+          <Card>
+            <EmptyState
+              icon={Vote}
+              title="No polls yet"
+              description={
+                admin
+                  ? "Import a poll definition to see its results here."
+                  : "Results show up here once your club runs a poll."
+              }
+              action={
+                admin ? (
+                  <Button asChild variant="outline">
+                    <Link href={`${base}/definitions`}>Import a poll definition</Link>
+                  </Button>
+                ) : undefined
+              }
+            />
+          </Card>
         )
       ) : table ? (
         <DataTable

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   ArrowLeftRight,
   CalendarDays,
   CalendarRange,
@@ -15,6 +16,7 @@ import {
   GripVertical,
   HandCoins,
   Handshake,
+  LayoutGrid,
   Hourglass,
   Link2,
   ListChecks,
@@ -28,6 +30,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Target,
+  Ticket,
   Timer,
   TrendingDown,
   Users,
@@ -40,6 +43,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +53,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Segmented } from "@/components/ui/segmented";
+import { IconChip } from "@/components/ui/stat";
 import {
   BOARD_COLUMNS,
   HEIGHT_PRESETS,
@@ -60,6 +65,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const BOARD_ICONS: Record<string, LucideIcon> = {
+  Activity,
   ArrowLeftRight,
   CalendarDays,
   CalendarRange,
@@ -81,6 +87,7 @@ export const BOARD_ICONS: Record<string, LucideIcon> = {
   ReceiptText,
   Rocket,
   Target,
+  Ticket,
   Timer,
   TrendingDown,
   Users,
@@ -126,6 +133,8 @@ export function WidgetBoard({
   onSave,
   intro,
   notice,
+  headerActions,
+  belowIntro,
 }: {
   types: readonly WidgetMeta[];
   initialLayout: BoardWidget[];
@@ -139,6 +148,13 @@ export function WidgetBoard({
   intro?: ReactNode;
   /** Something to say above the widgets (a setup prompt), under the title row. */
   notice?: ReactNode;
+  /**
+   * A card's header controls by widget type (a count chip, ••• and ↗, in
+   * that order after the title), shown while not customizing.
+   */
+  headerActions?: Readonly<Record<string, ReactNode>>;
+  /** A full-width line under the title row (the Overview's stat strip). */
+  belowIntro?: ReactNode;
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState(initialLayout);
@@ -204,13 +220,12 @@ export function WidgetBoard({
   const body = (type: string) => (bodies ? bodies[type] : renderBody?.(type)) ?? null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[18px]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">{intro}</div>
         {!editing && (
           <Button
             type="button"
-            size="sm"
             variant="outline"
             disabled={pending}
             onClick={() => setEditing(true)}
@@ -220,13 +235,14 @@ export function WidgetBoard({
           </Button>
         )}
       </div>
+      {belowIntro && <div className="pt-2 pb-3">{belowIntro}</div>}
 
       {editing && (
-        <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
+        <div className="bg-muted/60 rounded-tile flex flex-wrap items-center gap-2 py-2 pr-2 pl-4">
           <p className="text-muted-foreground mr-auto text-sm">
             Drag a widget by its handle to move it. Only you see these changes.
           </p>
-          <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(true)}>
             <Plus className="size-4" aria-hidden="true" />
             Add widget
           </Button>
@@ -266,7 +282,10 @@ export function WidgetBoard({
       )}
 
       {error && (
-        <p role="alert" className="text-destructive text-sm">
+        <p
+          role="alert"
+          className="bg-tint-danger text-tint-danger-foreground rounded-tile px-3 py-2 text-sm"
+        >
           {error}
         </p>
       )}
@@ -274,7 +293,10 @@ export function WidgetBoard({
       {notice}
 
       {layout.length === 0 ? (
-        <div className="text-muted-foreground flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-sm">
+        <div className="text-muted-foreground rounded-block border-border flex flex-col items-center gap-3 border-[1.5px] border-dashed p-10 text-sm">
+          <span className="bg-muted grid size-14 place-items-center rounded-full">
+            <LayoutGrid className="size-6" aria-hidden="true" />
+          </span>
           Your board is empty.
           <Button
             type="button"
@@ -291,7 +313,7 @@ export function WidgetBoard({
         </div>
       ) : (
         <div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid grid-cols-1 gap-4.5 sm:grid-cols-2 lg:grid-cols-4"
           onDragOver={(e) => {
             if (dragId) e.preventDefault();
           }}
@@ -306,20 +328,26 @@ export function WidgetBoard({
           {layout.map((w) => {
             const m = meta.get(w.type);
             if (!m) return null;
-            const Icon = BOARD_ICONS[m.icon] ?? ChartColumn;
+            const bare = m.frame === "bare";
+            const actions = !editing ? headerActions?.[w.type] : null;
             return (
               <section
                 key={w.id}
                 aria-label={m.title}
                 data-dragging={dragId === w.id || undefined}
+                data-frame={bare ? "bare" : "card"}
                 className={cn(
                   SPAN[w.w] ?? SPAN[1],
-                  "bg-card text-card-foreground relative flex min-w-0 flex-col overflow-hidden rounded-xl border transition-colors",
+                  "relative flex min-w-0 flex-col transition-[opacity,outline-color]",
+                  bare
+                    ? "rounded-block"
+                    : "bg-card text-card-foreground ring-foreground/6 edge rounded-card overflow-hidden ring-1",
                   // Part-width widgets stop at a common height so rows line up.
-                  !w.h && w.w < BOARD_COLUMNS && "lg:max-h-96",
-                  editing && "border-dashed",
+                  !bare && !w.h && w.w < BOARD_COLUMNS && "lg:max-h-[30rem]",
+                  editing && "outline-border outline-[1.5px] outline-offset-[3px] outline-dashed",
+                  editing && bare && "bg-muted/40 p-2",
                   dragId === w.id && "opacity-40",
-                  overId === w.id && dragId !== w.id && "border-primary border-solid",
+                  overId === w.id && dragId !== w.id && "outline-foreground outline-solid",
                 )}
                 style={w.h ? { height: w.h } : undefined}
                 onDragOver={(e) => {
@@ -337,8 +365,18 @@ export function WidgetBoard({
                   setOverId(null);
                 }}
               >
-                {/* While editing, a narrow widget's controls wrap below its title. */}
-                <header className="flex min-h-11 flex-wrap items-center gap-2 border-b px-4 py-2">
+                {/* While editing, a narrow widget's controls wrap below its title. A
+                    bare widget has no header until then: its body is its own surface. */}
+                <header
+                  className={cn(
+                    "flex flex-wrap items-center gap-2",
+                    bare
+                      ? editing
+                        ? "mb-2 min-h-10 px-2"
+                        : "sr-only"
+                      : "min-h-14 px-[18px] pt-4 pb-1 sm:px-6 sm:pt-5",
+                  )}
+                >
                   {editing && (
                     <span
                       draggable
@@ -363,15 +401,17 @@ export function WidgetBoard({
                           nudge(w.id, 1);
                         }
                       }}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring/50 -ml-1.5 grid size-6 cursor-grab place-items-center rounded-md outline-none focus-visible:ring-3 active:cursor-grabbing"
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted focus-glow -ml-2 grid size-8 cursor-grab place-items-center rounded-full outline-none active:cursor-grabbing"
                     >
                       <GripVertical className="size-4" aria-hidden="true" />
                     </span>
                   )}
-                  <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-                  <h2 title={m.title} className="heading min-w-0 truncate text-sm">
+                  <h2 title={m.title} className="heading min-w-0 truncate text-[17px]">
                     {m.title}
                   </h2>
+                  {actions && (
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">{actions}</div>
+                  )}
                   {editing && (
                     <div className="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
                       <Segmented
@@ -394,7 +434,7 @@ export function WidgetBoard({
                       <Button
                         type="button"
                         size="icon-sm"
-                        variant="ghost"
+                        variant="outline"
                         className="text-muted-foreground hover:text-destructive"
                         aria-label={`Remove ${m.title}`}
                         onClick={() => setLayout((l) => l.filter((x) => x.id !== w.id))}
@@ -404,7 +444,14 @@ export function WidgetBoard({
                     </div>
                   )}
                 </header>
-                <div className="min-h-0 flex-1 overflow-auto p-4">{body(w.type)}</div>
+                <div
+                  className={cn(
+                    "min-h-0 flex-1",
+                    bare ? "flex flex-col" : "overflow-auto px-[18px] pt-3 pb-5 sm:px-6 sm:pb-6",
+                  )}
+                >
+                  {body(w.type)}
+                </div>
               </section>
             );
           })}
@@ -428,7 +475,7 @@ export function WidgetBoard({
               {groups.map((group) => (
                 <section key={group} className="space-y-2">
                   <h3 className="eyebrow text-muted-foreground">{group}</h3>
-                  <ul className="grid gap-2 sm:grid-cols-2">
+                  <ul className="grid gap-2.5 sm:grid-cols-2">
                     {types
                       .filter((t) => t.group === group)
                       .map((t) => {
@@ -439,20 +486,13 @@ export function WidgetBoard({
                             <button
                               type="button"
                               onClick={() => add(t.type)}
-                              className="hover:bg-muted/60 focus-visible:ring-ring/50 flex h-full w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors outline-none focus-visible:ring-3"
+                              className="bg-muted/50 hover:bg-muted focus-glow rounded-tile flex h-full w-full items-start gap-3 p-3 text-left transition-colors outline-none"
                             >
-                              <Icon
-                                className="text-muted-foreground mt-0.5 size-4 shrink-0"
-                                aria-hidden="true"
-                              />
+                              <IconChip icon={Icon} />
                               <span className="min-w-0">
-                                <span className="flex items-center gap-2 text-sm font-medium">
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                                   {t.title}
-                                  {onBoard && (
-                                    <span className="text-muted-foreground text-xs font-normal">
-                                      On your board
-                                    </span>
-                                  )}
+                                  {onBoard && <Badge variant="secondary">On your board</Badge>}
                                 </span>
                                 <span className="text-muted-foreground block text-xs">
                                   {t.description}

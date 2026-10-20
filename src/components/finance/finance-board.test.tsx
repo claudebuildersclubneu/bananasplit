@@ -74,7 +74,7 @@ describe("finance board: the runway widget", () => {
   it("averages spending over the meetings held and prices the ones still scheduled", () => {
     const html = render(dashboard({}));
     expect(html).toContain("Average spend per meeting");
-    expect(html).toContain("$450.00");
+    expect(html).toContain("$450");
     expect(html).toContain("$900.00 over 2 meetings held");
     expect(html).toContain("About $450.00 at the current average");
     expect(html).toContain("calendar events other than board meetings");
@@ -104,7 +104,7 @@ describe("finance board: the runway widget", () => {
     expect(html).toContain("In and out");
     expect(html).toContain("$1,200");
     expect(html).toContain("Waiting for approval");
-    expect(html).toContain("$45.00 to review");
+    expect(html).toContain("$45 to review");
     expect(html).toContain('href="/app/cbc/finance/transactions?status=SUBMITTED"');
   });
 

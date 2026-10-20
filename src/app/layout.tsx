@@ -1,16 +1,25 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, JetBrains_Mono, Young_Serif } from "next/font/google";
+import { Bricolage_Grotesque, Hanken_Grotesk, JetBrains_Mono, Young_Serif } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth/config";
 
 /*
- * The type system (the design handoff; globals.css maps these to font-heading,
- * font-sans and font-mono): Young Serif for display, Hanken Grotesk for the
- * interface and body, JetBrains Mono, sparingly, for labels and figures.
+ * The type system (the Moonstone redesign; globals.css maps these to
+ * font-heading, font-sans and font-mono): Bricolage Grotesque for display
+ * (page titles, big figures, block titles), Hanken Grotesk for the
+ * interface and body, JetBrains Mono only for codes and shortcuts. Young
+ * Serif stays loaded for the logo's wordmark and the "Serif" heading choice
+ * in Look and feel.
  */
-const display = Young_Serif({
+const display = Bricolage_Grotesque({
+  variable: "--font-bricolage",
+  subsets: ["latin"],
+  axes: ["opsz"],
+});
+
+const serif = Young_Serif({
   variable: "--font-young-serif",
   subsets: ["latin"],
   weight: "400",
@@ -39,7 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${display.variable} ${body.variable} ${mono.variable} h-full antialiased`}
+      className={`${display.variable} ${serif.variable} ${body.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         {/*

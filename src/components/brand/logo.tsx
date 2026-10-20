@@ -7,10 +7,13 @@ import { cn } from "@/lib/utils";
 const SEED = { cx: 60, cy: 44, rx: 5, ry: 11 } as const;
 
 const INKS = {
-  /** The logo: banana peel, cream flesh, golden seeds. */
-  default: { ring: "fill-slice stroke-banana", seeds: "fill-core" },
+  /**
+   * The logo: banana peel, cream flesh, golden seeds. Fixed logo colours
+   * (brand.css --color-logo-*), not the yellow names a club theme re-points.
+   */
+  default: { ring: "fill-logo-flesh stroke-logo-ring", seeds: "fill-logo-seed" },
   /** On the yellow auth panel: drawn in ink on cream. */
-  ink: { ring: "fill-slice stroke-ink", seeds: "fill-ink" },
+  ink: { ring: "fill-logo-flesh stroke-logo-ink", seeds: "fill-logo-ink" },
   /** The large faint watermark: a cream outline. */
   outline: { ring: "fill-none stroke-paper", seeds: "fill-paper" },
 } as const;
@@ -63,7 +66,7 @@ export function Logo({
     <span className={cn("flex items-center gap-2.5", className)}>
       <CoreMark size={size} tone={tone} />
       <span
-        className={cn("font-heading tracking-[-0.01em]", wordmarkClassName)}
+        className={cn("font-logo tracking-[-0.01em]", wordmarkClassName)}
         style={{ fontSize: textSize }}
       >
         bananasplit

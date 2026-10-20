@@ -2,7 +2,7 @@ import { NotFoundError } from "@/lib/auth/errors";
 import { getSession } from "@/lib/auth/session";
 import { familyOf } from "@/lib/files/types";
 import { contentDisposition } from "@/lib/http/content-disposition";
-import { readNoteFile } from "@/server/notes/files";
+import { openNoteFile } from "@/server/notes/files";
 
 /**
  * GET /api/orgs/{orgId}/files/{fileId}: a Notes page file, to someone RLS
@@ -28,7 +28,7 @@ export async function GET(
 
   let found;
   try {
-    found = await readNoteFile(orgId, fileId);
+    found = await openNoteFile(orgId, fileId);
   } catch (error) {
     if (error instanceof NotFoundError) return notFound();
     throw error;
@@ -37,10 +37,11 @@ export async function GET(
 
   const download = new URL(request.url).searchParams.get("download") === "1";
   const pdf = familyOf(found.row.contentType) === "pdf";
-  return new Response(new Uint8Array(found.body), {
+  // Streamed: a big file never sits in memory, and the response isn't capped like a buffered one.
+  return new Response(found.blob.stream, {
     headers: {
       "Content-Type": found.row.contentType,
-      "Content-Length": String(found.body.length),
+      "Content-Length": String(found.blob.size ?? found.row.sizeBytes),
       "Content-Disposition": contentDisposition(download ? "attachment" : "inline", found.row.name),
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, no-store",

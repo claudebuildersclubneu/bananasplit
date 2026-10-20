@@ -173,6 +173,7 @@ export function PollResponder({
     [poll.slots, groupResponses, poll.durationMinutes],
   );
   const bestWindows = useMemo(() => pickDistinctWindows(ranked, 5), [ranked]);
+  const bestSlotIds = useMemo(() => new Set(bestWindows[0]?.slotIds ?? []), [bestWindows]);
   const windowByStart = useMemo(() => new Map(ranked.map((w) => [w.slot.id, w])), [ranked]);
   const slotById = useMemo(() => new Map(poll.slots.map((s) => [s.id, s])), [poll.slots]);
 
@@ -314,7 +315,7 @@ export function PollResponder({
     const Icon = meta?.icon;
     return {
       className: cn(
-        meta ? meta.cellClass : "border-border bg-background",
+        meta ? meta.cellClass : "bg-muted border-transparent",
         canEdit && "hover:brightness-95 dark:hover:brightness-110",
       ),
       style: meta?.style,
@@ -328,6 +329,8 @@ export function PollResponder({
     const percent = heatPercent(s.available, total);
     const isHighlighted = highlighted.has(slot.id) || scheduledIds.has(slot.id);
     const isPinned = pinnedId === slot.id;
+    // The best time (the top window's slots) wears the glow.
+    const isBest = total > 0 && bestSlotIds.has(slot.id);
     const names = [
       s.yes.length ? `Available: ${s.yes.map((r) => r.label).join(", ")}` : "",
       s.ifNeeded.length ? `If needed: ${s.ifNeeded.map((r) => r.label).join(", ")}` : "",
@@ -337,8 +340,10 @@ export function PollResponder({
     return {
       className: cn(
         "relative",
-        percent === 0 && "border-border bg-background text-muted-foreground",
+        percent === 0 && "bg-muted text-muted-foreground border-transparent",
         heatTextClass(percent),
+        isBest &&
+          "outline-glow shadow-[0_0_14px_color-mix(in_oklab,var(--glow)_65%,transparent)] outline-2 -outline-offset-1",
         (isHighlighted || isPinned) && "outline-foreground outline-2 -outline-offset-2",
       ),
       style: heatFill(percent),
@@ -387,7 +392,7 @@ export function PollResponder({
   // On a phone the read-out floats over the grid's bottom edge, so it only
   // appears once a time is picked, and can be put away.
   const mobileDetails = activeSlot ? (
-    <div className="sticky bottom-3 z-40 lg:hidden">
+    <div className="sticky bottom-[calc(var(--shell-bottom,0px)+0.75rem)] z-40 lg:hidden">
       {details("shadow-md pr-9")}
       <Button
         type="button"
@@ -411,7 +416,7 @@ export function PollResponder({
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* ---------------------------------------------------------------- header */}
       {/* Not a <header>: on the public link the org frame owns the page header. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -609,7 +614,7 @@ export function PollResponder({
             </Tabs>
           ) : (
             <div className="space-y-3">
-              <h2 className="text-sm font-medium">Everyone&apos;s availability</h2>
+              <h2 className="heading text-[17px]">Everyone&apos;s availability</h2>
               <GroupView
                 total={total}
                 grid={
@@ -744,7 +749,7 @@ function GroupView({
 
 function Note({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <div className="bg-muted/40 flex gap-2 rounded-xl border p-3 text-sm" role="note">
+    <div className="bg-muted rounded-tile flex gap-2.5 p-3.5 text-sm" role="note">
       <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

@@ -6,13 +6,15 @@ import { cn } from "@/lib/utils";
 import { CoreMark, Logo } from "./logo";
 
 /**
- * The framed card behind sign-in, sign-up and joining a club: a 1000px card
- * with a 12px paper frame, the yellow panel on the left (logo at the top,
- * `panel` at the bottom, a faint cream outline of the mark bleeding off the
- * corner) and the form on the right. Below lg the panel is hidden and the
- * logo sits above the form. `footer` closes the form column: the pages a
- * signed-in person reaches pass <SignedInAs /> (a server component, so it
- * can't be imported here: client forms import AuthTitle from this file).
+ * The card behind sign-in, sign-up, password help and joining a club
+ * (Moonstone): a 1000px card on the page, its 10px frame around a graphite
+ * panel on the left (the chrome colour, dark in both modes, lit by the
+ * banana glow from its corner: the logo at the top, `panel` at the bottom,
+ * a faint outline of the mark bleeding off the corner) and the form on the
+ * right. Below lg the panel is hidden and the logo sits above the form.
+ * `footer` closes the form column: the pages a signed-in person reaches pass
+ * <SignedInAs /> (a server component, so it can't be imported here: client
+ * forms import AuthTitle from this file).
  */
 export function AuthCard({
   panel = <AuthHeadline />,
@@ -21,7 +23,7 @@ export function AuthCard({
   formClassName,
   footer,
 }: {
-  /** The bottom of the yellow panel; the tagline when not given. */
+  /** The bottom of the panel; the tagline when not given. */
   panel?: ReactNode;
   children: ReactNode;
   /** Sign-up's taller card (660px instead of 620px). */
@@ -32,31 +34,31 @@ export function AuthCard({
   footer?: ReactNode;
 }) {
   return (
-    <main className="grid flex-1 grid-cols-1 place-items-center px-4 py-10 sm:px-6">
+    <main className="grid flex-1 grid-cols-1 place-items-center px-4 py-8 sm:px-6 sm:py-12">
       <div
         className={cn(
-          "bg-paper border-ink/10 shadow-frame flex w-full max-w-[1000px] gap-3 rounded-[34px] border p-3",
+          "bg-card text-card-foreground edge ring-foreground/6 rounded-shell flex w-full max-w-[1000px] gap-2.5 p-2.5 ring-1",
           tall ? "lg:min-h-[660px]" : "lg:min-h-[620px]",
         )}
       >
-        <div className="bg-peel relative hidden w-[440px] flex-none flex-col justify-between overflow-hidden rounded-[24px] p-10 lg:flex">
+        <div className="bg-chrome text-chrome-foreground glow-corner relative hidden w-[420px] flex-none flex-col justify-between overflow-hidden rounded-[calc(var(--radius-shell)-0.625rem)] p-10 lg:flex">
           <CoreMark
             size={420}
             tone="outline"
-            className="pointer-events-none absolute -right-[130px] -bottom-[120px] opacity-25"
+            className="pointer-events-none absolute -right-[130px] -bottom-[120px] opacity-[0.07]"
           />
-          <Link href="/" className="text-ink relative w-fit" data-plain>
-            <Logo tone="ink" />
+          <Link href="/" className="text-logo-cream relative w-fit" data-plain>
+            <Logo />
           </Link>
           <div className="relative">{panel}</div>
         </div>
         <div
           className={cn(
-            "flex min-w-0 flex-1 flex-col justify-center gap-5 px-5 py-8 sm:px-10 lg:px-16 lg:py-10",
+            "flex min-w-0 flex-1 flex-col justify-center gap-5 px-3.5 py-7 sm:px-10 lg:px-16 lg:py-10",
             formClassName,
           )}
         >
-          <Link href="/" className="text-ink w-fit lg:hidden" data-plain>
+          <Link href="/" className="logo-lockup w-fit lg:hidden" data-plain>
             <Logo />
           </Link>
           {children}
@@ -67,9 +69,13 @@ export function AuthCard({
   );
 }
 
-/** The panel's headline (the tagline unless given): Young Serif 52px, set tight. */
+/** The panel's headline (the tagline unless given): the display face, set tight. */
 export function AuthHeadline({
-  children = "Running your club shouldn't be bananas.",
+  children = (
+    <>
+      Running your club shouldn&apos;t be bananas<span className="glow-text">.</span>
+    </>
+  ),
   className,
 }: {
   children?: ReactNode;
@@ -77,17 +83,14 @@ export function AuthHeadline({
 }) {
   return (
     <p
-      className={cn(
-        "font-heading m-0 text-[52px] leading-none tracking-[-0.035em] text-balance",
-        className,
-      )}
+      className={cn("display-title m-0 text-[46px] leading-[1.02] tracking-[-0.035em]", className)}
     >
       {children}
     </p>
   );
 }
 
-/** The form's title and the line under it. */
+/** The form's title and the line under it. `eyebrow`: a small muted label above. */
 export function AuthTitle({
   eyebrow,
   title,
@@ -99,11 +102,13 @@ export function AuthTitle({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      {eyebrow && <span className="text-honey text-[14px] font-bold">{eyebrow}</span>}
-      <h1 className="font-heading m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
-        {title}
-      </h1>
-      {description && <p className="text-ink-muted m-0 text-[16px]">{description}</p>}
+      {eyebrow && <span className="eyebrow text-muted-foreground">{eyebrow}</span>}
+      <h1 className="display-title m-0 text-[clamp(30px,3vw,36px)] tracking-[-0.03em]">{title}</h1>
+      {description && (
+        <p className="text-muted-foreground m-0 text-[15px] leading-[1.55] text-pretty">
+          {description}
+        </p>
+      )}
     </div>
   );
 }

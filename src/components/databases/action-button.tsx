@@ -6,6 +6,7 @@ import { useState, useTransition, type ReactNode } from "react";
 
 import { ItemMenu, type ItemMenuEntry } from "@/components/item-menu";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Variant = "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
 
@@ -38,18 +39,28 @@ export function ActionButton<A extends AnyAction>({
   className?: string;
 }) {
   const router = useRouter();
+  const [confirmEl, ask] = useConfirm();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   return (
     <span className="inline-flex flex-col items-start gap-1">
+      {confirmEl}
       <Button
         type="button"
         variant={variant}
         size={size}
         disabled={pending}
         className={className}
-        onClick={() => {
-          if (confirm && !window.confirm(confirm)) return;
+        onClick={async () => {
+          if (
+            confirm &&
+            !(await ask({
+              title: confirm,
+              confirmLabel: typeof children === "string" ? children : "Confirm",
+              tone: variant === "destructive" ? "destructive" : "default",
+            }))
+          )
+            return;
           setError(null);
           start(async () => {
             const result = await action(...((args ?? []) as Parameters<A>));
@@ -77,7 +88,10 @@ export interface ActionMenuItem {
   label: string;
   action: AnyAction;
   args?: unknown[];
+  /** Asked first, in the confirm dialog ("Delete this check-in?"). */
   confirm?: string;
+  /** What happens, under the question. */
+  confirmDescription?: string;
   destructive?: boolean;
 }
 
@@ -98,11 +112,21 @@ export function ActionMenu({
   extra?: ItemMenuEntry[];
 }) {
   const router = useRouter();
+  const [confirmEl, ask] = useConfirm();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const run = (item: ActionMenuItem) => {
-    if (item.confirm && !window.confirm(item.confirm)) return;
+  const run = async (item: ActionMenuItem) => {
+    if (
+      item.confirm &&
+      !(await ask({
+        title: item.confirm,
+        description: item.confirmDescription,
+        confirmLabel: item.label,
+        tone: item.destructive ? "destructive" : "default",
+      }))
+    )
+      return;
     setError(null);
     start(async () => {
       const result = await item.action(...(item.args ?? []));
@@ -117,13 +141,15 @@ export function ActionMenu({
     label: item.label,
     destructive: item.destructive,
     disabled: pending,
-    onSelect: () => run(item),
+    onSelect: () => void run(item),
   });
 
   return (
     <span className="inline-flex items-center gap-2">
+      {confirmEl}
       <ItemMenu
         label={label}
+        className="border-input"
         items={[
           ...items.filter((i) => !i.destructive).map(entry),
           ...extra,

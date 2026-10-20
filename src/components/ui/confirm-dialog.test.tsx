@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { useConfirm, type ConfirmOptions } from "./confirm-dialog";
 
-function Harness({ options, onResult }: { options: ConfirmOptions; onResult: (ok: boolean) => void }) {
+function Harness({
+  options,
+  onResult,
+}: {
+  options: ConfirmOptions;
+  onResult: (ok: boolean) => void;
+}) {
   const [el, confirm] = useConfirm();
   return (
     <>
@@ -38,13 +44,21 @@ describe("useConfirm", () => {
   it("stays open and shows the error when the action fails", async () => {
     const run = vi.fn(async () => "Only the uploader can delete this.");
     const onResult = vi.fn();
-    render(<Harness options={{ title: "Delete the file?", confirmLabel: "Delete file", run }} onResult={onResult} />);
+    render(
+      <Harness
+        options={{ title: "Delete the file?", confirmLabel: "Delete file", run }}
+        onResult={onResult}
+      />,
+    );
 
     fireEvent.click(screen.getByText("Ask"));
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: "Delete file" }));
     });
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Only the uploader can delete this.");
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "Only the uploader can delete this.",
+    );
     expect(screen.getByText("Delete the file?")).toBeTruthy();
     expect(onResult).not.toHaveBeenCalled();
   });

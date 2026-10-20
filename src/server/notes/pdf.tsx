@@ -16,6 +16,8 @@ import {
 } from "@react-pdf/renderer";
 import { format } from "date-fns";
 
+import { paperPt } from "@/lib/notes/paper";
+
 /**
  * A note as a PDF: the ProseMirror document the TipTap editor saves
  * (src/components/notes/editor/note-editor.tsx) mapped onto react-pdf
@@ -29,6 +31,11 @@ import { format } from "date-fns";
  * smart quotes, dashes, the euro sign). Common symbols outside it (arrows,
  * check marks) are spelled out, e.g. "->"; anything else (emoji, CJK) has no
  * glyph and becomes "?" rather than garbage.
+ *
+ * Document mode prints as it shows (src/lib/notes/paper.ts): the note's
+ * paper (Letter or A4), one-inch margins, the title and club in the header
+ * band and the page number in the footer band, and a page break block
+ * starts a new page. Page mode notes print on the same paper.
  */
 
 export interface NotePdfInput {
@@ -40,6 +47,8 @@ export interface NotePdfInput {
   updatedAt: Date;
   visibility: "PRIVATE" | "ORGANIZATION";
   event: { title: string; startsAt: Date } | null;
+  /** Note.paperSize: LETTER (the default) or A4. */
+  paperSize?: string | null;
 }
 
 type Style = Styles[string];
@@ -71,17 +80,12 @@ const COLOR = {
   link: "#2563eb",
 };
 
-/** US Letter, in points. */
-const PAGE_HEIGHT = 792;
 const BODY_SIZE = 10.5;
 const LINE_HEIGHT = 1.5;
 const LINE = BODY_SIZE * LINE_HEIGHT;
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 54,
-    paddingBottom: 60,
-    paddingHorizontal: 60,
     fontFamily: "Helvetica",
     fontSize: BODY_SIZE,
     lineHeight: LINE_HEIGHT,
@@ -138,18 +142,35 @@ const styles = StyleSheet.create({
   headerCell: { backgroundColor: "#fafafa", fontWeight: "bold" },
   // Anchored by `top`, not `bottom`: react-pdf 4 lays a fixed element with a
   // render prop (the page number) out thousands of points off the page when
-  // it is positioned from the bottom edge.
+  // it is positioned from the bottom edge. `top` and the sides come from
+  // the paper.
   footer: {
     position: "absolute",
-    top: PAGE_HEIGHT - 40,
-    left: 60,
-    right: 60,
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 8,
     color: COLOR.subtle,
   },
+  band: { position: "absolute", fontSize: 8, color: COLOR.subtle },
   footerTitle: { maxWidth: "75%" },
+  callout: {
+    flexDirection: "row",
+    backgroundColor: "#eef3fa",
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 7,
+  },
+  calloutBody: { flex: 1 },
+  summary: { fontWeight: "bold", marginBottom: 3 },
+  columns: { flexDirection: "row", marginBottom: 7 },
+  column: { flex: 1, paddingRight: 10 },
+  card: {
+    borderWidth: 1,
+    borderColor: COLOR.border,
+    borderRadius: 6,
+    padding: 7,
+    marginBottom: 7,
+  },
 });
 
 /** Bullets as shapes, not glyphs: filled dot, hollow dot, square by depth. */
@@ -227,6 +248,12 @@ export function plainText(node: PMNode): string {
     const next = stack.pop()!;
     if (typeof next.text === "string") out.push(next.text);
     if (next.type === "hardBreak") out.push("\n");
+    // Chips read as their words.
+    if (next.type === "mention") out.push(`@${String(next.attrs?.label ?? "someone")}`);
+    if (next.type === "dateChip") out.push(String(next.attrs?.date ?? ""));
+    if (next.type === "noteLink" || next.type === "taskChip" || next.type === "linkCard")
+      out.push(String(next.attrs?.title ?? ""));
+    if (next.type === "fileAttachment") out.push(String(next.attrs?.name ?? ""));
     const kids = children(next);
     for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]!);
   }
@@ -291,7 +318,11 @@ function markStyle(marks: PMMark[]): { style: Style; href: string | null } {
         decorations.push("underline");
         break;
       case "strike":
+      case "suggestionDelete":
         decorations.push("line-through");
+        break;
+      case "suggestionInsert":
+        if (!decorations.includes("underline")) decorations.push("underline");
         break;
       case "code":
         style.fontFamily = "Courier";
@@ -435,6 +466,65 @@ function Block({ node, depth, tight }: { node: PMNode } & BlockOptions): ReactNo
       );
     }
 
+    case "callout":
+      return (
+        <View style={styles.callout} wrap={false}>
+          <View style={styles.calloutBody}>
+            <Blocks nodes={kids} depth={depth + 1} tight />
+          </View>
+        </View>
+      );
+
+    case "details": {
+      const [summary, content] = kids;
+      return (
+        <View style={styles.paragraph}>
+          {summary && (
+            <Text style={styles.summary}>
+              <Inline nodes={children(summary)} />
+            </Text>
+          )}
+          {content && <Blocks nodes={children(content)} depth={depth + 1} tight />}
+        </View>
+      );
+    }
+
+    case "columns":
+      return (
+        <View style={styles.columns}>
+          {kids.map((col, i) => (
+            <View key={i} style={styles.column}>
+              <Blocks nodes={children(col)} depth={depth + 1} tight />
+            </View>
+          ))}
+        </View>
+      );
+
+    case "pageBreak":
+      return <View break />;
+
+    case "taskChip":
+      return (
+        <View style={styles.listItem}>
+          <Checkbox checked={false} />
+          <Text style={styles.listBody}>{toWinAnsi(String(node.attrs?.title ?? "Task"))}</Text>
+        </View>
+      );
+
+    case "image":
+    case "fileAttachment":
+    case "linkCard": {
+      const label =
+        node.type === "image"
+          ? `[Image${node.attrs?.alt ? `: ${String(node.attrs.alt)}` : ""}]`
+          : String(node.attrs?.name ?? node.attrs?.title ?? "File");
+      return (
+        <View style={styles.card} wrap={false}>
+          <Text>{toWinAnsi(label)}</Text>
+        </View>
+      );
+    }
+
     default: {
       const text = plainText(node);
       return text ? <Text style={styles.paragraph}>{toWinAnsi(text)}</Text> : null;
@@ -449,6 +539,7 @@ function formatDate(date: Date, timezone: string, pattern: string) {
 function NoteDocument({ note }: { note: NotePdfInput }) {
   const doc = (note.contentJson ?? {}) as PMNode;
   const blocks = children(doc);
+  const paper = paperPt(note.paperSize);
   const isEmpty = !plainText(doc).trim() && !blocks.some((b) => b.type === "table");
   const title = note.title.trim() || "Untitled note";
 
@@ -466,7 +557,16 @@ function NoteDocument({ note }: { note: NotePdfInput }) {
       creator="Bananasplit"
       producer="Bananasplit"
     >
-      <Page size="LETTER" style={styles.page}>
+      <Page
+        size={note.paperSize === "A4" ? "A4" : "LETTER"}
+        style={[styles.page, { padding: paper.margin }]}
+      >
+        <Text
+          fixed
+          style={[styles.band, { top: paper.band, left: paper.margin, right: paper.margin }]}
+        >
+          {toWinAnsi(`${title} · ${note.orgName}`)}
+        </Text>
         <View style={styles.header}>
           <Text style={styles.org}>{toWinAnsi(note.orgName)}</Text>
           <Text style={styles.title}>{toWinAnsi(title)}</Text>
@@ -486,7 +586,17 @@ function NoteDocument({ note }: { note: NotePdfInput }) {
           <Blocks nodes={blocks} depth={0} />
         )}
 
-        <View style={styles.footer} fixed>
+        <View
+          style={[
+            styles.footer,
+            {
+              top: paper.height - paper.band - 10,
+              left: paper.margin,
+              right: paper.margin,
+            },
+          ]}
+          fixed
+        >
           <Text style={styles.footerTitle}>{toWinAnsi(title)}</Text>
           <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>

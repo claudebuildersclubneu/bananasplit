@@ -60,7 +60,7 @@ const PARAM: Partial<Record<keyof WorkspaceQuery, string>> = {
 };
 
 /** Params that belong to one layout and must not leak into another. */
-const LAYOUT_LOCAL = ["page", "done", "position", "week", "person", "limit"];
+const LAYOUT_LOCAL = ["page", "done", "position", "week", "person", "limit", "lanes"];
 
 export function WorkspaceProvider({
   query,

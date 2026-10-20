@@ -17,13 +17,35 @@ Member) and from the org chart; members cannot change their own title. A
 person in two organizations can have a different title in each, and each
 organization sees only its own.
 
-**People.** User menu > **People** lists every current member, 50 to a page,
-with their picture, pronouns, title, and major and year. Search matches
-names, titles and majors. Each person's page adds their bio and links, and
-an **Open tasks** button that opens the task table filtered to them. Only
-members of the organization can see these pages; anyone else, and anyone
-asking about a person who is not a current member, gets a "not found" page.
-Emails are never shown on them.
+**People.** **People > Directory** lists every current member with their
+picture, title and team. Teams are the org chart's top-level branches (the
+top position, its advisors and its reports who lead nobody are
+"Leadership"; every other report of the top position starts a team named
+from its title, "VP Growth" leads "Growth"); members not on the published
+chart are "Not on the chart".
+
+- **Search as you type**: every word must appear in the name, title, team,
+  major, year ("2027", "class of 2027"), pronouns or role. The database does
+  the matching; when nothing matches every word it shows **close matches**
+  (typos: "jakson" finds Jackson).
+- **Filters**: Free now, Team, Role and Year. **Free now** comes from the
+  busy times members already share (Privacy decides who sees them): a member
+  is free when the current hour in their own time zone is between 8 am and
+  11 pm and not marked busy.
+- **Sort** by team, name (with an A-Z rail) or newest, as a **grid** or a
+  dense **list**. Big clubs load as you scroll.
+- **The profile sheet**: pick anyone to open their profile beside the list
+  (full screen on a phone). Up and down arrows move to the next person, Esc
+  closes it, and the link (`?person=`) opens it again. It shows role and
+  team, Copy email (only to owners and admins, or to everyone when Privacy >
+  "Members see each other's emails" is on), Find a time, their tasks, About,
+  where they sit on the org chart (reports to, leads), this week's busy
+  times, open tasks, contact and links, and when they joined. The full page
+  at `/people/{id}` shows the same profile.
+
+Only members of the organization can see these pages; anyone else, and
+anyone asking about a person who is not a current member, gets a "not
+found" page. The filters, sort and open profile are all in the URL.
 
 **Where pictures and names show up.** The user menu, the people pages, and
 every section that shows a person with the shared avatar component (the org
@@ -76,7 +98,18 @@ these profile sections.
 ## For developers
 
 - Reads: `src/server/profiles/queries.ts` (`getOwnProfile`, `listOrgPeople`,
-  `getOrgPerson`, `getShellUser`, `userProfileSelect`). Writes:
+  `getOrgPerson`, `getShellUser`, `userProfileSelect`) and
+  `src/server/profiles/directory.ts` (`loadDirectory`, `searchPeopleInTx`,
+  `getPersonSheet`), all in the viewer's RLS transaction. Teams:
+  `chartTeams` in `src/lib/org-chart/teams.ts`; free now:
+  `src/server/profiles/presence.ts`. UI: `src/components/profile/`
+  (`people-directory.tsx`, `person-profile.tsx`, `directory-model.ts`).
+- Search uses pg_trgm's `word_similarity` when the runtime role may call it.
+  Today `app_user` has no EXECUTE on the pg_trgm functions, so the search
+  uses the same trigram idea by hand (`termTrigrams`, the share of a word's
+  trigrams found in the member's best-matching word) and switches by itself
+  once `GRANT EXECUTE ON FUNCTION public.word_similarity(text, text) TO
+  app_user` lands. Writes:
   `src/server/profiles/service.ts`, all on the user's own row through
   `withUserTx` (RLS and the column grant allow nothing else).
 - Links into the section: `profileHref`, `peopleHref`, `personHref` and

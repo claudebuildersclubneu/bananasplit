@@ -1,25 +1,40 @@
 import type { OrgKind, OrgPlan } from "@/generated/prisma/enums";
 
-import { FEATURE_LABELS, planIncludes, type PlanFeature, type PricedPlan } from "./features";
+import {
+  FEATURE_LABELS,
+  isPluralFeature,
+  personalPlanFor,
+  PLAN_LIMITS,
+  PLAN_NAMES,
+  planIncludes,
+  type PlanFeature,
+  type PlanLimits,
+  type PricedPlan,
+} from "./features";
 
 /**
  * What a space (a Personal space or a club) can use right now, the one
  * place the app asks (docs/features/personal-and-clubs.md). Pure and
  * client-safe; the pricing table keeps asking planIncludes().
  *
- *   PERSONAL          the FREE plan's features (src/lib/billing/features.ts):
- *                     tasks, the calendar and RSVP pages, polls, settings.
- *   TRIAL, running    everything (Society), for 30 days from the club's start.
+ *   PERSONAL          its plan, Personal Free (FREE) or Personal Plus
+ *                     (src/lib/billing/features.ts): tasks, the calendar
+ *                     and RSVP pages, polls, notes and files, settings;
+ *                     Plus adds themes, calendar sync and AI.
+ *   TRIAL, running    everything (Team Advanced), for 30 days from the
+ *                     club's start, with Team Advanced's limits.
  *   TRIAL, ended      "paused": everything can still be opened and read
- *                     (Society minus what runs on its own: AI and website
- *                     sync), but nothing in the club can be created or
- *                     changed until the owner picks Club or Society
- *                     (canWriteSpace; withOrgAction refuses the writes).
- *   CLUB, SOCIETY     that plan.
+ *                     (Team Advanced minus what runs on its own: AI and
+ *                     website sync), but nothing in the club can be created
+ *                     or changed until the owner picks Team or Team
+ *                     Advanced (canWriteSpace; withOrgAction refuses the
+ *                     writes, and so does the upload gate).
+ *   CLUB, SOCIETY     that plan (Team, Team Advanced).
  *
  *   spaceIncludes(org, "finance")      // gate a page, a link, an action
+ *   spaceLimits(org)                   // storage, largest file, note history
  *   spaceStatus(org)                   // "personal" | "trial" | "paused" | "paid"
- *   trialDaysLeft(org)                 // Admin panel > Plan, the trial banner
+ *   trialDaysLeft(org)                 // Settings › Plan, the trial banner
  */
 
 /** The three columns of Organization that decide what a space includes. */
@@ -71,10 +86,13 @@ export function trialDaysLeft(space: SpaceInfo, now: Date = new Date()): number 
   return Math.max(0, Math.ceil((space.trialEndsAt.getTime() - now.getTime()) / DAY_MS));
 }
 
-/** The priced plan whose features the space has (a trial is Society). */
-export function effectivePlan(space: SpaceInfo): PricedPlan {
-  if (space.kind === "PERSONAL") return "FREE";
-  if (space.plan === "TRIAL" || space.plan === "FREE") return "SOCIETY";
+/** The priced plan whose features and limits the space has (a trial is Team Advanced). */
+export function effectivePlan(space: Pick<SpaceInfo, "kind" | "plan">): PricedPlan {
+  if (space.kind === "PERSONAL") return space.plan === "PERSONAL_PLUS" ? "PERSONAL_PLUS" : "FREE";
+  // A club is never on a Personal plan (the database refuses it).
+  if (space.plan === "TRIAL" || space.plan === "FREE" || space.plan === "PERSONAL_PLUS") {
+    return "SOCIETY";
+  }
   return space.plan;
 }
 
@@ -87,9 +105,14 @@ export function spaceIncludes(
   feature: PlanFeature,
   now: Date = new Date(),
 ): boolean {
-  if (space.kind === "PERSONAL") return planIncludes("FREE", feature);
+  if (space.kind === "PERSONAL") return planIncludes(effectivePlan(space), feature);
   if (isPaused(space, now) && PAUSED_OFF.has(feature)) return false;
   return planIncludes(effectivePlan(space), feature);
+}
+
+/** The space's limits: its plan's; a trial's are Team Advanced's (paused or not). */
+export function spaceLimits(space: Pick<SpaceInfo, "kind" | "plan">): PlanLimits {
+  return PLAN_LIMITS[effectivePlan(space)];
 }
 
 /** What a refused write says in a paused club (members never see a price). */
@@ -98,9 +121,13 @@ export const PAUSED_WRITE_MESSAGE =
 
 /** What a refused action says when the space doesn't include its feature. */
 export function featureRefusal(space: Pick<SpaceInfo, "kind">, feature: PlanFeature): string {
-  return space.kind === "PERSONAL"
-    ? `${FEATURE_LABELS[feature]} ${feature === "taskViews" || feature === "teamwork" ? "are" : "is"} for clubs. Start a club or join one to use it.`
-    : `${FEATURE_LABELS[feature]} ${feature === "taskViews" || feature === "teamwork" ? "aren't" : "isn't"} on this club's plan.`;
+  const plural = isPluralFeature(feature);
+  if (space.kind === "PERSONAL") {
+    return personalPlanFor(feature) === "PERSONAL_PLUS"
+      ? `${FEATURE_LABELS[feature]} ${plural ? "come" : "comes"} with ${PLAN_NAMES.PERSONAL_PLUS}.`
+      : `${FEATURE_LABELS[feature]} ${plural ? "are" : "is"} for clubs. Start a club or join one to use it.`;
+  }
+  return `${FEATURE_LABELS[feature]} ${plural ? "aren't" : "isn't"} on this club's plan.`;
 }
 
 /**

@@ -2,15 +2,19 @@
 
 Several members can edit the same note at once and see each other's changes
 as they type, with a coloured caret and name for everyone in the note and
-their avatars next to the save status. It is **off by default**
-(`COLLAB_ENABLED`); while it is off, or whenever the collaboration server
-cannot be reached, notes use the autosave editor exactly as before.
+their avatars in the note's top bar. It is **on by default wherever a
+collaboration server is configured** (`COLLAB_SERVER_URL` and
+`COLLAB_SECRET`); `COLLAB_ENABLED=false` switches it off. Without a server,
+or whenever the server cannot be reached, notes use the autosave editor
+exactly as before. Comments, version history (autosave snapshots and named
+versions) and suggestions work the same on both paths.
 
 Production runs on Vercel, whose functions cannot hold the long-lived
 WebSockets live editing needs, so it needs one more service: a small
 collaboration server, shipped in this repo (`pnpm collab:start`), or a hosted
 equivalent (see [Hosting](#hosting-options)). Choosing and running it is the
-one decision left before turning this on.
+one decision left before production gets live editing; until then
+production simply stays on the autosave path.
 
 ## For an org
 
@@ -113,34 +117,39 @@ and the fallback do not change.
    (the app's production origin, e.g. `https://portal.example.org`) and, if
    the platform does not set `PORT`, `COLLAB_PORT`. Start it with
    `pnpm collab:start` and check that `https://<host>/` answers.
-4. **In Vercel (Production scope)**, set `COLLAB_ENABLED=true`,
-   `COLLAB_SERVER_URL` (the `wss://` URL) and the same `COLLAB_SECRET`,
-   then redeploy. The migration (`20260926120000_note_yjs_state`) applies on
+4. **In Vercel (Production scope)**, set `COLLAB_SERVER_URL` (the `wss://`
+   URL) and the same `COLLAB_SECRET`, then redeploy (no flag needed;
+   `COLLAB_ENABLED=true` is still accepted). The migration (`20260926120000_note_yjs_state`) applies on
    deploy like every other.
-5. **Previews:** leave `COLLAB_ENABLED` unset in the Preview scope (the
-   default) unless previews get their own collaboration server; Vercel
-   Deployment Protection would also block its calls into a preview.
-6. **Watch it:** point the uptime monitor at the collaboration host too.
+5. **Previews:** leave `COLLAB_SERVER_URL` unset in the Preview scope (or set
+   `COLLAB_ENABLED=false` there if the variable is shared) unless previews
+   get their own collaboration server; Vercel Deployment Protection would
+   also block its calls into a preview.
+6. **Nothing else changes in deploy infrastructure:** no new migration for
+   this switch, no Vercel config. Version snapshots on live saves are
+   written by the app (the bridge's store route) on the service path after
+   the save commits, so the collaboration server needs no new permission or
+   variable.
+7. **Watch it:** point the uptime monitor at the collaboration host too.
    When it is down, notes quietly fall back to autosave.
 
 RUNBOOK "Live collaboration" has the same steps plus secret rotation.
 
 ## For the platform operator
 
-| What                 | Where                                                                                                                                                                                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| App (Vercel)         | `COLLAB_ENABLED` (`"true"` to turn on), `COLLAB_SERVER_URL` (`wss://`, or `ws://` on localhost), `COLLAB_SECRET` (32+ characters). Any one missing or invalid keeps collaboration off and logs `[collab] COLLAB_ENABLED is set but ignored: …` once. |
-| Collaboration server | `COLLAB_SECRET` (same value), `COLLAB_APP_URL` (default `NEXT_PUBLIC_APP_URL`), `COLLAB_PORT` or `PORT` (default 1234), `COLLAB_HOST`. Node 22+. Entry point `scripts/collab-server.ts`; code in `src/collab-server/`.                               |
-| Bridge               | `POST /api/collab/load` and `/api/collab/store` (503 while off, 401 without a valid signature, 413 above 3 MB of document state). ESLint lets only these routes import `withOrgTxAs`.                                                                |
-| Revoke               | `POST <collab host>/revoke`, signed, called after commit when a note turns PRIVATE or is deleted: closes the note's connections and refuses older tokens for it.                                                                                     |
-| Storage              | `Note.yjsState` (bytea, NULL until a note is saved live). Covered by the existing Note policies (RLS case P-COLLAB-01); left out of list reads and org exports.                                                                                      |
+| What                 | Where                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App (Vercel)         | `COLLAB_SERVER_URL` (`wss://`, or `ws://` on localhost) and `COLLAB_SECRET` (32+ characters) turn it on; `COLLAB_ENABLED="false"` turns it off. A URL (or `COLLAB_ENABLED="true"`) with a missing or invalid value keeps collaboration off and logs `[collab] live collaboration is configured but off: …` once. |
+| Collaboration server | `COLLAB_SECRET` (same value), `COLLAB_APP_URL` (default `NEXT_PUBLIC_APP_URL`), `COLLAB_PORT` or `PORT` (default 1234), `COLLAB_HOST`. Node 22+. Entry point `scripts/collab-server.ts`; code in `src/collab-server/`.                                                                                           |
+| Bridge               | `POST /api/collab/load` and `/api/collab/store` (503 while off, 401 without a valid signature, 413 above 3 MB of document state). ESLint lets only these routes import `withOrgTxAs`.                                                                                                                            |
+| Revoke               | `POST <collab host>/revoke`, signed, called after commit when a note turns PRIVATE or is deleted: closes the note's connections and refuses older tokens for it.                                                                                                                                                 |
+| Storage              | `Note.yjsState` (bytea, NULL until a note is saved live). Covered by the existing Note policies (RLS case P-COLLAB-01); left out of list reads and org exports.                                                                                                                                                  |
 
 ## Local development
 
 1. Add to `.env` (any 32+ character secret):
 
    ```sh
-   COLLAB_ENABLED="true"
    COLLAB_SERVER_URL="ws://localhost:1234"
    COLLAB_SECRET="local-dev-collab-secret-at-least-32-chars"
    ```

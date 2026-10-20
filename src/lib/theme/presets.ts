@@ -16,6 +16,8 @@ export interface ThemePreset {
   description: string;
   light: ThemeRoles;
   dark: ThemeRoles;
+  /** The preset's own glow (the light behind the page); absent = its accent. */
+  glow?: string;
 }
 
 export const CUSTOM_PRESET_ID = "custom";
@@ -23,16 +25,69 @@ export const DEFAULT_PRESET_ID = "default";
 export const GRAPHITE_PRESET_ID = "graphite";
 
 /**
- * "Bananasplit", the app's built-in look, in the brand's own palette (the
- * design handoff, src/app/brand.css): cream paper, ink text and an ink
- * primary, with banana as the highlighter (a fill only, about 1.5:1 on
- * cream, never text). Dark mode is the same banana split at night: ink-dark
- * paper, cream text, banana as the primary with an ink label, and a riper
- * banana for the highlighter.
+ * "Moonstone", the default since the redesign: graphite and pearl with no
+ * fill colour of its own, lit by a banana glow (the light behind the page,
+ * the halo on create buttons, the active item and focus). Dark first: the
+ * org mode defaults to dark. The primary and accent are one colour (pearl in
+ * dark, ink in light); the glow is what marks "create".
  */
 export const DEFAULT_PRESET: ThemePreset = {
   id: DEFAULT_PRESET_ID,
-  name: "Bananasplit",
+  name: "Moonstone",
+  description: "Graphite and pearl, lit by a banana glow.",
+  light: {
+    primary: "#111318",
+    accent: "#111318",
+    background: "#eff1f4",
+    surface: "#ffffff",
+    text: "#111318",
+  },
+  dark: {
+    primary: "#eef0f4",
+    accent: "#eef0f4",
+    background: "#0c0d10",
+    surface: "#15161b",
+    text: "#eef0f4",
+  },
+  glow: "#f2c230",
+};
+
+export const BANANA_NIGHT_PRESET_ID = "night";
+
+/** "Banana night": graphite greys with banana as the accent (the redesign's first draft). */
+export const BANANA_NIGHT_PRESET: ThemePreset = {
+  id: BANANA_NIGHT_PRESET_ID,
+  name: "Banana night",
+  description: "Graphite greys with a banana accent.",
+  light: {
+    primary: "#16181b",
+    accent: "#f2c230",
+    background: "#f3f4f6",
+    surface: "#ffffff",
+    text: "#16181b",
+  },
+  dark: {
+    primary: "#eceef1",
+    accent: "#f2c230",
+    background: "#0f1114",
+    surface: "#171a1e",
+    text: "#eceef1",
+  },
+};
+
+export const BANANA_CREAM_PRESET_ID = "cream";
+
+/**
+ * "Banana cream", the built-in look before the redesign, in the brand's own
+ * palette (src/app/brand.css): cream paper, ink type and an ink primary,
+ * with banana as the highlighter (a fill only, about 1.5:1 on cream, never
+ * text). Dark mode is the same banana split at night: ink-dark paper, cream
+ * text, banana as the primary with an ink label, and a riper banana for the
+ * highlighter.
+ */
+export const BANANA_CREAM_PRESET: ThemePreset = {
+  id: BANANA_CREAM_PRESET_ID,
+  name: "Banana cream",
   description: "Cream paper, ink type and a banana highlighter.",
   light: {
     primary: "#1c1810",
@@ -121,6 +176,8 @@ export const CBC_PRESET: ThemePreset = {
 
 export const THEME_PRESETS: readonly ThemePreset[] = [
   DEFAULT_PRESET,
+  BANANA_NIGHT_PRESET,
+  BANANA_CREAM_PRESET,
   CBC_PRESET,
   {
     id: "harbor",
@@ -250,4 +307,19 @@ export function savedPresetId(id: string, light: ThemeRoles): string {
     return GRAPHITE_PRESET_ID;
   }
   return findPreset(id) ? id : CUSTOM_PRESET_ID;
+}
+
+/**
+ * Light palettes a row saved as "default" may hold from before Moonstone:
+ * the raspberry Bananasplit and the cream Bananasplit. Picking the default
+ * has always meant following the brand, so resolve.ts moves them onto
+ * today's default (the decision recorded in docs/features/themes.md).
+ */
+export function isFormerDefault(light: ThemeRoles): boolean {
+  return sameRoles(light, LEGACY_DEFAULT_LIGHT) || sameRoles(light, BANANA_CREAM_PRESET.light);
+}
+
+/** The glow a preset paints with: its own, else null (the accent). */
+export function presetGlow(id: string): string | null {
+  return findPreset(id)?.glow ?? null;
 }

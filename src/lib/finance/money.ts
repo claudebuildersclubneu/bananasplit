@@ -29,6 +29,14 @@ export function formatCents(cents: number, currency = "USD"): string {
   }).format(cents / 100);
 }
 
+/**
+ * Money outside tables, in whole dollars ("$1,830", "-$42"): headline
+ * figures, cards and chips. Tables keep the cents (formatCents).
+ */
+export function formatDollars(cents: number, currency = "USD"): string {
+  return formatCents(Math.round(cents / 100) * 100, currency).replace(/\.00$/, "");
+}
+
 /** Sums a list of integer cent amounts, staying in integer arithmetic throughout. */
 export function sumCents(amounts: readonly number[]): number {
   let total = 0;

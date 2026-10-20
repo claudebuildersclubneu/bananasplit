@@ -12,9 +12,10 @@ import { profileDetailsSchema, profileLinkSchema } from "@/lib/profile/schema";
  *      review, then the Personal dashboard. Joining a club adds one small
  *      club step, "Your role in <club>" (/onboarding/join/[orgSlug]).
  *   B  Create an organization, only for the person creating one:
- *      B1 name -> B2 data -> B3 labels -> B4 finance -> B5 teams -> B6 invite
- *      -> B7 bring (move things in from Personal; skipped when there's
- *      nothing to bring) -> the org, as admin.
+ *      B1 name -> labels -> finance -> teams -> weekly pulse -> invite
+ *      officers -> connect tools (optional) -> bring (move things in from
+ *      Personal; skipped when there's nothing to bring) -> the club, as
+ *      its admin.
  *
  * Pure and client-safe: the pages, forms and actions share these.
  */
@@ -87,17 +88,20 @@ export function unfinishedProfileSteps(profile: {
 // B1 is /onboarding/organization; the rest live under the new org's slug.
 // Connecting tools comes after inviting officers: it's optional, and a new
 // club's first minutes are better spent on its own setup and its people.
-export const ORG_STEPS = ["labels", "finance", "teams", "invite", "data", "bring"] as const;
+// The weekly pulse is picked right after Teams (redesign guide 15.2).
+export const ORG_STEPS = ["labels", "finance", "teams", "pulse", "invite", "data", "bring"] as const;
 export type OrgStep = (typeof ORG_STEPS)[number];
-/** Seven steps in the stepper: B1 plus these six. */
+/** Eight steps in the stepper: B1 plus these seven. */
 export const ORG_STEP_COUNT = ORG_STEPS.length + 1;
 
-/** The stepper's names for B1-B7, in order. */
+/** The stepper's names, in order. */
 export const ORG_STEP_NAMES = [
   "Club basics",
-  "Labels",
+  "Tags",
   "Finance",
   "Teams",
+  // When the club's weekly recap goes out, to whom, and how.
+  "Weekly pulse",
   "Invite officers",
   // Optional: a club's data is stored in Bananasplit whether or not it connects anything.
   "Connect tools",

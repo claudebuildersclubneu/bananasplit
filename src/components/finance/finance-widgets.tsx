@@ -9,49 +9,38 @@ import {
   ListChecks,
   PiggyBank,
   ReceiptText,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
+import { Donut, LegendSwatch, seriesColor } from "@/components/reports/charts/chart-kit";
+import { TrendChart } from "@/components/reports/charts/trend-chart";
+import { Button } from "@/components/ui/button";
+import { BlockCard } from "@/components/ui/block-card";
+import { Gauge, MixBar, TickMeter } from "@/components/ui/meters";
+import { IconChip } from "@/components/ui/stat";
 import type { DashboardData, DashboardTransaction } from "@/app/app/[orgSlug]/finance/queries";
-import { formatCents } from "@/lib/finance/money";
+import { formatCents, formatDollars } from "@/lib/finance/money";
 import { SETUP_STEPS, stepDone, type FinanceSetupState } from "@/lib/finance/setup";
 import type { WidgetTypeId } from "@/lib/finance/widgets";
 import { cn } from "@/lib/utils";
 
+import { tickUnitCents } from "./budget-ticks";
 import { BurnChart } from "./burn-chart";
 import { RunwaySection } from "./runway-section";
+import { TransactionStatusBadge } from "./transaction-status-badge";
 
 /**
  * The finance widgets' bodies (the board adds the frame, title and edit
  * controls). Every figure comes from DashboardData: the active period's
- * ledger, the same numbers as the budget and transactions pages.
+ * ledger, the same numbers as the budget and transactions pages. Charts are
+ * the chart kit's (src/components/reports/charts), coloured only from the
+ * theme's chart slots; a category keeps its slot (its place in the budget)
+ * in the donut and on its budget line alike.
  */
-
-const CHART_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
 
 const KIND_LABEL: Record<string, string> = {
   EXPENSE: "Expenses",
@@ -71,7 +60,18 @@ const INCOME_LABEL: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = { SUBMITTED: "To approve", APPROVED: "To pay back" };
 
-const money = (cents: number) => formatCents(cents).replace(/\.00$/, "");
+/** Money outside tables: whole dollars ("$1,830"); tables keep the cents. */
+const money = (cents: number) => formatDollars(cents);
+
+/** Axis money: $0, $500, $1.5K, $12K. */
+const axisMoney = (cents: number) => {
+  const dollars = cents / 100;
+  if (Math.abs(dollars) >= 1000) {
+    const k = dollars / 1000;
+    return `${dollars < 0 ? "-" : ""}$${Math.abs(k).toFixed(Math.abs(k) % 1 ? 1 : 0)}K`;
+  }
+  return `${dollars < 0 ? "-" : ""}$${Math.abs(Math.round(dollars))}`;
+};
 
 const shortDate = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -81,53 +81,60 @@ const shortDate = new Intl.DateTimeFormat("en-US", {
 
 function Big({ value, sub, tone }: { value: ReactNode; sub?: ReactNode; tone?: "good" | "bad" }) {
   return (
-    <div className="min-w-0 space-y-1">
+    <div className="min-w-0 space-y-2">
       <p
         className={cn(
-          "text-2xl font-semibold break-all tabular-nums",
+          "numeral text-[30px] break-all",
           tone === "good" && "text-success",
           tone === "bad" && "text-destructive",
         )}
       >
         {value}
       </p>
-      {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
+      {sub && <p className="text-muted-foreground text-[13px]">{sub}</p>}
     </div>
   );
 }
 
-function ChartEmpty({ text }: { text: string }) {
-  return <EmptyState size="compact" title={text} className="py-8" />;
+function ChartEmpty({ text, icon }: { text: string; icon?: LucideIcon }) {
+  return (
+    <div className="text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2.5 py-6 text-center text-sm">
+      {icon && <IconChip icon={icon} className="text-muted-foreground" />}
+      {text}
+    </div>
+  );
 }
 
+const rowClass =
+  "hover:bg-muted/60 focus-glow rounded-field -mx-2.5 flex items-center gap-3 px-2.5 py-2.5 transition-colors outline-none";
+
 function TxList({ rows, orgSlug }: { rows: DashboardTransaction[]; orgSlug: string }) {
-  if (rows.length === 0) return <ChartEmpty text="No transactions yet this period" />;
+  if (rows.length === 0)
+    return <ChartEmpty text="No transactions yet this period" icon={ReceiptText} />;
   return (
-    <ul className="divide-y">
+    <ul className="divide-border/70 divide-y">
       {rows.map((t) => {
         const inbound = t.direction === "IN";
         const Icon = inbound ? ArrowDownLeft : ArrowUpRight;
         return (
           <li key={t.id}>
-            <Link
-              href={`/app/${orgSlug}/finance/transactions`}
-              className="hover:bg-accent/50 -mx-2 flex items-center gap-3 rounded-md px-2 py-2"
-            >
-              <Icon
+            <Link href={`/app/${orgSlug}/finance/transactions`} className={rowClass}>
+              <span
                 className={cn(
-                  "size-4 shrink-0",
-                  inbound ? "text-success" : "text-muted-foreground",
+                  "grid size-8 shrink-0 place-items-center rounded-full",
+                  inbound ? "bg-tint-success text-tint-success-foreground" : "bg-muted",
                 )}
-                aria-hidden="true"
-              />
+              >
+                <Icon className="size-4" aria-hidden="true" />
+              </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{t.description}</span>
+                <span className="block truncate text-sm font-medium">{t.description}</span>
                 <span className="text-muted-foreground block text-xs">
                   {shortDate.format(new Date(t.occurredAt))}
                   {t.categoryName ? ` · ${t.categoryName}` : ""}
                 </span>
               </span>
-              <span className={cn("text-sm font-medium tabular-nums", inbound && "text-success")}>
+              <span className={cn("text-sm font-semibold tabular-nums", inbound && "text-success")}>
                 {inbound ? "+" : "−"}
                 {formatCents(t.amountCents)}
               </span>
@@ -141,7 +148,7 @@ function TxList({ rows, orgSlug }: { rows: DashboardTransaction[]; orgSlug: stri
 
 function Shortcut({
   href,
-  icon: Icon,
+  icon,
   label,
   detail,
 }: {
@@ -153,15 +160,115 @@ function Shortcut({
   return (
     <Link
       href={href}
-      className="hover:bg-accent/60 flex items-center gap-3 rounded-lg border p-2.5 transition-colors"
+      className="bg-muted/50 hover:bg-muted focus-glow rounded-tile group/sc flex items-center gap-3 p-3 transition-[background-color,transform] duration-200 ease-(--ease-ink) outline-none hover:-translate-y-0.5 motion-reduce:transform-none"
     >
-      <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+      <IconChip icon={icon} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{label}</span>
+        <span className="block truncate text-sm font-semibold">{label}</span>
         <span className="text-muted-foreground block truncate text-xs">{detail}</span>
       </span>
-      <ArrowRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+      <ArrowRight
+        className="text-muted-foreground size-4 shrink-0 transition-transform group-hover/sc:translate-x-0.5"
+        aria-hidden="true"
+      />
     </Link>
+  );
+}
+
+/**
+ * Budget vs. actual: a Progress block with the budget gauge (spent of
+ * everything allocated), then one tick meter per budget line, drawn to
+ * scale: every tick is the same amount on every line.
+ */
+function BudgetWidget({ data, base }: { data: DashboardData; base: string }) {
+  if (data.categories.length === 0) {
+    return (
+      <EmptyState
+        size="compact"
+        title="No budget categories yet"
+        description="Give each category an amount to see spending against it."
+        action={
+          <Button asChild size="sm" variant="outline">
+            <Link href={`${base}/budget`}>Set up the budget</Link>
+          </Button>
+        }
+      />
+    );
+  }
+  const spent = data.categories.reduce((sum, c) => sum + c.spentCents, 0);
+  const total = data.totalAllocatedCents;
+  const left = total - spent;
+  const pct = total > 0 ? (spent / total) * 100 : 0;
+  const maxAllocated = Math.max(...data.categories.map((c) => c.allocatedCents), 1);
+  const unit = tickUnitCents(maxAllocated);
+  const maxTicks = Math.ceil(maxAllocated / unit);
+
+  return (
+    <div className="@container">
+      <div className="grid gap-5 @md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] @md:items-start">
+        <BlockCard
+          tone="goal"
+          kicker={data.period ? `Budget · ${data.period.label}` : "Budget"}
+          className="min-h-0 p-4.5"
+          action={
+            <Link
+              href={`${base}/budget`}
+              aria-label="Open the budget"
+              className="focus-glow grid size-8 place-items-center rounded-full ring-1 ring-current/30 transition-[background-color,transform] ring-inset hover:bg-current/10 active:scale-[0.94]"
+            >
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+            </Link>
+          }
+        >
+          <div className="mt-3 flex items-center gap-3.5 @md:flex-col @md:items-start">
+            <Gauge value={pct} caption={spent > total ? "over" : "spent"} size={112} />
+            <div className="min-w-0">
+              <p className="display-title text-[19px]">
+                {money(spent)} of {money(total)}
+              </p>
+              <p className="mt-1 text-[13px] text-(--meta)">
+                {left >= 0 ? `${money(left)} left to spend` : `${money(-left)} over budget`}
+              </p>
+            </div>
+          </div>
+        </BlockCard>
+        <div className="min-w-0 space-y-3.5">
+          {data.categories.map((c, i) => {
+            const over = c.spentCents > c.allocatedCents;
+            const ticks = Math.max(1, Math.ceil(c.allocatedCents / unit));
+            return (
+              <div key={c.id} className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="truncate font-medium">{c.name}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-[13px] tabular-nums",
+                      over ? "text-destructive font-semibold" : "text-muted-foreground",
+                    )}
+                  >
+                    {money(c.spentCents)} of {money(c.allocatedCents)}
+                  </span>
+                </div>
+                {c.allocatedCents > 0 ? (
+                  <div style={{ width: `${Math.max(8, (ticks / maxTicks) * 100)}%` }}>
+                    <TickMeter
+                      total={ticks}
+                      filled={over ? ticks : c.spentCents / unit}
+                      height={16}
+                      color={over ? "var(--destructive)" : seriesColor(i)}
+                      label={`${c.name}: ${money(c.spentCents)} of ${money(c.allocatedCents)}${over ? ", over budget" : ""}`}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-xs">Nothing allocated</p>
+                )}
+              </div>
+            );
+          })}
+          <p className="text-muted-foreground pt-0.5 text-xs">One tick per {money(unit)}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -180,11 +287,13 @@ export function WidgetBody({
   const base = `/app/${orgSlug}/finance`;
   // Null until the club sets up a budget: every widget still renders, empty.
   const period = data.period;
+  // A category's slot is its place in the budget, on every chart.
+  const slotOf = new Map(data.categories.map((c, i) => [c.id, seriesColor(i)]));
   switch (type) {
     case "balance":
       return (
         <Big
-          value={formatCents(data.balanceCents)}
+          value={money(data.balanceCents)}
           sub={period?.label ?? "No budget period yet"}
           tone={data.balanceCents < 0 ? "bad" : undefined}
         />
@@ -192,7 +301,7 @@ export function WidgetBody({
     case "in-out":
       return (
         // Side by side when the widget is wide enough, stacked when not.
-        <div className="flex flex-wrap gap-x-6 gap-y-3">
+        <div className="flex flex-wrap gap-x-7 gap-y-4">
           <Big value={money(data.inTotalCents)} sub="In" tone="good" />
           <Big value={money(data.outTotalCents)} sub="Out" />
         </div>
@@ -201,19 +310,19 @@ export function WidgetBody({
       const spent = data.categories.reduce((sum, c) => sum + c.spentCents, 0);
       return (
         <Big
-          value={formatCents(data.totalAllocatedCents)}
-          sub={`${formatCents(spent)} spent of it`}
+          value={money(data.totalAllocatedCents)}
+          sub={`${money(spent)} spent of it`}
         />
       );
     }
     case "owed":
       return (
         <Big
-          value={formatCents(data.outstandingReimbursementsCents)}
+          value={money(data.outstandingReimbursementsCents)}
           sub={
             <Link
               href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE`}
-              className="hover:underline"
+              className="hover:text-foreground underline-offset-4 hover:underline"
             >
               Expenses not yet paid back
             </Link>
@@ -228,9 +337,9 @@ export function WidgetBody({
             data.pendingApproval.count > 0 ? (
               <Link
                 href={`/app/${orgSlug}/finance/transactions?status=SUBMITTED`}
-                className="hover:underline"
+                className="hover:text-foreground underline-offset-4 hover:underline"
               >
-                {formatCents(data.pendingApproval.cents)} to review
+                {money(data.pendingApproval.cents)} to review
               </Link>
             ) : (
               "Nothing to review"
@@ -240,154 +349,87 @@ export function WidgetBody({
       );
     case "burn":
       return <BurnChart data={data.burnByMonth} />;
-    case "trend":
+    case "trend": {
       if (data.balanceTrend.length === 0)
-        return <ChartEmpty text="No transactions yet this period" />;
+        return <ChartEmpty text="No transactions yet this period" icon={ReceiptText} />;
+      const first = data.balanceTrend[0].balanceCents;
       return (
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={data.balanceTrend} margin={{ left: 0, right: 8, top: 8 }}>
-            <defs>
-              <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              tickFormatter={(d: string) => shortDate.format(new Date(d))}
-              minTickGap={24}
-            />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => money(v)} width={70} />
-            <Tooltip
-              formatter={(value) => formatCents(Number(value ?? 0))}
-              labelFormatter={(d) => shortDate.format(new Date(String(d)))}
-            />
-            <Area
-              type="monotone"
-              dataKey="balanceCents"
-              name="Balance"
-              stroke="var(--chart-1)"
-              strokeWidth={2}
-              fill="url(#trendFill)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <TrendChart
+          label={`Balance over the period, ${data.balanceTrend.length} days with activity`}
+          seriesLabel="Balance"
+          format={formatCents}
+          formatAxis={axisMoney}
+          reference={{ value: first, label: `Started at ${money(first)}`, short: "Start" }}
+          points={data.balanceTrend.map((p) => ({
+            key: p.date,
+            tick: shortDate.format(new Date(p.date)),
+            heading: shortDate.format(new Date(p.date)),
+            value: p.balanceCents,
+          }))}
+        />
       );
+    }
     case "by-category": {
       const slices = data.categories.filter((c) => c.spentCents > 0);
-      if (slices.length === 0) return <ChartEmpty text="Nothing spent in a category yet" />;
+      if (slices.length === 0)
+        return <ChartEmpty text="Nothing spent in a category yet" icon={PiggyBank} />;
       const total = slices.reduce((sum, c) => sum + c.spentCents, 0);
       return (
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <div className="h-44 w-44 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={slices}
-                  dataKey="spentCents"
-                  nameKey="name"
-                  innerRadius="58%"
-                  outerRadius="100%"
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {slices.map((c, i) => (
-                    <Cell key={c.id} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="w-full min-w-0 space-y-1.5">
-            {slices.map((c, i) => (
-              <li key={c.id} className="flex items-center gap-2 text-sm">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
-                />
-                <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                <span className="text-muted-foreground tabular-nums">
+        <Donut
+          label={`Spending by category: ${slices.map((c) => `${c.name} ${money(c.spentCents)}`).join(", ")}`}
+          center={axisMoney(total)}
+          centerLabel="spent"
+          parts={slices.map((c) => ({
+            label: c.name,
+            value: c.spentCents,
+            color: slotOf.get(c.id),
+            display: (
+              <>
+                {money(c.spentCents)}
+                <span className="text-muted-foreground ml-2 inline-block w-9 text-right font-normal">
                   {Math.round((c.spentCents / total) * 100)}%
                 </span>
+              </>
+            ),
+          }))}
+        />
+      );
+    }
+    case "by-kind": {
+      const rows = data.spendByKind.map((k, i) => ({
+        label: KIND_LABEL[k.kind] ?? k.kind,
+        cents: k.cents,
+        color: seriesColor(i),
+      }));
+      if (rows.length === 0)
+        return <ChartEmpty text="Nothing spent yet this period" icon={ReceiptText} />;
+      const total = rows.reduce((sum, r) => sum + r.cents, 0);
+      return (
+        <div className="space-y-4">
+          <p className="flex items-baseline gap-2">
+            <span className="numeral text-[30px]">{money(total)}</span>
+            <span className="text-muted-foreground text-[13px]">out this period</span>
+          </p>
+          <MixBar
+            height={36}
+            legend={false}
+            label={rows.map((r) => `${r.label} ${money(r.cents)}`).join(", ")}
+            segments={rows.map((r) => ({ label: r.label, value: r.cents, color: r.color }))}
+          />
+          <ul className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2">
+            {rows.map((r) => (
+              <li key={r.label} className="flex min-w-0 items-center gap-2">
+                <LegendSwatch shape="rect" color={r.color} />
+                <span className="min-w-0 flex-1 truncate">{r.label}</span>
+                <b className="font-semibold tabular-nums">{money(r.cents)}</b>
               </li>
             ))}
           </ul>
         </div>
       );
     }
-    case "by-kind": {
-      const rows = data.spendByKind.map((k) => ({
-        label: KIND_LABEL[k.kind] ?? k.kind,
-        cents: k.cents,
-      }));
-      if (rows.length === 0) return <ChartEmpty text="Nothing spent yet this period" />;
-      return (
-        <ResponsiveContainer width="100%" height={Math.max(120, rows.length * 44)}>
-          <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 16 }}>
-            <XAxis type="number" hide />
-            <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-            <Bar dataKey="cents" name="Spent" radius={[0, 4, 4, 0]}>
-              {rows.map((r, i) => (
-                <Cell key={r.label} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
     case "budget":
-      if (data.categories.length === 0) {
-        return (
-          <EmptyState
-            size="compact"
-            title="No budget categories yet"
-            action={
-              <Link
-                href={`/app/${orgSlug}/finance/budget`}
-                className="text-primary text-sm hover:underline"
-              >
-                Set up the budget
-              </Link>
-            }
-          />
-        );
-      }
-      return (
-        <div className="space-y-3">
-          {data.categories.map((c) => {
-            const pct =
-              c.allocatedCents > 0
-                ? Math.min(100, Math.round((c.spentCents / c.allocatedCents) * 100))
-                : 0;
-            const over = c.spentCents > c.allocatedCents;
-            return (
-              <div key={c.id} className="space-y-1">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{c.name}</span>
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      over ? "text-destructive" : "text-muted-foreground",
-                    )}
-                  >
-                    {formatCents(c.spentCents)} / {formatCents(c.allocatedCents)}
-                  </span>
-                </div>
-                <div className="bg-muted h-2 overflow-hidden rounded-full">
-                  <div
-                    className={cn("h-full rounded-full", over ? "bg-destructive" : "bg-primary")}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
+      return <BudgetWidget data={data} base={base} />;
     case "runway":
       return data.runway && period ? (
         <RunwaySection
@@ -397,27 +439,45 @@ export function WidgetBody({
           hideHeading
         />
       ) : (
-        <ChartEmpty text="Not enough history to project yet" />
+        <ChartEmpty text="Not enough history to project yet" icon={Target} />
       );
-    case "sponsorships":
+    case "sponsorships": {
+      const received = data.sponsorshipReceivedCents;
+      const committed = data.sponsorshipCommittedCents;
       return (
-        <div className="space-y-2.5 text-sm">
+        <div className="space-y-3.5 text-sm">
+          {received + committed > 0 && (
+            <MixBar
+              height={14}
+              legend={false}
+              label={`${money(received)} received, ${money(committed)} committed and still to come`}
+              segments={[
+                { label: "Received", value: received, color: "var(--chart-1)" },
+                { label: "Committed", value: committed, hatch: true },
+              ]}
+            />
+          )}
           <div className="flex items-center justify-between gap-2">
-            <Badge variant="secondary">Committed</Badge>
-            <span className="font-medium tabular-nums">
-              {formatCents(data.sponsorshipCommittedCents)}
+            <span className="inline-flex items-center gap-2">
+              <LegendSwatch shape="rect" color="var(--chart-1)" />
+              Received
             </span>
+            <span className="font-semibold tabular-nums">{formatCents(received)}</span>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <Badge>Received</Badge>
-            <span className="font-medium tabular-nums">
-              {formatCents(data.sponsorshipReceivedCents)}
+            <span className="inline-flex items-center gap-2">
+              <LegendSwatch shape="hatch" color="var(--chart-1)" />
+              Committed
             </span>
+            <span className="font-semibold tabular-nums">{formatCents(committed)}</span>
           </div>
           {data.sponsorshipCreditsCents > 0 && (
             <div className="flex items-center justify-between gap-2">
-              <Badge variant="outline">In credits</Badge>
-              <span className="font-medium tabular-nums">
+              <span className="text-muted-foreground inline-flex items-center gap-2">
+                <LegendSwatch shape="rect" color="var(--muted-foreground)" />
+                In credits
+              </span>
+              <span className="font-semibold tabular-nums">
                 {formatCents(data.sponsorshipCreditsCents)}
               </span>
             </div>
@@ -428,6 +488,7 @@ export function WidgetBody({
           </p>
         </div>
       );
+    }
     case "recent":
       return <TxList rows={data.recent} orgSlug={orgSlug} />;
     case "top-expenses":
@@ -440,7 +501,10 @@ export function WidgetBody({
           <Big
             value="—"
             sub={
-              <Link href={`${base}/budget`} className="hover:underline">
+              <Link
+                href={`${base}/budget`}
+                className="hover:text-foreground underline-offset-4 hover:underline"
+              >
                 Set a budget to see this
               </Link>
             }
@@ -460,73 +524,46 @@ export function WidgetBody({
         label: INCOME_LABEL[k.kind] ?? k.kind,
         cents: k.cents,
       }));
-      if (rows.length === 0) return <ChartEmpty text="No money in yet this period" />;
+      if (rows.length === 0)
+        return <ChartEmpty text="No money in yet this period" icon={ArrowDownLeft} />;
       const total = rows.reduce((sum, r) => sum + r.cents, 0);
       return (
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <div className="h-40 w-40 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={rows}
-                  dataKey="cents"
-                  nameKey="label"
-                  innerRadius="58%"
-                  outerRadius="100%"
-                  paddingAngle={2}
-                  stroke="none"
-                >
-                  {rows.map((r, i) => (
-                    <Cell key={r.label} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCents(Number(value ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="w-full min-w-0 space-y-1.5">
-            {rows.map((r, i) => (
-              <li key={r.label} className="flex items-center gap-2 text-sm">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
-                />
-                <span className="min-w-0 flex-1 truncate">{r.label}</span>
-                <span className="text-muted-foreground tabular-nums">{money(r.cents)}</span>
-                <span className="text-muted-foreground w-9 text-right text-xs tabular-nums">
+        <Donut
+          label={`Money in by source: ${rows.map((r) => `${r.label} ${money(r.cents)}`).join(", ")}`}
+          center={axisMoney(total)}
+          centerLabel="in"
+          parts={rows.map((r) => ({
+            label: r.label,
+            value: r.cents,
+            display: (
+              <>
+                {money(r.cents)}
+                <span className="text-muted-foreground ml-2 inline-block w-9 text-right font-normal">
                   {Math.round((r.cents / total) * 100)}%
                 </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+              </>
+            ),
+          }))}
+        />
       );
     }
     case "reimbursements":
       if (data.reimbursementQueue.length === 0) {
-        return <ChartEmpty text="Nobody is waiting to be paid back" />;
+        return <ChartEmpty text="Nobody is waiting to be paid back" icon={Check} />;
       }
       return (
-        <ul className="divide-y">
+        <ul className="divide-border/70 divide-y">
           {data.reimbursementQueue.map((t) => (
             <li key={t.id}>
-              <Link
-                href={`${base}/transactions?status=${t.status}`}
-                className="hover:bg-accent/50 -mx-2 flex items-center gap-3 rounded-md px-2 py-2"
-              >
+              <Link href={`${base}/transactions?status=${t.status}`} className={rowClass}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{t.description}</span>
+                  <span className="block truncate text-sm font-medium">{t.description}</span>
                   <span className="text-muted-foreground block truncate text-xs">
                     {t.submitter} · {shortDate.format(new Date(t.occurredAt))}
                   </span>
                 </span>
-                <Badge
-                  variant={t.status === "APPROVED" ? "default" : "secondary"}
-                  className="shrink-0 text-[10px]"
-                >
-                  {STATUS_LABEL[t.status] ?? t.status}
-                </Badge>
-                <span className="text-sm font-medium tabular-nums">
+                <TransactionStatusBadge status={t.status} label={STATUS_LABEL[t.status]} />
+                <span className="w-20 text-right text-sm font-semibold tabular-nums">
                   {formatCents(t.amountCents)}
                 </span>
               </Link>
@@ -536,7 +573,7 @@ export function WidgetBody({
       );
     case "shortcuts":
       return (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           <Shortcut
             href={`${base}/import`}
             icon={FileSpreadsheet}
@@ -568,32 +605,33 @@ export function WidgetBody({
         </div>
       );
     case "setup": {
-      if (!setup) return <ChartEmpty text="Open the setup guide to see what's left" />;
+      if (!setup)
+        return <ChartEmpty text="Open the setup guide to see what's left" icon={ListChecks} />;
       return (
-        <ul className="space-y-1.5">
+        <ul className="space-y-0.5">
           {SETUP_STEPS.map((step) => {
             const ok = stepDone(setup, step.id);
             return (
               <li key={step.id}>
-                <Link
-                  href={`${base}/setup`}
-                  className="hover:bg-accent/50 -mx-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
-                >
+                <Link href={`${base}/setup`} className={cn(rowClass, "py-2")}>
                   <span
                     className={cn(
-                      "grid size-5 shrink-0 place-items-center rounded-full border",
+                      "grid size-[22px] shrink-0 place-items-center rounded-full",
                       ok
-                        ? "bg-success border-success text-success-foreground"
-                        : "text-muted-foreground",
+                        ? "bg-block-goal text-block-goal-foreground"
+                        : "ring-input ring-[1.5px] ring-inset",
                     )}
                   >
-                    {ok && <Check className="size-3" aria-hidden="true" />}
+                    {ok && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
                   </span>
-                  <span className={cn("min-w-0 flex-1 truncate", ok && "text-muted-foreground")}>
+                  <span
+                    className={cn("min-w-0 flex-1 truncate text-sm", ok && "text-muted-foreground")}
+                  >
                     {step.title}
+                    {ok && <span className="sr-only"> (done)</span>}
                   </span>
                   {!ok && !step.core && (
-                    <span className="text-muted-foreground text-xs">optional</span>
+                    <span className="text-muted-foreground text-xs">Optional</span>
                   )}
                 </Link>
               </li>

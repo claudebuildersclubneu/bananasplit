@@ -69,13 +69,13 @@ export function ConnectionPicker({
   }
   if (list.length === 0) {
     return (
-      <div className="bg-muted/60 rounded-lg border p-3 text-sm">
+      <div className="bg-muted/60 rounded-tile p-3 text-sm">
         <p className="font-medium">No AI model is connected yet.</p>
         <p className="text-muted-foreground mt-0.5 text-xs">
           An owner or admin can connect Claude, OpenAI, Gemini or another model in{" "}
           <Link
             href={`/app/${orgSlug}/settings/integrations`}
-            className="text-primary underline underline-offset-2"
+            className="text-foreground font-medium underline underline-offset-4"
           >
             Admin panel › Integrations
           </Link>
@@ -91,7 +91,7 @@ export function ConnectionPicker({
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Read with</span>
             <select
-              className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
+              className="border-input bg-card rounded-field focus-visible:border-foreground h-8 border px-3 text-sm outline-none"
               value={selected?.id}
               onChange={(e) => onChoose(e.target.value as AiConnectionId)}
             >

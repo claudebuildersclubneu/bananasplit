@@ -12,6 +12,7 @@ import {
   SignupSource,
   TaskPriority,
   TaskStatus,
+  TaskType,
   TaskVisibility,
   ThemeMode,
   type AssignmentRelation,
@@ -350,9 +351,8 @@ export const CBC_INTAKE_PROJECT = {
   description:
     "Intake queue for flyers, social graphics, slides and event visuals. File a request here, never by DM. " +
     "The VP Growth sets priority; the designer turns requests around in 3 to 5 days.",
-  triagePositionKey: "vp-growth",
-  triagePerson: "lucas" as CbcPersonKey,
-  defaultDueInDays: 5,
+  /** The VP Growth leads it (they triaged its requests while Requests existed). */
+  leadPerson: "lucas" as CbcPersonKey,
 };
 
 /** The Claude Builders Club theme preset (Phase 8 scope). Strict hex only. */
@@ -441,19 +441,16 @@ export async function applyCbcTemplate(
       ).id;
   }
 
-  // The Design Requests project (an intake queue until Requests was retired).
-  const triageUserId = members[CBC_INTAKE_PROJECT.triagePerson] ?? null;
+  // The Design Requests project (an intake queue until Requests was
+  // retired; a plain project now, led by the VP Growth).
+  const leadId = members[CBC_INTAKE_PROJECT.leadPerson] ?? null;
   const existingProject = await db.project.findFirst({
     where: { organizationId, name: CBC_INTAKE_PROJECT.name },
     select: { id: true },
   });
   const projectData = {
     description: CBC_INTAKE_PROJECT.description,
-    // A plain project: Requests (the intake queue) is retired.
-    isIntake: false,
-    triageUserId,
-    triagePositionKey: CBC_INTAKE_PROJECT.triagePositionKey,
-    defaultDueInDays: CBC_INTAKE_PROJECT.defaultDueInDays,
+    leadId,
   };
   const intakeProjectId = existingProject
     ? (
@@ -1951,6 +1948,8 @@ async function seedCbcTasks(db: Db, ctx: TaskSeedContext): Promise<number> {
   const cursor = new Map<TaskStatus, number>();
 
   const ids = new Map<string, string>();
+  // A task with subtasks is a STORY (app.task_hierarchy_guard).
+  const parents = new Set(CBC_TASKS.map((t) => t.parent).filter(Boolean));
   for (const t of CBC_TASKS) {
     let rank: string;
     if (t.parent) {
@@ -1970,6 +1969,7 @@ async function seedCbcTasks(db: Db, ctx: TaskSeedContext): Promise<number> {
       data: {
         organizationId,
         projectId: t.intake ? ctx.intakeProjectId : null,
+        type: parents.has(t.ref) ? TaskType.STORY : TaskType.TASK,
         title: t.title,
         description: t.description ?? null,
         status: t.status,

@@ -22,7 +22,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
+import { nativeSelectClass, notice } from "./styles";
 import { useViewParams } from "./view-params";
 
 const KINDS: [string, string][] = [
@@ -117,7 +119,7 @@ export function SessionFormDialog({
             Edit
           </Button>
         ) : (
-          <Button size="sm">
+          <Button variant="create">
             <Plus aria-hidden="true" />
             New session
           </Button>
@@ -130,8 +132,8 @@ export function SessionFormDialog({
             Sessions are calendar events: this shows on the calendar too. Times are in {timezone}.
           </DialogDescription>
         </DialogHeader>
-        <form action={submit} className="grid gap-3">
-          <div className="grid gap-1">
+        <form action={submit} className="grid gap-4">
+          <div className="grid gap-1.5">
             <Label htmlFor="s-title">Title</Label>
             <Input
               id="s-title"
@@ -141,14 +143,14 @@ export function SessionFormDialog({
               defaultValue={initial?.title ?? ""}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-kind">Type</Label>
               <select
                 id="s-kind"
                 name="kind"
                 defaultValue={initial?.kind ?? "WORKSHOP"}
-                className="border-input bg-background h-8 rounded-lg border px-2 text-sm"
+                className={nativeSelectClass}
               >
                 {KINDS.map(([v, l]) => (
                   <option key={v} value={v}>
@@ -157,21 +159,21 @@ export function SessionFormDialog({
                 ))}
               </select>
             </div>
-            <div className="grid gap-1">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-vis">Visibility</Label>
               <select
                 id="s-vis"
                 name="visibility"
                 defaultValue={initial?.visibility ?? "INTERNAL"}
-                className="border-input bg-background h-8 rounded-lg border px-2 text-sm"
+                className={nativeSelectClass}
               >
                 <option value="INTERNAL">Internal (board only)</option>
                 <option value="PUBLIC">Public (website)</option>
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-start">Starts</Label>
               <Input
                 id="s-start"
@@ -181,7 +183,7 @@ export function SessionFormDialog({
                 defaultValue={initial?.startsAt ?? ""}
               />
             </div>
-            <div className="grid gap-1">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-end">Ends</Label>
               <Input
                 id="s-end"
@@ -192,7 +194,7 @@ export function SessionFormDialog({
               />
             </div>
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="s-loc">Location</Label>
             <Input
               id="s-loc"
@@ -201,14 +203,14 @@ export function SessionFormDialog({
               defaultValue={initial?.location ?? ""}
             />
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="s-host-mode">Host</Label>
             <div className="flex gap-2">
               <select
                 id="s-host-mode"
                 value={hostMode}
                 onChange={(e) => setHostMode(e.target.value)}
-                className="border-input bg-background h-8 rounded-lg border px-2 text-sm"
+                className={cn(nativeSelectClass, "w-36 shrink-0")}
               >
                 <option value="none">None</option>
                 <option value="member">A member</option>
@@ -219,7 +221,7 @@ export function SessionFormDialog({
                   name="hostUserId"
                   defaultValue={initial?.hostUserId ?? members[0]?.id}
                   aria-label="Host member"
-                  className="border-input bg-background h-8 flex-1 rounded-lg border px-2 text-sm"
+                  className={cn(nativeSelectClass, "flex-1")}
                 >
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -238,7 +240,7 @@ export function SessionFormDialog({
               )}
             </div>
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="s-rsvp">RSVP link</Label>
             <Input
               id="s-rsvp"
@@ -248,8 +250,8 @@ export function SessionFormDialog({
               defaultValue={initial?.rsvpUrl ?? ""}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-term">Term</Label>
               <Input
                 id="s-term"
@@ -259,7 +261,7 @@ export function SessionFormDialog({
                 defaultValue={initial?.term ?? ""}
               />
             </div>
-            <div className="grid gap-1">
+            <div className="grid gap-1.5">
               <Label htmlFor="s-slot">Stamp slot</Label>
               <Input
                 id="s-slot"
@@ -271,7 +273,7 @@ export function SessionFormDialog({
               />
             </div>
           </div>
-          <div className="grid gap-1">
+          <div className="grid gap-1.5">
             <Label htmlFor="s-desc">Description</Label>
             <Textarea
               id="s-desc"
@@ -281,11 +283,14 @@ export function SessionFormDialog({
             />
           </div>
           {error && (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className={notice.error}>
               {error}
             </p>
           )}
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <Button type="submit" disabled={pending}>
               {pending ? "Saving…" : "Save"}
             </Button>

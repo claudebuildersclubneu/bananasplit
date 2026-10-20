@@ -10,7 +10,8 @@ import { BrandField, BrandInput } from "./fields";
 
 /**
  * A new password (sign-up, password reset): the field and its three-segment
- * strength meter, yellow filled and straw empty, with the label beside it.
+ * strength meter (filled in the text colour, empty in the muted fill), with
+ * the label beside it.
  * Posts as `password`.
  */
 export function NewPasswordField({
@@ -46,12 +47,12 @@ export function NewPasswordField({
             key={n}
             aria-hidden="true"
             className={cn(
-              "h-1 flex-1 rounded-[2px]",
-              n <= strength.score ? "bg-banana" : "bg-straw",
+              "h-1 flex-1 rounded-full transition-colors",
+              n <= strength.score ? "bg-foreground" : "bg-muted-strong",
             )}
           />
         ))}
-        <span className="text-ink-soft ml-1.5 min-w-12 text-[12px]">
+        <span className="text-muted-foreground ml-1.5 min-w-12 text-[12px]">
           {strength.label && <span className="sr-only">Password strength: </span>}
           {strength.label}
         </span>

@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  FolderOpen,
   CircleCheck,
   KeyRound,
   ListChecks,
@@ -45,8 +46,18 @@ import type {
   ProfileGap,
 } from "@/server/personal/home";
 
+import { TileIcon, TileText, tileClass } from "@/components/overview/bits";
+import { UpNext } from "@/components/overview/up-next";
+import { FILE_ICONS } from "@/components/notes/file-card";
+import { familyOf } from "@/lib/files/types";
+import { personalUpNext } from "@/lib/personal/up-next";
+import { ago } from "@/lib/relative-time";
+import { cn } from "@/lib/utils";
+import { orgInitials } from "@/lib/theme/logo";
+
 import { DueTaskRow } from "./due-task-row";
 import { PersonalShortcuts } from "./personal-shortcuts";
+import { PersonalStats } from "./personal-stats";
 
 /**
  * The Personal space's home (/app/{personal slug}): the Personal dashboard
@@ -79,17 +90,29 @@ export function PersonalHome({
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="eyebrow text-muted-foreground mb-2">{dateLine}</p>
           <h1 className="page-title">
             {greeting(now, data.timeZone)}
             {data.firstName ? `, ${data.firstName}` : ""}
           </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            Your clubs, plans and to-dos in one place. Only you can see Personal.
+          <p className="text-muted-foreground mt-2 text-[15px]">
+            {dateLine} · Your clubs, plans and to-dos. Only you can see Personal.
           </p>
         </div>
         <PersonalShortcuts base={base} />
       </header>
+
+      <div className="pt-1 pb-2">
+        <PersonalStats
+          dueSoon={data.dueSoonTotal}
+          dueToday={data.dueSoon.filter((t) => t.bucket === "today").length}
+          overdue={data.dueSoon.filter((t) => t.bucket === "overdue").length}
+          upcoming={data.upcoming.length}
+          upcomingDays={UPCOMING_DAYS}
+          rsvps={data.rsvps.length}
+        />
+      </div>
+
+      <UpNext slots={personalUpNext(data, now)} calendarHref={`${base}/calendar`} />
 
       {data.pendingInvites.length > 0 && (
         <section aria-labelledby="invites-heading" className="space-y-3">
@@ -124,7 +147,9 @@ export function PersonalHome({
           <DueSoonSection data={data} base={base} />
         </div>
         <div className="min-w-0 space-y-6">
+          <YourWeekCard data={data} base={base} />
           <RsvpsCard data={data} now={now} base={base} />
+          <RecentFilesCard data={data} now={now} base={base} />
           <PollsCard data={data} now={now} base={base} />
         </div>
       </div>
@@ -172,7 +197,7 @@ function SectionTitle({
  */
 function HomeCard({
   id,
-  icon: Icon,
+  icon: _icon,
   title,
   action,
   children,
@@ -186,9 +211,8 @@ function HomeCard({
   return (
     <Card role="region" aria-labelledby={id}>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">
+        <CardTitle>
           <h2 id={id} className="flex items-center gap-2">
-            <Icon className="text-muted-foreground size-4" aria-hidden="true" />
             {title}
           </h2>
         </CardTitle>
@@ -261,9 +285,9 @@ function ClubsSection({ data, now }: { data: PersonalHomeData; now: Date }) {
   return (
     <HomeCard id="clubs-heading" icon={Users} title="Your clubs">
       {hasClubs ? (
-        <ul className="divide-y">
+        <ul className="grid gap-2.5 sm:grid-cols-2">
           {data.clubs.map((club) => (
-            <li key={club.id}>
+            <li key={club.id} className="min-w-0">
               <ClubRow club={club} viewerZone={data.timeZone} now={now} />
             </li>
           ))}
@@ -300,25 +324,20 @@ function ClubRow({
 }) {
   const logo = orgLogoUrl(club.logo, 64);
   return (
-    <Link
-      href={`/app/${club.slug}`}
-      className="hover:bg-accent/50 group -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors"
-    >
+    <Link href={`/app/${club.slug}`} className={cn(tileClass, "group h-full items-start")}>
       {logo ? (
         // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
-        <img src={logo} alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg" />
+        <img src={logo} alt="" width={36} height={36} className="size-9 shrink-0 rounded-full" />
       ) : (
-        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-lg text-xs font-semibold">
-          {club.name.slice(0, 2).toUpperCase()}
-        </span>
+        <TileIcon className="text-xs font-semibold">{orgInitials(club.name)}</TileIcon>
       )}
-      <span className="min-w-0 flex-1 space-y-0.5">
+      <span className="min-w-0 flex-1 space-y-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{club.name}</span>
+          <span className="truncate text-[15px] font-semibold">{club.name}</span>
           {club.paused && <Badge variant="secondary">Paused</Badge>}
         </span>
-        <span className="text-muted-foreground block truncate text-xs">{roleLine(club)}</span>
-        <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
+        <span className="text-muted-foreground block truncate text-[13px]">{roleLine(club)}</span>
+        <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[13px]">
           <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
           {club.nextMeeting ? (
             <span className="truncate">
@@ -330,23 +349,23 @@ function ClubRow({
             <span>No meeting on the calendar</span>
           )}
         </span>
-      </span>
-      <span className="text-muted-foreground hidden shrink-0 flex-col items-end gap-1 text-xs sm:flex">
-        <span className="inline-flex items-center gap-1">
-          <ListChecks className="size-3.5" aria-hidden="true" />
-          {club.openTasks === 0
-            ? "No open tasks"
-            : `${club.openTasks} open task${club.openTasks === 1 ? "" : "s"}`}
-        </span>
-        {club.unread > 0 && (
-          <span className="text-foreground inline-flex items-center gap-1">
-            <span className="bg-primary size-1.5 rounded-full" aria-hidden="true" />
-            {club.unread} unread
+        <span className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+          <span className="inline-flex items-center gap-1">
+            <ListChecks className="size-3.5" aria-hidden="true" />
+            {club.openTasks === 0
+              ? "No open tasks"
+              : `${club.openTasks} open task${club.openTasks === 1 ? "" : "s"}`}
           </span>
-        )}
+          {club.unread > 0 && (
+            <span className="text-foreground inline-flex items-center gap-1 font-medium">
+              <span className="bg-brand-accent size-1.5 rounded-full" aria-hidden="true" />
+              {club.unread} unread
+            </span>
+          )}
+        </span>
       </span>
       <ArrowRight
-        className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+        className="text-muted-foreground mt-1 size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
         aria-hidden="true"
       />
     </Link>
@@ -558,6 +577,99 @@ function DueSoonSection({ data, base }: { data: PersonalHomeData; base: string }
             </p>
           )}
         </div>
+      )}
+    </HomeCard>
+  );
+}
+
+// ---------------------------------------------------------------- your week
+
+/**
+ * "Your week" (the Personal pulse): what you finished in the last seven
+ * days across Personal and your clubs, and what's due next.
+ */
+function YourWeekCard({ data, base }: { data: PersonalHomeData; base: string }) {
+  const { done, bySpace } = data.yourWeek;
+  const max = Math.max(1, ...bySpace.map((s) => s.done));
+  return (
+    <HomeCard
+      id="week-heading"
+      icon={CircleCheck}
+      title="Your week"
+      action={<CardLink href={`${base}/tasks`}>Tasks</CardLink>}
+    >
+      <div className="space-y-4">
+        <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <b className="numeral text-[40px] leading-none">{done}</b>
+          <span className="text-muted-foreground text-sm">
+            {done === 1 ? "task" : "tasks"} finished in the last 7 days
+          </span>
+        </p>
+        {bySpace.length > 0 ? (
+          <ul className="space-y-2.5">
+            {bySpace.slice(0, 4).map((s, i) => (
+              <li key={s.space.id} className="space-y-1.5">
+                <span className="flex items-baseline justify-between gap-3 text-[13px]">
+                  <span className="truncate font-medium">{s.space.name}</span>
+                  <span className="font-semibold tabular-nums">{s.done}</span>
+                </span>
+                <span className="bg-muted block h-2 overflow-hidden rounded-full">
+                  <span
+                    className="block h-full rounded-full"
+                    style={{
+                      width: `${(s.done / max) * 100}%`,
+                      background: `var(--chart-${(i % 5) + 1})`,
+                    }}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Check off a task in Personal or a club and it counts here.
+          </p>
+        )}
+        <p className="text-muted-foreground text-[13px]">
+          {data.dueSoonTotal === 0
+            ? "Nothing due in the coming week."
+            : `${data.dueSoonTotal} due in the coming week.`}
+        </p>
+      </div>
+    </HomeCard>
+  );
+}
+
+// ---------------------------------------------------------------- files
+
+function RecentFilesCard({ data, now, base }: { data: PersonalHomeData; now: Date; base: string }) {
+  return (
+    <HomeCard
+      id="files-heading"
+      icon={FolderOpen}
+      title="Recent files"
+      action={<CardLink href={`${base}/notes`}>Files</CardLink>}
+    >
+      {data.recentFiles.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Upload PDFs, slides and images to Personal&apos;s Files; the newest show here.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {data.recentFiles.map((f) => {
+            const Icon = FILE_ICONS[familyOf(f.contentType)];
+            return (
+              <li key={f.id}>
+                <Link href={f.href} className={tileClass}>
+                  <TileIcon>
+                    <Icon />
+                  </TileIcon>
+                  <TileText title={f.name} sub={ago(f.createdAt, now)} />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </HomeCard>
   );
