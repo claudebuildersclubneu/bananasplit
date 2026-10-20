@@ -63,7 +63,8 @@ export function IconPicker({
             "grid shrink-0 place-items-center rounded-2xl transition-colors disabled:cursor-default",
             icon
               ? "hover:bg-muted size-14 text-[40px] leading-none"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground size-10",
+              : // No icon yet: offered when you're at the title, not left floating above it.
+                "text-muted-foreground hover:bg-muted hover:text-foreground size-10 opacity-0 group-focus-within/note-head:opacity-100 group-hover/note-head:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
           )}
         >
           {icon ?? <SmilePlus className="size-5" aria-hidden="true" />}

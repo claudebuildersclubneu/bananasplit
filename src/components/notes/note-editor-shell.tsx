@@ -920,84 +920,97 @@ export function NoteEditorShell({
             />
           ) : (
             <>
-              <header className={cn("space-y-2", isDocument && "mx-auto max-w-[816px]")}>
-                <IconPicker
-                  icon={icon}
-                  disabled={!canType}
-                  onChange={(next) => {
-                    setIcon(next);
-                    saveSettings({ icon: next });
-                  }}
-                />
-                <Input
-                  value={title}
-                  disabled={!canType}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    queueSave({ title: e.target.value });
-                  }}
-                  placeholder="Untitled note"
-                  aria-label="Title"
-                  // Set like the page's title: no box, the display face, not faded when read-only.
-                  className="page-title h-auto min-w-0 text-[2rem] border-none bg-transparent px-0 py-0 shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
-                />
-                <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-                  <span>
-                    Edited {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true })}
-                    {workspace.updatedByName ? ` by ${workspace.updatedByName}` : ""}
-                  </span>
-                  <EventLinkPicker
-                    events={events}
-                    value={eventId}
+              <div
+                className={cn(
+                  "space-y-4",
+                  // Page mode writes on a sheet of its own, like a card in
+                  // Files; Document mode's paper is the sheet.
+                  !isDocument &&
+                    "bg-card text-card-foreground edge rounded-card px-5 py-7 sm:px-12 sm:py-10",
+                )}
+              >
+                <header
+                  className={cn("group/note-head space-y-2", isDocument && "mx-auto max-w-[816px]")}
+                >
+                  <IconPicker
+                    icon={icon}
                     disabled={!canType}
-                    onChange={(id) => {
-                      setEventId(id);
-                      queueSave({ eventId: id });
+                    onChange={(next) => {
+                      setIcon(next);
+                      saveSettings({ icon: next });
                     }}
                   />
-                </div>
-              </header>
+                  <Input
+                    value={title}
+                    disabled={!canType}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      queueSave({ title: e.target.value });
+                    }}
+                    placeholder="Untitled note"
+                    aria-label="Title"
+                    // Set like the page's title: no box, the display face, not faded when read-only.
+                    className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 text-[2rem] shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
+                  />
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                    <span>
+                      Edited{" "}
+                      {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true })}
+                      {workspace.updatedByName ? ` by ${workspace.updatedByName}` : ""}
+                    </span>
+                    <EventLinkPicker
+                      events={events}
+                      value={eventId}
+                      disabled={!canType}
+                      onChange={(id) => {
+                        setEventId(id);
+                        queueSave({ eventId: id });
+                      }}
+                    />
+                  </div>
+                </header>
 
-              {live ? (
-                <NoteEditor
-                  // A new session (another Y.Doc) needs a new editor bound to it.
-                  key={live.doc.guid}
-                  collaboration={{ doc: live.doc, provider: live.provider, user: live.user }}
-                  editable={canType}
-                  layout={layout}
-                  paperSize={paperSize}
-                  place={place}
-                  canComment
-                  onComment={startComment}
-                  onEditor={onEditor}
-                  onClickThread={(id) => {
-                    setActiveThread(id);
-                    openRail("comments");
-                  }}
-                  onCreateSubpage={createSubpage}
-                />
-              ) : (
-                <NoteEditor
-                  key={`autosave-${restored?.n ?? 0}`}
-                  content={restored?.json ?? note.contentJson}
-                  editable={canType}
-                  layout={layout}
-                  paperSize={paperSize}
-                  place={place}
-                  canComment
-                  onComment={startComment}
-                  onEditor={onEditor}
-                  onClickThread={(id) => {
-                    setActiveThread(id);
-                    openRail("comments");
-                  }}
-                  onCreateSubpage={createSubpage}
-                  onChange={(json, text) => {
-                    contentRef.current = { json, text };
-                    queueSave({});
-                  }}
-                />
-              )}
+                {live ? (
+                  <NoteEditor
+                    // A new session (another Y.Doc) needs a new editor bound to it.
+                    key={live.doc.guid}
+                    collaboration={{ doc: live.doc, provider: live.provider, user: live.user }}
+                    editable={canType}
+                    layout={layout}
+                    paperSize={paperSize}
+                    place={place}
+                    canComment
+                    onComment={startComment}
+                    onEditor={onEditor}
+                    onClickThread={(id) => {
+                      setActiveThread(id);
+                      openRail("comments");
+                    }}
+                    onCreateSubpage={createSubpage}
+                  />
+                ) : (
+                  <NoteEditor
+                    key={`autosave-${restored?.n ?? 0}`}
+                    content={restored?.json ?? note.contentJson}
+                    editable={canType}
+                    layout={layout}
+                    paperSize={paperSize}
+                    place={place}
+                    canComment
+                    onComment={startComment}
+                    onEditor={onEditor}
+                    onClickThread={(id) => {
+                      setActiveThread(id);
+                      openRail("comments");
+                    }}
+                    onCreateSubpage={createSubpage}
+                    onChange={(json, text) => {
+                      contentRef.current = { json, text };
+                      queueSave({});
+                    }}
+                  />
+                )}
+              </div>
 
               {(subpages.length > 0 || workspace.backlinks.length > 0) && (
                 <footer
