@@ -8,6 +8,7 @@ import { can } from "@/lib/auth/permissions";
 import { dueDateKey, fromDateKey, isDateKey } from "@/lib/tasks/dates";
 import {
   canArchiveProject,
+  canChangeProjectLead,
   canCreateProject,
   canDeleteProject,
   canEditProject,
@@ -15,6 +16,7 @@ import {
   PROJECT_CREATE_DENIED,
   PROJECT_DELETE_DENIED,
   PROJECT_EDIT_DENIED,
+  PROJECT_LEAD_DENIED,
   type ProjectActor,
 } from "@/lib/tasks/projects";
 import { HEX_RE } from "@/lib/theme/hex";
@@ -28,11 +30,12 @@ import { projectOptionSelect, type ProjectOption } from "@/server/tasks/queries"
  * Creating and editing a project is every member's while the club's
  * `memberCanCreateProjects` is on (the default; the Project INSERT policy
  * reads the same flag), otherwise owners and admins only, and a project's
- * lead always keeps their own up to date. Archiving and unarchiving belong to
- * owners, admins and the lead; deleting to owners and admins. The Project
- * UPDATE policy is any member's (members keep a project's status, dates and
- * lead current), so these checks are the only thing between a member and
- * archiving somebody else's project: they live here, not only in the UI.
+ * lead always keeps their own up to date. Archiving, unarchiving, deleting
+ * and handing the lead on belong to owners, admins and the lead (the
+ * Project DELETE policy and app.project_lead_guard agree). The Project
+ * UPDATE policy is otherwise any member's (members keep a project's status
+ * and dates current), so these checks are the only thing between a member
+ * and archiving somebody else's project: they live here, not only in the UI.
  */
 
 const id = z
@@ -156,11 +159,14 @@ const updateProjectTx = withOrgAction(
     const parsed = updateSchema.safeParse(input);
     if (!parsed.success) return { error: firstIssue(parsed.error) };
     const d = parsed.data;
-    // Handing the lead to somebody else is a lead's call too, but taking a
-    // project away from its lead while members can't make projects is not:
-    // with the flag off only an admin moves the lead.
-    if (d.leadId !== undefined && d.leadId !== project.leadId && !canCreateProject(actor)) {
-      if (project.leadId !== actor.userId) return { error: PROJECT_EDIT_DENIED };
+    // Leading a project lets you delete it, so only an admin or the current
+    // lead moves the lead (app.project_lead_guard says the same).
+    if (
+      d.leadId !== undefined &&
+      d.leadId !== project.leadId &&
+      !canChangeProjectLead(actor, project)
+    ) {
+      return { error: PROJECT_LEAD_DENIED };
     }
     const leadError = await assertLead(ctx, d.leadId);
     if (leadError) return { error: leadError };
@@ -232,7 +238,7 @@ const deleteProjectTx = withOrgAction(
   async (ctx, projectId: string): Promise<{ error?: string }> => {
     const project = await loadProject(ctx, projectId);
     if (!project) return { error: "Project not found." };
-    if (!canDeleteProject(await actorOf(ctx))) return { error: PROJECT_DELETE_DENIED };
+    if (!canDeleteProject(await actorOf(ctx), project)) return { error: PROJECT_DELETE_DENIED };
     // Task.projectId is ON DELETE SET NULL: the tasks stay, unfiled.
     await ctx.db.project.deleteMany({
       where: { id: project.id, organizationId: ctx.organizationId },

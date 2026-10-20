@@ -573,10 +573,12 @@ export const longDue = (key: string) => longFmt.format(asDate(key));
 export function DueMenu({
   value,
   onPick,
+  clearLabel = "No due date",
 }: {
   value: string;
   /** "" clears the date. */
   onPick: (key: string) => void;
+  clearLabel?: string;
 }) {
   const { org } = useTasks();
   const today = org.todayKey;
@@ -658,7 +660,7 @@ export function DueMenu({
         className={cn(menuItemClass(), "text-muted-foreground")}
         onClick={() => onPick("")}
       >
-        No due date
+        {clearLabel}
       </button>
       <div className="bg-border mx-1 my-1.5 h-px" />
       <div className="flex items-center justify-between px-1.5 pb-1.5">
@@ -727,11 +729,16 @@ export function DueField({
   value,
   onChange,
   disabled,
+  label = "Due date",
+  emptyLabel = "No due date",
 }: {
   id?: string;
   value: string;
   onChange: (key: string) => void;
   disabled?: boolean;
+  /** The same picker for another date (the start date). */
+  label?: string;
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -741,17 +748,18 @@ export function DueField({
           id={id}
           type="button"
           disabled={disabled}
-          aria-label="Due date"
+          aria-label={label}
           className={wellClass(open, !value)}
         >
           <Calendar className="text-muted-foreground size-[15px] shrink-0" aria-hidden="true" />
-          <span className="truncate">{value ? shortDue(value) : "No due date"}</span>
+          <span className="truncate">{value ? shortDue(value) : emptyLabel}</span>
           <UpDown />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={MENU}>
         <DueMenu
           value={value}
+          clearLabel={emptyLabel}
           onPick={(k) => {
             onChange(k);
             setOpen(false);

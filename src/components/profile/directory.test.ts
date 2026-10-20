@@ -107,12 +107,15 @@ describe("free now", () => {
     expect(localSlot(monday, "Not/AZone")).toEqual({ day: 0, hour: 18 });
   });
 
-  it("is free unless that hour is busy, never at night, unknown when hidden", () => {
-    expect(isFreeNow([], "America/New_York", monday)).toBe(true);
-    expect(isFreeNow(["0-14"], "America/New_York", monday)).toBe(false);
-    expect(isFreeNow(["0-13", "0-15"], "America/New_York", monday)).toBe(true);
-    expect(isFreeNow([], "Asia/Tokyo", monday)).toBe(false);
-    expect(isFreeNow(null, "America/New_York", monday)).toBeNull();
+  it("is free unless that hour is busy, never at night, unknown when hidden or never shared", () => {
+    const shared = (busy: string[] | null) => ({ busy, shared: busy === null ? null : true });
+    expect(isFreeNow(shared([]), "America/New_York", monday)).toBe(true);
+    expect(isFreeNow(shared(["0-14"]), "America/New_York", monday)).toBe(false);
+    expect(isFreeNow(shared(["0-13", "0-15"]), "America/New_York", monday)).toBe(true);
+    expect(isFreeNow(shared([]), "Asia/Tokyo", monday)).toBe(false);
+    expect(isFreeNow(shared(null), "America/New_York", monday)).toBeNull();
+    // Never filled in: no busy hours, but not free either.
+    expect(isFreeNow({ busy: [], shared: false }, "America/New_York", monday)).toBeNull();
   });
 
   it("folds busy hours into bands for the week strip", () => {

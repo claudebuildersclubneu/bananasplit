@@ -20,7 +20,8 @@ const weeksBetween = (a: string, b: string) =>
 
 /**
  * The Roadmap: epics on a week timeline, grouped by project. Each bar runs
- * from the epic's start to its due date with its progress filled in, and
+ * from the epic's start (its start date, else when it was made or its
+ * earliest dated work) to its due date with its progress filled in, and
  * this week's column is marked. An epic with no date anywhere shows from its
  * start for two weeks, dashed, saying so.
  */

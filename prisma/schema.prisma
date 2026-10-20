@@ -588,6 +588,8 @@ model Project {
   /// Strict "#rrggbb" (check constraint), or NULL for the default colour.
   color          String?
   /// The member who leads it (app.assert_org_member); NULL when nobody does.
+  /// They may delete it; on app_user only an OWNER/ADMIN or the lead
+  /// changes it (app.project_lead_guard).
   leadId         String?
   status         ProjectStatus @default(ACTIVE)
   /// Calendar dates (no time of day).
@@ -629,6 +631,9 @@ model Task {
   visibility        TaskVisibility      @default(ORG)
   priority          TaskPriority        @default(MEDIUM)
   dueDate           DateTime?
+  /// A calendar date (no time of day): where an epic's or story's bar starts
+  /// on the Roadmap. NULL: the Roadmap's own rule (made, or earliest work).
+  startDate         DateTime?           @db.Date
   /// Fractional-indexing rank string for kanban ordering within a status column.
   rank              String
   parentTaskId      String?
@@ -721,6 +726,9 @@ model Label {
   /// Who made it, when made inline; NULL for older and admin-made tags.
   /// Immutable for the app roles.
   createdById    String?
+  // Names are unique per org ignoring case: the expression index
+  // "Label_organizationId_lower_name_key" on ("organizationId", lower("name"))
+  // lives in the migration only (Prisma can't declare it).
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User?        @relation("LabelCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -910,6 +918,10 @@ model Note {
   layout         NoteLayout               @default(PAGE)
   /// DOCUMENT layout only (kept for PAGE so switching back keeps it).
   paperSize      PaperSize                @default(LETTER)
+  /// DOCUMENT layout's header and footer bands (at most 200 characters);
+  /// NULL prints the default (title and club; the title).
+  headerText     String?
+  footerText     String?
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   author       User          @relation("NoteAuthor", fields: [authorId], references: [id])

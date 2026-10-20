@@ -96,8 +96,11 @@ saved to `Note.layout`; switching never changes the content).
   visual page breaks, the title and club in the header and page numbers in
   the footer. The PDF prints on the same paper with the same bands, and a
   page break block starts a new page in both. Comments sit in the margin
-  beside their passage. Header and footer text are fixed (title, club,
-  page); custom header and footer text would need two new Note columns.
+  beside their passage. **Header and footer…** in the "…" menu sets the
+  note's own header and footer text (`Note.headerText`, `Note.footerText`,
+  200 characters at most; empty for the default title and club / title).
+  The page number stays on the right of the footer, and the PDF uses the
+  same text (`bandHeader` / `bandFooter` in `src/lib/notes/paper.ts`).
 - **Comments** (both modes): select text and choose **Comment** in the
   floating capsule (or comment on the whole note). Threads have replies,
   **@mentions** (the people named are told, with the existing "Someone
@@ -132,18 +135,18 @@ saved to `Note.layout`; switching never changes the content).
 
 ## How it's stored
 
-| What                  | Where                                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| General access        | `Note.visibility` (`PRIVATE` / `ORGANIZATION`) and `Note.memberCanEdit` (club notes every member edits)                                     |
-| People added by name  | `NoteShare` (`noteId`, `userId`, `role` `VIEWER` or `EDITOR`, `createdById`)                                                                |
-| The rules, in the app | `src/lib/notes/access.ts` (`isNoteVisibleTo`, `canEditNote`, `canShareNote`)                                                                |
-| The actions           | `src/app/app/[orgSlug]/notes/actions.ts` (`updateNoteAccess`, `shareNote`, `updateNoteShare`, `removeNoteShare`)                            |
-| List and search       | `src/server/notes/visibility.ts` (`noteVisibleWhere`, `noteVisibleSql`)                                                                     |
-| Nested pages, layout  | `Note.parentId`, `icon`, `layout`, `paperSize`; `updateNoteSettings` (no version bump); `src/server/notes/tree.ts` (tree, backlinks)        |
-| Comments              | `NoteComment`; `comment-actions.ts`; anchors in `src/lib/notes/comment-anchor.ts` and `editor/comment-highlights.ts`                        |
-| Versions              | `NoteVersion`; `version-actions.ts`; snapshots and pruning in `src/server/notes/versions.ts` (service path, after commit)                   |
-| Schema                | `src/lib/notes/schema-extensions.ts` and `nodes.ts` (every block), `suggestions.ts` (suggesting marks and logic)                            |
-| Exports               | `src/server/notes/pdf.tsx`, `src/server/notes/docx.ts`, `src/lib/notes/export/markdown.ts`; `[noteId]/pdf` and `[noteId]/export?format=docx | md` |
+| What                  | Where                                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| General access        | `Note.visibility` (`PRIVATE` / `ORGANIZATION`) and `Note.memberCanEdit` (club notes every member edits)                                                          |
+| People added by name  | `NoteShare` (`noteId`, `userId`, `role` `VIEWER` or `EDITOR`, `createdById`)                                                                                     |
+| The rules, in the app | `src/lib/notes/access.ts` (`isNoteVisibleTo`, `canEditNote`, `canShareNote`)                                                                                     |
+| The actions           | `src/app/app/[orgSlug]/notes/actions.ts` (`updateNoteAccess`, `shareNote`, `updateNoteShare`, `removeNoteShare`)                                                 |
+| List and search       | `src/server/notes/visibility.ts` (`noteVisibleWhere`, `noteVisibleSql`)                                                                                          |
+| Nested pages, layout  | `Note.parentId`, `icon`, `layout`, `paperSize`, `headerText`, `footerText`; `updateNoteSettings` (no version bump); `src/server/notes/tree.ts` (tree, backlinks) |
+| Comments              | `NoteComment`; `comment-actions.ts`; anchors in `src/lib/notes/comment-anchor.ts` and `editor/comment-highlights.ts`                                             |
+| Versions              | `NoteVersion`; `version-actions.ts`; snapshots and pruning in `src/server/notes/versions.ts` (service path, after commit)                                        |
+| Schema                | `src/lib/notes/schema-extensions.ts` and `nodes.ts` (every block), `suggestions.ts` (suggesting marks and logic)                                                 |
+| Exports               | `src/server/notes/pdf.tsx`, `src/server/notes/docx.ts`, `src/lib/notes/export/markdown.ts`; `[noteId]/pdf` and `[noteId]/export?format=docx                      | md` |
 
 Comments and versions have their own RLS (migration
 `20261019120000_moonstone_product_update`): whoever can see the note reads

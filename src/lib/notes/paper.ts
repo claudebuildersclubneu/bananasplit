@@ -52,3 +52,18 @@ export function paperPt(size: string | null | undefined) {
     band: BAND_IN * PT_PER_IN,
   };
 }
+
+/** Note.headerText and Note.footerText: at most this many characters (a check constraint). */
+export const MAX_BAND_TEXT = 200;
+
+/** The header band: the note's own text, else its title and club. */
+export function bandHeader(note: { title: string; orgName: string; headerText?: string | null }) {
+  const own = note.headerText?.trim();
+  if (own) return own;
+  return [note.title.trim() || "Untitled note", note.orgName].filter(Boolean).join(" · ");
+}
+
+/** The footer band's text beside the page number: the note's own, else its title. */
+export function bandFooter(note: { title: string; footerText?: string | null }) {
+  return note.footerText?.trim() || note.title.trim() || "Untitled note";
+}

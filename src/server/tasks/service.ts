@@ -128,6 +128,8 @@ const baseFields = {
   blockedReason: z.string().trim().max(MAX_BLOCKED_REASON).nullable().optional(),
   priority: z.enum(PRIORITY_VALUES).optional(),
   dueDate: dateKeySchema.nullable().optional(),
+  /** Where an epic or story starts (the Roadmap); on or before its due date. */
+  startDate: dateKeySchema.nullable().optional(),
   projectId: idSchema.nullable().optional(),
   parentTaskId: idSchema.nullable().optional(),
   ownerId: idSchema.nullable().optional(),
@@ -238,6 +240,7 @@ const subjectSelect = {
   visibility: true,
   priority: true,
   dueDate: true,
+  startDate: true,
   projectId: true,
   type: true,
   parentTaskId: true,
@@ -744,6 +747,13 @@ async function nextSubtaskRank(env: TaskEnv, parentTaskId: string): Promise<stri
   return generateKeyBetween(last?.rank ?? null, null);
 }
 
+/** A start date after the due date is refused (either may be unset). */
+function assertStartBeforeDue(startKey: string | null, dueKey: string | null): void {
+  if (startKey && dueKey && startKey > dueKey) {
+    throw new TaskError("The start date is after the due date.");
+  }
+}
+
 // ---- Create ----------------------------------------------------------------------
 
 export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActionResult> {
@@ -767,6 +777,8 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
   };
 
   const dueKey = d.dueDate ?? null;
+  const startKey = d.startDate ?? null;
+  assertStartBeforeDue(startKey, dueKey);
   if (!parent) {
     if (env.org.taskRequireOwner && !d.ownerId) {
       throw new TaskError("Every task needs an owner.");
@@ -811,6 +823,7 @@ export async function createTask(env: TaskEnv, input: unknown): Promise<TaskActi
       visibility,
       priority,
       dueDate: dueKey ? fromDateKey(dueKey) : null,
+      startDate: startKey ? fromDateKey(startKey) : null,
       projectId: project?.id ?? null,
       parentTaskId: parent?.id ?? null,
       rank,
@@ -940,6 +953,18 @@ async function applyUpdate(
     data.dueDate = d.dueDate ? fromDateKey(d.dueDate) : null;
     activity.push({ type: "DUE_CHANGED", diffJson: { from: prevDueKey, to: d.dueDate ?? null } });
     fieldEdit = true;
+  }
+  const prevStartKey = s.startDate ? dueDateKey(s.startDate) : null;
+  const startChanged = d.startDate !== undefined && (d.startDate ?? null) !== prevStartKey;
+  if (startChanged) {
+    data.startDate = d.startDate ? fromDateKey(d.startDate) : null;
+    fieldEdit = true;
+  }
+  if (startChanged || dueChanged) {
+    assertStartBeforeDue(
+      startChanged ? (d.startDate ?? null) : prevStartKey,
+      dueChanged ? (d.dueDate ?? null) : prevDueKey,
+    );
   }
 
   const wantsStatus = d.status !== undefined ? d.status : undefined;

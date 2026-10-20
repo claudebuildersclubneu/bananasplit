@@ -205,7 +205,20 @@ export function PersonProfile({
         </Section>
 
         <Section title="This week">
-          {person.busy ? (
+          {person.busy && person.availabilityShared === false ? (
+            <p className="text-muted-foreground text-sm">
+              {isSelf ? (
+                <>
+                  You haven&apos;t shared when you&apos;re free.{" "}
+                  <Link href={profileHref(orgSlug, "availability")} className="text-foreground underline underline-offset-4">
+                    Add it
+                  </Link>
+                </>
+              ) : (
+                `${first} hasn't shared when they're free yet.`
+              )}
+            </p>
+          ) : person.busy ? (
             <>
               <WeekStrip busy={person.busy} />
               <p className="text-muted-foreground text-xs">

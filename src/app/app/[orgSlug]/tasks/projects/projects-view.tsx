@@ -43,6 +43,7 @@ import { formatDueKey } from "@/lib/tasks/dates";
 import { projectColor } from "@/lib/tasks/project-color";
 import {
   canArchiveProject,
+  canChangeProjectLead,
   canCreateProject,
   canDeleteProject,
   canEditProject,
@@ -329,7 +330,7 @@ function ProjectListRow({
                   onSelect: () => void setArchived(false),
                 }
               : { label: "Archive", icon: Archive, onSelect: () => void setArchived(true) }),
-          canDeleteProject(viewer) && {
+          canDeleteProject(viewer, p) && {
             label: "Delete",
             icon: Trash2,
             destructive: true,
@@ -361,6 +362,8 @@ function ProjectDialog({
   const [name, setName] = useState(project?.name ?? "");
   const [color, setColor] = useState<string | null>(project?.color ?? null);
   const [leadId, setLeadId] = useState<string | null>(project?.leadId ?? viewer.userId);
+  // Leading a project lets you delete it: only an admin or its lead hands it on.
+  const leadLocked = project !== null && !canChangeProjectLead(viewer, project);
   const [status, setStatus] = useState<ProjectStatusValue>(
     (project?.status as ProjectStatusValue) ?? "ACTIVE",
   );
@@ -376,7 +379,7 @@ function ProjectDialog({
       const input = {
         name,
         ...(color ? { color } : {}),
-        leadId,
+        ...(leadLocked ? {} : { leadId }),
         status,
         startDate: startDate || null,
         targetDate: targetDate || null,
@@ -456,6 +459,7 @@ function ProjectDialog({
               <Select
                 value={leadId ?? "none"}
                 onValueChange={(v) => setLeadId(v === "none" ? null : v)}
+                disabled={leadLocked}
               >
                 <SelectTrigger id="project-lead" className="w-full">
                   <SelectValue />

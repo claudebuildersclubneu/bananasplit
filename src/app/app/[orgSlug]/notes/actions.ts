@@ -10,6 +10,7 @@ import {
   PaperSize,
 } from "@/generated/prisma/client";
 import { collabConfig } from "@/lib/collab/config";
+import { MAX_BAND_TEXT } from "@/lib/notes/paper";
 import { applyContentToState, InvalidNoteContentError, seedNoteState } from "@/lib/collab/note-doc";
 import {
   canEditNote,
@@ -83,14 +84,24 @@ export type NoteDetailsInput = z.infer<typeof noteDetailsSchema>;
 const noteIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, "Invalid id");
 
 /**
- * The page's own settings: its icon, Page or Document layout, paper and
- * the page it sits inside. Not the body, so no version bump: an autosave
+ * The page's own settings: its icon, Page or Document layout, paper,
+ * Document mode's header and footer text ("" for the default), and the page
+ * it sits inside. Not the body, so no version bump: an autosave
  * editor keeps saving, and the last change wins per field.
  */
+const bandTextSchema = z
+  .string()
+  .trim()
+  .max(MAX_BAND_TEXT, `Keep it under ${MAX_BAND_TEXT} characters.`)
+  .nullable()
+  .optional();
+
 const noteSettingsSchema = z.object({
   icon: z.string().trim().max(32).nullable().optional(),
   layout: z.enum([NoteLayout.PAGE, NoteLayout.DOCUMENT]).optional(),
   paperSize: z.enum([PaperSize.LETTER, PaperSize.A4]).optional(),
+  headerText: bandTextSchema,
+  footerText: bandTextSchema,
   parentId: noteIdSchema.nullable().optional(),
 });
 
@@ -390,6 +401,8 @@ export const updateNoteSettings = filesAction(
     }
     const patch: NoteSettingsInput = { ...parsed.data };
     if (patch.icon === "") patch.icon = null;
+    if (patch.headerText === "") patch.headerText = null;
+    if (patch.footerText === "") patch.footerText = null;
     if (patch.parentId !== undefined && patch.parentId !== existing.parentId) {
       if (patch.parentId !== null) {
         if (patch.parentId === noteId || (await wouldLoop(ctx, noteId, patch.parentId))) {

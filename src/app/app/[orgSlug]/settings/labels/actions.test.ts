@@ -15,6 +15,7 @@ function makeDb(
 ) {
   return {
     $queryRaw: vi.fn(async () => [{ id: "audit_1" }]),
+    $executeRaw: vi.fn(async (_sql: TemplateStringsArray) => 0),
     orgSettings: {
       findUnique: vi.fn(async () => ({ memberCanCreateTags: opts.membersCanCreate ?? true })),
       upsert: vi.fn(async () => ({})),
@@ -101,6 +102,36 @@ describe("createTag (inline, from any tag field)", () => {
       }),
     );
     expect(fake.db.label.create).not.toHaveBeenCalled();
+  });
+
+  it("reuses the tag someone else made a moment ago (the unique index's 23505)", async () => {
+    fake.role = Role.MEMBER;
+    const db = makeDb();
+    let made = false;
+    db.label.findFirst.mockImplementation(async () =>
+      made ? { id: "lbl_race", name: "Catering", color: "#123456" } : null,
+    );
+    db.label.create.mockImplementation(async () => {
+      made = true;
+      throw Object.assign(new Error("unique"), { code: "23505" });
+    });
+    fake.db = db;
+    expect(await createTag("org_1", { name: "catering" })).toEqual({
+      created: false,
+      tag: { id: "lbl_race", name: "Catering", color: "#123456" },
+    });
+    const sql = db.$executeRaw.mock.calls.map((c) => c[0].join(""));
+    expect(sql).toEqual(["SAVEPOINT tag_create", "ROLLBACK TO SAVEPOINT tag_create"]);
+  });
+
+  it("rethrows any other failure", async () => {
+    fake.role = Role.ADMIN;
+    const db = makeDb();
+    db.label.create.mockImplementation(async () => {
+      throw Object.assign(new Error("boom"), { code: "23514" });
+    });
+    fake.db = db;
+    await expect(createTag("org_1", { name: "catering" })).rejects.toThrow();
   });
 
   it("refuses an empty or over-long name", async () => {

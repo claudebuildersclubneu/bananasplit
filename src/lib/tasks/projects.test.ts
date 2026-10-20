@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canArchiveProject,
+  canChangeProjectLead,
   canCreateProject,
   canDeleteProject,
   canEditProject,
@@ -31,9 +32,15 @@ describe("project rules", () => {
     expect(canArchiveProject(admin, { leadId: "u2" })).toBe(true);
   });
 
-  it("delete is for admins", () => {
-    expect(canDeleteProject(member(true))).toBe(false);
-    expect(canDeleteProject(admin)).toBe(true);
+  it("delete and handing on the lead are for admins and the lead", () => {
+    expect(canDeleteProject(member(true), { leadId: "u2" })).toBe(false);
+    expect(canDeleteProject(member(true), { leadId: null })).toBe(false);
+    expect(canDeleteProject(member(false), { leadId: "u1" })).toBe(true);
+    expect(canDeleteProject(admin, { leadId: null })).toBe(true);
+    expect(canChangeProjectLead(member(true), { leadId: null })).toBe(false);
+    expect(canChangeProjectLead(member(true), { leadId: "u2" })).toBe(false);
+    expect(canChangeProjectLead(member(false), { leadId: "u1" })).toBe(true);
+    expect(canChangeProjectLead(admin, { leadId: "u2" })).toBe(true);
   });
 
   it("creationRights defaults to everyone when the club has no settings row", () => {

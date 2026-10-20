@@ -27,6 +27,7 @@ export const taskListSelect = {
   visibility: true,
   priority: true,
   dueDate: true,
+  startDate: true,
   rank: true,
   parentTaskId: true,
   projectId: true,
@@ -514,9 +515,9 @@ export type ProjectOverviewItem = Awaited<ReturnType<typeof getProjectsOverview>
 
 /**
  * The Roadmap: the club's epics (filtered like every layout) with what the
- * timeline needs. Task has no start date, so a bar starts when the epic was
- * made or at its earliest dated piece of work, whichever is first, and ends
- * at its due date or its latest dated piece of work.
+ * timeline needs. A bar starts at the epic's start date; without one, when
+ * the epic was made or at its earliest dated piece of work, whichever is
+ * first. It ends at its due date or its latest dated piece of work.
  */
 export async function getRoadmapEpics(
   db: TxClient,
@@ -531,6 +532,7 @@ export async function getRoadmapEpics(
       title: true,
       status: true,
       dueDate: true,
+      startDate: true,
       createdAt: true,
       completedAt: true,
       project: { select: { id: true, name: true, color: true } },
@@ -554,7 +556,9 @@ export async function getRoadmapEpics(
       .map((d) => d.toISOString().slice(0, 10));
     const created = e.createdAt.toISOString().slice(0, 10);
     const due = e.dueDate ? e.dueDate.toISOString().slice(0, 10) : null;
-    const start = [created, ...keys].sort()[0]!;
+    const start = e.startDate
+      ? e.startDate.toISOString().slice(0, 10)
+      : [created, ...keys].sort()[0]!;
     const end = due ?? (keys.length > 0 ? keys.sort()[keys.length - 1]! : null);
     let done = 0;
     let total = 0;

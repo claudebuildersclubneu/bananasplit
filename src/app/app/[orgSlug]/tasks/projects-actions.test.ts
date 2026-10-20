@@ -117,8 +117,9 @@ describe("createProject", () => {
 });
 
 describe("updateProject", () => {
-  it("lets any member rename, recolour and set the lead, status and dates while allowed", async () => {
+  it("lets any member rename, recolour and set the status and dates while allowed", async () => {
     fake.role = Role.MEMBER;
+    fake.db = makeDb({ leadId: "actor" });
     const result = await updateProject("org_1", "proj_1", {
       name: "Renamed",
       color: "#112233",
@@ -156,6 +157,21 @@ describe("updateProject", () => {
     fake.role = Role.MEMBER;
     fake.db = makeDb({ membersCanCreate: false, leadId: "actor" });
     expect("project" in (await updateProject("org_1", "proj_1", { status: "DONE" }))).toBe(true);
+  });
+
+  it("lets only an admin or the current lead change who leads it", async () => {
+    fake.role = Role.MEMBER;
+    fake.db = makeDb({ leadId: "someone-else" });
+    // Members may edit it (the switch is on), but not make themselves lead.
+    expect(await updateProject("org_1", "proj_1", { leadId: "actor" })).toEqual({
+      error: "Only an owner, an admin or the project's lead can change who leads it.",
+    });
+    expect("project" in (await updateProject("org_1", "proj_1", { status: "DONE" }))).toBe(true);
+
+    fake.db = makeDb({ leadId: null });
+    expect(await updateProject("org_1", "proj_1", { leadId: "actor" })).toMatchObject({
+      error: expect.stringMatching(/who leads it/),
+    });
   });
 
   it("says when the project isn't there", async () => {
@@ -206,18 +222,25 @@ describe("archiveProject and unarchiveProject", () => {
 });
 
 describe("deleteProject", () => {
-  it("is for owners and admins only, not the lead", async () => {
+  it("lets the project's lead delete it, not another member", async () => {
     fake.role = Role.MEMBER;
-    fake.db = makeDb({ leadId: "actor" });
+    fake.db = makeDb({ leadId: "someone-else" });
     expect(await deleteProject("org_1", "proj_1")).toEqual({
-      error: "Only an owner or admin can delete a project.",
+      error: "Only an owner, an admin or the project's lead can delete it.",
     });
     expect(fake.db.project.deleteMany).not.toHaveBeenCalled();
 
-    fake.role = Role.ADMIN;
+    fake.db = makeDb({ leadId: "actor", membersCanCreate: false });
     expect(await deleteProject("org_1", "proj_1")).toEqual({});
     expect(fake.db.project.deleteMany).toHaveBeenCalledWith({
       where: { id: "proj_1", organizationId: "org_1" },
     });
+  });
+
+  it.each([Role.OWNER, Role.ADMIN])("lets a %s delete anyone's project", async (role) => {
+    fake.role = role;
+    fake.db = makeDb({ leadId: "someone-else" });
+    expect(await deleteProject("org_1", "proj_1")).toEqual({});
+    expect(fake.db.project.deleteMany).toHaveBeenCalled();
   });
 });

@@ -70,6 +70,8 @@ export async function GET(
     visibility: note.visibility,
     event: note.event,
     paperSize: note.paperSize,
+    headerText: note.headerText,
+    footerText: note.footerText,
   });
 
   return new NextResponse(new Uint8Array(pdf), {

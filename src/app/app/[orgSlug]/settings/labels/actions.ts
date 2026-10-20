@@ -8,6 +8,7 @@ import { canCreateTags, cleanTagName, MAX_TAG_NAME, TAG_CREATE_DENIED } from "@/
 import { HEX_RE } from "@/lib/theme/hex";
 import { writeOrgAuditLog } from "@/server/audit";
 import { withOrgAction, type OrgContext } from "@/server/db/context";
+import { sqlStateOf } from "@/server/db/errors";
 import { chartPalette, nextColor } from "@/server/tasks/catalog";
 
 /** Every tag action belongs to tags (withOrgAction's space check: the "labels" feature). */
@@ -20,7 +21,9 @@ const tagsAction: typeof withOrgAction = (handler, options) =>
  * - createTag: anyone, from any tag field, while the club's
  *   `memberCanCreateTags` is on (the default; the Label INSERT policy reads
  *   the same flag and pins createdById to the maker); otherwise owners and
- *   admins. A name that already exists in any case is reused, never doubled.
+ *   admins. A name that already exists in any case is reused, never doubled:
+ *   the unique index on ("organizationId", lower("name")) settles a race
+ *   between two people making the same tag, and the loser gets the winner's.
  * - Rename, recolour, merge and delete: owners and admins (Settings > Tags).
  * - setCreationRules: the "Who can create tags / projects" switches.
  */
@@ -102,15 +105,28 @@ export const createTag = tagsAction(async (ctx, input: unknown): Promise<CreateR
       used.map((l) => l.color),
     );
   }
-  const tag = await ctx.db.label.create({
-    data: {
-      organizationId: ctx.organizationId,
-      name: parsed.data.name,
-      color,
-      createdById: ctx.userId,
-    },
-    select: tagSelect,
-  });
+  // A savepoint, so a unique violation (someone made it a moment ago)
+  // doesn't abort the action's transaction.
+  await ctx.db.$executeRaw`SAVEPOINT tag_create`;
+  let tag: TagOption;
+  try {
+    tag = await ctx.db.label.create({
+      data: {
+        organizationId: ctx.organizationId,
+        name: parsed.data.name,
+        color,
+        createdById: ctx.userId,
+      },
+      select: tagSelect,
+    });
+    await ctx.db.$executeRaw`RELEASE SAVEPOINT tag_create`;
+  } catch (error) {
+    await ctx.db.$executeRaw`ROLLBACK TO SAVEPOINT tag_create`;
+    if (sqlStateOf(error) !== "23505") throw error;
+    const winner = await sameName(ctx, parsed.data.name);
+    if (!winner) throw error;
+    return { tag: winner, created: false };
+  }
   if (admin) {
     await writeOrgAuditLog(ctx.db, {
       organizationId: ctx.organizationId,

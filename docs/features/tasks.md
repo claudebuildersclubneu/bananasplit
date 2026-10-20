@@ -164,7 +164,7 @@ became **destinations** in the header.
 | **Week**      | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week.                                                                                                                                                                                                            | `2` |
 | **List**      | Open work grouped by epic (stories with their tasks under them, roll-up progress), then everything outside an epic. A club without epics gets one plain list. A quick add on top takes `#tags`. The Free plan's only view.                                                                                                             | `3` |
 | **Table**     | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                                                                                                                                                      | `4` |
-| **Roadmap**   | Epics on a week timeline, grouped by project: each bar runs from the epic's start to its due date with its progress filled in, and this week is marked.                                                                                                                                                                                | `5` |
+| **Roadmap**   | Epics on a week timeline, grouped by project: each bar runs from the epic's start date (or, without one, when it was made or its earliest dated work) to its due date with its progress filled in, and this week is marked.                                                                                                            | `5` |
 | **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by project and person.                                                                                                                                                                                                                                    | `6` |
 
 Due dates also show on the main Calendar (its Tasks layer). A **stat strip**
@@ -233,22 +233,29 @@ toolbar's Project pill) can make one on the spot: type a name and pick
 unless one is picked. Archived projects never appear in pickers; a task
 still filed under one shows it, marked archived, until somebody moves it.
 
-| Who                                                                     | May                                                     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------- |
-| Every member, while **Members can create projects** is on (the default) | Create and edit (rename, recolour, lead, status, dates) |
-| The project's lead                                                      | Edit it (even with the switch off), archive, unarchive  |
-| Owners and admins                                                       | All of it, and delete (its tasks stay, unfiled)         |
+| Who                                                                     | May                                                                                                               |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Every member, while **Members can create projects** is on (the default) | Create (choosing its first lead) and edit (rename, recolour, status, dates)                                       |
+| The project's lead                                                      | Edit it (even with the switch off), hand the lead on, archive, unarchive, and delete it (its tasks stay, unfiled) |
+| Owners and admins                                                       | All of it, on every project                                                                                       |
 
 The switch lives on **Settings › Tags**. The checks are in the server
 actions (`src/lib/tasks/projects.ts`); the Project INSERT policy reads the
-same switch, and DELETE is owners' and admins'.
+same switch, and DELETE is owners', admins' and the project's lead's. Since
+leading a project lets you delete it, only an owner, an admin or the current
+lead changes who leads an existing one (the form's Lead is locked for anyone
+else, and `app.project_lead_guard` refuses it in the database); a member
+leaving clears their own lead as before.
 
 ### Tags
 
 Tags (stored as labels) are typed on the spot: the tag field finds, toggles
 and offers **Create tag “catering”**, which takes the theme's next chart
 colour. Names are unique regardless of case, so typing "Catering" picks
-"catering" instead of making a second. `#tag` in a title (the composer,
+"catering" instead of making a second. The database holds it to that (a
+unique index on the org and the lower-cased name): when two people make the
+same tag at once, `createTag` catches the clash and hands back the one that
+won. Duplicates made before the index were merged into the oldest. `#tag` in a title (the composer,
 the Sentence title, the List's quick add) tags the task: "Book a
 photographer #showcase". Who may make new tags is **Members can create
 tags** on **Settings › Tags** (everyone by default); owners and admins
@@ -300,8 +307,10 @@ and the server checks again with plain-language refusals ("A task inside a
 story can't be broken down any further.") before the database's trigger
 would refuse (`src/lib/tasks/hierarchy.ts`). Moving a childless task into a
 story makes it a task; moving an empty epic into an epic makes it a story.
-Epics have no start date of their own: the Roadmap starts a bar when the
-epic was made, or at its earliest dated piece of work. Clubs that never
+Epics and stories have an optional **Start date** in the editor
+(`Task.startDate`, a calendar date, never after the due date); the Roadmap
+starts an epic's bar there. Without one it starts when the epic was made,
+or at its earliest dated piece of work. Clubs that never
 make an epic see exactly the old one-level subtasks.
 
 ### Sunday updates

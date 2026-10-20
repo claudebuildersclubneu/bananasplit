@@ -122,6 +122,8 @@ export default async function NoteDetailPage({
         parentId: note.parentId,
         layout: note.layout,
         paperSize: note.paperSize,
+        headerText: note.headerText,
+        footerText: note.footerText,
         updatedAt: note.updatedAt.toISOString(),
         updatedByName: data.updatedByName,
         historyDays: noteHistoryWindowDays(org),

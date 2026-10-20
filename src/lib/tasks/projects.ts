@@ -3,11 +3,15 @@
  * src/app/app/[orgSlug]/tasks/projects-actions.ts call these, and the UI
  * uses the same functions to decide what to offer).
  *
- * - Create and edit (name, colour, lead, status, dates): every member while
+ * - Create and edit (name, colour, status, dates): every member while
  *   the club's `memberCanCreateProjects` is on (the default), otherwise
  *   owners and admins. A project's lead can always edit their own project.
+ * - Change who leads an existing project: owners, admins and its current
+ *   lead (app.project_lead_guard), since leading one lets you delete it.
+ *   Whoever creates a project picks its first lead.
  * - Archive and unarchive: owners, admins and the project's lead.
- * - Delete: owners and admins (the Project DELETE policy is OWNER/ADMIN).
+ * - Delete: owners, admins and the project's lead (the Project DELETE
+ *   policy says the same).
  */
 
 export interface ProjectActor {
@@ -46,15 +50,24 @@ export function canArchiveProject(actor: ProjectActor, project: ProjectSubject):
   return actor.isAdmin || (project.leadId !== null && project.leadId === actor.userId);
 }
 
-export function canDeleteProject(actor: ProjectActor): boolean {
-  return actor.isAdmin;
+const isLead = (actor: ProjectActor, project: ProjectSubject) =>
+  project.leadId !== null && project.leadId === actor.userId;
+
+export function canChangeProjectLead(actor: ProjectActor, project: ProjectSubject): boolean {
+  return actor.isAdmin || isLead(actor, project);
+}
+
+export function canDeleteProject(actor: ProjectActor, project: ProjectSubject): boolean {
+  return actor.isAdmin || isLead(actor, project);
 }
 
 export const PROJECT_CREATE_DENIED = "Only an owner or admin can create projects in this club.";
 export const PROJECT_EDIT_DENIED = "Only an owner, an admin or the project's lead can change it.";
 export const PROJECT_ARCHIVE_DENIED =
   "Only an owner, an admin or the project's lead can archive it.";
-export const PROJECT_DELETE_DENIED = "Only an owner or admin can delete a project.";
+export const PROJECT_LEAD_DENIED =
+  "Only an owner, an admin or the project's lead can change who leads it.";
+export const PROJECT_DELETE_DENIED = "Only an owner, an admin or the project's lead can delete it.";
 
 /**
  * What a viewer may make on the spot in Tasks (TasksProvider's `can`): the

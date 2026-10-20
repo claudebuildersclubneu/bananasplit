@@ -2336,7 +2336,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-B9-02",
-    "projects: OWNER/ADMIN create (members too only while the org allows it) and delete; a member may still clear a lead and write tasks",
+    "projects: OWNER/ADMIN create (members too only while the org allows it) and delete (and the lead, P-GAPS-03); a member may still clear their own lead and write tasks",
     "app_user",
     A("u_memberA"),
     async (q) => {
@@ -2351,7 +2351,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `INSERT INTO "Project" ("id","organizationId","name") VALUES ('p_m','org_A','Member project')`,
       );
+      // Not the lead: deletes nothing.
+      await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.member_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
       // The documented carve-out: untieDepartingMember runs as the member
       // who is leaving and clears their own lead.
       s.member_clears_lead = await rc(q, `UPDATE "Project" SET "leadId" = NULL WHERE "id" = 'p_A'`);
@@ -4672,5 +4675,204 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       ).rows.map((r) => r.name),
     { value: ["Member A"] },
   );
+
+  // ============ Moonstone gaps (20261019150000_moonstone_gaps) ============
+  await tcase(
+    "P-GAPS-01",
+    "Task.startDate: a calendar date any task writer sets",
+    "app_user",
+    A("u_memberA"),
+    async (q) => {
+      const s = {};
+      s.type = (
+        await q(`SELECT data_type FROM information_schema.columns
+                  WHERE table_name = 'Task' AND column_name = 'startDate'`)
+      ).rows[0]?.data_type;
+      s.member_sets = await rc(
+        q,
+        `UPDATE "Task" SET "startDate" = '2026-10-05', "type" = 'EPIC' WHERE "id" = 't_A'`,
+      );
+      s.value = (await q(`SELECT "startDate"::text v FROM "Task" WHERE "id" = 't_A'`)).rows[0]?.v;
+      await q(`SELECT app.set_context('u_memberB','org_B')`);
+      s.other_org = await rc(q, `UPDATE "Task" SET "startDate" = '2026-10-05' WHERE "id" = 't_A'`);
+      return s;
+    },
+    { value: { type: "date", member_sets: 1, value: "2026-10-05", other_org: 0 } },
+  );
+  await tcase(
+    "P-GAPS-02",
+    "Label names are unique per org ignoring case (two orgs may share one)",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      const tag = (id, org, name) =>
+        tryq(
+          q,
+          `INSERT INTO "Label" ("id","organizationId","name","color","createdById") VALUES ($1,$2,$3,'#000000',app.user_id())`,
+          [id, org, name],
+        );
+      s.same_case = await tag("l_g1", "org_A", "Label A");
+      s.other_case = await tag("l_g2", "org_A", "LABEL a");
+      s.new_name = await tag("l_g3", "org_A", "Catering");
+      s.rename_clash = await tryq(q, `UPDATE "Label" SET "name" = 'catering' WHERE "id" = 'l_A'`);
+      await q(`SELECT app.set_context('u_ownerB','org_B')`);
+      s.other_org = await tag("l_g4", "org_B", "label a");
+      return s;
+    },
+    {
+      value: {
+        same_case: "23505",
+        other_case: "23505",
+        new_name: 1,
+        rename_clash: "23505",
+        other_org: 1,
+      },
+    },
+  );
+  await tcase(
+    "P-GAPS-03",
+    "a project's lead deletes it; only an OWNER/ADMIN or the lead changes who leads it",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      const lead = async () =>
+        (await q(`SELECT "leadId" v FROM "Project" WHERE "id" = 'p_A'`)).rows[0]?.v ?? null;
+      // Unled: a member can't appoint themselves (and then delete it).
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.self_appoint = await tryq(
+        q,
+        `UPDATE "Project" SET "leadId" = 'u_memberA' WHERE "id" = 'p_A'`,
+      );
+      s.member_delete_unled = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
+      // An admin appoints the treasurer.
+      await q(`SELECT app.set_context('u_adminA','org_A')`);
+      s.admin_appoints = await rc(
+        q,
+        `UPDATE "Project" SET "leadId" = 'u_treasA' WHERE "id" = 'p_A'`,
+      );
+      // Another member can neither take it nor delete it, but still edits it.
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_takes = await tryq(
+        q,
+        `UPDATE "Project" SET "leadId" = 'u_memberA' WHERE "id" = 'p_A'`,
+      );
+      s.member_clears_other = await tryq(
+        q,
+        `UPDATE "Project" SET "leadId" = NULL WHERE "id" = 'p_A'`,
+      );
+      s.member_edits = await rc(q, `UPDATE "Project" SET "status" = 'ON_HOLD' WHERE "id" = 'p_A'`);
+      s.non_lead_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
+      // The lead hands it on, then the new lead deletes it.
+      await q(`SELECT app.set_context('u_treasA','org_A')`);
+      s.lead_hands_on = await rc(
+        q,
+        `UPDATE "Project" SET "leadId" = 'u_memberA' WHERE "id" = 'p_A'`,
+      );
+      s.after_hand_on = await lead();
+      s.old_lead_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.lead_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_A'`);
+      s.task_kept =
+        (await q(`SELECT "projectId" FROM "Task" WHERE "id" = 't_A'`)).rows[0]?.projectId ?? null;
+      // A lead in another org deletes nothing here.
+      await q(`SELECT app.set_context('u_bothAB','org_B')`);
+      s.foreign_delete = await rc(q, `DELETE FROM "Project" WHERE "id" = 'p_B'`);
+      return s;
+    },
+    {
+      value: {
+        self_appoint: "42501",
+        member_delete_unled: 0,
+        admin_appoints: 1,
+        member_takes: "42501",
+        member_clears_other: "42501",
+        member_edits: 1,
+        non_lead_delete: 0,
+        lead_hands_on: 1,
+        after_hand_on: "u_memberA",
+        old_lead_delete: 0,
+        lead_delete: 1,
+        task_kept: null,
+        foreign_delete: 0,
+      },
+    },
+  );
+  await tcase(
+    "P-GAPS-03b",
+    "the service path still sets any project's lead",
+    "app_service",
+    { org: "org_A" },
+    async (q) => rc(q, `UPDATE "Project" SET "leadId" = 'u_memberA' WHERE "id" = 'p_A'`),
+    { value: 1 },
+  );
+  await tcase(
+    "P-GAPS-04",
+    "Note.headerText and footerText: whoever edits the note sets them, 200 characters at most",
+    "app_user",
+    A("u_adminA"),
+    async (q) => {
+      const s = {};
+      s.admin_sets = await rc(
+        q,
+        `UPDATE "Note" SET "headerText" = 'Board minutes', "footerText" = 'Confidential' WHERE "id" = 'n_A_priv'`,
+      );
+      s.too_long = await tryq(
+        q,
+        `UPDATE "Note" SET "headerText" = repeat('x', 201) WHERE "id" = 'n_A_priv'`,
+      );
+      s.at_limit = await rc(
+        q,
+        `UPDATE "Note" SET "footerText" = repeat('x', 200) WHERE "id" = 'n_A_priv'`,
+      );
+      await q(`SELECT app.set_context('u_memberA','org_A')`);
+      s.member_private = await rc(
+        q,
+        `UPDATE "Note" SET "headerText" = 'Mine' WHERE "id" = 'n_A_priv'`,
+      );
+      return s;
+    },
+    { value: { admin_sets: 1, too_long: "23514", at_limit: 1, member_private: 0 } },
+  );
+  await tcase(
+    "P-GAPS-05",
+    "app.member_availability_shared: whether a member saved availability, only where their busy hours may be seen",
+    "owner",
+    null,
+    async (q) => {
+      await q(
+        `INSERT INTO "UserAvailability" ("userId","rules","busy") VALUES ('u_memberA','{"secret":"Therapy"}',ARRAY[]::text[])`,
+      );
+      const shared = async (user, org, target) => {
+        await q(`SELECT app.set_context($1, $2)`, [user, org]);
+        return (
+          (await q(`SELECT app.member_availability_shared($1) AS v`, [target])).rows[0]?.v ?? null
+        );
+      };
+      const s = {};
+      s.saved_empty = await shared("u_treasA", "org_A", "u_memberA");
+      s.never = await shared("u_treasA", "org_A", "u_adminA");
+      s.self_never = await shared("u_adminA", "org_A", "u_adminA");
+      s.other_org = await shared("u_memberB", "org_B", "u_memberA");
+      await q(
+        `UPDATE "OrgSettings" SET "showMemberAvailability" = false WHERE "organizationId" = 'org_A'`,
+      );
+      s.hidden_member = await shared("u_treasA", "org_A", "u_memberA");
+      s.hidden_admin = await shared("u_adminA", "org_A", "u_memberA");
+      return s;
+    },
+    {
+      value: {
+        saved_empty: true,
+        never: false,
+        self_never: false,
+        other_org: null,
+        hidden_member: null,
+        hidden_admin: true,
+      },
+    },
+  );
+
   await own(`DELETE FROM "Organization" WHERE "id" IN ('org_PA','org_PB','org_PM')`);
 });

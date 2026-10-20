@@ -16,6 +16,7 @@ import {
   MessageSquare,
   PanelLeft,
   PanelRightClose,
+  PanelTop,
   PencilLine,
   RotateCcw,
   Trash2,
@@ -61,6 +62,7 @@ import {
   type CommentDraft,
 } from "@/components/notes/workspace/comments-panel";
 import { HistoryPanel, type PreviewVersion } from "@/components/notes/workspace/history-panel";
+import { HeaderFooterDialog } from "@/components/notes/workspace/header-footer-dialog";
 import { IconPicker } from "@/components/notes/workspace/icon-picker";
 import { NotesTree, type TreePage } from "@/components/notes/workspace/notes-tree";
 import { SuggestionsPanel } from "@/components/notes/workspace/suggestions-panel";
@@ -72,6 +74,7 @@ import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toaster";
+import { bandFooter, bandHeader } from "@/lib/notes/paper";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { NOTE_TRASH_DAYS } from "@/lib/notes/trash";
 import { cn } from "@/lib/utils";
@@ -103,6 +106,9 @@ export interface NoteWorkspace {
   parentId: string | null;
   layout: Layout;
   paperSize: Paper;
+  /** Document mode's header and footer text (null: the default). */
+  headerText: string | null;
+  footerText: string | null;
   updatedAt: string;
   updatedByName: string | null;
   /** ?comment= in the link from a notification. */
@@ -147,6 +153,8 @@ const EMPTY_WORKSPACE: NoteWorkspace = {
   parentId: null,
   layout: "PAGE",
   paperSize: "LETTER",
+  headerText: null,
+  footerText: null,
   updatedAt: new Date(0).toISOString(),
   updatedByName: null,
   focusCommentId: null,
@@ -181,6 +189,11 @@ export function NoteEditorShell({
   const [eventId, setEventId] = useState(note.eventId);
   const [layout, setLayout] = useState<Layout>(workspace.layout);
   const [paperSize, setPaperSize] = useState<Paper>(workspace.paperSize);
+  const [bands, setBands] = useState({
+    headerText: workspace.headerText,
+    footerText: workspace.footerText,
+  });
+  const [bandsOpen, setBandsOpen] = useState(false);
   const [icon, setIcon] = useState<string | null>(workspace.icon);
   const versionRef = useRef(note.version);
   const contentRef = useRef({ json: note.contentJson, text: note.contentText });
@@ -335,7 +348,13 @@ export function NoteEditorShell({
   }
 
   // ---- Page settings ------------------------------------------------------------
-  function saveSettings(patch: { icon?: string | null; layout?: Layout; paperSize?: Paper }) {
+  function saveSettings(patch: {
+    icon?: string | null;
+    layout?: Layout;
+    paperSize?: Paper;
+    headerText?: string | null;
+    footerText?: string | null;
+  }) {
     void updateNoteSettings(orgId, note.id, patch).then((r) => {
       if (r.error) toast({ title: r.error, tone: "error" });
       else router.refresh();
@@ -501,6 +520,8 @@ export function NoteEditorShell({
       },
       title,
       orgName: workspace.orgName,
+      headerText: bands.headerText,
+      footerText: bands.footerText,
     }),
     [
       orgId,
@@ -512,6 +533,7 @@ export function NoteEditorShell({
       workspace.pages,
       title,
       workspace.orgName,
+      bands,
     ],
   );
 
@@ -750,6 +772,12 @@ export function NoteEditorShell({
                     setPaperSize(next);
                     saveSettings({ paperSize: next });
                   },
+                },
+              canEdit &&
+                isDocument && {
+                  label: "Header and footer…",
+                  icon: PanelTop,
+                  onSelect: () => setBandsOpen(true),
                 },
               {
                 label: "Download PDF",
@@ -1020,6 +1048,21 @@ export function NoteEditorShell({
         </SheetContent>
       </Sheet>
       {confirmEl}
+      {bandsOpen && (
+        <HeaderFooterDialog
+          headerText={bands.headerText}
+          footerText={bands.footerText}
+          defaults={{
+            header: bandHeader({ title, orgName: workspace.orgName }),
+            footer: bandFooter({ title }),
+          }}
+          onSave={(next) => {
+            setBands(next);
+            saveSettings(next);
+          }}
+          onClose={() => setBandsOpen(false)}
+        />
+      )}
       {importText !== null && (
         <ActionItemsImport
           orgId={orgId}

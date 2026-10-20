@@ -2087,6 +2087,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "list_org_creation_codes",
         "lock_org",
         "log_org_deletion",
+        // Whether a member shared their availability at all, under
+        // member_busy_hours's rule (it calls it); never what they shared.
+        "member_availability_shared",
         "member_busy_hours",
         "member_org_id",
         "member_role",
@@ -2438,6 +2441,11 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       note_comment_guard: "",
       // The nightly job's counter repair (service path, its org context only).
       storage_reconcile: "s",
+      // Moonstone gaps: "Free now" asks whether availability was shared at
+      // all (member path only); the trigger that keeps who leads a project
+      // with admins and the lead (no grant).
+      member_availability_shared: "u",
+      project_lead_guard: "",
     };
     await tcase(
       "T27f",

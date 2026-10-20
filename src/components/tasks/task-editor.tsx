@@ -67,7 +67,7 @@ import { AudienceList } from "./visibility-control";
  * bottom. A new task can also be written as one sentence (Sentence mode).
  * Create and edit:
  * title, description with @mentions, status (a reason when Blocked),
- * priority, due date, project, labels, the accountable owner and "also
+ * priority, due date (and a start date for epics and stories), project, labels, the accountable owner and "also
  * involved" collaborators, 'Created by', flags with their acknowledgement,
  * subtasks, comments and history.
  *
@@ -134,6 +134,9 @@ export function TaskEditor({
   const [dueDate, setDueDate] = useState(() =>
     task?.dueDate ? dueDateKey(task.dueDate) : (defaults?.dueDate ?? ""),
   );
+  const [startDate, setStartDate] = useState(() =>
+    task?.startDate ? dueDateKey(task.startDate) : "",
+  );
   const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const [visibility, setVisibility] = useState<TaskVisibility>(
     task?.visibility ?? defaults?.visibility ?? TaskVisibility.ORG,
@@ -192,6 +195,7 @@ export function TaskEditor({
   ];
   const ownerRequired = org.requireOwner && isTopLevel;
   const dueRequired = org.requireDueDate && isTopLevel;
+  const hasStart = type === "EPIC" || type === "STORY";
 
   async function save() {
     // One save at a time: ⌘↵ held down, or pressed while the first is in flight.
@@ -246,6 +250,8 @@ export function TaskEditor({
       blockedReason: status === TaskStatus.BLOCKED ? blockedReason.trim() : null,
       priority,
       dueDate: dueDate || null,
+      // Epics and stories have a start (the Roadmap); a plain task doesn't.
+      ...(hasStart || task?.startDate ? { startDate: hasStart ? startDate || null : null } : {}),
       projectId,
       ownerId,
       assigneeIds: assigneeIds.filter((id) => id !== ownerId),
@@ -493,6 +499,22 @@ export function TaskEditor({
           />
         </Field>
       </div>
+
+      {hasStart && (
+        <Field>
+          <FieldLabel htmlFor="task-start-date" optional>
+            Start date
+          </FieldLabel>
+          <DueField
+            id="task-start-date"
+            label="Start date"
+            emptyLabel="No start date"
+            value={startDate}
+            onChange={setStartDate}
+            disabled={readOnly}
+          />
+        </Field>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
