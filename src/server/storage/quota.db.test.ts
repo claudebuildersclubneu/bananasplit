@@ -101,6 +101,8 @@ afterAll(async () => {
     await ownerDb.organization.delete({ where: { id: club.id } });
     await ownerDb.orgSlugHistory.deleteMany({ where: { slug: club.slug } });
   }
+  // The Personal space first: its files name the user.
+  if (personalId) await ownerDb.organization.deleteMany({ where: { id: personalId } });
   if (owner.id) await ownerDb.user.deleteMany({ where: { id: owner.id } });
   await disconnectAll();
   await disconnectOwnerDb();
