@@ -62,10 +62,10 @@ function BandRow({ band, set }: { band: (typeof BANDS)[number]; set: Set<string>
             className={cn(
               "block h-3 rounded-[4px]",
               share === 0
-                ? "bg-muted"
+                ? "bg-foreground/[0.07]"
                 : share < 1
-                  ? "bg-[color-mix(in_oklab,var(--chart-2)_38%,var(--muted))]"
-                  : "bg-[color-mix(in_oklab,var(--chart-2)_72%,var(--muted))]",
+                  ? "bg-[color-mix(in_oklab,var(--chart-2)_40%,transparent)]"
+                  : "bg-[color-mix(in_oklab,var(--chart-2)_78%,transparent)]",
             )}
           />
         );
