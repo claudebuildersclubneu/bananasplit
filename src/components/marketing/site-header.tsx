@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { SignOutLink } from "@/components/auth/sign-out-link";
 import { Logo } from "@/components/brand/logo";
+import { pill } from "@/components/brand/pill";
+import { cn } from "@/lib/utils";
 
 const NAV = [
   { label: "Features", href: "#features" },
@@ -11,45 +13,49 @@ const NAV = [
 ] as const;
 
 /**
- * The sticky bar: translucent cream, blurred over whatever scrolls beneath.
- * Below md the section links drop out, and on the narrowest phones the
- * name, so the mark, Log in and the call to action fit on one line. Signed
- * in, the call to action is "Open your club" (the app) and Log in goes.
+ * The floating bar: a glass capsule (glass-light) over whatever scrolls
+ * beneath, inset from the edges. Below md the section links drop out, and
+ * on the narrowest phones the name, so the mark, Log in and the call to
+ * action fit on one line. Signed in, the call to action is "Open your club"
+ * (the app) and Log in becomes Sign out.
  */
 export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
   return (
-    <header className="border-ink/8 bg-cream/82 sticky top-0 z-20 border-b backdrop-blur-[14px] backdrop-saturate-[1.4]">
-      <div className="mx-auto flex max-w-[1240px] items-center gap-4 px-6 py-3 md:gap-8">
-        <a href="#top" className="flex" aria-label="Bananasplit">
-          <Logo size={28} textSize={20} wordmarkClassName="hidden min-[400px]:inline" />
+    <header className="sticky top-0 z-30 px-3 pt-3 sm:px-6">
+      <div className="glass-light mx-auto flex h-14 max-w-[1240px] items-center gap-3 rounded-full pr-2 pl-4 sm:pl-5 md:gap-8">
+        <a href="#top" className="logo-lockup flex" aria-label="Bananasplit" data-plain>
+          <Logo size={26} textSize={19} wordmarkClassName="hidden min-[400px]:inline" />
         </a>
-        <nav className="text-ink-muted hidden flex-1 flex-wrap gap-7 text-[14px] font-medium md:flex">
+        <nav className="hidden flex-1 gap-1 text-[14px] font-medium md:flex">
           {NAV.map((item) => (
-            <a key={item.href} href={item.href} className="text-ink-muted">
+            <a
+              key={item.href}
+              href={item.href}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-full px-3 py-2 transition-colors"
+            >
               {item.label}
             </a>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-[18px]">
+        <div className="ml-auto flex items-center gap-1.5">
           {signedIn ? (
             <>
-              <SignOutLink className="cursor-pointer text-[14px] font-medium whitespace-nowrap" />
-              <Link
-                href="/app"
-                className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
-              >
+              <SignOutLink
+                className={cn(pill({ tone: "outline", size: "md" }), "border-transparent")}
+              />
+              <Link href="/app" className={pill({ tone: "glow", size: "md" })}>
                 Open your club
               </Link>
             </>
           ) : (
             <>
-              <Link href="/sign-in" className="text-[14px] font-medium whitespace-nowrap">
+              <Link
+                href="/sign-in"
+                className={cn(pill({ tone: "outline", size: "md" }), "border-transparent")}
+              >
                 Log in
               </Link>
-              <a
-                href="#pricing"
-                className="bg-ink text-cream hover:bg-ink-hover hover:text-cream rounded-full px-4 py-[9px] text-[14px] font-semibold whitespace-nowrap"
-              >
+              <a href="#pricing" className={pill({ tone: "glow", size: "md" })}>
                 Create your club
               </a>
             </>

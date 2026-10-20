@@ -1,7 +1,9 @@
+import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { FinanceBoard } from "@/components/finance/finance-board";
+import { Button } from "@/components/ui/button";
 import { FinanceSetupBanner } from "@/components/finance/setup/setup-banner";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
@@ -46,13 +48,17 @@ export default async function FinancePage({ params }: PageProps<"/app/[orgSlug]/
       )}
 
       {dashboard.unreconciledOver60DaysCount > 0 && (
-        <p className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm">
-          {dashboard.unreconciledOver60DaysCount} transaction(s) are unreconciled and over 60 days
-          old.{" "}
-          <Link href={`/app/${orgSlug}/finance/transactions?reconciled=no`} className="underline">
-            Review them
-          </Link>
-        </p>
+        <div className="bg-tint-danger text-tint-danger-foreground rounded-tile flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 pr-2.5 pl-4 text-sm">
+          <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
+          <p className="min-w-0 flex-1">
+            {dashboard.unreconciledOver60DaysCount === 1
+              ? "1 transaction is unreconciled and over 60 days old."
+              : `${dashboard.unreconciledOver60DaysCount} transactions are unreconciled and over 60 days old.`}
+          </p>
+          <Button asChild size="sm" variant="outline" className="border-current/30">
+            <Link href={`/app/${orgSlug}/finance/transactions?reconciled=no`}>Review them</Link>
+          </Button>
+        </div>
       )}
 
       <FinanceBoard

@@ -1,19 +1,36 @@
 "use client";
 
-import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Copy, Info, Loader2, Upload } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  Copy,
+  Loader2,
+  TriangleAlert,
+  Upload,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   checkImportDuplicates,
   importFinanceBudget,
   importFinanceRecords,
 } from "@/app/app/[orgSlug]/finance/import-actions";
+import { TableFrame } from "@/components/databases/table-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { TransactionKind } from "@/generated/prisma/enums";
 import {
   inferKind,
@@ -30,6 +47,15 @@ import { formatCents } from "@/lib/finance/money";
 import { cn } from "@/lib/utils";
 
 import type { ImportSummary } from "./import-done";
+import {
+  ErrorNotice,
+  fieldSelect,
+  fieldSelectSm,
+  HatchProgress,
+  ImportPanel,
+  ReadNotes,
+  WarningNotice,
+} from "./panel";
 
 /**
  * Every proposed row, editable, before anything is saved: tick what goes
@@ -63,22 +89,26 @@ function newBatchId(): string {
 const dollars = (cents: number | null) =>
   cents === null ? "" : `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 
-function Notes({ readBy, notes }: { readBy: string | null; notes: string[] }) {
-  if (!readBy && notes.length === 0) return null;
+/** A figure on an inset tile: the label above, the number in the display face. */
+function Figure({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="bg-muted/40 space-y-1 rounded-xl border p-3 text-xs">
-      {readBy && <p className="font-medium">Read by {readBy}</p>}
-      {notes.map((n, i) => (
-        <p key={i} className="text-muted-foreground flex items-start gap-1.5">
-          <Info className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          {n}
-        </p>
-      ))}
+    <div className="bg-muted/60 rounded-tile min-w-28 px-4 py-3">
+      <dt className="eyebrow text-muted-foreground">{label}</dt>
+      <dd className={cn("numeral mt-1.5 text-[22px]", className)}>{children}</dd>
     </div>
   );
 }
 
 export function ImportReview({
+  embedded,
   orgId,
   fileName,
   initialRows,
@@ -89,6 +119,8 @@ export function ImportReview({
   onBack,
   onDone,
 }: {
+  /** Inside the setup guide (already a card). */
+  embedded?: boolean;
   orgId: string;
   orgSlug: string;
   fileName: string;
@@ -110,6 +142,7 @@ export function ImportReview({
   const [reconciled, setReconciled] = useState(false);
   const [bulkCategory, setBulkCategory] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Rows that are already in the books start unticked (importing an export twice shouldn't double the money).
@@ -224,6 +257,7 @@ export function ImportReview({
     };
     for (let at = 0; at < records.length; at += CHUNK) {
       const part = records.slice(at, at + CHUNK);
+      setProgress({ done: at, total: records.length });
       setBusy(
         records.length > CHUNK
           ? `Importing ${Math.min(at + CHUNK, records.length).toLocaleString()} of ${records.length.toLocaleString()}…`
@@ -252,6 +286,7 @@ export function ImportReview({
           if (!summary.categoriesCreated.includes(c)) summary.categoriesCreated.push(c);
       } catch (e) {
         setBusy(null);
+        setProgress(null);
         setError(
           `${e instanceof Error ? e.message : "The import stopped."}${summary.created > 0 ? ` ${summary.created} rows went in before it stopped: the next screen can undo them.` : ""}`,
         );
@@ -265,6 +300,7 @@ export function ImportReview({
       else summary.outCents += r.amountCents;
     }
     setBusy(null);
+    setProgress(null);
     router.refresh();
     onDone(summary);
   }
@@ -292,91 +328,84 @@ export function ImportReview({
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="heading text-lg">Check the rows</h2>
-          <p className="text-muted-foreground text-sm">
-            Nothing is saved until you import. Untick anything that shouldn&apos;t go in, and fix
-            what looks wrong.
-          </p>
+    <div className="space-y-4.5">
+      <ImportPanel embedded={embedded}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl min-w-0 space-y-1">
+            <h2 className="heading text-[17px]">Check the rows</h2>
+            <p className="text-muted-foreground text-sm">
+              Nothing is saved until you import. Untick anything that shouldn&apos;t go in, and fix
+              what looks wrong.
+            </p>
+          </div>
+          <dl className="flex flex-wrap gap-2">
+            <Figure label="Importing">{chosen.length.toLocaleString()}</Figure>
+            <Figure label="Money in">{formatCents(totals.in)}</Figure>
+            <Figure label="Money out">{formatCents(totals.out)}</Figure>
+          </dl>
         </div>
-        <dl className="flex flex-wrap gap-2 text-sm">
-          <div className="rounded-xl border px-3 py-1.5">
-            <dt className="text-muted-foreground text-xs">Importing</dt>
-            <dd className="font-semibold tabular-nums">{chosen.length.toLocaleString()}</dd>
-          </div>
-          <div className="rounded-xl border px-3 py-1.5">
-            <dt className="text-muted-foreground text-xs">Money in</dt>
-            <dd className="text-success font-semibold tabular-nums">{formatCents(totals.in)}</dd>
-          </div>
-          <div className="rounded-xl border px-3 py-1.5">
-            <dt className="text-muted-foreground text-xs">Money out</dt>
-            <dd className="font-semibold tabular-nums">{formatCents(totals.out)}</dd>
-          </div>
-        </dl>
-      </div>
 
-      <Notes readBy={readBy} notes={notes} />
+        <ReadNotes readBy={readBy} notes={notes} />
 
-      {byPeriod.size > 0 && (
-        <p className="text-sm">
-          <span className="text-muted-foreground">Goes into </span>
-          {[...byPeriod.entries()].map(([label, p], i) => (
-            <span key={label}>
-              {i > 0 && <span className="text-muted-foreground">, </span>}
-              <span className="font-medium">{label}</span>
-              <span className="text-muted-foreground">
-                {" "}
-                ({p.count.toLocaleString()}
-                {p.isNew ? (createPeriods ? ", a new budget year" : ", no period: left out") : ""})
-              </span>
-            </span>
-          ))}
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Segmented
-          label="Show rows"
-          className="max-w-full overflow-x-auto"
-          value={filter}
-          onSelect={(v) => {
-            setFilter(v as Filter);
-            setPage(0);
-          }}
-          options={FILTERS.map((f) => ({
-            value: f.id,
-            label: (
-              <>
-                {f.label}{" "}
+        {byPeriod.size > 0 && (
+          <p className="text-sm">
+            <span className="text-muted-foreground">Goes into </span>
+            {[...byPeriod.entries()].map(([label, p], i) => (
+              <span key={label}>
+                {i > 0 && <span className="text-muted-foreground">, </span>}
+                <span className="font-semibold">{label}</span>
                 <span className="text-muted-foreground tabular-nums">
-                  {f.count.toLocaleString()}
+                  {" "}
+                  ({p.count.toLocaleString()}
+                  {p.isNew ? (createPeriods ? ", a new budget year" : ", no period: left out") : ""}
+                  )
                 </span>
-              </>
-            ),
-          }))}
-        />
-        <div className="flex items-center gap-2">
-          <Input
-            value={bulkCategory}
-            onChange={(e) => setBulkCategory(e.target.value)}
-            placeholder="Category for every ticked row"
-            aria-label="Category for every ticked row"
-            list="import-categories"
-            className="h-8 w-56 text-xs"
+              </span>
+            ))}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Segmented
+            label="Show rows"
+            className="max-w-full overflow-x-auto"
+            value={filter}
+            onSelect={(v) => {
+              setFilter(v as Filter);
+              setPage(0);
+            }}
+            options={FILTERS.map((f) => ({
+              value: f.id,
+              label: (
+                <>
+                  {f.label}{" "}
+                  <span className="text-muted-foreground tabular-nums">
+                    {f.count.toLocaleString()}
+                  </span>
+                </>
+              ),
+            }))}
           />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={applyBulkCategory}
-            disabled={!bulkCategory.trim()}
-          >
-            Apply
-          </Button>
+          <div className="flex items-center gap-2">
+            <Input
+              value={bulkCategory}
+              onChange={(e) => setBulkCategory(e.target.value)}
+              placeholder="Category for every ticked row"
+              aria-label="Category for every ticked row"
+              list="import-categories"
+              className="w-60"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={applyBulkCategory}
+              disabled={!bulkCategory.trim()}
+            >
+              Apply
+            </Button>
+          </div>
         </div>
-      </div>
+      </ImportPanel>
 
       <datalist id="import-categories">
         {categoryNames.map((n) => (
@@ -384,81 +413,76 @@ export function ImportReview({
         ))}
       </datalist>
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-[56rem] text-sm">
-          <thead className="bg-muted/50 text-muted-foreground text-xs">
-            <tr>
-              <th className="w-10 p-2 text-left">
+      <TableFrame bare={embedded}>
+        <Table className="min-w-[56rem]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
                 <span className="sr-only">Import</span>
-              </th>
-              <th className="p-2 text-left font-medium">Date</th>
-              <th className="p-2 text-left font-medium">Description</th>
-              <th className="p-2 text-right font-medium">Amount</th>
-              <th className="p-2 text-left font-medium">Way</th>
-              <th className="p-2 text-left font-medium">Type</th>
-              <th className="p-2 text-left font-medium">Category</th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right tabular-nums">Amount</TableHead>
+              <TableHead>Way</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Category</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {shown.map((r) => {
               const problems = rowProblems(r);
               const dup = duplicates.has(dupKey(r));
               return (
-                <tr
+                <TableRow
                   key={r.key}
                   className={cn(
-                    "border-t align-top",
-                    !r.include && "bg-muted/30 text-muted-foreground",
+                    "[&>td]:py-2.5 [&>td]:align-top",
+                    !r.include && "bg-muted/40 text-muted-foreground",
                   )}
                 >
-                  <td className="p-2">
+                  <TableCell className="pt-4!">
                     <Checkbox
                       checked={r.include}
                       onCheckedChange={(v) => patch(r.key, { include: v === true })}
                       aria-label={`Import ${r.source}`}
                     />
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell>
                     <Input
                       type="date"
                       value={r.date ?? ""}
                       onChange={(e) => patch(r.key, { date: e.target.value || null })}
-                      className="h-8 w-36 text-xs"
+                      className="h-8 w-38 text-[13px]"
                       aria-label={`Date, ${r.source}`}
                     />
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell className="whitespace-normal">
                     <Input
                       value={r.description}
                       onChange={(e) => patch(r.key, { description: e.target.value })}
-                      className="h-8 min-w-56 text-xs"
+                      className="h-8 min-w-56 text-[13px]"
                       aria-label={`Description, ${r.source}`}
                     />
-                    <div className="mt-1 flex flex-wrap items-center gap-1">
-                      <span className="text-muted-foreground text-[11px]">{r.source}</span>
-                      {r.counterparty && (
-                        <span className="text-muted-foreground text-[11px]">
-                          · {r.counterparty}
-                        </span>
-                      )}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-muted-foreground text-xs">
+                        {r.source}
+                        {r.counterparty ? ` · ${r.counterparty}` : ""}
+                      </span>
                       {dup && (
-                        <Badge variant="secondary" className="gap-1 text-[10px]">
-                          <Copy className="size-3" aria-hidden="true" />
+                        <Badge variant="info">
+                          <Copy aria-hidden="true" />
                           Already recorded?
                         </Badge>
                       )}
                       {problems.map((p) => (
-                        <Badge
-                          key={p}
-                          variant="outline"
-                          className="border-warning/40 text-warning text-[10px]"
-                        >
+                        <Badge key={p} variant="secondary" className="text-foreground">
+                          <TriangleAlert className="text-warning" aria-hidden="true" />
                           {p}
                         </Badge>
                       ))}
                     </div>
-                  </td>
-                  <td className="p-2 text-right">
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
                     <Input
                       key={`${r.key}-${r.amountCents}`}
                       defaultValue={dollars(r.amountCents)}
@@ -467,19 +491,16 @@ export function ImportReview({
                         const a = parseAmount(e.target.value);
                         patch(r.key, { amountCents: a && a.cents > 0 ? a.cents : null });
                       }}
-                      className="h-8 w-28 text-right text-xs tabular-nums"
+                      className="ml-auto h-8 w-28 text-right text-[13px] tabular-nums"
                       aria-label={`Amount, ${r.source}`}
                     />
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      className={cn(
-                        "h-8 w-20 gap-1 text-xs",
-                        r.direction === "IN" && "text-success",
-                      )}
+                      className={cn("w-20", r.direction === "IN" && "text-success")}
                       onClick={() => {
                         const direction: Direction = r.direction === "IN" ? "OUT" : "IN";
                         patch(r.key, {
@@ -492,16 +513,16 @@ export function ImportReview({
                       aria-label={`${r.direction === "IN" ? "Money in" : r.direction === "OUT" ? "Money out" : "Not set"}, ${r.source}. Switch.`}
                     >
                       {r.direction === "IN" ? (
-                        <ArrowDownLeft className="size-3.5" aria-hidden="true" />
+                        <ArrowDownLeft aria-hidden="true" />
                       ) : (
-                        <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                        <ArrowUpRight aria-hidden="true" />
                       )}
                       {r.direction === "IN" ? "In" : r.direction === "OUT" ? "Out" : "Set"}
                     </Button>
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell>
                     <select
-                      className="border-input bg-background h-8 rounded-lg border px-2 text-xs"
+                      className={fieldSelectSm}
                       value={r.kind}
                       onChange={(e) => patch(r.key, { kind: e.target.value as TransactionKind })}
                       aria-label={`Type, ${r.source}`}
@@ -512,38 +533,38 @@ export function ImportReview({
                         </option>
                       ))}
                     </select>
-                  </td>
-                  <td className="p-2">
+                  </TableCell>
+                  <TableCell>
                     <Input
                       value={r.category ?? ""}
                       onChange={(e) => patch(r.key, { category: e.target.value || null })}
                       list="import-categories"
                       placeholder="None"
-                      className="h-8 w-40 text-xs"
+                      className="h-8 w-40 text-[13px]"
                       aria-label={`Category, ${r.source}`}
                     />
                     {r.category && isNewCategory(r) && (
-                      <span className="text-muted-foreground mt-1 block text-[11px]">
+                      <span className="text-muted-foreground mt-1.5 block text-xs">
                         {createCategories ? "New category" : "Not a category yet: left blank"}
                       </span>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
             {shown.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-muted-foreground p-6 text-center text-sm">
-                  Nothing here.
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
+                  No rows here.
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableFrame>
 
       {pages > 1 && (
-        <div className="flex items-center justify-end gap-2 text-xs">
+        <div className="flex items-center justify-end gap-2 text-[13px]">
           <Button
             type="button"
             size="sm"
@@ -568,65 +589,74 @@ export function ImportReview({
         </div>
       )}
 
-      <fieldset className="space-y-2 rounded-xl border p-4">
-        <legend className="px-1 text-sm font-medium">When importing</legend>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            checked={createPeriods}
-            onCheckedChange={(v) => setCreatePeriods(v === true)}
-            className="mt-0.5"
-          />
-          <span>
-            Add budget years for dates outside your budget periods
-            <span className="text-muted-foreground block text-xs">
-              Past years are kept separate, so this year&apos;s balance only counts this year.
+      <ImportPanel embedded={embedded}>
+        <fieldset className="space-y-3.5">
+          <legend className="heading mb-3.5 text-[15px]">When importing</legend>
+          <label className="flex items-start gap-3 text-sm">
+            <Checkbox
+              checked={createPeriods}
+              onCheckedChange={(v) => setCreatePeriods(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              Add budget years for dates outside your budget periods
+              <span className="text-muted-foreground block text-[13px]">
+                Past years are kept separate, so this year&apos;s balance only counts this year.
+              </span>
             </span>
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            checked={createCategories}
-            onCheckedChange={(v) => setCreateCategories(v === true)}
-            className="mt-0.5"
-          />
-          <span>
-            Add categories that don&apos;t exist yet (at $0 budgeted)
-            <span className="text-muted-foreground block text-xs">
-              Otherwise those rows go in uncategorized.
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <Checkbox
+              checked={createCategories}
+              onCheckedChange={(v) => setCreateCategories(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              Add categories that don&apos;t exist yet (at $0 budgeted)
+              <span className="text-muted-foreground block text-[13px]">
+                Otherwise those rows go in uncategorized.
+              </span>
             </span>
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            checked={reconciled}
-            onCheckedChange={(v) => setReconciled(v === true)}
-            className="mt-0.5"
-          />
-          <span>
-            These match the bank: mark them reconciled
-            <span className="text-muted-foreground block text-xs">
-              Reconciled rows are locked against edits. Leave this off if you might still fix
-              things.
+          </label>
+          <label className="flex items-start gap-3 text-sm">
+            <Checkbox
+              checked={reconciled}
+              onCheckedChange={(v) => setReconciled(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              These match the bank: mark them reconciled
+              <span className="text-muted-foreground block text-[13px]">
+                Reconciled rows are locked against edits. Leave this off if you might still fix
+                things.
+              </span>
             </span>
-          </span>
-        </label>
-      </fieldset>
+          </label>
+        </fieldset>
+      </ImportPanel>
 
       {needsDraft && (
-        <p className="text-warning text-sm">
+        <WarningNotice>
           Some dates aren&apos;t in any budget period, so those rows will be left out. Tick
           &ldquo;Add budget years&rdquo; to keep them.
-        </p>
+        </WarningNotice>
       )}
-      {error && (
-        <p role="alert" className="text-destructive text-sm">
-          {error}
-        </p>
+      {error && <ErrorNotice>{error}</ErrorNotice>}
+      {progress && busy && (
+        <HatchProgress
+          done={progress.done}
+          total={progress.total}
+          label={
+            progress.total > CHUNK
+              ? busy
+              : `Importing ${progress.total.toLocaleString()} transaction${progress.total === 1 ? "" : "s"}…`
+          }
+        />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onBack} disabled={busy !== null}>
-          <ArrowLeft className="size-4" aria-hidden="true" />
+          <ArrowLeft aria-hidden="true" />
           Back
         </Button>
         <Button
@@ -635,9 +665,9 @@ export function ImportReview({
           disabled={busy !== null || chosen.length === 0}
         >
           {busy ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            <Loader2 className="animate-spin" aria-hidden="true" />
           ) : (
-            <Upload className="size-4" aria-hidden="true" />
+            <Upload aria-hidden="true" />
           )}
           {busy ??
             `Import ${chosen.length.toLocaleString()} transaction${chosen.length === 1 ? "" : "s"}`}
@@ -648,6 +678,7 @@ export function ImportReview({
 }
 
 export function BudgetReview({
+  embedded,
   orgId,
   initialLines,
   periods,
@@ -656,6 +687,7 @@ export function BudgetReview({
   onBack,
   onDone,
 }: {
+  embedded?: boolean;
   orgId: string;
   initialLines: BudgetLine[];
   periods: PeriodLike[];
@@ -701,86 +733,83 @@ export function BudgetReview({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="heading text-lg">A budget: check the lines</h2>
-          <p className="text-muted-foreground text-sm">
-            Each line becomes a budget category with that amount. Lines with the same name as a
-            category update it.
-          </p>
+    <div className="space-y-4.5">
+      <ImportPanel embedded={embedded}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl min-w-0 space-y-1">
+            <h2 className="heading text-[17px]">A budget: check the lines</h2>
+            <p className="text-muted-foreground text-sm">
+              Each line becomes a budget category with that amount. Lines with the same name as a
+              category update it.
+            </p>
+          </div>
+          <dl className="flex flex-wrap gap-2">
+            <Figure label="Total budgeted">{formatCents(total)}</Figure>
+          </dl>
         </div>
-        <div className="rounded-xl border px-3 py-1.5 text-sm">
-          <p className="text-muted-foreground text-xs">Total budgeted</p>
-          <p className="font-semibold tabular-nums">{formatCents(total)}</p>
-        </div>
-      </div>
-      <Notes readBy={readBy} notes={notes} />
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Put it in</span>
-        <select
-          className="border-input bg-background h-8 rounded-lg border px-2 text-sm"
-          value={periodId}
-          onChange={(e) => setPeriodId(e.target.value)}
-        >
-          {!active && <option value="">This school year (new)</option>}
-          {periods.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-              {p.isActive ? " (current)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <ul className="divide-y rounded-xl border">
-        {lines.map((l) => (
-          <li
-            key={l.key}
-            className={cn(
-              "flex flex-wrap items-center gap-3 p-2.5",
-              !l.include && "text-muted-foreground",
-            )}
+        <ReadNotes readBy={readBy} notes={notes} />
+        <label className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-muted-foreground">Put it in</span>
+          <select
+            className={cn(fieldSelect, "w-auto min-w-56")}
+            value={periodId}
+            onChange={(e) => setPeriodId(e.target.value)}
           >
-            <Checkbox
-              checked={l.include}
-              onCheckedChange={(v) => patch(l.key, { include: v === true })}
-              aria-label={`Include ${l.name}`}
-            />
-            <Input
-              value={l.name}
-              onChange={(e) => patch(l.key, { name: e.target.value })}
-              className="h-8 min-w-48 flex-1 text-sm"
-              aria-label={`Name, ${l.source}`}
-            />
-            <Input
-              key={`${l.key}-${l.allocatedCents}`}
-              defaultValue={dollars(l.allocatedCents)}
-              inputMode="decimal"
-              onBlur={(e) => {
-                const a = parseAmount(e.target.value);
-                patch(l.key, { allocatedCents: a ? a.cents : null });
-              }}
-              className="h-8 w-32 text-right text-sm tabular-nums"
-              aria-label={`Amount, ${l.source}`}
-            />
-          </li>
-        ))}
-      </ul>
-      {error && (
-        <p role="alert" className="text-destructive text-sm">
-          {error}
-        </p>
-      )}
+            {!active && <option value="">This school year (new)</option>}
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+                {p.isActive ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <ul className="divide-border/70 -mx-2 divide-y">
+          {lines.map((l) => (
+            <li
+              key={l.key}
+              className={cn(
+                "hover:bg-muted/60 rounded-field flex flex-wrap items-center gap-3 px-2 py-2 transition-colors",
+                !l.include && "text-muted-foreground",
+              )}
+            >
+              <Checkbox
+                checked={l.include}
+                onCheckedChange={(v) => patch(l.key, { include: v === true })}
+                aria-label={`Include ${l.name}`}
+              />
+              <Input
+                value={l.name}
+                onChange={(e) => patch(l.key, { name: e.target.value })}
+                className="min-w-48 flex-1"
+                aria-label={`Name, ${l.source}`}
+              />
+              <Input
+                key={`${l.key}-${l.allocatedCents}`}
+                defaultValue={dollars(l.allocatedCents)}
+                inputMode="decimal"
+                onBlur={(e) => {
+                  const a = parseAmount(e.target.value);
+                  patch(l.key, { allocatedCents: a ? a.cents : null });
+                }}
+                className="w-32 text-right tabular-nums"
+                aria-label={`Amount, ${l.source}`}
+              />
+            </li>
+          ))}
+        </ul>
+      </ImportPanel>
+      {error && <ErrorNotice>{error}</ErrorNotice>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onBack} disabled={busy}>
-          <ArrowLeft className="size-4" aria-hidden="true" />
+          <ArrowLeft aria-hidden="true" />
           Back
         </Button>
         <Button type="button" onClick={() => void save()} disabled={busy || chosen.length === 0}>
           {busy ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            <Loader2 className="animate-spin" aria-hidden="true" />
           ) : (
-            <Upload className="size-4" aria-hidden="true" />
+            <Upload aria-hidden="true" />
           )}
           Save {chosen.length} budget line{chosen.length === 1 ? "" : "s"}
         </Button>

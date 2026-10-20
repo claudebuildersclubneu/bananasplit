@@ -34,7 +34,9 @@ function CopyField({ label, value }: { label: string; value: string }) {
     <div className="grid gap-1">
       <span className="text-muted-foreground text-xs">{label}</span>
       <div className="flex items-center gap-2">
-        <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 text-xs">{value}</code>
+        <code className="bg-muted rounded-field min-w-0 flex-1 truncate px-3 py-2 text-xs">
+          {value}
+        </code>
         <Button
           type="button"
           variant="outline"
@@ -125,9 +127,9 @@ export function SyncPanel({
       {show("feed") && feed && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               Website events feed
-              <Badge variant={status.publicEventsEnabled ? "secondary" : "outline"}>
+              <Badge variant={status.publicEventsEnabled ? "success" : "secondary"}>
                 {status.publicEventsEnabled ? "On" : "Off"}
               </Badge>
             </CardTitle>
@@ -156,7 +158,7 @@ export function SyncPanel({
       {show("google") && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               Google Calendar mirror
               <StatusBadge status={google?.status ?? null} />
             </CardTitle>
@@ -229,7 +231,7 @@ export function SyncPanel({
       {show("import") && google && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Import existing Google events</CardTitle>
+            <CardTitle>Import existing Google events</CardTitle>
             <CardDescription>
               Once, after connecting: events already on the public Google Calendar are matched to
               the suite&apos;s events so nothing is duplicated. Run the dry run, check the numbers,

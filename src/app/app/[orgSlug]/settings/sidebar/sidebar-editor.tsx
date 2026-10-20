@@ -24,7 +24,9 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toConfig, type GroupId, type ResolvedGroup, type ResolvedItem } from "@/lib/nav/sidebar";
 import { cn } from "@/lib/utils";
@@ -70,7 +72,9 @@ export function SidebarEditor({
   const dirty = JSON.stringify(toConfig(groups)) !== JSON.stringify(toConfig(initial));
 
   function updateItem(id: string, patch: Partial<ResolvedItem>) {
-    setGroups((gs) => gs.map((g) => ({ ...g, items: g.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) })));
+    setGroups((gs) =>
+      gs.map((g) => ({ ...g, items: g.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) })),
+    );
   }
 
   /** Moves `id` to `group`, in front of `beforeId` (or to the end). */
@@ -85,7 +89,10 @@ export function SidebarEditor({
         const index = at < 0 ? g.items.length : at;
         // Overview stays first.
         const safe = g.items[index]?.locked ? index + 1 : index;
-        return { ...g, items: [...g.items.slice(0, safe), { ...item, group }, ...g.items.slice(safe)] };
+        return {
+          ...g,
+          items: [...g.items.slice(0, safe), { ...item, group }, ...g.items.slice(safe)],
+        };
       });
     });
   }
@@ -110,18 +117,21 @@ export function SidebarEditor({
         setStatus({ ok: false, text: result.error ?? "Couldn't save." });
         return;
       }
-      setStatus({ ok: true, text: config ? "Sidebar saved for everyone." : "Back to the default sidebar." });
+      setStatus({
+        ok: true,
+        text: config ? "Sidebar saved for everyone." : "Back to the default sidebar.",
+      });
       router.refresh();
     });
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_15rem]">
-      <div className="space-y-5">
+    <div className="grid gap-7.5 xl:grid-cols-[minmax(0,1fr)_15rem]">
+      <div className="space-y-4.5">
         {groups.map((group) => (
-          <section
+          <Card
             key={group.id}
-            className="bg-card rounded-xl border"
+            className="gap-2 px-3 py-3"
             onDragOver={(e) => {
               if (dragId) e.preventDefault();
             }}
@@ -132,7 +142,7 @@ export function SidebarEditor({
               setDragId(null);
             }}
           >
-            <header className="flex items-center gap-2 border-b px-4 py-2.5">
+            <header className="flex items-center gap-2 px-2 pt-1">
               <Input
                 value={group.label ?? ""}
                 disabled={!canEdit}
@@ -140,17 +150,23 @@ export function SidebarEditor({
                 maxLength={24}
                 onChange={(e) =>
                   setGroups((gs) =>
-                    gs.map((g) => (g.id === group.id ? { ...g, label: e.target.value || null } : g)),
+                    gs.map((g) =>
+                      g.id === group.id ? { ...g, label: e.target.value || null } : g,
+                    ),
                   )
                 }
                 aria-label="Heading"
-                className="h-8 max-w-56 border-transparent bg-transparent px-1 text-xs font-semibold tracking-wide uppercase shadow-none focus-visible:border-input"
+                className="heading hover:bg-muted/60 h-10 max-w-64 border-transparent bg-transparent px-2 text-[15px] shadow-none"
               />
-              <span className="text-muted-foreground ms-auto text-xs">{group.items.length} sections</span>
+              <Badge variant="secondary" className="ms-auto">
+                {group.items.length} section{group.items.length === 1 ? "" : "s"}
+              </Badge>
             </header>
-            <ul className="divide-y">
+            <ul className="divide-border/70 divide-y">
               {group.items.length === 0 && (
-                <li className="text-muted-foreground px-4 py-3 text-sm">Drag a section here.</li>
+                <li className="rounded-tile hatch bg-muted text-muted-foreground mx-1 px-4 py-3 text-sm">
+                  Drag a section here.
+                </li>
               )}
               {group.items.map((item) => {
                 const Icon = ICONS[item.icon] ?? LayoutDashboard;
@@ -158,8 +174,8 @@ export function SidebarEditor({
                   <li
                     key={item.id}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2",
-                      item.hidden && "bg-muted/40",
+                      "rounded-field flex items-center gap-3 px-2 py-2 transition-colors",
+                      item.hidden ? "bg-muted/40" : "hover:bg-muted/40",
                       dragId === item.id && "opacity-40",
                     )}
                     onDragOver={(e) => {
@@ -174,7 +190,9 @@ export function SidebarEditor({
                     }}
                   >
                     {item.locked ? (
-                      <Lock className="text-muted-foreground size-4 shrink-0" aria-label="Always first" />
+                      <span className="grid size-8 shrink-0 place-items-center">
+                        <Lock className="text-muted-foreground size-4" aria-label="Always first" />
+                      </span>
                     ) : (
                       <span
                         role="button"
@@ -197,12 +215,14 @@ export function SidebarEditor({
                             nudge(item.id, 1);
                           }
                         }}
-                        className="text-muted-foreground hover:text-foreground cursor-grab rounded p-0.5 active:cursor-grabbing"
+                        className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:outline-foreground grid size-8 shrink-0 cursor-grab place-items-center rounded-full outline-none focus-visible:outline-2 active:cursor-grabbing"
                       >
                         <GripVertical className="size-4" aria-hidden="true" />
                       </span>
                     )}
-                    <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                    <span className="bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1">
+                      <Icon className="size-[18px]" aria-hidden="true" />
+                    </span>
                     <div className="min-w-0 flex-1">
                       <Input
                         value={item.label}
@@ -210,15 +230,16 @@ export function SidebarEditor({
                         maxLength={24}
                         onChange={(e) => updateItem(item.id, { label: e.target.value })}
                         onBlur={(e) => {
-                          if (!e.target.value.trim()) updateItem(item.id, { label: item.defaultLabel });
+                          if (!e.target.value.trim())
+                            updateItem(item.id, { label: item.defaultLabel });
                         }}
                         aria-label={`Name of ${item.defaultLabel}`}
                         className={cn(
-                          "h-8 border-transparent bg-transparent px-1 font-medium shadow-none focus-visible:border-input",
+                          "hover:bg-muted/60 h-8 border-transparent bg-transparent px-2 font-semibold shadow-none",
                           item.hidden && "text-muted-foreground line-through",
                         )}
                       />
-                      <p className="text-muted-foreground truncate px-1 text-xs">
+                      <p className="text-muted-foreground truncate px-2 text-[13px]">
                         {item.label !== item.defaultLabel ? `${item.defaultLabel} · ` : ""}
                         {item.description}
                       </p>
@@ -244,17 +265,26 @@ export function SidebarEditor({
                 );
               })}
             </ul>
-          </section>
+          </Card>
         ))}
 
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" disabled={pending || !dirty} onClick={() => save(toConfig(groups))}>
+            <Button
+              type="button"
+              disabled={pending || !dirty}
+              onClick={() => save(toConfig(groups))}
+            >
               {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
               Save for everyone
             </Button>
             {dirty && (
-              <Button type="button" variant="ghost" disabled={pending} onClick={() => setGroups(initial)}>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => setGroups(initial)}
+              >
                 Discard changes
               </Button>
             )}
@@ -265,7 +295,10 @@ export function SidebarEditor({
               </Button>
             )}
             {status && (
-              <span role="status" className={cn("text-sm", status.ok ? "text-muted-foreground" : "text-destructive")}>
+              <span
+                role="status"
+                className={cn("text-sm", status.ok ? "text-success" : "text-destructive")}
+              >
                 {status.text}
               </span>
             )}
@@ -274,23 +307,26 @@ export function SidebarEditor({
       </div>
 
       <aside className="max-w-xs space-y-2 xl:sticky xl:top-20 xl:max-w-none xl:self-start">
-        <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Preview</p>
-        <div className="bg-sidebar text-sidebar-foreground space-y-3 rounded-xl border p-3">
+        <p className="eyebrow text-muted-foreground px-1">Preview</p>
+        <div className="bg-sidebar text-sidebar-foreground ring-foreground/6 edge rounded-card space-y-3 p-3 ring-1">
           {groups
             .map((g) => ({ ...g, items: g.items.filter((i) => !i.hidden) }))
             .filter((g) => g.items.length > 0)
             .map((g) => (
               <div key={g.id} className="space-y-0.5">
                 {g.label && (
-                  <p className="text-sidebar-foreground/50 px-2 pb-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                  <p className="text-sidebar-foreground/60 px-2.5 pb-0.5 text-xs font-medium">
                     {g.label}
                   </p>
                 )}
                 {g.items.map((i) => {
                   const Icon = ICONS[i.icon] ?? LayoutDashboard;
                   return (
-                    <p key={i.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm">
-                      <Icon className="size-3.5" aria-hidden="true" />
+                    <p
+                      key={i.id}
+                      className="rounded-field flex items-center gap-2.5 px-2.5 py-1.5 text-sm"
+                    >
+                      <Icon className="size-4" aria-hidden="true" />
                       {i.label || i.defaultLabel}
                     </p>
                   );
@@ -298,7 +334,7 @@ export function SidebarEditor({
               </div>
             ))}
         </div>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground px-1 text-[13px]">
           Hiding a section tidies the app for members; it doesn&apos;t delete anything. Owners and
           admins can still open it.
         </p>

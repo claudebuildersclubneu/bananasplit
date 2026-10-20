@@ -194,7 +194,11 @@ export interface DashboardData {
   sponsorshipReceivedCents: number;
   /** The value of credit sponsorships committed, invoiced or received: never on the ledger. */
   sponsorshipCreditsCents: number;
-  burnByMonth: { month: string; inCents: number; outCents: number }[];
+  /**
+   * Money in and out per month. `pendingCents` is the part of `outCents`
+   * still waiting to be paid back (expenses submitted or approved).
+   */
+  burnByMonth: { month: string; inCents: number; outCents: number; pendingCents: number }[];
   unreconciledOver60DaysCount: number;
   runway: Runway | null;
   /** Money in and out this period (the ledger: what counts toward the balance). */
@@ -341,12 +345,20 @@ export async function getDashboardData(
     spentCents: spentByCategory.get(c.id) ?? 0,
   }));
 
-  const burnMap = new Map<string, { inCents: number; outCents: number }>();
+  const burnMap = new Map<string, { inCents: number; outCents: number; pendingCents: number }>();
   for (const t of ledger) {
     const month = t.occurredAt.toISOString().slice(0, 7);
-    const entry = burnMap.get(month) ?? { inCents: 0, outCents: 0 };
+    const entry = burnMap.get(month) ?? { inCents: 0, outCents: 0, pendingCents: 0 };
     if (t.direction === TransactionDirection.IN) entry.inCents += t.amountCents;
-    else entry.outCents += t.amountCents;
+    else {
+      entry.outCents += t.amountCents;
+      if (
+        t.kind === TransactionKind.EXPENSE &&
+        (t.status === TransactionStatus.SUBMITTED || t.status === TransactionStatus.APPROVED)
+      ) {
+        entry.pendingCents += t.amountCents;
+      }
+    }
     burnMap.set(month, entry);
   }
   const burnByMonth = [...burnMap.entries()]
@@ -381,7 +393,8 @@ export async function getDashboardData(
   for (const t of spending) kindTotals.set(t.kind, (kindTotals.get(t.kind) ?? 0) + t.amountCents);
   const incomeTotals = new Map<TransactionKind, number>();
   for (const t of ledger) {
-    if (t.direction === TransactionDirection.IN) incomeTotals.set(t.kind, (incomeTotals.get(t.kind) ?? 0) + t.amountCents);
+    if (t.direction === TransactionDirection.IN)
+      incomeTotals.set(t.kind, (incomeTotals.get(t.kind) ?? 0) + t.amountCents);
   }
   const queue = allTransactions
     .filter(
@@ -458,6 +471,18 @@ export async function getDashboardData(
       occurredAt: t.occurredAt,
     })),
   };
+}
+
+/** Expense requests submitted and waiting for an owner or treasurer to approve them. */
+export function countAwaitingApproval(db: TxClient, organizationId: string): Promise<number> {
+  return db.transaction.count({
+    where: {
+      organizationId,
+      kind: TransactionKind.EXPENSE,
+      status: TransactionStatus.SUBMITTED,
+      voidedAt: null,
+    },
+  });
 }
 
 export async function getMoneyOwedToUser(

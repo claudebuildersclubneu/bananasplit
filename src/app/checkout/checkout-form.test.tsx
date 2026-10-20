@@ -27,7 +27,7 @@ afterEach(() => {
 describe("CheckoutForm", () => {
   it("prices the seats and never goes below one member", () => {
     render(<CheckoutForm {...props} />);
-    expect(screen.getByRole("heading", { name: "Subscribe to Society" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Subscribe to Team Advanced" })).toBeTruthy();
     expect(screen.getAllByText("$14.00")).toHaveLength(4);
 
     fireEvent.click(screen.getByRole("button", { name: "More members" }));
@@ -38,10 +38,23 @@ describe("CheckoutForm", () => {
     expect(screen.getAllByText("$7.00")).toHaveLength(4);
   });
 
-  it("prices the Club plan at $4 a member, with thousands separators", () => {
+  it("prices Team (?plan=club) at $4 a member, with thousands separators", () => {
     render(<CheckoutForm {...props} plan="club" initialMembers={300} />);
-    expect(screen.getByText("Club plan · Robotics Club")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Subscribe to Team" })).toBeTruthy();
+    expect(screen.getByText("Team · Robotics Club")).toBeTruthy();
     expect(screen.getAllByText("$1,200.00")).toHaveLength(4);
+  });
+
+  it("sells Personal Plus yearly by default, or monthly, with no seats", () => {
+    render(<CheckoutForm {...props} plan="plus" />);
+    expect(screen.getByRole("heading", { name: "Subscribe to Personal Plus" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "More members" })).toBeNull();
+    expect(screen.getAllByText("$36.00")).toHaveLength(3);
+    expect(screen.getByText(/Yearly saves \$12\.00/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Monthly" }));
+    expect(screen.getAllByText("$4.00")).toHaveLength(3);
+    expect(screen.queryByText("$36.00")).toBeNull();
   });
 
   it("does not submit: Subscribe says card payments aren't connected", () => {

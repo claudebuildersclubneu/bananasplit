@@ -1,12 +1,13 @@
 import { Info } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCents } from "@/lib/finance/money";
 import { formatFinanceDate, type Runway } from "@/lib/finance/stats";
+import { cn } from "@/lib/utils";
 
 import { RunwayStatusLabel } from "./runway-status";
 
+/** One runway figure: an inset tile with a plain label, the figure, and what it counts. */
 export function StatCard({
   title,
   value,
@@ -19,16 +20,16 @@ export function StatCard({
   children?: ReactNode;
 }) {
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="font-sans text-sm font-medium">{title}</CardTitle>
-        <CardDescription className="text-foreground text-2xl font-semibold tabular-nums">
-          {value}
-        </CardDescription>
-        {children}
-      </CardHeader>
-    </Card>
+    <div className={cn("bg-muted/50 rounded-tile min-w-0 space-y-1.5 p-4", className)}>
+      <p className="text-muted-foreground text-[13px]">{title}</p>
+      <div className="numeral text-[26px]">{value}</div>
+      {children}
+    </div>
   );
+}
+
+function Detail({ children }: { children: ReactNode }) {
+  return <p className="text-muted-foreground text-[13px] leading-snug">{children}</p>;
 }
 
 function plural(count: number, noun: string): string {
@@ -77,27 +78,25 @@ export function RunwaySection({
 
   return (
     <section aria-labelledby="runway-heading" className="space-y-3">
-      <h2 id="runway-heading" className={hideHeading ? "sr-only" : "text-sm font-medium"}>
+      <h2 id="runway-heading" className={hideHeading ? "sr-only" : "heading text-[17px]"}>
         Runway
       </h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-sans text-sm font-medium">When the money runs out</CardTitle>
-            <RunwayStatusLabel runway={runway} periodEndsOn={period.endsOn} className="text-base" />
-            <CardDescription>{detail}</CardDescription>
-            {withExpected && <CardDescription>{withExpected}</CardDescription>}
-          </CardHeader>
-        </Card>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-muted/50 rounded-tile min-w-0 space-y-1.5 p-4">
+          <p className="text-muted-foreground text-[13px]">When the money runs out</p>
+          <RunwayStatusLabel runway={runway} periodEndsOn={period.endsOn} className="text-base" />
+          <Detail>{detail}</Detail>
+          {withExpected && <Detail>{withExpected}</Detail>}
+        </div>
         <StatCard
           title="Projected at period end"
           value={formatCents(runway.projectedEndBalanceCents)}
         >
-          <CardDescription>
+          <Detail>
             {runway.daysLeftInPeriod > 0
               ? `${plural(runway.daysLeftInPeriod, "day")} left, through ${periodEnd}`
               : `${period.label} ended ${periodEnd}`}
-          </CardDescription>
+          </Detail>
         </StatCard>
         <StatCard
           title="Average spend per meeting"
@@ -107,24 +106,24 @@ export function RunwaySection({
               : formatCents(runway.avgSpendPerMeetingCents)
           }
         >
-          <CardDescription>
+          <Detail>
             {runway.meetingsHeld > 0
               ? `${formatCents(runway.spentCents)} over ${plural(runway.meetingsHeld, "meeting")} held`
               : "No meetings held yet this period"}
-          </CardDescription>
+          </Detail>
         </StatCard>
         <StatCard title="Meetings still scheduled" value={runway.meetingsScheduled}>
-          <CardDescription>
+          <Detail>
             {runway.meetingsScheduled === 0
               ? "None left on this period's calendar"
               : runway.projectedMeetingCostCents === null
                 ? "No average to project from yet"
                 : `About ${formatCents(runway.projectedMeetingCostCents)} at the current average`}
-          </CardDescription>
+          </Detail>
         </StatCard>
       </div>
       {runway.limitedHistory && (
-        <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <p className="text-muted-foreground bg-muted/50 rounded-tile flex items-center gap-2 px-3 py-2 text-[13px]">
           <Info className="size-4 shrink-0" aria-hidden="true" />
           Only {plural(runway.burnWindowDays, "day")} of history so far: treat the projection as
           rough.

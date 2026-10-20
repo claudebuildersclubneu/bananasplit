@@ -1,6 +1,17 @@
 "use client";
 
-import { Check, Copy, ExternalLink, Printer, PowerOff, ScanLine, Ticket } from "lucide-react";
+import {
+  Banknote,
+  Check,
+  Copy,
+  ExternalLink,
+  Hourglass,
+  Printer,
+  PowerOff,
+  ScanLine,
+  Ticket,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -12,12 +23,16 @@ import {
 import { BackLink } from "@/components/back-link";
 import { ItemMenu } from "@/components/item-menu";
 import { PageHeader } from "@/components/page-header";
+import { BlockCard } from "@/components/ui/block-card";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Gauge } from "@/components/ui/meters";
 import { Segmented } from "@/components/ui/segmented";
+import { IconChip, Stat, StatStrip } from "@/components/ui/stat";
 import { toast } from "@/components/ui/toaster";
 import type { RsvpCover } from "@/lib/rsvp/cover";
 import { formatCents } from "@/lib/rsvp/pay";
+import { cn } from "@/lib/utils";
 
 import type { BringLine } from "./bring-list-editor";
 import { PagePreview } from "./page-preview";
@@ -118,13 +133,13 @@ export function RsvpManager(props: RsvpManagerProps) {
       actions={
         page.enabled && page.url ? (
           <>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" asChild>
               <Link href={links.door}>
                 <ScanLine aria-hidden="true" />
                 Check in guests
               </Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" asChild>
               <a href={page.url} target="_blank" rel="noopener noreferrer">
                 <ExternalLink aria-hidden="true" />
                 Open page
@@ -154,19 +169,17 @@ export function RsvpManager(props: RsvpManagerProps) {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-7">
       {confirmEl}
       <BackLink href={links.back.href} label={links.back.label} />
       {header}
 
       {!page.enabled && (
-        <section className="bg-card overflow-hidden rounded-xl border">
+        <section className="bg-card text-card-foreground ring-foreground/6 edge rounded-card overflow-hidden ring-1">
           <div className="grid gap-6 p-6 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
             <div className="space-y-3">
-              <span className="bg-primary/10 text-primary inline-flex size-9 items-center justify-center rounded-lg">
-                <Ticket className="size-5" aria-hidden="true" />
-              </span>
-              <h2 className="heading text-xl">
+              <IconChip icon={Ticket} size="md" />
+              <h2 className="display-title text-[23px]">
                 {page.url ? "This RSVP page is off" : "Let anyone sign up with a link"}
               </h2>
               <p className="text-muted-foreground max-w-prose text-sm leading-relaxed">
@@ -193,15 +206,13 @@ export function RsvpManager(props: RsvpManagerProps) {
       )}
 
       {page.enabled && page.url && (
-        <div className="bg-card flex flex-wrap items-center gap-3 rounded-xl border p-3">
-          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Link
-          </span>
+        <div className="bg-card text-card-foreground ring-foreground/6 edge flex flex-wrap items-center gap-3 rounded-full py-1.5 ps-5 pe-1.5 ring-1">
+          <span className="text-muted-foreground text-[13px] font-medium">Link</span>
           <a
             href={page.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="min-w-0 flex-1 truncate font-mono text-sm hover:underline"
+            className="min-w-0 flex-1 truncate text-[15px] font-medium underline-offset-4 hover:underline"
           >
             {page.url.replace(/^https?:\/\//, "")}
           </a>
@@ -214,42 +225,60 @@ export function RsvpManager(props: RsvpManagerProps) {
 
       {(page.enabled || guests.length > 0) && (
         <>
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat
-              label="Going"
-              value={going.length}
-              detail={capacity ? `of ${capacity} spots` : "No limit"}
-            />
-            <Stat
-              label="Waitlist"
-              value={waiting}
-              detail={page.settings.waitlist ? "First in line moves up" : "Waitlist off"}
-            />
-            {props.owes !== null ? (
-              <Stat
-                label="Collected"
-                value={formatCents(collected)}
-                detail={`${paidCount} of ${going.length} paid · ${formatCents(props.owes)} each`}
-              />
-            ) : (
-              <Stat
-                label="Spots left"
-                value={capacity ? Math.max(0, capacity - going.length) : "∞"}
-                detail={
+          <div
+            className={cn(
+              "grid gap-[18px]",
+              capacity && "md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-center",
+            )}
+          >
+            {capacity ? (
+              <BlockCard
+                tone="goal"
+                kicker={
                   page.settings.closed
                     ? "Sign-ups closed"
                     : event.ended
                       ? "Event ended"
                       : "Taking sign-ups"
                 }
+                title={going.length >= capacity ? "Full" : "Spots taken"}
+                figure={`${going.length} of ${capacity}`}
+                figureLabel={
+                  going.length >= capacity
+                    ? page.settings.waitlist
+                      ? "New sign-ups join the waitlist"
+                      : "Registration is closed"
+                    : `${capacity - going.length} ${capacity - going.length === 1 ? "spot" : "spots"} left`
+                }
+                aside={<Gauge value={(going.length / capacity) * 100} size={132} />}
+                className="min-h-0"
               />
-            )}
-            <Stat
-              label="Checked in"
-              value={checkedIn}
-              detail={going.length ? `of ${going.length} going` : "At the door"}
-            />
-          </dl>
+            ) : null}
+            <StatStrip className={cn(capacity && "md:pl-4")}>
+              <Stat
+                icon={Users}
+                value={going.length}
+                label={capacity ? "Going" : "Going · no limit"}
+              />
+              <Stat
+                icon={Hourglass}
+                value={waiting}
+                label={page.settings.waitlist ? "On the waitlist" : "Waitlist off"}
+              />
+              {props.owes !== null && (
+                <Stat
+                  icon={Banknote}
+                  value={formatCents(collected)}
+                  label={`${paidCount} of ${going.length} paid · ${formatCents(props.owes)} each`}
+                />
+              )}
+              <Stat
+                icon={ScanLine}
+                value={checkedIn}
+                label={going.length ? `Checked in of ${going.length}` : "Checked in"}
+              />
+            </StatStrip>
+          </div>
 
           <Segmented
             label="RSVP page sections"
@@ -290,16 +319,6 @@ export function RsvpManager(props: RsvpManagerProps) {
           )}
         </>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value, detail }: { label: string; value: number | string; detail: string }) {
-  return (
-    <div className="bg-card rounded-xl border p-4">
-      <dt className="text-muted-foreground text-xs font-medium">{label}</dt>
-      <dd className="heading mt-1 text-2xl tabular-nums">{value}</dd>
-      <dd className="text-muted-foreground mt-0.5 text-xs">{detail}</dd>
     </div>
   );
 }

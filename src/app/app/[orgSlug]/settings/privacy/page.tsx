@@ -1,9 +1,20 @@
+import { Database } from "lucide-react";
+
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 import { can } from "@/lib/auth/permissions";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { planGate } from "@/server/billing/plan-gate";
 
+import { SettingsCard } from "../settings-card";
 import { SettingsNoAccess } from "../settings-no-access";
 import { BallotVisibilityForm, DatabaseVisibilityRow, PrivacyForm } from "./privacy-forms";
+
+const VOTE_SUMMARY: Record<string, string> = {
+  OWNER_ONLY: "votes visible to owners",
+  OWNER_AND_ADMINS: "votes visible to owners and admins",
+  NOBODY: "votes visible to nobody",
+};
 
 /**
  * Settings > Privacy (OWNER/ADMIN): ballot privacy, member and contact
@@ -40,21 +51,33 @@ export default async function PrivacySettingsPage({
     }),
   }));
 
-  return (
-    <div className="max-w-3xl space-y-8">
-      <h1 className="page-title">Privacy</h1>
+  const votes = VOTE_SUMMARY[settings.ballotIndividualVisibility] ?? "votes private";
+  const hidden = databases.filter((d) => d.memberVisibility === "HIDDEN").length;
+  const summary = [
+    votes,
+    settings.showMemberEmailsToMembers ? "member emails shown" : "member emails hidden",
+    settings.publicEventsEnabled ? "public feed on" : "public feed off",
+    databases.length > 0
+      ? `${hidden} of ${databases.length} database${databases.length === 1 ? "" : "s"} hidden`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Ballots</h2>
+  return (
+    <div className="max-w-3xl space-y-7.5">
+      <PageHeader
+        title="Privacy"
+        description={summary.charAt(0).toUpperCase() + summary.slice(1)}
+      />
+
+      <div className="space-y-4.5">
         <BallotVisibilityForm
           orgId={organization.id}
           value={settings.ballotIndividualVisibility}
           canEdit={can({ role }, "privacy.ballots")}
         />
-      </section>
 
-      <section className="space-y-3">
-        <h2 className="font-medium">Members, contacts and the public feed</h2>
         <PrivacyForm
           orgId={organization.id}
           canEdit
@@ -66,33 +89,35 @@ export default async function PrivacySettingsPage({
             contactEmailVisibility: settings.contactEmailVisibility,
           }}
         />
-      </section>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="font-medium">Databases</h2>
-          <p className="text-muted-foreground text-sm">
-            Who can browse each database. &ldquo;Hidden&rdquo; removes it from the members&apos;
-            list; owners and admins can always open it to manage it.
-          </p>
-        </div>
-        {databases.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No databases yet.</p>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {databases.map((d) => (
-              <DatabaseVisibilityRow
-                key={d.id}
-                orgId={organization.id}
-                id={d.id}
-                name={d.name}
-                value={d.memberVisibility}
-                canEdit
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+        <SettingsCard
+          title="Databases"
+          description="Who can browse each database. “Hidden” removes it from the members' list; owners and admins can always open it to manage it. Changes save as you pick."
+        >
+          {databases.length === 0 ? (
+            <EmptyState
+              size="compact"
+              icon={Database}
+              title="No databases yet."
+              description="Databases you add show here, each with who can browse it."
+              className="py-0"
+            />
+          ) : (
+            <ul className="divide-border/70 divide-y">
+              {databases.map((d) => (
+                <DatabaseVisibilityRow
+                  key={d.id}
+                  orgId={organization.id}
+                  id={d.id}
+                  name={d.name}
+                  value={d.memberVisibility}
+                  canEdit
+                />
+              ))}
+            </ul>
+          )}
+        </SettingsCard>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,25 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+import { StepPills } from "./step-pills";
+import { fileInputClass, notice } from "./styles";
+import { TableFrame } from "./table-frame";
 
 interface PreviewResult {
   total?: number;
@@ -14,11 +30,28 @@ interface PreviewResult {
   error?: string;
 }
 
+const STEPS = ["Choose a file", "Preview", "Import"] as const;
+
+/** A CSV column name as a header: "checked_in_at" reads "Checked in at". */
+function columnLabel(key: string): string {
+  const words = key.replace(/_/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /**
  * Upload a CSV, preview it (nothing saved), then import it. The file is sent
- * twice (preview, then commit) and never stored on the server.
+ * twice (preview, then commit) and never stored on the server. The steps
+ * show as pills; the card's one primary action is the next step.
  */
-export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; backHref: string }) {
+export function CsvImportForm({
+  uploadUrl,
+  backHref,
+  backLabel = "the table",
+}: {
+  uploadUrl: string;
+  backHref: string;
+  backLabel?: string;
+}) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -42,92 +75,119 @@ export function CsvImportForm({ uploadUrl, backHref }: { uploadUrl: string; back
     }
   };
 
+  const ready = Boolean(
+    preview && !preview.committed && !preview.error && (preview.valid ?? 0) > 0,
+  );
+  const step = preview?.committed ? STEPS.length : ready ? 2 : file ? 1 : 0;
   const columns = preview?.sample?.[0] ? Object.keys(preview.sample[0]) : [];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          aria-label="CSV file"
-          onChange={(e) => {
-            setFile(e.target.files?.[0] ?? null);
-            setPreview(null);
-          }}
-          className="file:border-border file:bg-background hover:file:bg-muted text-sm file:mr-3 file:h-7 file:cursor-pointer file:rounded-lg file:border file:px-2.5 file:text-[0.8rem] file:font-medium"
-        />
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!file || busy}
-          onClick={() => send("preview")}
-        >
-          Preview
-        </Button>
-        {preview && !preview.committed && !preview.error && (preview.valid ?? 0) > 0 && (
-          <Button size="sm" disabled={busy} onClick={() => send("commit")}>
-            Import {preview.valid} rows
+    <Card>
+      <CardContent className="space-y-5">
+        <StepPills steps={STEPS} current={step} label="Import steps" />
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="csv-file">CSV file</Label>
+          <input
+            id="csv-file"
+            type="file"
+            accept=".csv,text/csv"
+            aria-label="CSV file"
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setPreview(null);
+            }}
+            className={fileInputClass}
+          />
+        </div>
+
+        {preview?.error && (
+          <p role="alert" className={notice.error}>
+            {preview.error}
+          </p>
+        )}
+        {preview?.committed && (
+          <p role="status" className={notice.success}>
+            Imported {preview.committed.created} rows ({preview.committed.skipped} skipped as
+            duplicates or problems).
+          </p>
+        )}
+        {preview && !preview.committed && !preview.error && (
+          <p className="text-sm tabular-nums" role="status">
+            <span className="font-semibold">{preview.valid ?? 0}</span> of {preview.total ?? 0} rows
+            are ready to import.
+          </p>
+        )}
+        {preview?.issues && preview.issues.length > 0 && (
+          <div className="bg-muted/60 rounded-tile space-y-1.5 p-4 text-sm">
+            <p className="flex items-center gap-2 font-semibold">
+              <CircleAlert className="text-warning size-4 shrink-0" aria-hidden="true" />
+              Rows that will be skipped
+            </p>
+            <ul className="text-muted-foreground max-h-48 list-disc space-y-0.5 overflow-y-auto pl-9 text-[13px]">
+              {preview.issues.map((i) => (
+                <li key={`${i.line}-${i.message}`}>
+                  Line {i.line}: {i.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {columns.length > 0 && !preview?.committed && (
+          <TableFrame bare maxHeight="24rem">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {columns.map((c) => (
+                    <TableHead
+                      key={c}
+                      className={c === "line" ? "text-right tabular-nums" : undefined}
+                    >
+                      {columnLabel(c)}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {preview?.sample?.map((row) => (
+                  <TableRow key={String(row.line)}>
+                    {columns.map((c) => (
+                      <TableCell
+                        key={c}
+                        className={
+                          typeof row[c] === "number" ? "text-right tabular-nums" : undefined
+                        }
+                      >
+                        {String(row[c] ?? "")}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableFrame>
+        )}
+      </CardContent>
+      <CardFooter className="flex-wrap justify-end gap-2">
+        {preview?.committed ? (
+          <Button asChild>
+            <Link href={backHref}>Back to {backLabel}</Link>
+          </Button>
+        ) : ready ? (
+          <>
+            <Button variant="outline" disabled={!file || busy} onClick={() => send("preview")}>
+              Preview again
+            </Button>
+            <Button disabled={busy} onClick={() => send("commit")}>
+              {busy ? "Importing…" : `Import ${preview?.valid} rows`}
+            </Button>
+          </>
+        ) : (
+          <Button disabled={!file || busy} onClick={() => send("preview")}>
+            {busy ? "Reading…" : "Preview"}
           </Button>
         )}
-      </div>
-
-      {preview?.error && (
-        <p role="alert" className="text-destructive text-sm">
-          {preview.error}
-        </p>
-      )}
-      {preview?.committed && (
-        <p className="text-success text-sm">
-          Imported {preview.committed.created} rows ({preview.committed.skipped} skipped as
-          duplicates or problems).{" "}
-          <a className="underline underline-offset-2" href={backHref}>
-            Back to the table
-          </a>
-        </p>
-      )}
-      {preview && !preview.committed && !preview.error && (
-        <p className="text-sm">
-          {preview.valid ?? 0} of {preview.total ?? 0} rows are ready to import.
-        </p>
-      )}
-      {preview?.issues && preview.issues.length > 0 && (
-        <div className="border-warning/40 bg-warning/10 rounded-xl border p-3 text-sm">
-          <p className="font-medium">Rows that will be skipped</p>
-          <ul className="mt-1 max-h-48 list-disc overflow-y-auto pl-5 text-xs">
-            {preview.issues.map((i) => (
-              <li key={`${i.line}-${i.message}`}>
-                Line {i.line}: {i.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {columns.length > 0 && !preview?.committed && (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-left">
-              <tr>
-                {columns.map((c) => (
-                  <th key={c} className="px-2 py-1 font-medium capitalize">
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {preview?.sample?.map((row) => (
-                <tr key={String(row.line)} className="border-t">
-                  {columns.map((c) => (
-                    <td key={c} className="px-2 py-1">
-                      {String(row[c] ?? "")}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

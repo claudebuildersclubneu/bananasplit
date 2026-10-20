@@ -42,7 +42,7 @@ export function DisconnectButton({
 
   if (!canRemove && !isGoogle) {
     return (
-      <span className="text-muted-foreground self-center text-xs">
+      <span className="text-muted-foreground self-center text-[13px]">
         Only an owner can remove this.
       </span>
     );
@@ -81,7 +81,7 @@ export function DisconnectButton({
                 })
               }
             >
-              {isPending ? "Disconnecting…" : "Disconnect"}
+              {isPending ? "Disconnecting…" : `Disconnect ${setupStep(step).title}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -89,7 +89,7 @@ export function DisconnectButton({
       {result ? (
         <p
           role="status"
-          className={result.ok ? "text-muted-foreground text-xs" : "text-destructive text-xs"}
+          className={result.ok ? "text-success text-[13px]" : "text-destructive text-[13px]"}
         >
           {result.ok ? (result.message ?? "Disconnected.") : result.error}
         </p>

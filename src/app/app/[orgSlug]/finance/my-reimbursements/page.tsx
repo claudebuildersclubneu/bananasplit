@@ -1,3 +1,4 @@
+import { ReimbursementStats } from "@/components/finance/reimbursement-stats";
 import { TransactionTable } from "@/components/finance/transaction-table";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
@@ -33,19 +34,23 @@ export default async function MyReimbursementsPage({
     },
   ).catch(handleAuthErrorInPage);
 
+  const pending = transactions.filter(
+    (t) => !t.voidedAt && (t.status === "SUBMITTED" || t.status === "APPROVED"),
+  ).length;
+
   // Request a reimbursement is the Finance header's button on this page.
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {!isFinance && <FinanceAccessGate orgId={org.id} orgSlug={orgSlug} role={role} compact />}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="rounded-xl border px-4 py-2.5">
-          <p className="text-muted-foreground text-xs">Money owed to you</p>
-          <p className="text-xl font-semibold tabular-nums">{formatCents(owedCents)}</p>
-        </div>
-        <p className="text-muted-foreground max-w-xs text-sm">
-          Your own expense submissions and their reimbursement status.
-        </p>
-      </div>
+      <ReimbursementStats
+        owed={formatCents(owedCents)}
+        requests={transactions.length}
+        waiting={pending}
+      />
+      <p className="text-muted-foreground -mt-2 max-w-prose text-sm">
+        Your own expense submissions and where each one is: hatched while it waits for approval or
+        payment, green once you&apos;re paid back.
+      </p>
       <TransactionTable
         orgId={org.id}
         transactions={transactions}

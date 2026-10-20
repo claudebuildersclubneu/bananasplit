@@ -47,12 +47,12 @@ export function ContactSearch({
         className="sm:w-full"
       />
       {q.trim().length >= 2 && results.length > 0 && (
-        <ul className="max-h-48 overflow-y-auto rounded-lg border p-1 text-sm">
+        <ul className="bg-popover ring-foreground/6 rounded-tile shadow-e2 max-h-48 overflow-y-auto p-1.5 text-sm ring-1">
           {results.map((c) => (
             <li key={c.id}>
               <button
                 type="button"
-                className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left"
+                className="hover:bg-muted rounded-field flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left"
                 onClick={() => {
                   onPick(c);
                   setQ("");

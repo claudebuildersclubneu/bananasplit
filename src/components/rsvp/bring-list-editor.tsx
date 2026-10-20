@@ -120,7 +120,7 @@ export function BringListEditor({
               key={idea}
               type="button"
               onClick={() => setLines((prev) => [...prev, { label: idea, slots: 1 }])}
-              className="bg-muted hover:bg-muted/70 rounded-md px-2 py-1 text-xs font-medium"
+              className="bg-muted hover:bg-muted-strong rounded-full px-2.5 py-1 text-xs font-medium"
             >
               + {idea}
             </button>

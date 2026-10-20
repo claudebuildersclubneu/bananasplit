@@ -172,34 +172,54 @@ previews on Settings > Theme included. No grain on the page.
 
 ## Bananasplit's own pages (developers)
 
-The home page, sign-in, sign-up, password help, joining a club, checkout,
-onboarding, email confirmation and the 404 page follow the design handoff, not
-an org theme. They mount `BrandRoot` (`src/components/brand/brand-root.tsx`):
-always light, the brand faces (Young Serif, Hanken Grotesk, JetBrains Mono,
-loaded only there) and the fixed palette in `src/app/brand.css` as Tailwind
-colours (`bg-ink`, `text-ink-muted`, `bg-banana`, `border-ink/10` ...), with
-shadows (`shadow-card`, `shadow-frame` ...) and gradients (`bg-peel`,
-`bg-hero` ...) as utilities. `.brand` also points the app tokens at the
-palette, so shared components inside (Input, Switch, Checkbox) print in ink on
-cream. Type sizes there are plain pixels (`text-[14px]`): Tailwind's
-`text-sm` and friends also set a line height, and the design uses the
-browser's `normal`.
+The home page, sign-in, sign-up, password help, email confirmation, checkout
+and the 404 page belong to no club, so they never take an org theme. They
+mount `BrandRoot` (`src/components/brand/brand-root.tsx`), which since the
+Moonstone redesign uses the app's own tokens as they are (globals.css): the
+same Moonstone colours, type and components as the app, **dark by default**
+(redesign guide 17). A visitor's stored choice wins (the footer's Light / Dark
+/ System switch, `src/components/brand/theme-switch.tsx`, stores the same
+choice as the user menu in the app), and "System" follows the device.
+`BrandRoot` also puts `.corona` (the drifting banana glow) on its box.
+
+`src/app/brand.css` adds only what these pages need on top of the tokens:
+the logo's fixed colours (`--color-logo-*`, plus `logo-lockup`: ink type on
+light, the dark lockup's cream on dark), glow utilities built from tokens
+(`hero-light` behind the hero, `glow-corner` and `glow-rise` on panels,
+`glow-text`), and the `focus-banana` field ring (a text-colour border and a
+glow halo). Pages here build from Moonstone pieces: cards (`bg-card edge`),
+block colours, the glass-light header, 40px fields (`brandInputClass`) and
+pill buttons (`pill()`: `ink` is the primary, `glow` the one create action,
+`outline`).
+
+The older cream-and-banana palette stays in brand.css as Tailwind colours
+(`bg-ink`, `bg-cream`, `bg-banana` ...) for the pages that still use it (the
+public RSVP pages, onboarding, the theme preview). `<BrandRoot look="cream">`
+gives a page that look whole: always light, with the tokens pointed at the
+cream palette, so token-based components (the pill buttons, the brand
+fields, Input) print in ink on cream.
+
+Emails (`src/server/email/templates.ts`) can't read CSS variables, so the
+layout spells out Moonstone's light palette (`EMAIL_COLORS`): a white card on
+a soft grey page, ink text and an ink pill, with the standard lockup on top
+(`public/brand/bananasplit-logo.png`, the SVG rendered as is, since Gmail
+and Outlook don't show SVG images).
 
 ## Converted colours
 
 The sites that other sections left hard-coded now use tokens:
 
-| Was                                                          | Now                                                        | Where                                                                    |
-| ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Was                                                          | Now                                                        | Where                                                                                                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `border-amber-500/40 bg-amber-500/10` callouts               | `border-warning/40 bg-warning/10`                          | databases definitions, org-chart import, calendar detail and form, profile feed, CSV import, data table, detail panels, position editor |
-| `text-amber-600`, `text-amber-700 dark:text-amber-400`       | `text-warning`                                             | the same callouts, member picker, prompts, task editor, due label        |
-| `bg-amber-100 ... dark:bg-amber-900/40` flag badge           | `bg-warning/15 text-warning`                               | `tasks/task-badges.tsx`                                                  |
-| `text-emerald-600`, `text-emerald-700 dark:text-emerald-300` | `text-success`                                             | finance transactions, org-chart draft editor, databases cell and forms   |
-| `bg-emerald-500`, `bg-amber-500`, `bg-rose-500` poll brushes | `bg-success`, `bg-warning`, `bg-destructive`               | `calendar/poll-responder.tsx`                                            |
-| `rgba(16, 185, 129, a)` heat map                             | `color-mix(in oklab, var(--success) N%, transparent)`      | `calendar/poll-responder.tsx`                                            |
-| `bg-red-500` / `bg-amber-400` / `bg-slate-300` priority dots | `bg-destructive` / `bg-warning` / `bg-muted-foreground/40` | `tasks/task-badges.tsx`                                                  |
-| `bg-amber-500` outline warning dot                           | `bg-warning`                                               | `org-chart/editor/outline-tree.tsx`                                      |
-| `bg-emerald-500/15`, `bg-amber-500/15` badge tones           | `bg-success/15`, `bg-warning/15`                           | `databases/cell.tsx`                                                     |
+| `text-amber-600`, `text-amber-700 dark:text-amber-400`       | `text-warning`                                             | the same callouts, member picker, prompts, task editor, due label                                                                       |
+| `bg-amber-100 ... dark:bg-amber-900/40` flag badge           | `bg-warning/15 text-warning`                               | `tasks/task-badges.tsx`                                                                                                                 |
+| `text-emerald-600`, `text-emerald-700 dark:text-emerald-300` | `text-success`                                             | finance transactions, org-chart draft editor, databases cell and forms                                                                  |
+| `bg-emerald-500`, `bg-amber-500`, `bg-rose-500` poll brushes | `bg-success`, `bg-warning`, `bg-destructive`               | `calendar/poll-responder.tsx`                                                                                                           |
+| `rgba(16, 185, 129, a)` heat map                             | `color-mix(in oklab, var(--success) N%, transparent)`      | `calendar/poll-responder.tsx`                                                                                                           |
+| `bg-red-500` / `bg-amber-400` / `bg-slate-300` priority dots | `bg-destructive` / `bg-warning` / `bg-muted-foreground/40` | `tasks/task-badges.tsx`                                                                                                                 |
+| `bg-amber-500` outline warning dot                           | `bg-warning`                                               | `org-chart/editor/outline-tree.tsx`                                                                                                     |
+| `bg-emerald-500/15`, `bg-amber-500/15` badge tones           | `bg-success/15`, `bg-warning/15`                           | `databases/cell.tsx`                                                                                                                    |
 
 Not converted on purpose: `google-icon.tsx` (Google's brand colours), email HTML
 in `src/server/email/**` (mail clients have no CSS variables), label colours

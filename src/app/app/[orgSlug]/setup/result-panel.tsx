@@ -1,6 +1,8 @@
 import {
   ArrowRight,
+  BarChart3,
   CalendarDays,
+  Check,
   ClipboardCheck,
   FileSpreadsheet,
   PenLine,
@@ -15,6 +17,7 @@ import { formatCount, formatDecimal, shortDate } from "@/components/reports/form
 import { Stat, StatRow } from "@/components/reports/stat";
 import { PanelSection } from "@/components/setup/setup-ui";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import type { AttendanceReport } from "@/server/reports/types";
 import { setupStep, type SetupStepId } from "@/server/setup/catalog";
 import { countsSentence, totalRows, type DataSummary } from "@/server/setup/summary";
@@ -33,10 +36,16 @@ import type { SetupStepView } from "./view";
  * at the importer the key exists for.
  */
 
+/** The line that says it works: a filled circle (done) and the sentence. */
 function Done({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-success flex items-baseline gap-2 text-sm font-medium">
-      <span aria-hidden="true">✓</span>
+    <p className="flex items-center gap-2.5 text-sm font-semibold">
+      <span
+        aria-hidden="true"
+        className="bg-block-goal text-block-goal-foreground grid size-6 shrink-0 place-items-center rounded-full"
+      >
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
       <span>{children}</span>
     </p>
   );
@@ -58,12 +67,15 @@ function Destination({
     <li>
       <Link
         href={href}
-        className="hover:bg-muted/60 focus-visible:ring-ring group flex items-center gap-3 rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        className="group rounded-tile bg-muted/60 hover:bg-muted focus-visible:outline-foreground flex h-full items-center gap-3 p-3.5 transition-colors outline-none focus-visible:outline-2"
       >
-        <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+        {/* The IconChip look (sm), drawn here: this panel renders on the server. */}
+        <span className="bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1">
+          <Icon className="size-[18px]" aria-hidden="true" />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">{label}</span>
-          <span className="text-muted-foreground block text-xs">{detail}</span>
+          <span className="block text-sm font-semibold">{label}</span>
+          <span className="text-muted-foreground mt-0.5 block text-[13px]">{detail}</span>
         </span>
         <ArrowRight
           className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
@@ -80,7 +92,7 @@ function NextStepLink({ orgSlug, nextStep }: { orgSlug: string; nextStep: SetupS
     <Button asChild>
       <Link href={href}>
         {nextStep ? `Next: ${setupStep(nextStep).title}` : "Finish setup"}
-        <ArrowRight className="size-4" aria-hidden="true" />
+        <ArrowRight data-icon="inline-end" aria-hidden="true" />
       </Link>
     </Button>
   );
@@ -110,7 +122,7 @@ function DataResult({
       <div className="space-y-1">
         <Done>Connected to your website, read-only.</Done>
         {endpoint ? (
-          <p className="text-muted-foreground font-mono text-xs break-all">{endpoint}</p>
+          <p className="text-muted-foreground pl-8.5 font-mono text-xs break-all">{endpoint}</p>
         ) : null}
       </div>
 
@@ -118,8 +130,8 @@ function DataResult({
         <SyncWatcher orgId={orgId} startingRows={rows} />
       ) : rows === 0 ? (
         <div className="space-y-4">
-          <div className="space-y-2 rounded-lg border border-dashed p-5">
-            <p className="text-sm font-medium">
+          <div className="rounded-tile bg-muted/60 space-y-1.5 p-5">
+            <p className="heading text-[15px]">
               The connection works, but there is nothing to pull yet.
             </p>
             <p className="text-muted-foreground text-sm">
@@ -166,17 +178,17 @@ function DataResult({
           </StatRow>
 
           {points.length >= 2 ? (
-            <section className="space-y-2 rounded-lg border p-4">
+            <section className="rounded-tile bg-muted/40 space-y-2 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h3 className="text-sm font-medium">Attendance over time</h3>
+                <h3 className="heading text-[15px]">Attendance over time</h3>
                 <Link
                   href={`/app/${orgSlug}/databases/reports`}
-                  className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+                  className="text-muted-foreground hover:text-foreground text-[13px] font-medium underline-offset-4 hover:underline"
                 >
                   All reports
                 </Link>
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground text-[13px]">
                 {formatCount(attendance?.totalCheckIns ?? 0)} check-ins across the{" "}
                 {formatCount(attendance?.totalSessions ?? 0)} sessions that had any
                 {attendance?.average === null || attendance?.average === undefined
@@ -219,7 +231,7 @@ function DataResult({
               ) : null}
               <Destination
                 href={`/app/${orgSlug}/databases/reports`}
-                icon={ArrowRight}
+                icon={BarChart3}
                 label="Reports"
                 detail="Attendance, retention, signups and stamp cards"
               />
@@ -236,12 +248,12 @@ function DataResult({
         </>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <NextStepLink orgSlug={orgSlug} nextStep="calendar" />
         <TestButton orgId={orgId} step="data" label="Test again" variant="ghost" />
         <Link
           href={`/app/${orgSlug}/setup/status`}
-          className="text-muted-foreground ml-auto text-xs underline-offset-4 hover:underline"
+          className="text-muted-foreground hover:text-foreground focus-glow ml-auto rounded-full text-[13px] font-medium underline-offset-4 hover:underline"
         >
           Connection status
         </Link>
@@ -308,7 +320,7 @@ function CalendarResult({
       <div className="space-y-1">
         <Done>Google Calendar is connected{account ? ` as ${account}` : ""}.</Done>
       </div>
-      <dl className="grid gap-x-6 gap-y-2 rounded-lg border p-4 text-sm sm:grid-cols-[11rem_1fr]">
+      <dl className="rounded-tile bg-muted/60 grid gap-x-6 gap-y-2 p-4 text-sm sm:grid-cols-[11rem_1fr]">
         <dt className="text-muted-foreground">Public events go to</dt>
         <dd>{publicName ?? "Nowhere — pick a calendar below"}</dd>
         <dt className="text-muted-foreground">Internal events go to</dt>
@@ -334,7 +346,7 @@ function CalendarResult({
           />
         </ul>
       </PanelSection>
-      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <NextStepLink orgSlug={orgSlug} nextStep="claude" />
         <TestButton
           orgId={orgId}
@@ -376,7 +388,7 @@ function ClaudeResult({
           />
         </ul>
       </PanelSection>
-      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <NextStepLink orgSlug={orgSlug} nextStep={null} />
         <TestButton orgId={orgId} step="claude" label="Test again" variant="ghost" />
       </div>
@@ -403,31 +415,33 @@ export function ResultPanel({
 }) {
   const step = setupStep(view.id);
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-8 duration-500 ease-out motion-reduce:animate-none">
-      <header className="space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">{step.title}</h2>
-          <Link
-            href={editHref}
-            className="text-muted-foreground text-xs underline-offset-4 hover:underline"
-          >
-            Change the credential
-          </Link>
-        </div>
-      </header>
-      {view.id === "data" ? (
-        <DataResult
-          orgId={orgId}
-          orgSlug={orgSlug}
-          summary={summary}
-          attendance={attendance}
-          endpoint={summary.sync?.endpoint ?? null}
-        />
-      ) : null}
-      {view.id === "calendar" ? (
-        <CalendarResult orgId={orgId} orgSlug={orgSlug} view={view} />
-      ) : null}
-      {view.id === "claude" ? <ClaudeResult orgId={orgId} orgSlug={orgSlug} view={view} /> : null}
-    </div>
+    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out motion-reduce:animate-none max-sm:[--card-spacing:--spacing(4.5)]">
+      <CardContent className="space-y-7">
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="display-title text-2xl">{step.title}</h2>
+            <Link
+              href={editHref}
+              className="text-muted-foreground hover:text-foreground focus-glow rounded-full text-[13px] font-medium underline-offset-4 hover:underline"
+            >
+              Change the credential
+            </Link>
+          </div>
+        </header>
+        {view.id === "data" ? (
+          <DataResult
+            orgId={orgId}
+            orgSlug={orgSlug}
+            summary={summary}
+            attendance={attendance}
+            endpoint={summary.sync?.endpoint ?? null}
+          />
+        ) : null}
+        {view.id === "calendar" ? (
+          <CalendarResult orgId={orgId} orgSlug={orgSlug} view={view} />
+        ) : null}
+        {view.id === "claude" ? <ClaudeResult orgId={orgId} orgSlug={orgSlug} view={view} /> : null}
+      </CardContent>
+    </Card>
   );
 }
