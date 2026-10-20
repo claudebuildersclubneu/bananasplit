@@ -45,6 +45,7 @@ describe("job-kind registry rules ('Background jobs' decision, item 7)", () => {
       "password-changed-email",
       "password-reset-email",
       "purge-unverified",
+      "storage-reconcile",
       "verify-email",
     ]);
   });
