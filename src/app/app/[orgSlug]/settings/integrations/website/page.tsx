@@ -21,24 +21,29 @@ export default async function WebsiteIntegrationPage({
   const { organization, dto, canWrite, canRemove } = page;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-7.5">
       <IntegrationHeader
         orgSlug={orgSlug}
         title="Website build hook"
+        dto={dto}
+        secretLabel="hook"
         description="When public events change, the portal asks Netlify to rebuild your website so it shows the new schedule (at most once a minute)."
       />
-      <StatusPanel dto={dto} secretLabel="Hook" />
-      <NetlifyForm orgId={organization.id} dto={dto} canWrite={canWrite} />
-      {dto.hasSecret && (
-        <TestAndRemove
-          orgId={organization.id}
-          provider="NETLIFY_BUILD_HOOK"
-          canTest={canWrite}
-          canRemove={canRemove}
-          testLabel="Trigger a test build"
-          removeCopy="The hook is deleted. Your website stops rebuilding automatically when events change."
-        />
-      )}
+      <div className="space-y-4.5">
+        <StatusPanel dto={dto} secretLabel="Hook" />
+        <NetlifyForm orgId={organization.id} dto={dto} canWrite={canWrite} />
+        {dto.hasSecret && (
+          <TestAndRemove
+            orgId={organization.id}
+            provider="NETLIFY_BUILD_HOOK"
+            name="the build hook"
+            canTest={canWrite}
+            canRemove={canRemove}
+            testLabel="Trigger a test build"
+            removeCopy="The hook is deleted. Your website stops rebuilding automatically when events change."
+          />
+        )}
+      </div>
     </div>
   );
 }

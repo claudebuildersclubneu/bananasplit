@@ -17,12 +17,16 @@ export const KIND_LABELS: Record<TransactionKind, string> = {
   ADJUSTMENT: "Adjustment",
 };
 
+/** The kind picker: a 40px field like every other input in the transaction dialog. */
 export function TransactionKindSelect({
+  id,
   value,
   onChange,
   disabled,
   restrictToExpense,
 }: {
+  /** For a <Label htmlFor>. */
+  id?: string;
   value: TransactionKind;
   onChange: (value: TransactionKind) => void;
   disabled?: boolean;
@@ -33,7 +37,7 @@ export function TransactionKindSelect({
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as TransactionKind)} disabled={disabled}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

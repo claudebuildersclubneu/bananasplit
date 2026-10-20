@@ -26,9 +26,10 @@ import {
   saveSupabaseAction,
   sendTestEmailAction,
 } from "./actions";
+import { nativeSelectClass, SettingsCard } from "../settings-card";
 import { FeedbackLine, SecretInput, feedbackOf, type Feedback } from "./integration-ui";
 
-const selectClass = "border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm";
+const selectClass = nativeSelectClass;
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -72,7 +73,6 @@ export function AiModelForm({
   const vendor = aiVendor(vendorId) ?? AI_VENDORS[0];
   return (
     <form
-      className="space-y-4 rounded-lg border p-4"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         submit(
@@ -81,57 +81,63 @@ export function AiModelForm({
         );
       }}
     >
-      <div className="grid gap-1.5">
-        <Label htmlFor="ai-vendor">Provider</Label>
-        <select
-          id="ai-vendor"
-          className={selectClass}
-          value={vendorId}
-          onChange={(e) => setVendorId(e.target.value)}
-          disabled={!canWrite}
-        >
-          {AI_VENDORS.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-muted-foreground text-xs">
-          Bananasplit only ever calls the provider&apos;s official address (
-          {vendor.baseUrl.replace("https://", "")}).
-        </p>
-      </div>
-      <SecretInput
-        id="ai-key"
-        label="API key"
-        hasSecret={dto.hasSecret}
-        last4={dto.last4}
-        value={apiKey}
-        onChange={setApiKey}
-        placeholder={vendor.keyHint}
-        help={`Create one at ${vendor.keysUrl}, on an account your club pays for. Changing the provider needs that provider's key.`}
-      />
-      <div className="grid gap-1.5">
-        <Label htmlFor="ai-model">Model</Label>
-        <Input
-          id="ai-model"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          placeholder={`e.g. ${vendor.exampleModel}`}
-          maxLength={120}
-          disabled={!canWrite}
+      <SettingsCard
+        title="Provider, key and model"
+        status={feedback && <FeedbackLine feedback={feedback} />}
+        footer={
+          canWrite && (
+            <Button type="submit" disabled={isPending || !model.trim()}>
+              {isPending ? "Saving and testing…" : dto.hasSecret ? "Save" : "Save and test"}
+            </Button>
+          )
+        }
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="ai-vendor">Provider</Label>
+          <select
+            id="ai-vendor"
+            className={selectClass}
+            value={vendorId}
+            onChange={(e) => setVendorId(e.target.value)}
+            disabled={!canWrite}
+          >
+            {AI_VENDORS.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-muted-foreground text-[13px]">
+            Bananasplit only ever calls the provider&apos;s official address (
+            {vendor.baseUrl.replace("https://", "")}).
+          </p>
+        </div>
+        <SecretInput
+          id="ai-key"
+          label="API key"
+          hasSecret={dto.hasSecret}
+          last4={dto.last4}
+          value={apiKey}
+          onChange={setApiKey}
+          placeholder={vendor.keyHint}
+          help={`Create one at ${vendor.keysUrl}, on an account your club pays for. Changing the provider needs that provider's key.`}
         />
-        <p className="text-muted-foreground text-xs">
-          The model id exactly as {vendor.label} lists it. Pick one that can read images if
-          you&apos;ll import calendar screenshots. Usage is billed to your {vendor.label} account.
-        </p>
-      </div>
-      {canWrite && (
-        <Button type="submit" disabled={isPending || !model.trim()}>
-          {isPending ? "Saving and testing…" : dto.hasSecret ? "Save" : "Save and test"}
-        </Button>
-      )}
-      <FeedbackLine feedback={feedback} />
+        <div className="grid gap-1.5">
+          <Label htmlFor="ai-model">Model</Label>
+          <Input
+            id="ai-model"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={`e.g. ${vendor.exampleModel}`}
+            maxLength={120}
+            disabled={!canWrite}
+          />
+          <p className="text-muted-foreground text-[13px]">
+            The model id exactly as {vendor.label} lists it. Pick one that can read images if
+            you&apos;ll import calendar screenshots. Usage is billed to your {vendor.label} account.
+          </p>
+        </div>
+      </SettingsCard>
     </form>
   );
 }
@@ -155,7 +161,6 @@ export function ClaudeForm({
   const perImport = estimateParseCostUsd(model);
   return (
     <form
-      className="space-y-4 rounded-lg border p-4"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         submit(
@@ -164,63 +169,70 @@ export function ClaudeForm({
         );
       }}
     >
-      <SecretInput
-        id="claude-key"
-        label="API key"
-        hasSecret={dto.hasSecret}
-        last4={dto.last4}
-        value={apiKey}
-        onChange={setApiKey}
-        placeholder="sk-ant-…"
-        help="Create one at console.anthropic.com under API keys, in a workspace your club pays for."
-      />
-      <div className="grid gap-1.5">
-        <Label htmlFor="claude-model">Model</Label>
-        <select
-          id="claude-model"
-          className={selectClass}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        >
-          {CLAUDE_MODELS.map((m) => {
-            const cost = estimateParseCostUsd(m.id);
-            return (
-              <option key={m.id} value={m.id}>
-                {m.label}
-                {m.id === DEFAULT_CLAUDE_MODEL ? " (default)" : ""}
-                {cost !== null ? ` — about ${formatUsd(cost)} per import` : ""}
-              </option>
-            );
-          })}
-        </select>
-        <p className="text-muted-foreground text-xs">
-          {selected?.note} About {perImport !== null ? formatUsd(perImport) : "—"} per import of a
-          chart the size of a club board&apos;s (
-          {selected
-            ? `$${selected.inputPerMTok} in / $${selected.outputPerMTok} out per million
+      <SettingsCard
+        title="Key and model"
+        status={feedback && <FeedbackLine feedback={feedback} />}
+        footer={
+          canWrite && (
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving and testing…" : dto.hasSecret ? "Save" : "Save and test"}
+            </Button>
+          )
+        }
+      >
+        <SecretInput
+          id="claude-key"
+          label="API key"
+          hasSecret={dto.hasSecret}
+          last4={dto.last4}
+          value={apiKey}
+          onChange={setApiKey}
+          placeholder="sk-ant-…"
+          help="Create one at console.anthropic.com under API keys, in a workspace your club pays for."
+        />
+        <div className="grid gap-1.5">
+          <Label htmlFor="claude-model">Model</Label>
+          <select
+            id="claude-model"
+            className={selectClass}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          >
+            {CLAUDE_MODELS.map((m) => {
+              const cost = estimateParseCostUsd(m.id);
+              return (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                  {m.id === DEFAULT_CLAUDE_MODEL ? " (default)" : ""}
+                  {cost !== null ? ` — about ${formatUsd(cost)} per import` : ""}
+                </option>
+              );
+            })}
+          </select>
+          <p className="text-muted-foreground text-[13px]">
+            {selected?.note} About {perImport !== null ? formatUsd(perImport) : "—"} per import of a
+            chart the size of a club board&apos;s (
+            {selected
+              ? `$${selected.inputPerMTok} in / $${selected.outputPerMTok} out per million
           tokens`
-            : "list price"}
-          ), billed to your Anthropic account. Most documents never reach Claude at all: the portal
-          reads them itself, for nothing.
-        </p>
-      </div>
-      {selected?.serverFallbacks && (
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <Label htmlFor="claude-fallbacks">Retry declined requests on a fallback model</Label>
-            <p className="text-muted-foreground text-xs">
-              If Claude declines a document, Anthropic re-runs it on its recommended fallback model.
-            </p>
-          </div>
-          <Switch id="claude-fallbacks" checked={fallbacks} onCheckedChange={setFallbacks} />
+              : "list price"}
+            ), billed to your Anthropic account. Most documents never reach Claude at all: the
+            portal reads them itself, for nothing.
+          </p>
         </div>
-      )}
-      {canWrite && (
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving and testing…" : dto.hasSecret ? "Save" : "Save and test"}
-        </Button>
-      )}
-      <FeedbackLine feedback={feedback} />
+        {selected?.serverFallbacks && (
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Label htmlFor="claude-fallbacks">Retry declined requests on a fallback model</Label>
+              <p className="text-muted-foreground mt-1 text-[13px]">
+                If Claude declines a document, Anthropic re-runs it on its recommended fallback
+                model.
+              </p>
+            </div>
+            <Switch id="claude-fallbacks" checked={fallbacks} onCheckedChange={setFallbacks} />
+          </div>
+        )}
+      </SettingsCard>
     </form>
   );
 }
@@ -245,9 +257,8 @@ export function EmailSenderForm({
   const save = useSubmit();
   const test = useSubmit();
   return (
-    <div className="space-y-4">
+    <div className="space-y-4.5">
       <form
-        className="space-y-4 rounded-lg border p-4"
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
           save.submit(
@@ -262,69 +273,75 @@ export function EmailSenderForm({
           );
         }}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="from-name">From name</Label>
-            <Input
-              id="from-name"
-              value={fromName}
-              maxLength={80}
-              onChange={(e) => setFromName(e.target.value)}
-            />
+        <SettingsCard
+          title="Sender"
+          description="Who your club's email comes from, and the Resend key that sends it."
+          status={save.feedback && <FeedbackLine feedback={save.feedback} />}
+          footer={
+            canWrite && (
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? "Saving and checking the domain…" : "Save and check domain"}
+              </Button>
+            )
+          }
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="from-name">From name</Label>
+              <Input
+                id="from-name"
+                value={fromName}
+                maxLength={80}
+                onChange={(e) => setFromName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="from-address">From address</Label>
+              <Input
+                id="from-address"
+                type="email"
+                value={fromAddress}
+                placeholder="team@mail.yourclub.org"
+                onChange={(e) => setFromAddress(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5 sm:col-span-2">
+              <Label htmlFor="reply-to">Reply-to (optional)</Label>
+              <Input
+                id="reply-to"
+                type="email"
+                value={replyTo}
+                placeholder="president@yourclub.org"
+                onChange={(e) => setReplyTo(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="from-address">From address</Label>
-            <Input
-              id="from-address"
-              type="email"
-              value={fromAddress}
-              placeholder="team@mail.yourclub.org"
-              onChange={(e) => setFromAddress(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1.5 sm:col-span-2">
-            <Label htmlFor="reply-to">Reply-to (optional)</Label>
-            <Input
-              id="reply-to"
-              type="email"
-              value={replyTo}
-              placeholder="president@yourclub.org"
-              onChange={(e) => setReplyTo(e.target.value)}
-            />
-          </div>
-        </div>
-        <SecretInput
-          id="resend-key"
-          label="Resend API key"
-          hasSecret={dto.hasSecret}
-          last4={dto.last4}
-          value={apiKey}
-          onChange={setApiKey}
-          placeholder="re_…"
-          help="A Resend key with full access (the domain check reads your domains)."
-        />
-        {canWrite && (
-          <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? "Saving and checking the domain…" : "Save and check domain"}
-          </Button>
-        )}
-        <FeedbackLine feedback={save.feedback} />
+          <SecretInput
+            id="resend-key"
+            label="Resend API key"
+            hasSecret={dto.hasSecret}
+            last4={dto.last4}
+            value={apiKey}
+            onChange={setApiKey}
+            placeholder="re_…"
+            help="A Resend key with full access (the domain check reads your domains)."
+          />
+        </SettingsCard>
       </form>
       {canWrite && dto.hasSecret && (
-        <div className="space-y-2 rounded-lg border p-4">
-          <p className="text-sm font-medium">Send a test email</p>
-          <p className="text-muted-foreground text-xs">
-            Sends one message from this sender to your own address.
-          </p>
-          <Button
-            variant="outline"
-            disabled={test.isPending}
-            onClick={() => test.submit(() => sendTestEmailAction(orgId))}
-          >
-            {test.isPending ? "Sending…" : "Send test email"}
-          </Button>
-          <FeedbackLine feedback={test.feedback} />
-        </div>
+        <SettingsCard
+          title="Send a test email"
+          description="Sends one message from this sender to your own address."
+          status={test.feedback && <FeedbackLine feedback={test.feedback} />}
+          footer={
+            <Button
+              disabled={test.isPending}
+              onClick={() => test.submit(() => sendTestEmailAction(orgId))}
+            >
+              {test.isPending ? "Sending…" : "Send test email"}
+            </Button>
+          }
+        />
       )}
     </div>
   );
@@ -350,7 +367,6 @@ export function SupabaseForm({
   const host = `${poolerPrefix}-${poolerRegion}.pooler.supabase.com`;
   return (
     <form
-      className="space-y-4 rounded-lg border p-4"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         submit(
@@ -366,77 +382,83 @@ export function SupabaseForm({
         );
       }}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <Label htmlFor="sb-ref">Project ref</Label>
-          <Input
-            id="sb-ref"
-            value={projectRef}
-            placeholder="abcdefghijklmnopqrst"
-            autoComplete="off"
-            onChange={(e) => setProjectRef(e.target.value)}
-          />
+      <SettingsCard
+        title="Connection"
+        description="Read-only, with verified TLS. The host is built from these fields; other hosts are not accepted."
+        status={feedback && <FeedbackLine feedback={feedback} />}
+        footer={
+          canWrite && (
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving and connecting…" : "Save and test"}
+            </Button>
+          )
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="sb-ref">Project ref</Label>
+            <Input
+              id="sb-ref"
+              value={projectRef}
+              placeholder="abcdefghijklmnopqrst"
+              autoComplete="off"
+              onChange={(e) => setProjectRef(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sb-role">Database role</Label>
+            <Input
+              id="sb-role"
+              value={roleName}
+              autoComplete="off"
+              onChange={(e) => setRoleName(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sb-region">Pooler region</Label>
+            <select
+              id="sb-region"
+              className={selectClass}
+              value={poolerRegion}
+              onChange={(e) => setPoolerRegion(e.target.value)}
+            >
+              {SUPABASE_POOLER_REGIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sb-prefix">Pooler host prefix</Label>
+            <select
+              id="sb-prefix"
+              className={selectClass}
+              value={poolerPrefix}
+              onChange={(e) => setPoolerPrefix(e.target.value)}
+            >
+              <option value="aws-0">aws-0</option>
+              <option value="aws-1">aws-1</option>
+            </select>
+          </div>
         </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="sb-role">Database role</Label>
-          <Input
-            id="sb-role"
-            value={roleName}
-            autoComplete="off"
-            onChange={(e) => setRoleName(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="sb-region">Pooler region</Label>
-          <select
-            id="sb-region"
-            className={selectClass}
-            value={poolerRegion}
-            onChange={(e) => setPoolerRegion(e.target.value)}
-          >
-            {SUPABASE_POOLER_REGIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="sb-prefix">Pooler host prefix</Label>
-          <select
-            id="sb-prefix"
-            className={selectClass}
-            value={poolerPrefix}
-            onChange={(e) => setPoolerPrefix(e.target.value)}
-          >
-            <option value="aws-0">aws-0</option>
-            <option value="aws-1">aws-1</option>
-          </select>
-        </div>
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Connects to <code>{host}</code> as{" "}
-        <code>
-          {roleName || "role"}.{projectRef || "ref"}
-        </code>
-        , read-only, with verified TLS. The host is built from these fields; other hosts are not
-        accepted.
-      </p>
-      <SecretInput
-        id="sb-password"
-        label="Role password"
-        hasSecret={dto.hasSecret}
-        last4={dto.last4}
-        value={password}
-        onChange={setPassword}
-        placeholder="The cbc_suite_reader password"
-      />
-      {canWrite && (
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving and connecting…" : "Save and test"}
-        </Button>
-      )}
-      <FeedbackLine feedback={feedback} />
+        <p className="bg-muted/60 rounded-field text-muted-foreground px-3.5 py-2.5 text-[13px]">
+          Connects to <code className="text-foreground font-mono">{host}</code> as{" "}
+          <code className="text-foreground font-mono">
+            {roleName || "role"}.{projectRef || "ref"}
+          </code>
+          .
+        </p>
+        <SecretInput
+          id="sb-password"
+          label="Role password"
+          hasSecret={dto.hasSecret}
+          last4={dto.last4}
+          value={password}
+          onChange={setPassword}
+          placeholder="The cbc_suite_reader password"
+        />
+      </SettingsCard>
     </form>
   );
 }
@@ -456,7 +478,6 @@ export function NetlifyForm({
   const { feedback, isPending, submit } = useSubmit();
   return (
     <form
-      className="space-y-4 rounded-lg border p-4"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         submit(
@@ -465,22 +486,28 @@ export function NetlifyForm({
         );
       }}
     >
-      <SecretInput
-        id="netlify-hook"
-        label="Build hook URL"
-        hasSecret={dto.hasSecret}
-        last4={dto.last4}
-        value={hook}
-        onChange={setHook}
-        placeholder="https://api.netlify.com/build_hooks/…"
-        help="Netlify: Site configuration > Build & deploy > Build hooks > Add build hook."
-      />
-      {canWrite && (
-        <Button type="submit" disabled={isPending || !hook.trim()}>
-          {isPending ? "Saving…" : "Save hook"}
-        </Button>
-      )}
-      <FeedbackLine feedback={feedback} />
+      <SettingsCard
+        title="Build hook"
+        status={feedback && <FeedbackLine feedback={feedback} />}
+        footer={
+          canWrite && (
+            <Button type="submit" disabled={isPending || !hook.trim()}>
+              {isPending ? "Saving…" : "Save hook"}
+            </Button>
+          )
+        }
+      >
+        <SecretInput
+          id="netlify-hook"
+          label="Build hook URL"
+          hasSecret={dto.hasSecret}
+          last4={dto.last4}
+          value={hook}
+          onChange={setHook}
+          placeholder="https://api.netlify.com/build_hooks/…"
+          help="Netlify: Site configuration > Build & deploy > Build hooks > Add build hook."
+        />
+      </SettingsCard>
     </form>
   );
 }
@@ -517,37 +544,42 @@ export function GoogleCalendarPanel({
   const connected = dto.status === "CONNECTED" || dto.status === "ERROR";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4.5">
       {canWrite && (
-        <form
-          method="post"
-          action="/api/integrations/google-calendar/start"
-          className="rounded-lg border p-4"
-        >
+        <form method="post" action="/api/integrations/google-calendar/start">
           <input type="hidden" name="orgId" value={orgId} />
-          <p className="mb-2 text-sm">
-            {dto.hasSecret && connected
-              ? `Connected${dto.config.accountEmail ? ` as ${str(dto.config.accountEmail)}` : ""}. Reconnect to switch accounts.`
-              : "Sign in with the Google account that owns your club's calendars."}
-          </p>
-          <p className="text-muted-foreground mb-3 text-xs">
-            Bananasplit asks only to manage the events it creates and to list your calendars. It
-            never reads other events.
-          </p>
-          <Button type="submit" disabled={!configured}>
-            {dto.hasSecret && connected ? "Reconnect Google Calendar" : "Connect Google Calendar"}
-          </Button>
-          {!configured && (
-            <p className="text-muted-foreground mt-2 text-xs">
-              Not available yet: the platform needs a Google OAuth client
-              (GOOGLE_CALENDAR_CLIENT_ID).
+          <SettingsCard
+            title="Google account"
+            description={
+              dto.hasSecret && connected
+                ? `Connected${dto.config.accountEmail ? ` as ${str(dto.config.accountEmail)}` : ""}. Reconnect to switch accounts.`
+                : "Sign in with the Google account that owns your club's calendars."
+            }
+            status={
+              !configured && (
+                <p className="text-muted-foreground text-[13px]">
+                  Not available yet: the platform needs a Google OAuth client
+                  (GOOGLE_CALENDAR_CLIENT_ID).
+                </p>
+              )
+            }
+            footer={
+              <Button type="submit" disabled={!configured}>
+                {dto.hasSecret && connected
+                  ? "Reconnect Google Calendar"
+                  : "Connect Google Calendar"}
+              </Button>
+            }
+          >
+            <p className="text-muted-foreground text-sm">
+              Bananasplit asks only to manage the events it creates and to list your calendars. It
+              never reads other events.
             </p>
-          )}
+          </SettingsCard>
         </form>
       )}
       {connected && calendars.length > 0 && (
         <form
-          className="space-y-4 rounded-lg border p-4"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
             save.submit(() =>
@@ -558,62 +590,73 @@ export function GoogleCalendarPanel({
             );
           }}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="gcal-public">Public events calendar</Label>
-              <select
-                id="gcal-public"
-                className={selectClass}
-                value={publicId}
-                onChange={(e) => setPublicId(e.target.value)}
-              >
-                <option value="">Don&apos;t mirror public events</option>
-                {calendars.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.summary}
-                    {c.primary ? " (primary)" : ""}
-                  </option>
-                ))}
-              </select>
+          <SettingsCard
+            title="Calendars"
+            description="Which of your Google calendars each kind of event is mirrored to."
+            status={save.feedback && <FeedbackLine feedback={save.feedback} />}
+            footer={
+              canWrite && (
+                <Button type="submit" disabled={save.isPending}>
+                  {save.isPending ? "Saving…" : "Save calendars"}
+                </Button>
+              )
+            }
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="gcal-public">Public events calendar</Label>
+                <select
+                  id="gcal-public"
+                  className={selectClass}
+                  value={publicId}
+                  onChange={(e) => setPublicId(e.target.value)}
+                >
+                  <option value="">Don&apos;t mirror public events</option>
+                  {calendars.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.summary}
+                      {c.primary ? " (primary)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="gcal-internal">Internal events calendar (optional)</Label>
+                <select
+                  id="gcal-internal"
+                  className={selectClass}
+                  value={internalId}
+                  onChange={(e) => setInternalId(e.target.value)}
+                >
+                  <option value="">Don&apos;t mirror internal events</option>
+                  {calendars.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.summary}
+                      {c.primary ? " (primary)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="gcal-internal">Internal events calendar (optional)</Label>
-              <select
-                id="gcal-internal"
-                className={selectClass}
-                value={internalId}
-                onChange={(e) => setInternalId(e.target.value)}
-              >
-                <option value="">Don&apos;t mirror internal events</option>
-                {calendars.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.summary}
-                    {c.primary ? " (primary)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {canWrite && (
-            <Button type="submit" disabled={save.isPending}>
-              {save.isPending ? "Saving…" : "Save calendars"}
-            </Button>
-          )}
-          <FeedbackLine feedback={save.feedback} />
+          </SettingsCard>
         </form>
       )}
       {importPanel}
       {canWrite && dto.hasSecret && dto.status !== "DISCONNECTED" && (
-        <div className="space-y-2">
-          <Button
-            variant="outline"
-            disabled={disconnect.isPending}
-            onClick={() => disconnect.submit(() => disconnectGoogleAction(orgId))}
-          >
-            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-          </Button>
-          <FeedbackLine feedback={disconnect.feedback} />
-        </div>
+        <SettingsCard
+          title="Disconnect"
+          description="Revokes the portal's access at Google. Events stop mirroring until you connect again."
+          status={disconnect.feedback && <FeedbackLine feedback={disconnect.feedback} />}
+          footer={
+            <Button
+              variant="outline"
+              disabled={disconnect.isPending}
+              onClick={() => disconnect.submit(() => disconnectGoogleAction(orgId))}
+            >
+              {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+            </Button>
+          }
+        />
       )}
     </div>
   );

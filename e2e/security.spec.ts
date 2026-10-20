@@ -160,7 +160,10 @@ test("public poll: guests keep separate answers, non-members answer as guests, o
   await dialog.getByRole("button", { name: "Schedule" }).click();
   await expect(page).toHaveURL(new RegExp(`/app/${orgSlug}/calendar/(?!polls)[a-z0-9]+$`));
   // Only the member (the owner) became an attendee.
-  await expect(page.getByText("Invited (1)")).toBeVisible();
+  const invited = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByText("Invited", { exact: true }) });
+  await expect(invited.locator('[data-slot="badge"]').first()).toHaveText("1");
 });
 
 test("calendar feed: the link is shown once, and regenerating kills the old one", async ({

@@ -22,6 +22,8 @@ import {
 } from "@/lib/theme/style";
 import { cn } from "@/lib/utils";
 
+import { choiceClass } from "./choice";
+
 /** Below this the accent barely shows against the page (a highlight, not text). */
 const FAINT_ACCENT = 1.25;
 const TEXT_AA = 4.5;
@@ -54,7 +56,7 @@ export function LookAndFeel({
   const set = (patch: Partial<ThemeStyle>) => onChange({ ...style, ...patch });
 
   return (
-    <div className="divide-y rounded-xl border">
+    <div className="divide-border/70 -my-1 divide-y">
       <Row
         id={`${groupId}-accent`}
         title="Accent colour"
@@ -185,9 +187,9 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-3 p-4 lg:grid-cols-[12rem_1fr]">
-      <div className="space-y-0.5">
-        <p id={id} className="text-sm font-medium">
+    <div className="grid gap-3 py-5 first:pt-1 last:pb-1 lg:grid-cols-[12rem_1fr] lg:gap-6">
+      <div className="space-y-1">
+        <p id={id} className="heading text-sm">
           {title}
         </p>
         <p className="text-muted-foreground text-xs">{hint}</p>
@@ -213,15 +215,9 @@ function Choices<T extends string>({
   render?: (value: T) => React.ReactNode;
 }) {
   return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className="grid gap-2 sm:grid-cols-3">
+    <div role="radiogroup" aria-labelledby={labelledBy} className="grid gap-2.5 sm:grid-cols-3">
       {options.map((option) => (
-        <label
-          key={option.value}
-          className={cn(
-            "has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm has-focus-visible:ring-3",
-            value === option.value && "border-primary ring-primary ring-1",
-          )}
-        >
+        <label key={option.value} className={choiceClass(value === option.value)}>
           <input
             type="radio"
             name={name}
@@ -232,7 +228,7 @@ function Choices<T extends string>({
           />
           {render?.(option.value)}
           <span className="space-y-0.5">
-            <span className="block font-medium">{option.label}</span>
+            <span className="block font-semibold">{option.label}</span>
             <span className="text-muted-foreground block text-xs">{option.hint}</span>
           </span>
         </label>
@@ -268,18 +264,12 @@ function AccentField({
 
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Accent colour" className="grid gap-2 sm:grid-cols-2">
+      <div role="radiogroup" aria-label="Accent colour" className="grid gap-2.5 sm:grid-cols-2">
         {[
           { custom: false, label: "From the palette", hint: "The accent the palette comes with." },
           { custom: true, label: "Custom", hint: "Any colour. Labels on it stay readable." },
         ].map((option) => (
-          <label
-            key={option.label}
-            className={cn(
-              "has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm has-focus-visible:ring-3",
-              custom === option.custom && "border-primary ring-primary ring-1",
-            )}
-          >
+          <label key={option.label} className={choiceClass(custom === option.custom)}>
             <input
               type="radio"
               name={group}
@@ -289,11 +279,11 @@ function AccentField({
             />
             <span
               aria-hidden="true"
-              className="size-5 shrink-0 rounded-full border"
+              className="ring-foreground/15 size-5 shrink-0 rounded-full ring-1"
               style={{ backgroundColor: option.custom ? current : paletteAccent }}
             />
             <span className="space-y-0.5">
-              <span className="block font-medium">{option.label}</span>
+              <span className="block font-semibold">{option.label}</span>
               <span className="text-muted-foreground block text-xs">{option.hint}</span>
             </span>
           </label>
@@ -307,7 +297,7 @@ function AccentField({
             aria-label="Accent colour picker"
             value={HEX_RE.test(current) ? current : paletteAccent}
             onChange={(event) => onChange(event.target.value.toLowerCase())}
-            className="border-input size-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-0.5"
+            className="border-input size-10 shrink-0 cursor-pointer rounded-full border bg-transparent p-1"
           />
           <Label htmlFor={`${id}-hex`} className="sr-only">
             Accent colour hex
@@ -363,10 +353,13 @@ function AccentContrast({ tokens }: { tokens: DerivedTheme }) {
         const ok = row.label >= TEXT_AA;
         const faint = row.visible < FAINT_ACCENT;
         return (
-          <li key={row.mode} className="flex items-center gap-2.5 rounded-lg border p-2.5 text-xs">
+          <li
+            key={row.mode}
+            className="bg-muted/40 rounded-tile flex items-center gap-2.5 p-2.5 text-xs"
+          >
             <span
               aria-hidden="true"
-              className="flex h-7 w-10 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold"
+              className="ring-foreground/10 flex h-7 w-10 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1"
               style={{ backgroundColor: row.fill, color: row.ink }}
             >
               Aa
@@ -423,7 +416,7 @@ function GlowField({
 
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Glow" className="grid gap-2 sm:grid-cols-2">
+      <div role="radiogroup" aria-label="Glow" className="grid gap-2.5 sm:grid-cols-2">
         {[
           {
             custom: false,
@@ -432,13 +425,7 @@ function GlowField({
           },
           { custom: true, label: "Custom", hint: "Any colour. It only ever shows as light." },
         ].map((option) => (
-          <label
-            key={option.label}
-            className={cn(
-              "has-focus-visible:ring-ring/50 rounded-tile flex cursor-pointer items-start gap-2.5 border p-3 text-sm has-focus-visible:ring-3",
-              custom === option.custom && "border-primary ring-primary ring-1",
-            )}
-          >
+          <label key={option.label} className={choiceClass(custom === option.custom)}>
             <input
               type="radio"
               name={group}
@@ -448,14 +435,14 @@ function GlowField({
             />
             <span
               aria-hidden="true"
-              className="size-5 shrink-0 rounded-full border"
+              className="ring-foreground/15 size-5 shrink-0 rounded-full ring-1"
               style={{
                 backgroundColor: option.custom ? current : paletteGlow,
                 boxShadow: `0 0 10px 2px ${option.custom ? current : paletteGlow}`,
               }}
             />
             <span className="space-y-0.5">
-              <span className="block font-medium">{option.label}</span>
+              <span className="block font-semibold">{option.label}</span>
               <span className="text-muted-foreground block text-xs">{option.hint}</span>
             </span>
           </label>
@@ -468,7 +455,7 @@ function GlowField({
             aria-label="Glow colour picker"
             value={HEX_RE.test(current) ? current : paletteGlow}
             onChange={(event) => onChange(event.target.value.toLowerCase())}
-            className="border-input size-9 shrink-0 cursor-pointer rounded-full border bg-transparent p-0.5"
+            className="border-input size-10 shrink-0 cursor-pointer rounded-full border bg-transparent p-1"
           />
           <Label htmlFor={`${id}-hex`} className="sr-only">
             Glow colour hex
@@ -485,7 +472,7 @@ function GlowField({
             className="w-32 font-mono"
             spellCheck={false}
           />
-          {invalid && <p className="text-destructive text-xs">Use a six-digit hex like #f2c230.</p>}
+          {invalid && <p className="text-destructive text-xs">Use #rrggbb</p>}
         </div>
       )}
     </div>

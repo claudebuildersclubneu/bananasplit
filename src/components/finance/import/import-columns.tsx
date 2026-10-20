@@ -1,11 +1,21 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, CheckCircle2, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Info, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { ConnectionPicker, type useAiConnections } from "@/components/ai/connection-picker";
+import { TableFrame } from "@/components/databases/table-frame";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { AiLabel, SheetRead } from "@/lib/ai/finance-sheet";
 import {
   AMOUNT_SIGN_LABEL,
@@ -24,6 +34,8 @@ import type { SheetData } from "@/lib/finance/import/sheet";
 import type { DateOrder } from "@/lib/finance/import/values";
 import { cn } from "@/lib/utils";
 
+import { ErrorNotice, fieldSelect, fieldSelectSm, ImportPanel, WarningNotice } from "./panel";
+
 /**
  * Which column is which. The guess is shown on a preview of the sheet with
  * a picker over every column; "Read it with …" asks the club's AI model to
@@ -31,8 +43,6 @@ import { cn } from "@/lib/utils";
  */
 
 const PREVIEW_ROWS = 8;
-
-const selectClass = "border-input bg-background h-8 w-full min-w-28 rounded-lg border px-2 text-xs";
 
 const TRANSACTION_ROLES = COLUMN_ROLES.filter((r) => r !== "allocated");
 const BUDGET_ROLES: readonly ColumnRole[] = [
@@ -51,6 +61,7 @@ const norm = (s: string) =>
     .trim();
 
 export function ImportColumns({
+  embedded,
   orgId,
   orgSlug,
   today,
@@ -67,6 +78,8 @@ export function ImportColumns({
   onBack,
   onContinue,
 }: {
+  /** Inside the setup guide (already a card). */
+  embedded?: boolean;
   orgId: string;
   orgSlug: string;
   today: string;
@@ -172,239 +185,249 @@ export function ImportColumns({
   const categorized = labels.size;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="heading text-lg">Which column is which?</h2>
-          <p className="text-muted-foreground text-sm">
-            {fileName} · {dataRows.toLocaleString()} row{dataRows === 1 ? "" : "s"}
-            {sheet.truncated ? " (only the first 20,000 are read)" : ""}. Check the guess, or let AI
-            read it.
-          </p>
-        </div>
-        {sheets.length > 1 && (
-          <Segmented
-            label="Sheets"
-            className="max-w-full overflow-x-auto"
-            value={String(sheetIndex)}
-            onSelect={(v) => pickSheet(Number(v))}
-            options={sheets.map((s, i) => ({
-              value: String(i),
-              label: `${s.name}${s.hidden ? " (hidden)" : ""}`,
-            }))}
-          />
-        )}
-      </div>
-
-      <section className="bg-primary/5 border-primary/20 space-y-3 rounded-xl border p-4">
+    <div className="space-y-4.5">
+      <ImportPanel embedded={embedded}>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <ConnectionPicker
-            orgSlug={orgSlug}
-            list={ai.list}
-            failed={ai.failed}
-            selected={ai.selected}
-            onChoose={ai.setChoice}
-            what="the first rows and each text column's values"
-          />
-          {ai.selected && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void readWithAi()}
-              disabled={reading}
-            >
-              {reading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-              {reading
-                ? "Reading…"
-                : readBy
-                  ? "Read it again"
-                  : `Read it with ${ai.selected.label}`}
-            </Button>
+          <div className="min-w-0 space-y-1">
+            <h2 className="heading text-[17px]">Which column is which?</h2>
+            <p className="text-muted-foreground text-sm">
+              {fileName} · {dataRows.toLocaleString()} row{dataRows === 1 ? "" : "s"}
+              {sheet.truncated ? " (only the first 20,000 are read)" : ""}. Check the guess, or let
+              AI read it.
+            </p>
+          </div>
+          {sheets.length > 1 && (
+            <Segmented
+              label="Sheets"
+              className="max-w-full overflow-x-auto"
+              value={String(sheetIndex)}
+              onSelect={(v) => pickSheet(Number(v))}
+              options={sheets.map((s, i) => ({
+                value: String(i),
+                label: `${s.name}${s.hidden ? " (hidden)" : ""}`,
+              }))}
+            />
           )}
         </div>
-        {readBy && (
-          <p className="text-success flex items-center gap-1.5 text-sm">
-            <CheckCircle2 className="size-4" aria-hidden="true" />
-            Read by {readBy}
-            {categorized > 0
-              ? ` · ${categorized} value${categorized === 1 ? "" : "s"} sorted into categories`
-              : ""}
-          </p>
-        )}
-        {notes.length > 0 && (
-          <ul className="text-muted-foreground space-y-1 text-xs">
-            {notes.map((n, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <Info className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-                {n}
-              </li>
-            ))}
-          </ul>
-        )}
-        {error && (
-          <p role="alert" className="text-destructive text-sm">
-            {error}
-          </p>
-        )}
-      </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="space-y-1 text-xs">
-          <span className="text-muted-foreground font-medium">What&apos;s in it</span>
-          <select
-            className={selectClass}
-            value={mapping.kind}
-            onChange={(e) => set({ kind: e.target.value as SheetMapping["kind"] })}
-          >
-            <option value="transactions">Money in and out (a ledger or statement)</option>
-            <option value="budget">A budget (an amount per category)</option>
-          </select>
-        </label>
-        <label className="space-y-1 text-xs">
-          <span className="text-muted-foreground font-medium">Column names are in</span>
-          <select
-            className={selectClass}
-            value={mapping.headerRow}
-            onChange={(e) => set({ headerRow: Number(e.target.value) })}
-          >
-            <option value={-1}>No header row</option>
-            {sheet.rows.slice(0, 15).map((r, i) => (
-              <option key={i} value={i}>
-                Row {i + 1}: {r.filter(Boolean).slice(0, 3).join(", ").slice(0, 40)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {mapping.kind === "transactions" &&
-          has("amount") &&
-          !has("moneyIn") &&
-          !has("moneyOut") && (
-            <label className="space-y-1 text-xs">
-              <span className="text-muted-foreground font-medium">Money in or out</span>
-              <select
-                className={selectClass}
-                value={mapping.amountSign}
-                onChange={(e) => set({ amountSign: e.target.value as AmountSign })}
+        <section aria-label="Read with AI" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ConnectionPicker
+              orgSlug={orgSlug}
+              list={ai.list}
+              failed={ai.failed}
+              selected={ai.selected}
+              onChoose={ai.setChoice}
+              what="the first rows and each text column's values"
+            />
+            {ai.selected && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void readWithAi()}
+                disabled={reading}
               >
-                {AMOUNT_SIGNS.filter((s) => s !== "by-type" || typeCol >= 0).map((s) => (
-                  <option key={s} value={s}>
-                    {AMOUNT_SIGN_LABEL[s]}
-                  </option>
-                ))}
+                {reading ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Sparkles aria-hidden="true" />
+                )}
+                {reading
+                  ? "Reading…"
+                  : readBy
+                    ? "Read it again"
+                    : `Read it with ${ai.selected.label}`}
+              </Button>
+            )}
+          </div>
+          {readBy && (
+            <Badge variant="success" className="h-auto min-h-6 py-0.5 whitespace-normal">
+              <Check aria-hidden="true" />
+              Read by {readBy}
+              {categorized > 0
+                ? ` · ${categorized} value${categorized === 1 ? "" : "s"} sorted into categories`
+                : ""}
+            </Badge>
+          )}
+          {notes.length > 0 && (
+            <ul className="text-muted-foreground space-y-1 text-[13px]">
+              {notes.map((n, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  {n}
+                </li>
+              ))}
+            </ul>
+          )}
+          {error && <ErrorNotice>{error}</ErrorNotice>}
+        </section>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="space-y-1.5">
+            <span className="eyebrow text-muted-foreground block">What&apos;s in it</span>
+            <select
+              className={fieldSelect}
+              value={mapping.kind}
+              onChange={(e) => set({ kind: e.target.value as SheetMapping["kind"] })}
+            >
+              <option value="transactions">Money in and out (a ledger or statement)</option>
+              <option value="budget">A budget (an amount per category)</option>
+            </select>
+          </label>
+          <label className="space-y-1.5">
+            <span className="eyebrow text-muted-foreground block">Column names are in</span>
+            <select
+              className={fieldSelect}
+              value={mapping.headerRow}
+              onChange={(e) => set({ headerRow: Number(e.target.value) })}
+            >
+              <option value={-1}>No header row</option>
+              {sheet.rows.slice(0, 15).map((r, i) => (
+                <option key={i} value={i}>
+                  Row {i + 1}: {r.filter(Boolean).slice(0, 3).join(", ").slice(0, 40)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {mapping.kind === "transactions" &&
+            has("amount") &&
+            !has("moneyIn") &&
+            !has("moneyOut") && (
+              <label className="space-y-1.5">
+                <span className="eyebrow text-muted-foreground block">Money in or out</span>
+                <select
+                  className={fieldSelect}
+                  value={mapping.amountSign}
+                  onChange={(e) => set({ amountSign: e.target.value as AmountSign })}
+                >
+                  {AMOUNT_SIGNS.filter((s) => s !== "by-type" || typeCol >= 0).map((s) => (
+                    <option key={s} value={s}>
+                      {AMOUNT_SIGN_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          {mapping.kind === "transactions" && has("date") && (
+            <label className="space-y-1.5">
+              <span className="eyebrow text-muted-foreground block">Dates are written</span>
+              <select
+                className={fieldSelect}
+                value={mapping.dateOrder}
+                onChange={(e) => set({ dateOrder: e.target.value as DateOrder })}
+              >
+                <option value="MDY">Month first (9/5/2026 is Sep 5)</option>
+                <option value="DMY">Day first (5/9/2026 is Sep 5)</option>
+                <option value="YMD">Year first (2026-09-05)</option>
               </select>
             </label>
           )}
-        {mapping.kind === "transactions" && has("date") && (
-          <label className="space-y-1 text-xs">
-            <span className="text-muted-foreground font-medium">Dates are written</span>
-            <select
-              className={selectClass}
-              value={mapping.dateOrder}
-              onChange={(e) => set({ dateOrder: e.target.value as DateOrder })}
-            >
-              <option value="MDY">Month first (9/5/2026 is Sep 5)</option>
-              <option value="DMY">Day first (5/9/2026 is Sep 5)</option>
-              <option value="YMD">Year first (2026-09-05)</option>
-            </select>
-          </label>
-        )}
-      </div>
+        </div>
 
-      {mapping.kind === "transactions" &&
-        mapping.amountSign === "by-type" &&
-        typeValues.length > 0 && (
-          <div className="space-y-2 rounded-xl border p-3">
-            <p className="text-sm font-medium">What does each type mean?</p>
-            <ul className="flex flex-wrap gap-2">
-              {typeValues.map((v) => {
-                const way = mapping.typeIn.map(norm).includes(v)
-                  ? "in"
-                  : mapping.typeOut.map(norm).includes(v)
-                    ? "out"
-                    : "none";
-                return (
-                  <li
-                    key={v}
-                    className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
-                  >
-                    <span className="font-medium">{v}</span>
-                    <select
-                      aria-label={`${v} means`}
-                      className="border-input bg-background h-7 rounded-md border px-1 text-xs"
-                      value={way}
-                      onChange={(e) => setTypeValue(v, e.target.value as "in" | "out" | "none")}
+        {mapping.kind === "transactions" &&
+          mapping.amountSign === "by-type" &&
+          typeValues.length > 0 && (
+            <div className="bg-muted/60 rounded-tile space-y-3 p-4">
+              <p className="heading text-sm">What does each type mean?</p>
+              <ul className="flex flex-wrap gap-2">
+                {typeValues.map((v) => {
+                  const way = mapping.typeIn.map(norm).includes(v)
+                    ? "in"
+                    : mapping.typeOut.map(norm).includes(v)
+                      ? "out"
+                      : "none";
+                  return (
+                    <li
+                      key={v}
+                      className="bg-card ring-foreground/6 flex h-10 items-center gap-2 rounded-full pr-1 pl-3.5 text-[13px] ring-1"
                     >
-                      <option value="in">Money in</option>
-                      <option value="out">Money out</option>
-                      <option value="none">Not sure</option>
+                      <span className="font-semibold">{v}</span>
+                      <select
+                        aria-label={`${v} means`}
+                        className={cn(fieldSelectSm, "rounded-full")}
+                        value={way}
+                        onChange={(e) => setTypeValue(v, e.target.value as "in" | "out" | "none")}
+                      >
+                        <option value="in">Money in</option>
+                        <option value="out">Money out</option>
+                        <option value="none">Not sure</option>
+                      </select>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+      </ImportPanel>
+
+      <TableFrame bare={embedded}>
+        <Table className="min-w-max">
+          <TableHeader>
+            <TableRow>
+              {columns.map((c) => {
+                const mapped = (mapping.roles[c] ?? "ignore") !== "ignore";
+                return (
+                  <TableHead key={c} className="h-auto py-2.5 align-top">
+                    <select
+                      aria-label={`Column ${c + 1}${header?.[c] ? ` (${header[c]})` : ""}`}
+                      className={cn(
+                        fieldSelectSm,
+                        "w-full min-w-32",
+                        mapped
+                          ? "text-foreground border-foreground/30 font-semibold"
+                          : "text-muted-foreground bg-transparent",
+                      )}
+                      value={mapping.roles[c] ?? "ignore"}
+                      onChange={(e) =>
+                        onChange({
+                          mapping: setColumnRole(mapping, c, e.target.value as ColumnRole),
+                        })
+                      }
+                    >
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
                     </select>
-                  </li>
+                    <span className="mt-1.5 block max-w-48 truncate px-0.5 font-medium">
+                      {header?.[c] || `Column ${c + 1}`}
+                    </span>
+                  </TableHead>
                 );
               })}
-            </ul>
-          </div>
-        )}
-
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-max text-xs">
-          <thead className="bg-muted/50">
-            <tr>
-              {columns.map((c) => (
-                <th key={c} className="p-2 text-left align-top font-normal">
-                  <select
-                    aria-label={`Column ${c + 1}${header?.[c] ? ` (${header[c]})` : ""}`}
-                    className={cn(
-                      selectClass,
-                      mapping.roles[c] !== "ignore" && "border-primary/50 bg-primary/5",
-                    )}
-                    value={mapping.roles[c] ?? "ignore"}
-                    onChange={(e) =>
-                      onChange({ mapping: setColumnRole(mapping, c, e.target.value as ColumnRole) })
-                    }
-                  >
-                    {roles.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABEL[r]}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-muted-foreground mt-1 block max-w-48 truncate font-medium">
-                    {header?.[c] || `Column ${c + 1}`}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {preview.map((r, i) => (
-              <tr key={i} className="border-t">
+              <TableRow key={i}>
                 {columns.map((c) => (
-                  <td
+                  <TableCell
                     key={c}
                     className={cn(
-                      "max-w-56 truncate p-2",
-                      mapping.roles[c] === "ignore" ? "text-muted-foreground/70" : "",
+                      "max-w-56 truncate",
+                      mapping.roles[c] === "ignore" && "text-muted-foreground/70",
                     )}
                     title={r[c] ?? ""}
                   >
                     {r[c] ?? ""}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableFrame>
 
       {!money && (
-        <p className="text-muted-foreground text-sm">
+        <WarningNotice>
           Pick the column with the amounts (or the money in and money out columns) to go on.
-        </p>
+        </WarningNotice>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onBack}>
-          <ArrowLeft className="size-4" aria-hidden="true" />
+          <ArrowLeft aria-hidden="true" />
           Choose another file
         </Button>
         <Button type="button" onClick={onContinue} disabled={!money || dataRows <= 0}>
@@ -412,7 +435,7 @@ export function ImportColumns({
           {mapping.kind === "budget"
             ? "the budget"
             : `${dataRows.toLocaleString()} row${dataRows === 1 ? "" : "s"}`}
-          <ArrowRight className="size-4" aria-hidden="true" />
+          <ArrowRight aria-hidden="true" />
         </Button>
       </div>
     </div>

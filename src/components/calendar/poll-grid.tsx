@@ -190,7 +190,7 @@ export function PollGridFrame({
 
   return (
     <div
-      className="bg-background relative max-h-[min(70vh,44rem)] overflow-auto rounded-xl border"
+      className="bg-card text-card-foreground ring-foreground/6 edge rounded-card relative max-h-[min(70vh,44rem)] overflow-auto px-2 pb-2 ring-1"
       data-slot="poll-grid"
     >
       <table
@@ -200,7 +200,7 @@ export function PollGridFrame({
         aria-describedby={describedBy}
         aria-rowcount={grid.times.length + 1}
         aria-colcount={columnCount + 1}
-        className="w-full table-fixed border-separate border-spacing-x-[3px] border-spacing-y-px select-none"
+        className="w-full table-fixed border-separate border-spacing-x-1 border-spacing-y-[2px] select-none"
         style={{
           minWidth: `${AXIS_REM + columnCount * MIN_COL_REM}rem`,
           maxWidth: `${AXIS_REM + columnCount * MAX_COL_REM}rem`,
@@ -225,7 +225,7 @@ export function PollGridFrame({
                 month again where it changes. */}
             <td
               aria-hidden
-              className="bg-background text-muted-foreground sticky top-0 left-0 z-30 pr-1.5 pb-1.5 text-right align-bottom text-xs font-medium sm:text-transparent"
+              className="bg-card text-muted-foreground sticky top-0 left-0 z-30 pr-1.5 pb-1.5 text-right align-bottom text-xs font-medium sm:text-transparent"
             >
               {grid.days[0] ? dayHeader(grid.days[0]).month : null}
             </td>
@@ -236,16 +236,19 @@ export function PollGridFrame({
                 <th
                   key={day}
                   scope="col"
-                  className="bg-background sticky top-0 z-20 px-0.5 pt-2 pb-1.5 text-center font-normal"
+                  className="bg-card sticky top-0 z-20 px-0.5 pt-3 pb-2 text-center font-normal"
                 >
                   <span className="sr-only">{dayLabel(day)}</span>
                   <span
                     aria-hidden
-                    className="text-muted-foreground block text-[11px] leading-tight uppercase"
+                    className="text-muted-foreground block text-xs leading-tight font-medium"
                   >
                     {weekday}
                   </span>
-                  <span aria-hidden className="block truncate text-xs leading-tight font-medium">
+                  <span
+                    aria-hidden
+                    className="block truncate text-[13px] leading-tight font-semibold"
+                  >
                     <span className="sm:hidden">
                       {monthChanged ? `${month} ${dayOfMonth}` : dayOfMonth}
                     </span>
@@ -262,7 +265,7 @@ export function PollGridFrame({
               <th
                 scope="row"
                 className={cn(
-                  "bg-background text-muted-foreground sticky left-0 z-10 pr-1.5 text-right align-top text-[11px] leading-none font-normal tabular-nums",
+                  "bg-card text-muted-foreground sticky left-0 z-10 pr-1.5 text-right align-top text-[11px] leading-none font-normal tabular-nums",
                   // Dragging on the axis scrolls, even while the cells paint.
                   paintable && "touch-pan-y",
                 )}
@@ -285,8 +288,8 @@ export function PollGridFrame({
                     tabIndex={isFocus ? 0 : -1}
                     aria-label={cell.ariaLabel}
                     className={cn(
-                      "relative cursor-pointer rounded-[4px] p-0 outline-none",
-                      "focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-1",
+                      "relative cursor-pointer rounded-[8px] p-0 outline-none",
+                      "focus-visible:outline-foreground focus-visible:outline-2 focus-visible:outline-offset-1",
                       paintable && "touch-none",
                       // A little air above each hour, so a 15-minute grid reads in hours.
                       hourRow(time, row) && row > 0 && "pt-[3px]",
@@ -303,7 +306,7 @@ export function PollGridFrame({
                     <div
                       aria-hidden
                       className={cn(
-                        "flex size-full items-center justify-center rounded-[4px] border text-[11px] leading-none font-medium tabular-nums transition-colors",
+                        "flex size-full items-center justify-center rounded-[8px] border text-[11px] leading-none font-semibold tabular-nums transition-[background-color,box-shadow]",
                         cell.className,
                       )}
                       style={{ height: rowHeight - 1, ...cell.style }}

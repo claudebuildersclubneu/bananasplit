@@ -1,9 +1,18 @@
 "use client";
 
-import { ClipboardPaste, Download, FileText, Loader2, ShieldCheck, Upload } from "lucide-react";
+import {
+  ClipboardPaste,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { useAiConnections } from "@/components/ai/connection-picker";
+import { StepPills } from "@/components/databases/step-pills";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { DocumentRead } from "@/lib/ai/finance-sheet";
@@ -30,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { ImportColumns } from "./import-columns";
 import { ImportDone, type ImportSummary } from "./import-done";
 import { BudgetReview, ImportReview } from "./import-review";
+import { ErrorNotice, ImportPanel } from "./panel";
 
 /**
  * Bring past money records into Finance: a spreadsheet or bank export (read
@@ -82,7 +92,8 @@ export const STEPS = ["Choose", "Columns", "Review", "Done"] as const;
 function stepIndex(stage: Stage): number {
   if (stage.step === "source" || stage.step === "reading") return 0;
   if (stage.step === "columns") return 1;
-  if (stage.step === "done") return 3;
+  // Finished: every pill is done.
+  if (stage.step === "done") return STEPS.length;
   return 2;
 }
 
@@ -231,45 +242,13 @@ export function FinanceImport(props: FinanceImportProps) {
   const current = stepIndex(stage);
 
   return (
-    <div className="space-y-5">
-      {!props.embedded && (
-        <ol
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-          aria-label="Import steps"
-        >
-          {STEPS.map((s, i) => (
-            <li key={s} className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "grid size-5 place-items-center rounded-full border text-[11px] font-semibold",
-                  i < current && "bg-primary border-primary text-primary-foreground",
-                  i === current && "border-primary text-primary",
-                  i > current && "text-muted-foreground",
-                )}
-                aria-current={i === current ? "step" : undefined}
-              >
-                {i + 1}
-              </span>
-              <span className={cn(i === current ? "font-medium" : "text-muted-foreground")}>
-                {s}
-              </span>
-              {i < STEPS.length - 1 && <span className="bg-border h-px w-6" aria-hidden="true" />}
-            </li>
-          ))}
-        </ol>
-      )}
+    <div className="space-y-4.5">
+      {!props.embedded && <StepPills steps={STEPS} current={current} label="Import steps" />}
 
-      {error && (
-        <p
-          role="alert"
-          className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border p-3 text-sm"
-        >
-          {error}
-        </p>
-      )}
+      {error && <ErrorNotice>{error}</ErrorNotice>}
 
       {stage.step === "source" && (
-        <div className="space-y-4">
+        <ImportPanel embedded={props.embedded}>
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -283,20 +262,25 @@ export function FinanceImport(props: FinanceImportProps) {
               if (file) void pickFile(file);
             }}
             className={cn(
-              "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-              dragging ? "border-primary bg-primary/5" : "bg-muted/30",
+              "rounded-block flex flex-col items-center gap-3 border-[1.5px] border-dashed px-6 py-10 text-center transition-colors",
+              dragging ? "border-foreground bg-muted/60" : "border-border",
             )}
           >
+            <span className="bg-muted text-muted-foreground mb-1 grid size-14 place-items-center rounded-full">
+              <FileSpreadsheet className="size-6" aria-hidden="true" />
+            </span>
             <div className="space-y-1">
-              <p className="font-medium">Drop a spreadsheet, a bank export, a PDF or a photo</p>
-              <p className="text-muted-foreground text-sm">
+              <p className="heading text-[15px]">
+                Drop a spreadsheet, a bank export, a PDF or a photo
+              </p>
+              <p className="text-muted-foreground mx-auto max-w-prose text-sm">
                 CSV, Excel (.xlsx), a Venmo or bank statement, receipts, last year&apos;s budget.
                 Anything you kept money records in.
               </p>
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2 pt-1">
               <Button type="button" onClick={() => input.current?.click()}>
-                <Upload className="size-4" aria-hidden="true" />
+                <Upload aria-hidden="true" />
                 Choose a file
               </Button>
               <Button
@@ -305,7 +289,7 @@ export function FinanceImport(props: FinanceImportProps) {
                 onClick={() => setPasting((p) => !p)}
                 aria-expanded={pasting}
               >
-                <ClipboardPaste className="size-4" aria-hidden="true" />
+                <ClipboardPaste aria-hidden="true" />
                 Paste rows
               </Button>
             </div>
@@ -337,22 +321,27 @@ export function FinanceImport(props: FinanceImportProps) {
                 className="font-mono text-xs"
               />
               <div className="flex justify-end">
-                <Button type="button" onClick={() => void submitPasted()} disabled={!pasted.trim()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void submitPasted()}
+                  disabled={!pasted.trim()}
+                >
                   Use these rows
                 </Button>
               </div>
             </div>
           )}
 
-          <div className="text-muted-foreground grid gap-3 text-xs sm:grid-cols-2">
-            <p className="flex items-start gap-2">
+          <div className="text-muted-foreground grid gap-3 text-[13px] sm:grid-cols-2">
+            <p className="flex items-start gap-2.5">
               <ShieldCheck className="mt-px size-4 shrink-0" aria-hidden="true" />
               <span>
                 Spreadsheets are opened here in your browser; the file isn&apos;t uploaded. You
                 check every row, and only the ones you import are saved.
               </span>
             </p>
-            <p className="flex items-start gap-2">
+            <p className="flex items-start gap-2.5">
               <FileText className="mt-px size-4 shrink-0" aria-hidden="true" />
               <span>
                 PDFs and photos are read by your club&apos;s AI model (
@@ -360,33 +349,38 @@ export function FinanceImport(props: FinanceImportProps) {
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                  className="text-foreground focus-glow inline-flex items-center gap-1 rounded-sm font-medium underline underline-offset-3"
                 >
-                  <Download className="size-3" aria-hidden="true" />
+                  <Download className="size-3.5" aria-hidden="true" />
                   Download a template
                 </button>
               </span>
             </p>
           </div>
-        </div>
+        </ImportPanel>
       )}
 
       {stage.step === "reading" && (
-        <div
-          className="flex flex-col items-center gap-3 rounded-xl border px-6 py-12 text-center"
-          aria-live="polite"
-        >
-          <Loader2 className="text-primary size-6 animate-spin" aria-hidden="true" />
-          <p className="font-medium">Reading {stage.what}…</p>
-          <p className="text-muted-foreground text-sm">
-            {ai.selected?.label ?? "The AI model"} is listing the money records. This can take up to
-            a minute.
-          </p>
-        </div>
+        <ImportPanel embedded={props.embedded}>
+          <div className="mx-auto w-full max-w-md space-y-3 py-8 text-center" aria-live="polite">
+            <Loader2
+              className="text-muted-foreground mx-auto size-6 animate-spin"
+              aria-hidden="true"
+            />
+            <p className="heading text-[15px]">Reading {stage.what}…</p>
+            <p className="text-muted-foreground text-sm">
+              {ai.selected?.label ?? "The AI model"} is listing the money records. This can take up
+              to a minute.
+            </p>
+            {/* Not yet: the hatch, until the rows come back. */}
+            <div aria-hidden="true" className="bg-muted hatch h-2.5 rounded-full" />
+          </div>
+        </ImportPanel>
       )}
 
       {stage.step === "columns" && (
         <ImportColumns
+          embedded={props.embedded}
           orgId={orgId}
           orgSlug={orgSlug}
           today={today}
@@ -417,6 +411,7 @@ export function FinanceImport(props: FinanceImportProps) {
 
       {stage.step === "review" && (
         <ImportReview
+          embedded={props.embedded}
           orgId={orgId}
           orgSlug={orgSlug}
           fileName={fileName}
@@ -435,6 +430,7 @@ export function FinanceImport(props: FinanceImportProps) {
 
       {stage.step === "budget" && (
         <BudgetReview
+          embedded={props.embedded}
           orgId={orgId}
           initialLines={stage.lines}
           periods={props.periods}

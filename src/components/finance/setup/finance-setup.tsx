@@ -11,6 +11,7 @@ import {
   PiggyBank,
   Plus,
   Trash2,
+  TriangleAlert,
   Users,
   Wallet,
   type LucideIcon,
@@ -27,8 +28,12 @@ import { saveBudgetLines, setStartingBalance } from "@/app/app/[orgSlug]/finance
 import { changeMemberRole } from "@/app/app/[orgSlug]/settings/members/actions";
 import { BOARD_ICONS } from "@/components/boards/widget-board";
 import { FinanceImport } from "@/components/finance/import/finance-import";
+import { fieldSelect } from "@/components/finance/import/panel";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TickMeter } from "@/components/ui/meters";
+import { IconChip } from "@/components/ui/stat";
 import { toast } from "@/components/ui/toaster";
 import type { BoardWidget } from "@/lib/boards";
 import type { PeriodLike } from "@/lib/finance/import/plan";
@@ -122,6 +127,10 @@ export function FinanceSetup(props: FinanceSetupProps) {
     go(index + 1);
   };
   const doneCount = SETUP_STEPS.filter((s) => stepDone(state, s.id)).length;
+  // Whether the people step shows its own "Make treasurer" form (see PeopleStep).
+  const peopleCanSave =
+    props.canAppoint &&
+    props.members.some((m) => m.role === "MEMBER" && m.userId !== props.currentUserId);
   const meta = SETUP_STEPS[index];
   const strip = useRef<HTMLOListElement>(null);
 
@@ -136,56 +145,82 @@ export function FinanceSetup(props: FinanceSetupProps) {
     });
   }, [step]);
 
+  const MetaIcon = STEP_ICON[step];
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <nav aria-label="Setup steps" className="min-w-0 space-y-3">
-        <div className="space-y-1.5">
-          <p className="text-muted-foreground text-xs font-medium">
+    <div className="grid gap-4.5 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-7.5">
+      <nav aria-label="Setup steps" className="min-w-0 space-y-4">
+        <div className="space-y-2">
+          <p className="text-muted-foreground eyebrow tabular-nums">
             {doneCount} of {SETUP_STEPS.length} done
           </p>
-          <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-            <div
-              className="bg-primary h-full rounded-full transition-all"
-              style={{ width: `${(doneCount / SETUP_STEPS.length) * 100}%` }}
-            />
-          </div>
+          {/* Goal progress: one tick per step. */}
+          <TickMeter
+            total={SETUP_STEPS.length}
+            filled={doneCount}
+            label={`${doneCount} of ${SETUP_STEPS.length} setup steps done`}
+            color="var(--block-goal)"
+            height={10}
+            className="max-w-60"
+          />
         </div>
-        <ol ref={strip} className="flex gap-1 overflow-x-auto lg:flex-col">
+        {/* Phones: a strip of step pills. Wider: a spine of filled circles. */}
+        <ol ref={strip} className="-mx-1 flex gap-2 overflow-x-auto px-1 lg:flex-col lg:gap-1">
           {SETUP_STEPS.map((s, i) => {
             const done = stepDone(state, s.id);
+            const current = s.id === step;
             const StepIcon = STEP_ICON[s.id];
+            const last = i === SETUP_STEPS.length - 1;
             return (
-              <li key={s.id} className="shrink-0">
+              <li
+                key={s.id}
+                className={cn(
+                  "relative shrink-0",
+                  // The spine: a hairline from this circle down to the next one.
+                  !last &&
+                    "lg:after:bg-border lg:after:absolute lg:after:top-[calc(50%+16px)] lg:after:left-[25.5px] lg:after:h-[calc(100%-28px)] lg:after:w-px",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => setStep(s.id)}
-                  aria-current={s.id === step ? "step" : undefined}
+                  aria-current={current ? "step" : undefined}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
-                    s.id === step
-                      ? "bg-primary/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    "focus-visible:outline-foreground flex items-center gap-1.5 text-left whitespace-nowrap transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
+                    // Phone: a pill (current in the primary, done in the goal colour).
+                    "h-8 rounded-full px-3.5 text-[13px] font-semibold",
+                    current
+                      ? "max-lg:bg-primary max-lg:text-primary-foreground"
+                      : done
+                        ? "max-lg:bg-block-goal max-lg:text-block-goal-foreground"
+                        : "max-lg:bg-muted max-lg:text-muted-foreground",
+                    // Wider: a row on the spine; the current one is a soft tile.
+                    "lg:rounded-tile lg:h-auto lg:w-full lg:gap-3 lg:px-2.5 lg:py-2 lg:text-sm lg:font-medium lg:whitespace-normal",
+                    current
+                      ? "lg:bg-muted/70 lg:text-foreground"
+                      : "lg:text-muted-foreground lg:hover:bg-muted/50 lg:hover:text-foreground",
                   )}
                 >
                   <span
                     className={cn(
-                      "grid size-6 shrink-0 place-items-center rounded-full border text-[11px] font-semibold",
+                      "grid shrink-0 place-items-center rounded-full",
+                      "lg:relative lg:z-[1] lg:size-8",
                       done
-                        ? "bg-success border-success text-success-foreground"
-                        : s.id === step
-                          ? "border-primary text-primary"
-                          : "",
+                        ? "lg:bg-block-goal lg:text-block-goal-foreground"
+                        : current
+                          ? "lg:bg-primary lg:text-primary-foreground"
+                          : "lg:bg-muted lg:text-muted-foreground",
                     )}
                   >
                     {done ? (
-                      <Check className="size-3.5" aria-hidden="true" />
+                      <Check className="size-3.5 stroke-[2.5] lg:size-4" aria-hidden="true" />
                     ) : (
-                      <StepIcon className="size-3.5" aria-hidden="true" />
+                      <StepIcon className="size-3.5 lg:size-4" aria-hidden="true" />
                     )}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{s.title}</span>
-                    <span className="text-muted-foreground hidden text-xs lg:block">
+                    <span className="block truncate lg:font-semibold">{s.title}</span>
+                    <span className="text-muted-foreground hidden text-[13px] font-normal lg:block">
                       {i + 1}. {s.short}
                       {s.core ? "" : " · optional"}
                     </span>
@@ -198,17 +233,15 @@ export function FinanceSetup(props: FinanceSetupProps) {
         </ol>
       </nav>
 
-      <section
-        aria-labelledby="setup-step-title"
-        className="min-w-0 space-y-5 rounded-xl border p-5 sm:p-6"
-      >
-        <header>
-          <div className="min-w-0">
-            <p className="text-muted-foreground text-xs font-medium">
+      <Card role="region" aria-labelledby="setup-step-title" className="min-w-0 gap-5 px-5 sm:px-6">
+        <header className="flex items-start gap-3.5">
+          <IconChip icon={MetaIcon} size="md" />
+          <div className="min-w-0 space-y-1">
+            <p className="text-muted-foreground eyebrow">
               Step {index + 1} of {SETUP_STEPS.length}
               {meta.core ? "" : " · optional"}
             </p>
-            <h2 id="setup-step-title" className="heading text-lg">
+            <h2 id="setup-step-title" className="heading text-lg leading-tight">
               {meta.title}
             </h2>
             <p className="text-muted-foreground text-sm">{STEP_INTRO[step]}</p>
@@ -243,21 +276,23 @@ export function FinanceSetup(props: FinanceSetupProps) {
         )}
         {step === "board" && <BoardStep {...props} onSaved={next} />}
 
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+        <footer className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <Button
             type="button"
             variant="ghost"
             onClick={() => go(index - 1)}
             disabled={index === 0}
           >
-            <ArrowLeft className="size-4" aria-hidden="true" />
+            <ArrowLeft aria-hidden="true" />
             Back
           </Button>
           {/* Every step saves as it goes: leaving is just the Finance tabs. */}
           {(step === "people" || step === "records" || stepDone(state, step)) && (
             <Button
               type="button"
-              variant={step === "people" || step === "records" ? "default" : "outline"}
+              // The step's own save is its one primary; moving on is the
+              // primary only where the step has nothing to save.
+              variant={step === "people" && !peopleCanSave ? "default" : "outline"}
               onClick={next}
             >
               {index === SETUP_STEPS.length - 1
@@ -265,11 +300,11 @@ export function FinanceSetup(props: FinanceSetupProps) {
                 : stepDone(state, step)
                   ? "Next step"
                   : "Skip for now"}
-              <ArrowRight className="size-4" aria-hidden="true" />
+              <ArrowRight aria-hidden="true" />
             </Button>
           )}
         </footer>
-      </section>
+      </Card>
     </div>
   );
 }
@@ -300,19 +335,38 @@ function useSave() {
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p role="alert" className="text-destructive text-sm">
+    <p role="alert" className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm">
       {error}
     </p>
   );
 }
 
+/** A field's label: the muted 13px eyebrow above it. */
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <span className="eyebrow text-muted-foreground block">{children}</span>;
+}
+
+/** A choice tile's radio mark: a ring, filled with the text colour when chosen. */
+function RadioMark({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "mt-0.5 size-[18px] shrink-0 rounded-full transition-[border-width,border-color] duration-200",
+        on ? "border-foreground border-[5px]" : "border-muted-foreground/50 border-[1.5px]",
+      )}
+    />
+  );
+}
+
+/** The step's one primary commit. */
 function SaveButton({ pending, children }: { pending: boolean; children: ReactNode }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? (
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        <Loader2 className="animate-spin" aria-hidden="true" />
       ) : (
-        <Check className="size-4" aria-hidden="true" />
+        <Check aria-hidden="true" />
       )}
       {children}
     </Button>
@@ -396,37 +450,40 @@ function PeriodStep({ orgId, today, state, onSaved }: StepProps) {
                 });
             }}
             className={cn(
-              "rounded-lg border px-3 py-2.5 text-left transition-colors",
+              "rounded-tile focus-visible:outline-foreground flex items-start gap-3 px-4 py-3 text-left transition-[background-color,box-shadow] outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
               choice === o.id
-                ? "border-primary ring-primary/20 bg-primary/5 ring-2"
-                : "hover:border-foreground/20",
+                ? "bg-card ring-foreground shadow-e1 ring-[1.5px]"
+                : "bg-muted/60 hover:bg-muted",
             )}
           >
-            <span className="block text-sm font-medium">{o.title}</span>
-            <span className="text-muted-foreground block text-xs">{o.detail}</span>
+            <RadioMark on={choice === o.id} />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold">{o.title}</span>
+              <span className="text-muted-foreground block text-[13px]">{o.detail}</span>
+            </span>
           </button>
         ))}
       </div>
       {(choice === "custom" || choice === "edit") && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground text-xs font-medium">Name</span>
+          <label className="space-y-1.5">
+            <FieldLabel>Name</FieldLabel>
             <Input
               value={custom.label}
               onChange={(e) => setCustom({ ...custom, label: e.target.value })}
               placeholder="2026–27"
             />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground text-xs font-medium">First day</span>
+          <label className="space-y-1.5">
+            <FieldLabel>First day</FieldLabel>
             <Input
               type="date"
               value={custom.startsOn}
               onChange={(e) => setCustom({ ...custom, startsOn: e.target.value })}
             />
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="text-muted-foreground text-xs font-medium">Last day</span>
+          <label className="space-y-1.5">
+            <FieldLabel>Last day</FieldLabel>
             <Input
               type="date"
               value={custom.endsOn}
@@ -436,7 +493,7 @@ function PeriodStep({ orgId, today, state, onSaved }: StepProps) {
         </div>
       )}
       {current && choice !== "keep" && choice !== "edit" && (
-        <p className="text-muted-foreground text-xs">
+        <p className="bg-tint-info text-tint-info-foreground rounded-tile p-3 text-sm">
           Starting a new period makes it the current one. {current.label} keeps its transactions;
           its categories are copied over at $0.
         </p>
@@ -473,10 +530,10 @@ function BalanceStep({ orgId, today, state, onSaved }: StepProps) {
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,12rem)]">
-        <label className="space-y-1 text-sm">
-          <span className="text-muted-foreground text-xs font-medium">The club has</span>
+        <label className="space-y-1.5">
+          <FieldLabel>The club has</FieldLabel>
           <div className="relative">
-            <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
+            <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-sm">
               $
             </span>
             <Input
@@ -484,23 +541,23 @@ function BalanceStep({ orgId, today, state, onSaved }: StepProps) {
               onChange={(e) => setAmount(e.target.value)}
               inputMode="decimal"
               placeholder="0.00"
-              className="pl-6 text-base tabular-nums"
+              className="pl-7 tabular-nums"
               aria-label="Starting balance in dollars"
               aria-invalid={amount.trim() !== "" && cents === null}
             />
           </div>
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="text-muted-foreground text-xs font-medium">As of</span>
+        <label className="space-y-1.5">
+          <FieldLabel>As of</FieldLabel>
           <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         </label>
       </div>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-[13px]">
         Add up the bank account, Venmo, cash box and anything the school holds for you. Put a minus
         in front if the club owes money. Enter 0 to remove it.
       </p>
       {amount.trim() !== "" && cents === null && (
-        <p className="text-destructive text-sm">That isn&apos;t an amount.</p>
+        <p className="text-tint-danger-foreground text-sm">That isn&apos;t an amount.</p>
       )}
       <ErrorLine error={error} />
       <SaveButton pending={pending}>
@@ -543,7 +600,7 @@ function BudgetStep({ orgId, state, lines, onSaved }: StepProps) {
 
   if (!state.period) {
     return (
-      <p className="text-muted-foreground text-sm">
+      <p className="bg-muted/60 rounded-tile text-muted-foreground p-3 text-sm">
         Pick your budget period first (step 1), then set the budget lines.
       </p>
     );
@@ -590,7 +647,7 @@ function BudgetStep({ orgId, state, lines, onSaved }: StepProps) {
               maxLength={100}
             />
             <div className="relative w-28 shrink-0 sm:w-36">
-              <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
+              <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-sm">
                 $
               </span>
               <Input
@@ -602,7 +659,7 @@ function BudgetStep({ orgId, state, lines, onSaved }: StepProps) {
                 }
                 inputMode="decimal"
                 placeholder="0"
-                className="pl-6 text-right tabular-nums"
+                className="pl-7 text-right tabular-nums"
                 aria-label={`Budget for ${d.name || "this line"}`}
                 aria-invalid={centsOf(d) === null}
               />
@@ -615,42 +672,47 @@ function BudgetStep({ orgId, state, lines, onSaved }: StepProps) {
               onClick={() => setDrafts((ds) => ds.filter((x) => x.key !== d.key))}
               aria-label={`Remove ${d.name || "this line"}`}
             >
-              <Trash2 className="size-4" aria-hidden="true" />
+              <Trash2 aria-hidden="true" />
             </Button>
           </li>
         ))}
       </ul>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => add()}>
-          <Plus className="size-4" aria-hidden="true" />
+          <Plus aria-hidden="true" />
           Add a line
         </Button>
+        {/* Suggestions are add slots: dashed pills. */}
         {suggestions.map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => add(n)}
-            className="text-muted-foreground hover:border-primary/40 hover:text-foreground rounded-md border border-dashed px-2 py-1 text-xs"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline-foreground border-border inline-flex h-8 items-center rounded-full border-[1.5px] border-dashed px-3.5 text-[13px] font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             + {n}
           </button>
         ))}
       </div>
-      <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm">
+      <div className="bg-muted/60 rounded-tile flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 text-sm">
         <span>
-          Budgeted <span className="font-semibold tabular-nums">{formatCents(total)}</span>
+          Budgeted <span className="figure font-semibold">{formatCents(total)}</span>
           {balance !== null && (
-            <span className="text-muted-foreground"> of the {formatCents(balance)} you have</span>
+            <span className="text-muted-foreground figure">
+              {" "}
+              of the {formatCents(balance)} you have
+            </span>
           )}
         </span>
         {balance !== null && total > balance && (
-          <span className="text-warning text-xs">
+          <span className="flex items-start gap-2 text-[13px]">
+            <TriangleAlert className="text-warning mt-px size-4 shrink-0" aria-hidden="true" />
             That&apos;s more than the club has right now, which is fine if money is coming in.
           </span>
         )}
       </div>
       {invalid && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground text-[13px]">
           Every line needs a name and an amount (or leave the amount empty for $0).
         </p>
       )}
@@ -671,16 +733,20 @@ function PeopleStep({ orgId, members, canAppoint, currentUserId }: FinanceSetupP
 
   return (
     <div className="space-y-4">
-      <dl className="grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border p-3">
-          <dt className="text-muted-foreground text-xs font-medium">Owners</dt>
-          <dd className="text-sm font-medium">{names(owners)}</dd>
-          <dd className="text-muted-foreground mt-0.5 text-xs">Everything, money included.</dd>
+      <dl className="grid gap-2.5 sm:grid-cols-2">
+        <div className="bg-muted/60 rounded-tile space-y-1 p-4">
+          <dt className="eyebrow text-muted-foreground">Owners</dt>
+          <dd className="text-sm font-semibold">{names(owners)}</dd>
+          <dd className="text-muted-foreground text-[13px]">Everything, money included.</dd>
         </div>
-        <div className="rounded-xl border p-3">
-          <dt className="text-muted-foreground text-xs font-medium">Treasurers</dt>
-          <dd className="text-sm font-medium">{names(treasurers)}</dd>
-          <dd className="text-muted-foreground mt-0.5 text-xs">
+        <div className="bg-muted/60 rounded-tile space-y-1 p-4">
+          <dt className="eyebrow text-muted-foreground">Treasurers</dt>
+          <dd
+            className={cn("text-sm font-semibold", !treasurers.length && "text-muted-foreground")}
+          >
+            {names(treasurers)}
+          </dd>
+          <dd className="text-muted-foreground text-[13px]">
             The money: transactions, budget, approvals, sponsors.
           </dd>
         </div>
@@ -703,12 +769,10 @@ function PeopleStep({ orgId, members, canAppoint, currentUserId }: FinanceSetupP
               );
             }}
           >
-            <label className="min-w-56 flex-1 space-y-1 text-sm">
-              <span className="text-muted-foreground text-xs font-medium">
-                Make a member treasurer
-              </span>
+            <label className="min-w-56 flex-1 space-y-1.5">
+              <FieldLabel>Make a member treasurer</FieldLabel>
               <select
-                className="border-input bg-background h-8 w-full rounded-lg border px-2 text-sm"
+                className={fieldSelect}
                 value={pick}
                 onChange={(e) => setPick(e.target.value)}
               >
@@ -732,7 +796,7 @@ function PeopleStep({ orgId, members, canAppoint, currentUserId }: FinanceSetupP
           Owners and admins choose treasurers in Admin panel › Members.
         </p>
       )}
-      <p className="text-muted-foreground text-xs">
+      <p className="text-muted-foreground text-[13px]">
         Members can always ask to be paid back for what they bought; a treasurer or owner approves
         it, and nobody approves their own.
       </p>
@@ -778,9 +842,9 @@ function BoardStep({ orgId, board, onSaved }: StepProps) {
       }}
     >
       {groups.map((g) => (
-        <fieldset key={g} className="space-y-2">
-          <legend className="eyebrow text-muted-foreground">{g}</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
+        <fieldset key={g} className="space-y-2.5">
+          <legend className="eyebrow text-muted-foreground mb-2.5">{g}</legend>
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {FINANCE_WIDGETS.filter((w) => w.group === g).map((w) => {
               const WIcon = BOARD_ICONS[w.icon] ?? LayoutGrid;
               const on = picked.has(w.type);
@@ -792,25 +856,29 @@ function BoardStep({ orgId, board, onSaved }: StepProps) {
                   aria-checked={on}
                   onClick={() => toggle(w.type)}
                   className={cn(
-                    "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
-                    on ? "border-primary bg-primary/5" : "hover:border-foreground/20",
+                    "rounded-tile focus-visible:outline-foreground flex items-start gap-3 p-3 text-left transition-[background-color,box-shadow] outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
+                    on
+                      ? "bg-card ring-foreground shadow-e1 ring-[1.5px]"
+                      : "bg-muted/60 hover:bg-muted",
                   )}
                 >
                   <span
                     className={cn(
-                      "grid size-8 shrink-0 place-items-center rounded-md",
-                      on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                      "grid size-9 shrink-0 place-items-center rounded-full transition-colors",
+                      on
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground ring-foreground/6 ring-1",
                     )}
                   >
                     {on ? (
-                      <Check className="size-4" aria-hidden="true" />
+                      <Check className="size-4 stroke-[2.5]" aria-hidden="true" />
                     ) : (
                       <WIcon className="size-4" aria-hidden="true" />
                     )}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{w.title}</span>
-                    <span className="text-muted-foreground block text-xs">{w.description}</span>
+                    <span className="block text-sm font-semibold">{w.title}</span>
+                    <span className="text-muted-foreground block text-[13px]">{w.description}</span>
                   </span>
                 </button>
               );
@@ -819,19 +887,16 @@ function BoardStep({ orgId, board, onSaved }: StepProps) {
         </fieldset>
       ))}
       <div className="space-y-2">
-        <p className="text-muted-foreground text-xs font-medium">
-          Your dashboard ({preview.length} widgets)
+        <p className="eyebrow text-muted-foreground">
+          Your dashboard ({preview.length} widget{preview.length === 1 ? "" : "s"})
         </p>
-        <div
-          className="bg-muted/30 grid grid-cols-4 gap-1.5 rounded-xl border p-2"
-          aria-hidden="true"
-        >
+        <div className="bg-muted/60 rounded-tile grid grid-cols-4 gap-1.5 p-2" aria-hidden="true">
           {preview.map((w) => {
             const m = FINANCE_WIDGETS.find((x) => x.type === w.type);
             return (
               <div
                 key={w.id}
-                className="bg-background text-muted-foreground truncate rounded-md border px-1.5 py-2 text-[10px]"
+                className="bg-card text-muted-foreground ring-foreground/6 truncate rounded-[10px] px-2 py-2.5 text-[11px] font-medium ring-1"
                 style={{ gridColumn: `span ${Math.min(4, w.w)} / span ${Math.min(4, w.w)}` }}
               >
                 {m?.title}
