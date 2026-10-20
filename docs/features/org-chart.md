@@ -11,7 +11,37 @@ sense of, and for PDFs.
 
 ## For an org
 
-### 1. Get the chart in (three ways)
+### 1. Get the chart in (four ways)
+
+**Type it.** **Org Chart > Type the chart** (or **Import > Type or paste an
+outline**) opens a draft on **Type it**: one position per line, an outline
+beside a live chart.
+
+```
+President — @Maya Patel
+  Advisor: Faculty advisor — Dr. Lee
+  VP Events — @Ana Kim
+    Open: Events coordinator
+```
+
+- Indent a line under another to make it report to it. **Tab** indents,
+  **Shift+Tab** outdents, **Esc then Tab** leaves the field, Enter keeps the
+  indent. Any consistent indent works, and pasted bullets, numbered lists,
+  drawn trees (`├──`, `|--`) and markdown headings keep their shape.
+- The person follows a dash (— – - or --), a colon or a bar. **@** suggests
+  members; `@Name` links the member with exactly that name. A plain name is
+  a suggestion to confirm, and a name that isn't a member is flagged with
+  **Invite**.
+- **Open:** (or a person of Open, TBD, Vacant) marks an open role;
+  **Advisor:** or `(advisor)` an advisor.
+- **Not on the chart yet** lists members without a position: click one (or
+  drag it into the outline) to add them.
+- **Start from members** drafts positions from the titles members already
+  have (the top title at the top, advisors beside it, leads under it, and
+  the rest under the lead whose title shares a word with theirs).
+
+Typing keeps each position's responsibilities, decisions and confirmed
+link. **Edit positions** is the full editor below, on the same draft.
 
 **Import a document.** **Org Chart > Import**, then drop a file on the drop
 zone (or choose one).
@@ -94,8 +124,14 @@ Below that, the editor lists every position in an outline:
   top positions, unconfirmed matches, placeholders), plus notes from reading
   the document. **Open items** are questions the document left open.
 - **Preview** shows the chart as members will see it.
-- **Save draft** keeps your work; if someone else saved the same draft in the
-  meantime you are asked to reload instead of overwriting them.
+- Drafts **save themselves** a moment after each change (the same
+  editVersion check: if someone else saved the same draft in the meantime
+  you are asked to reload instead of overwriting them). **Undo** (or ⌘Z
+  outside a text field) steps back through your changes; **Save now** saves
+  at once.
+- **Titles to sync** lists linked members whose position and member title
+  differ: **Update member title** copies the position's title to Settings >
+  Members, **Use "..."** copies the member's title into the position.
 
 ### 4. Publish
 
@@ -142,9 +178,12 @@ who have left since show as placeholders in the restored chart.
 
 ### Browsing the chart (every member)
 
-- **Chart** is a zoomable, pannable tree (pinch and drag on a phone; the
-  buttons zoom and fit). **List** is the same chart as an accessible nested
-  list.
+- **Chart** is a zoomable, pannable tidy tree (pinch and drag on a phone;
+  the buttons zoom and fit) of pill tiles coloured by team (the chart's
+  top-level branches, in the theme's chart colours). The toggle under a
+  lead folds its branch; **Collapse teams** folds them all. **PNG**
+  downloads the chart as an image and **PDF** prints it (choose Save as
+  PDF). **List** is the same chart as an accessible nested list.
 - Click a position (or press Enter on it) to open its panel: title, person,
   reports to and manages (click to jump to them), advisors, responsibilities,
   decides alone, a link to the person's profile and their open tasks. The
@@ -173,8 +212,8 @@ who have left since show as placeholders in the restored chart.
 | Extraction | `src/server/org-chart/extract.ts` (sniffing, DOCX zip-bomb guards, PDF page cap) |
 | Starter structure | `src/lib/org-chart/starter.ts` |
 | Services | `src/server/org-chart/service.ts` (upload, drafts, publish, rollback, reads); `queries.ts` (cached published chart, `getReportingSubtree`) |
-| Pure logic | `src/lib/org-chart/` (schema, normalize, match, validate, layout, diff, draft operations) and `__fixtures__/` |
-| UI | `src/components/org-chart/` (canvas, list, side panel, editor, `editor/parse-report.tsx`) |
+| Pure logic | `src/lib/org-chart/` (schema, normalize, match, validate, layout, diff, draft operations, `outline.ts` for the typed chart, `teams.ts`, `export.ts`) and `__fixtures__/` |
+| UI | `src/components/org-chart/` (canvas, list, side panel, editor, `editor/outline-editor.tsx`, `editor/title-sync.tsx`, `export-chart.ts`, `editor/parse-report.tsx`) |
 
 ### How the two readers fit together
 
