@@ -78,6 +78,15 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     feature: "themes",
   },
   {
+    label: "Weekly pulse",
+    segment: "pulse",
+    description: "When the club's weekly recap goes out, to whom, and how.",
+    icon: "Activity",
+    group: "Club",
+    permission: "settings.view",
+    feature: "overview",
+  },
+  {
     label: "Labels",
     segment: "labels",
     description: "The shared label palette for tasks.",
