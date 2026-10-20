@@ -7,6 +7,8 @@ import {
   featureRefusal,
   isPaused,
   spaceIncludes,
+  spaceLimits,
+  spaceRefusal,
   spaceStatus,
   trialDaysLeft,
   trialEndsAtFrom,
@@ -18,6 +20,7 @@ const NOW = new Date("2026-10-13T12:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
 
 const personal: SpaceInfo = { kind: "PERSONAL", plan: "FREE", trialEndsAt: null };
+const plus: SpaceInfo = { kind: "PERSONAL", plan: "PERSONAL_PLUS", trialEndsAt: null };
 const trial = (endsInDays: number): SpaceInfo => ({
   kind: "CLUB",
   plan: "TRIAL",
@@ -27,18 +30,28 @@ const club: SpaceInfo = { kind: "CLUB", plan: "CLUB", trialEndsAt: null };
 const society: SpaceInfo = { kind: "CLUB", plan: "SOCIETY", trialEndsAt: null };
 
 describe("spaceIncludes", () => {
-  it("gives Personal tasks (every view), the calendar and RSVP pages, polls and settings", () => {
-    for (const f of ["rsvp", "tasks", "taskViews", "polls", "admin"] as const) {
-      expect(spaceIncludes(personal, f, NOW)).toBe(true);
+  it("gives both Personal plans tasks (every view), the calendar and RSVP pages, polls, notes and files, and settings", () => {
+    for (const space of [personal, plus]) {
+      for (const f of ["rsvp", "tasks", "taskViews", "polls", "admin", "files"] as const) {
+        expect(spaceIncludes(space, f, NOW)).toBe(true);
+      }
     }
   });
 
-  it("gives Personal nothing that needs a team", () => {
+  it("gives Personal Plus themes, calendar sync and AI, and Personal Free none of them", () => {
+    for (const f of ["themes", "integrations", "ai"] as const) {
+      expect(spaceIncludes(plus, f, NOW)).toBe(true);
+      expect(spaceIncludes(personal, f, NOW)).toBe(false);
+    }
+    expect(effectivePlan(plus)).toBe("PERSONAL_PLUS");
+    expect(effectivePlan(personal)).toBe("FREE");
+  });
+
+  it("gives Personal Free nothing that needs a team", () => {
     for (const f of [
       "overview",
       "teamwork",
       "labels",
-      "files",
       "people",
       "finance",
       "databases",
@@ -108,12 +121,34 @@ describe("trials", () => {
   });
 });
 
+describe("spaceLimits", () => {
+  it("follows the plan, and gives a trial (running or paused) Team Advanced's", () => {
+    expect(spaceLimits(personal).storageBytes).toBe(1024 ** 3);
+    expect(spaceLimits(plus).maxFileBytes).toBe(250 * 1024 ** 2);
+    expect(spaceLimits(club).noteHistoryDays).toBe(90);
+    expect(spaceLimits(trial(5))).toEqual(spaceLimits(society));
+    expect(spaceLimits(trial(-5))).toEqual(spaceLimits(society));
+  });
+});
+
+describe("spaceRefusal for notes and files", () => {
+  it("lets Personal Free and Plus and every club in, and refuses writes in a paused club", () => {
+    for (const space of [personal, plus, club, society, trial(3)]) {
+      expect(spaceRefusal(space, { feature: "files" }, NOW)).toBeNull();
+    }
+    expect(spaceRefusal(trial(-1), { feature: "files" }, NOW)?.refused).toBe("paused");
+    expect(spaceRefusal(trial(-1), { feature: "files", whenPaused: "allow" }, NOW)).toBeNull();
+  });
+});
+
 describe("featureRefusal", () => {
   it("points Personal at clubs and names a club's plan otherwise, never a price", () => {
     expect(featureRefusal(personal, "finance")).toBe(
       "Finance is for clubs. Start a club or join one to use it.",
     );
     expect(featureRefusal(club, "themes")).toBe("Custom themes isn't on this club's plan.");
+    expect(featureRefusal(personal, "themes")).toBe("Custom themes comes with Personal Plus.");
+    expect(featureRefusal(club, "files")).toBe("Notes and files aren't on this club's plan.");
     expect(featureRefusal(club, "themes")).not.toMatch(/\$/);
   });
 });

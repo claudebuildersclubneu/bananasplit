@@ -6,6 +6,7 @@ import {
   ArrowUpToLine,
   Banknote,
   Download,
+  Ticket,
   Trash2,
   UserPlus,
   UserX,
@@ -47,7 +48,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
-import { avatarTone, formatPhone, initials, instagramUrl } from "@/lib/rsvp/format";
+import { avatarTint } from "@/components/user-avatar";
+import { formatPhone, initials, instagramUrl } from "@/lib/rsvp/format";
 import { formatCents } from "@/lib/rsvp/pay";
 import { cn } from "@/lib/utils";
 
@@ -73,10 +75,13 @@ export interface RsvpGuest {
 
 type Filter = "all" | "GOING" | "WAITLIST" | "CANCELLED";
 
-const STATUS_BADGE: Record<RsvpGuest["status"], { label: string; className: string }> = {
-  GOING: { label: "Going", className: "bg-success/12 text-success" },
-  WAITLIST: { label: "Waitlist", className: "bg-warning/15 text-warning" },
-  CANCELLED: { label: "Cancelled", className: "bg-muted text-muted-foreground" },
+const STATUS_BADGE: Record<
+  RsvpGuest["status"],
+  { label: string; variant: "success" | "accent" | "secondary" }
+> = {
+  GOING: { label: "Going", variant: "success" },
+  WAITLIST: { label: "Waitlist", variant: "accent" },
+  CANCELLED: { label: "Cancelled", variant: "secondary" },
 };
 
 /** Quotes a CSV cell, and defuses spreadsheet formulas (=, +, -, @). */
@@ -250,12 +255,12 @@ export function RsvpGuests({
           ))}
         </div>
         <div className="ms-auto flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={guests.length === 0}>
+          <Button variant="outline" onClick={exportCsv} disabled={guests.length === 0}>
             <Download aria-hidden="true" />
             Export CSV
           </Button>
           {canAdd && (
-            <Button size="sm" onClick={() => setAdding(true)}>
+            <Button variant="create" onClick={() => setAdding(true)}>
               <UserPlus aria-hidden="true" />
               Add guest
             </Button>
@@ -264,8 +269,8 @@ export function RsvpGuests({
       </div>
 
       {inviters.length > 0 && (
-        <div className="bg-card flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border px-4 py-3 text-sm">
-          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+        <div className="bg-card ring-foreground/6 edge rounded-tile flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm ring-1">
+          <span className="text-muted-foreground text-[13px] font-medium">
             Brought the most friends
           </span>
           {inviters.map((g) => (
@@ -274,7 +279,7 @@ export function RsvpGuests({
                 aria-hidden="true"
                 className={cn(
                   "grid size-6 place-items-center rounded-full text-[10px] font-bold",
-                  avatarTone(g.name),
+                  avatarTint(g.name),
                 )}
               >
                 {initials(g.name)}
@@ -288,6 +293,7 @@ export function RsvpGuests({
 
       {guests.length === 0 ? (
         <EmptyState
+          icon={Ticket}
           title="Nobody has signed up yet"
           description={
             shareUrl
@@ -302,7 +308,7 @@ export function RsvpGuests({
           description="Try another name or filter."
         />
       ) : (
-        <div className="bg-card overflow-x-auto rounded-xl border">
+        <div className="bg-card ring-foreground/6 edge rounded-card overflow-x-auto p-2 ring-1">
           <Table>
             <TableHeader>
               <TableRow>
@@ -326,7 +332,7 @@ export function RsvpGuests({
                         aria-hidden="true"
                         className={cn(
                           "grid size-8 flex-none place-items-center rounded-full text-[11px] font-bold",
-                          avatarTone(g.name),
+                          avatarTint(g.name),
                         )}
                       >
                         {initials(g.name)}
@@ -368,7 +374,7 @@ export function RsvpGuests({
                     </a>
                   </TableCell>
                   <TableCell>
-                    <Badge className={STATUS_BADGE[g.status].className}>
+                    <Badge variant={STATUS_BADGE[g.status].variant}>
                       {STATUS_BADGE[g.status].label}
                     </Badge>
                   </TableCell>
@@ -380,9 +386,7 @@ export function RsvpGuests({
                       {g.status !== "GOING" ? (
                         <span className="text-muted-foreground text-xs">—</span>
                       ) : g.paid.confirmed ? (
-                        <Badge className="bg-success/12 text-success">
-                          Paid {formatCents(g.paid.cents ?? owes)}
-                        </Badge>
+                        <Badge variant="success">Paid {formatCents(g.paid.cents ?? owes)}</Badge>
                       ) : (
                         <Button
                           variant={g.paid.claimed ? "default" : "outline"}

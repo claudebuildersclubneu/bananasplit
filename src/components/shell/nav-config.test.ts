@@ -321,11 +321,11 @@ describe("Admin panel navigation", () => {
   it("shows each role the sections it may use", () => {
     expect(labels("OWNER")).toEqual([
       "General",
-      "Plan",
+      "Plan and storage",
       "Sidebar",
       "Theme",
       "Weekly pulse",
-      "Labels",
+      "Tags",
       "Members",
       "Privacy",
       "Integrations",
@@ -349,9 +349,10 @@ describe("Admin panel navigation", () => {
     expect(locked(club("TRIAL", new Date(Date.now() + 86_400_000)))).toEqual([]);
   });
 
-  it("gives Personal only its own settings: no members, invitations, plan or team settings", () => {
+  it("gives Personal only its own settings, its plan and storage, and no team settings", () => {
     expect(settingsNavItems("me", "OWNER", PERSONAL).map((i) => i.label)).toEqual([
       "General",
+      "Plan and storage",
       "Danger zone",
     ]);
   });

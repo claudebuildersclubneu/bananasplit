@@ -9,12 +9,14 @@ import {
   ArrowUpAZ,
   Check,
   CircleAlert,
+  Database,
   Download,
   Loader2,
   Maximize2,
   Pencil,
   Plus,
   RotateCcw,
+  SearchX,
   Settings2,
   Shapes,
   Trash2,
@@ -35,6 +37,7 @@ import {
   updateFieldAction,
 } from "@/app/app/[orgSlug]/databases/custom-actions";
 import { BackLink } from "@/components/back-link";
+import { EmptyState } from "@/components/empty-state";
 import { ItemMenu } from "@/components/item-menu";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -58,6 +61,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
 import {
   choicesVersion,
@@ -73,6 +84,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { CustomDatabase, CustomRecord } from "@/server/databases/custom";
 
+import { TableFrame } from "../table-frame";
 import { CellEditor, type Member } from "./cell-editor";
 import { ChoicesDialog, FieldNameDialog, NewFieldPopover } from "./field-dialogs";
 import { FieldIcon } from "./field-icon";
@@ -103,6 +115,10 @@ const WIDTH: Record<FieldType, number> = {
   PHONE: 160,
   URL: 200,
 };
+
+/** A row's ••• : quiet until the row is hovered or focused (always shown on touch). */
+const ROW_MENU =
+  "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100 focus-visible:opacity-100";
 
 /** Rows the export asks for at a time. */
 const EXPORT_PAGE = 2_000;
@@ -210,7 +226,7 @@ export function DatabaseGrid({
   const [renaming, setRenaming] = useState<FieldDef | null>(null);
   const [editingChoices, setEditingChoices] = useState<FieldDef | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const tableRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
   /** Bumped by every new list (a search, a reload): an older answer is dropped. */
   const listSeq = useRef(0);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -618,257 +634,282 @@ export function DatabaseGrid({
   const allShownSelected = shown.length > 0 && shown.every((r) => selected.has(r.id));
   const expandedRecord = records.find((r) => r.id === expanded) ?? null;
 
+  // The live summary under the title: how big the database is.
+  const summary = [
+    `${formatCount(total)} ${total === 1 ? "row" : "rows"}`,
+    `${fields.length} ${fields.length === 1 ? "field" : "fields"}`,
+  ].join(" · ");
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-7.5">
       {confirmEl}
-      <BackLink
-        href={trash ? base : `/app/${orgSlug}/databases`}
-        label={trash ? database.name : "Databases"}
-      />
-      <PageHeader
-        title={trash ? "Recently deleted" : database.name}
-        description={
-          trash
-            ? "Deleted rows. Restore them, or delete them for good."
-            : (database.description ?? undefined)
-        }
-        actions={
-          <>
-            {!trash && status}
-            {!trash && canEdit && (
-              <Button size="sm" onClick={() => void addRow()}>
-                <Plus aria-hidden="true" />
-                New row
-              </Button>
-            )}
-            {trash && database.canManage && records.length > 0 && (
-              <Button size="sm" variant="outline" onClick={() => void purge("all")}>
-                <Trash2 aria-hidden="true" />
-                Delete all for good
-              </Button>
-            )}
-            {!trash && (
-              <ItemMenu
-                label={`More actions for ${database.name}`}
-                items={[
-                  {
-                    label: exporting ? "Exporting…" : "Export CSV",
-                    icon: Download,
-                    onSelect: () => void exportCsv(),
-                  },
-                  {
-                    label: `Recently deleted${trashCount ? ` (${formatCount(trashCount)})` : ""}`,
-                    icon: Trash2,
-                    href: `${base}?trash=1`,
-                  },
-                  database.canManage && {
-                    label: "Settings",
-                    icon: Settings2,
-                    onSelect: () => setSettingsOpen(true),
-                    separated: true,
-                  },
-                ]}
-              />
-            )}
-          </>
-        }
-      />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchField
-          value={query}
-          onValueChange={search}
-          placeholder={`Search ${database.name}`}
-          aria-label={`Search ${database.name}`}
+      <div className="space-y-3">
+        <BackLink
+          href={trash ? base : `/app/${orgSlug}/databases`}
+          label={trash ? database.name : "Databases"}
         />
-        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs tabular-nums">
-          {loading === "search" && (
-            <Loader2 className="size-3.5 animate-spin" aria-label="Searching" />
-          )}
-          {next === null
-            ? `${formatCount(records.length)} ${noun(records.length)}`
-            : `${formatCount(records.length)} of ${formatCount(total)} ${noun(total)} loaded`}
-        </span>
-        {sort && next !== null && (
-          <span className="text-muted-foreground text-xs">
-            · Sorting the loaded rows; load the rest to sort them all.
-          </span>
-        )}
-        {!database.canEdit && !trash && (
-          <span className="text-muted-foreground text-xs">
-            · You can view this database; its owners and admins edit it.
-          </span>
-        )}
-        {selected.size > 0 && canEdit && (
-          <span className="ms-auto flex items-center gap-2">
-            <span className="text-sm">{formatCount(selected.size)} selected</span>
-            <Button size="sm" variant="outline" onClick={() => void trashRows([...selected])}>
-              <Trash2 aria-hidden="true" />
-              Delete
-            </Button>
-          </span>
-        )}
-      </div>
-
-      <div ref={tableRef} className="bg-card overflow-x-auto rounded-xl border">
-        <table className="w-max min-w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-[color-mix(in_oklab,var(--muted)_45%,var(--card))]">
-              {fields.map((f, i) => (
-                <th
-                  key={f.id}
-                  scope="col"
-                  style={{
-                    width: WIDTH[f.type] + (f.isPrimary && canEdit ? 36 : 0),
-                    minWidth: WIDTH[f.type] + (f.isPrimary && canEdit ? 36 : 0),
-                  }}
-                  className={cn(
-                    "border-r p-0 text-left font-medium",
-                    f.isPrimary &&
-                      "sticky left-0 z-10 bg-[color-mix(in_oklab,var(--muted)_45%,var(--card))]",
-                  )}
-                >
-                  {f.isPrimary && canEdit ? (
-                    <div className="flex items-center">
-                      <span className="grid w-9 shrink-0 place-items-center">
-                        <Checkbox
-                          aria-label="Select all rows"
-                          checked={allShownSelected}
-                          onCheckedChange={(v) =>
-                            setSelected(v === true ? new Set(shown.map((r) => r.id)) : new Set())
-                          }
-                        />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <FieldHeader
-                          field={f}
-                          index={i}
-                          count={fields.length}
-                          sort={sort}
-                          canManage={database.canManage && !trash}
-                          onSort={(dir) => setSort(dir ? { fieldId: f.id, dir } : null)}
-                          onRename={() => setRenaming(f)}
-                          onChoices={() => setEditingChoices(f)}
-                          onType={(t) => void changeType(f, t)}
-                          onMove={(d) => void move(f, d)}
-                          onDelete={() => void removeField(f)}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <FieldHeader
-                      field={f}
-                      index={i}
-                      count={fields.length}
-                      sort={sort}
-                      canManage={database.canManage && !trash}
-                      onSort={(dir) => setSort(dir ? { fieldId: f.id, dir } : null)}
-                      onRename={() => setRenaming(f)}
-                      onChoices={() => setEditingChoices(f)}
-                      onType={(t) => void changeType(f, t)}
-                      onMove={(d) => void move(f, d)}
-                      onDelete={() => void removeField(f)}
-                    />
-                  )}
-                </th>
-              ))}
-              {database.canManage && !trash && (
-                <th className="w-12 p-0">
-                  <NewFieldPopover
-                    onAdd={async (name, type) => {
-                      const field = await track(
-                        addFieldAction(orgId, database.id, {
-                          name,
-                          type,
-                          options: hasChoices(type) ? { choices: [] } : {},
-                        }),
-                      );
-                      if (field) setFields((fs) => [...fs, field]);
-                      return Boolean(field);
-                    }}
-                  />
-                </th>
-              )}
-              {trash && <th className="w-48 px-3 text-left font-medium">Deleted</th>}
-              <th className="w-12" aria-label="Row actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((r) => (
-              <GridRow
-                key={r.id}
-                record={r}
-                fields={fields}
-                primary={primary!}
-                members={members}
-                memberNames={memberNames}
-                canEdit={canEdit}
-                canManage={database.canManage}
-                canRestore={database.canEdit}
-                trash={trash}
-                selected={selected.has(r.id)}
-                formatDeleted={formatDeleted}
-                actions={actions}
-              />
-            ))}
-          </tbody>
-        </table>
-        {records.length === 0 ? (
-          searchedFor ? (
-            <p className="text-muted-foreground p-6 text-sm">No rows match “{searchedFor}”.</p>
-          ) : (
-            <div className="space-y-2 p-6">
-              <p className="heading text-sm">{trash ? "Nothing here" : "No rows yet"}</p>
-              <p className="text-muted-foreground text-sm">
-                {trash
-                  ? "Rows you delete show up here."
-                  : canEdit
-                    ? "Add the first row. Everything you type is saved automatically."
-                    : "Nothing has been added yet."}
-              </p>
-              {canEdit && (
-                <Button size="sm" variant="outline" onClick={() => void addRow()}>
+        <PageHeader
+          title={trash ? "Recently deleted" : database.name}
+          description={
+            trash
+              ? "Deleted rows. Restore them, or delete them for good."
+              : database.description
+                ? `${summary} · ${database.description}`
+                : summary
+          }
+          actions={
+            <>
+              {!trash && status}
+              {!trash && canEdit && (
+                <Button variant="create" onClick={() => void addRow()}>
                   <Plus aria-hidden="true" />
                   New row
                 </Button>
               )}
-            </div>
-          )
-        ) : null}
-        {next !== null && (
-          <div className="sticky left-0 flex w-full flex-wrap items-center justify-between gap-2 border-t px-3 py-2">
-            <span className="text-muted-foreground text-xs tabular-nums">
-              Showing {formatCount(records.length)} of {formatCount(total)} {noun(total)}.
+              {trash && database.canManage && records.length > 0 && (
+                <Button variant="destructive" onClick={() => void purge("all")}>
+                  <Trash2 aria-hidden="true" />
+                  Delete all for good
+                </Button>
+              )}
+              {!trash && (
+                <ItemMenu
+                  label={`More actions for ${database.name}`}
+                  className="border-input"
+                  items={[
+                    {
+                      label: exporting ? "Exporting…" : "Export CSV",
+                      icon: Download,
+                      onSelect: () => void exportCsv(),
+                    },
+                    {
+                      label: `Recently deleted${trashCount ? ` (${formatCount(trashCount)})` : ""}`,
+                      icon: Trash2,
+                      href: `${base}?trash=1`,
+                    },
+                    database.canManage && {
+                      label: "Settings",
+                      icon: Settings2,
+                      onSelect: () => setSettingsOpen(true),
+                      separated: true,
+                    },
+                  ]}
+                />
+              )}
+            </>
+          }
+        />
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <SearchField
+            value={query}
+            onValueChange={search}
+            placeholder={`Search ${database.name}`}
+            aria-label={`Search ${database.name}`}
+          />
+          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[13px] tabular-nums">
+            {loading === "search" && (
+              <Loader2 className="size-3.5 animate-spin" aria-label="Searching" />
+            )}
+            {next === null
+              ? `${formatCount(records.length)} ${noun(records.length)}`
+              : `${formatCount(records.length)} of ${formatCount(total)} ${noun(total)} loaded`}
+          </span>
+          {sort && next !== null && (
+            <span className="text-muted-foreground text-[13px]">
+              · Sorting the loaded rows; load the rest to sort them all.
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={loading !== null}
-              onClick={() => void loadMore()}
+          )}
+          {!database.canEdit && !trash && (
+            <span className="text-muted-foreground text-[13px]">
+              · You can view this database; its owners and admins edit it.
+            </span>
+          )}
+          {selected.size > 0 && canEdit && (
+            <span className="bg-muted ms-auto flex h-10 items-center gap-3 rounded-full ps-4 pe-1">
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCount(selected.size)} selected
+              </span>
+              <Button size="sm" variant="destructive" onClick={() => void trashRows([...selected])}>
+                <Trash2 aria-hidden="true" />
+                {selected.size === 1 ? "Delete row" : `Delete ${formatCount(selected.size)} rows`}
+              </Button>
+            </span>
+          )}
+        </div>
+
+        <TableFrame
+          className={cn(
+            // The first column sticks while the grid scrolls sideways: above
+            // the other header cells, and body cells pass under it.
+            "[&_thead_th[data-primary]]:z-20",
+          )}
+        >
+          <Table ref={tableRef} className="w-max min-w-full">
+            <TableHeader>
+              <TableRow>
+                {fields.map((f, i) => (
+                  <TableHead
+                    key={f.id}
+                    scope="col"
+                    data-primary={f.isPrimary || undefined}
+                    style={{
+                      width: WIDTH[f.type] + (f.isPrimary && canEdit ? 36 : 0),
+                      minWidth: WIDTH[f.type] + (f.isPrimary && canEdit ? 36 : 0),
+                    }}
+                    className={cn("px-1", f.isPrimary && "left-0")}
+                  >
+                    {f.isPrimary && canEdit ? (
+                      <div className="flex items-center">
+                        <span className="grid w-9 shrink-0 place-items-center">
+                          <Checkbox
+                            aria-label="Select all rows"
+                            checked={allShownSelected}
+                            onCheckedChange={(v) =>
+                              setSelected(v === true ? new Set(shown.map((r) => r.id)) : new Set())
+                            }
+                          />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <FieldHeader
+                            field={f}
+                            index={i}
+                            count={fields.length}
+                            sort={sort}
+                            canManage={database.canManage && !trash}
+                            onSort={(dir) => setSort(dir ? { fieldId: f.id, dir } : null)}
+                            onRename={() => setRenaming(f)}
+                            onChoices={() => setEditingChoices(f)}
+                            onType={(t) => void changeType(f, t)}
+                            onMove={(d) => void move(f, d)}
+                            onDelete={() => void removeField(f)}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <FieldHeader
+                        field={f}
+                        index={i}
+                        count={fields.length}
+                        sort={sort}
+                        canManage={database.canManage && !trash}
+                        onSort={(dir) => setSort(dir ? { fieldId: f.id, dir } : null)}
+                        onRename={() => setRenaming(f)}
+                        onChoices={() => setEditingChoices(f)}
+                        onType={(t) => void changeType(f, t)}
+                        onMove={(d) => void move(f, d)}
+                        onDelete={() => void removeField(f)}
+                      />
+                    )}
+                  </TableHead>
+                ))}
+                {database.canManage && !trash && (
+                  <TableHead className="w-12 px-1">
+                    <NewFieldPopover
+                      onAdd={async (name, type) => {
+                        const field = await track(
+                          addFieldAction(orgId, database.id, {
+                            name,
+                            type,
+                            options: hasChoices(type) ? { choices: [] } : {},
+                          }),
+                        );
+                        if (field) setFields((fs) => [...fs, field]);
+                        return Boolean(field);
+                      }}
+                    />
+                  </TableHead>
+                )}
+                {trash && <TableHead className="w-48">Deleted</TableHead>}
+                <TableHead className="w-12" aria-label="Row actions" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {shown.map((r) => (
+                <GridRow
+                  key={r.id}
+                  record={r}
+                  fields={fields}
+                  primary={primary!}
+                  members={members}
+                  memberNames={memberNames}
+                  canEdit={canEdit}
+                  canManage={database.canManage}
+                  canRestore={database.canEdit}
+                  trash={trash}
+                  selected={selected.has(r.id)}
+                  formatDeleted={formatDeleted}
+                  actions={actions}
+                />
+              ))}
+            </TableBody>
+          </Table>
+          {records.length === 0 ? (
+            searchedFor ? (
+              <EmptyState
+                icon={SearchX}
+                title={`No rows match “${searchedFor}”`}
+                description="Try another word, or clear the search."
+              />
+            ) : (
+              <EmptyState
+                icon={trash ? Trash2 : Database}
+                title={trash ? "Nothing here" : "No rows yet"}
+                description={
+                  trash
+                    ? "Rows you delete show up here."
+                    : canEdit
+                      ? "Add the first row. Everything you type is saved automatically."
+                      : "Nothing has been added yet."
+                }
+                action={
+                  canEdit ? (
+                    <Button variant="outline" onClick={() => void addRow()}>
+                      <Plus aria-hidden="true" />
+                      New row
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
+          ) : null}
+          {next !== null && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 pt-3 pb-1">
+              <span className="text-muted-foreground text-[13px] tabular-nums">
+                Showing {formatCount(records.length)} of {formatCount(total)} {noun(total)}.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading !== null}
+                onClick={() => void loadMore()}
+              >
+                {loading === "more" && <Loader2 className="animate-spin" aria-hidden="true" />}
+                Load more
+              </Button>
+            </div>
+          )}
+          {canEdit && records.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void addRow()}
+              className="text-muted-foreground hover:bg-muted/60 hover:text-foreground rounded-field focus-visible:outline-foreground mt-1 flex h-10 w-full items-center gap-2 px-3.5 text-sm font-medium transition-colors outline-none focus-visible:outline-2"
             >
-              {loading === "more" && <Loader2 className="animate-spin" aria-hidden="true" />}
-              Load more
-            </Button>
-          </div>
-        )}
-        {canEdit && records.length > 0 && (
-          <button
-            type="button"
-            onClick={() => void addRow()}
-            className="text-muted-foreground hover:bg-muted/40 hover:text-foreground sticky left-0 flex w-full items-center gap-2 border-t px-3 py-2 text-sm"
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            New row
-          </button>
-        )}
+              <Plus className="size-4" aria-hidden="true" />
+              New row
+            </button>
+          )}
+        </TableFrame>
       </div>
 
       <Sheet open={expandedRecord !== null} onOpenChange={(o) => !o && setExpanded(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-md">
           {expandedRecord && (
             <>
-              <SheetHeader>
-                <SheetTitle>
+              <SheetHeader className="gap-1 px-6 pt-6 pr-14 pb-5">
+                <SheetTitle className="text-[19px]">
                   {displayText(primary!, expandedRecord.values[primary!.id], memberNames) ||
                     "Untitled row"}
                 </SheetTitle>
@@ -878,14 +919,14 @@ export function DatabaseGrid({
                     : "Every change saves as you make it."}
                 </SheetDescription>
               </SheetHeader>
-              <dl className="space-y-3 px-4 pb-6">
+              <dl className="space-y-4 px-6 pb-8">
                 {fields.map((f) => (
-                  <div key={f.id} className="space-y-1">
-                    <dt className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+                  <div key={f.id} className="space-y-1.5">
+                    <dt className="text-muted-foreground flex items-center gap-1.5 text-[13px] font-medium">
                       <FieldIcon type={f.type} />
                       {f.name}
                     </dt>
-                    <dd className="rounded-md border p-0.5">
+                    <dd className="border-input rounded-field border">
                       <CellEditor
                         field={f}
                         value={expandedRecord.values[f.id]}
@@ -973,10 +1014,7 @@ const GridRow = memo(function GridRow({
 }) {
   const name = displayText(primary, r.values[primary.id], memberNames);
   return (
-    <tr
-      data-row={r.id}
-      className="group/row border-b last:border-b-0 hover:bg-[color-mix(in_oklab,var(--muted)_25%,var(--card))]"
-    >
+    <TableRow data-row={r.id} data-state={selected ? "selected" : undefined} className="group/row">
       {fields.map((f) => {
         const cell = (
           <CellEditor
@@ -991,18 +1029,19 @@ const GridRow = memo(function GridRow({
           />
         );
         return (
-          <td
+          <TableCell
             key={f.id}
             data-primary={f.isPrimary || undefined}
             className={cn(
-              "border-r p-0.5",
+              "p-1",
+              // The sticky first column needs an opaque fill, matching the row's.
               f.isPrimary &&
-                "bg-card sticky left-0 z-10 font-medium group-hover/row:bg-[color-mix(in_oklab,var(--muted)_25%,var(--card))]",
+                "bg-card sticky left-0 z-[5] font-medium group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--glow)_16%,var(--card))]",
             )}
           >
             {f.isPrimary && canEdit ? (
               <div className="flex items-center">
-                <span className="grid w-8 shrink-0 place-items-center">
+                <span className="grid w-9 shrink-0 place-items-center">
                   <Checkbox
                     aria-label={`Select ${name || "row"}`}
                     checked={selected}
@@ -1014,19 +1053,20 @@ const GridRow = memo(function GridRow({
             ) : (
               cell
             )}
-          </td>
+          </TableCell>
         );
       })}
-      {canManage && !trash && <td />}
+      {canManage && !trash && <TableCell className="p-1" />}
       {trash && (
-        <td className="text-muted-foreground px-3 text-xs whitespace-nowrap">
+        <TableCell className="text-muted-foreground text-[13px] tabular-nums">
           {r.deletedAt ? formatDeleted(r.deletedAt) : ""}
-        </td>
+        </TableCell>
       )}
-      <td className="px-1">
+      <TableCell className="px-1 py-1">
         {trash ? (
           <ItemMenu
             label="Row actions"
+            className={ROW_MENU}
             items={[
               canRestore && {
                 label: "Restore",
@@ -1045,6 +1085,7 @@ const GridRow = memo(function GridRow({
         ) : (
           <ItemMenu
             label="Row actions"
+            className={ROW_MENU}
             items={[
               { label: "Expand row", icon: Maximize2, onSelect: () => actions.expand(r.id) },
               canEdit && {
@@ -1057,8 +1098,8 @@ const GridRow = memo(function GridRow({
             ]}
           />
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 });
 
@@ -1088,12 +1129,18 @@ function FieldHeader({
   onDelete: () => void;
 }) {
   const sorted = sort?.fieldId === field.id ? sort.dir : null;
+  // Numbers and money sit right-aligned, their header too.
+  const numeric = field.type === "NUMBER" || field.type === "CURRENCY";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="hover:bg-muted/60 flex h-9 w-full items-center gap-1.5 px-2 text-left text-xs font-medium"
+          className={cn(
+            "hover:text-foreground hover:bg-muted-strong/60 data-[state=open]:bg-muted-strong/60 data-[state=open]:text-foreground rounded-field focus-visible:outline-foreground flex h-8 w-full items-center gap-1.5 px-2.5 text-left text-[12.5px] font-semibold transition-colors outline-none focus-visible:outline-2",
+            numeric && "flex-row-reverse text-right",
+            sorted && "text-foreground",
+          )}
           aria-label={`${field.name} (${FIELD_TYPE_META[field.type].label}) options`}
         >
           <FieldIcon type={field.type} />

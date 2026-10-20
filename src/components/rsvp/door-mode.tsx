@@ -1,12 +1,13 @@
 "use client";
 
-import { Camera, Check, Search, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { setGuestCheckedIn } from "@/app/app/[orgSlug]/calendar/[eventId]/rsvp/actions";
-import { avatarTone, doorScan, initials } from "@/lib/rsvp/format";
+import { avatarTint } from "@/components/user-avatar";
+import { doorScan, initials } from "@/lib/rsvp/format";
 import { formatCents } from "@/lib/rsvp/pay";
 import { cn } from "@/lib/utils";
 
@@ -136,52 +137,67 @@ export function DoorMode({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 pb-24">
-      <div className="flex items-start justify-between gap-3">
+    <div className="bg-chrome text-chrome-foreground rounded-shell shadow-e3 mx-auto flex w-full max-w-2xl flex-col gap-5 p-5 pb-24 sm:p-8 sm:pb-24">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href={backHref} className="text-muted-foreground text-sm hover:underline">
-            ← Back to the guest list
+          <Link
+            href={backHref}
+            className="group/back text-chrome-foreground/70 hover:text-chrome-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <span className="border-chrome-foreground/25 group-hover/back:bg-chrome-foreground/10 grid size-8 place-items-center rounded-full border transition-colors">
+              <ArrowLeft className="size-4" aria-hidden="true" />
+            </span>
+            Guest list
           </Link>
-          <h1 className="heading mt-1 truncate text-2xl">{title}</h1>
-          <p className="text-muted-foreground text-sm">{when}</p>
+          <h1 className="display-title mt-4 text-[clamp(28px,5vw,40px)] break-words">{title}</h1>
+          <p className="text-chrome-foreground/70 mt-1.5 text-base">{when}</p>
         </div>
-        <div className="bg-card flex-none rounded-xl border px-4 py-2 text-center">
-          <p className="heading text-2xl tabular-nums">
+        <div className="flex-none text-right">
+          <p className="numeral text-[56px] tabular-nums">
             {inCount}
-            <span className="text-muted-foreground text-base">/{going.length}</span>
+            <span className="text-chrome-foreground/50 text-[28px]">/{going.length}</span>
           </p>
-          <p className="text-muted-foreground text-xs">in</p>
+          <p className="text-chrome-foreground/70 mt-1 text-sm font-medium">checked in</p>
         </div>
       </div>
 
-      <div className="bg-muted h-2 overflow-hidden rounded-full">
+      <div
+        className="bg-chrome-foreground/12 h-2.5 overflow-hidden rounded-full"
+        role="img"
+        aria-label={`${inCount} of ${going.length} checked in`}
+      >
         <div
-          className="bg-primary h-full rounded-full transition-[width]"
+          className="bg-glow h-full rounded-full shadow-[0_0_12px_var(--glow)] transition-[width] duration-500 ease-(--ease-ink) motion-reduce:transition-none"
           style={{ width: `${going.length ? (inCount / going.length) * 100 : 0}%` }}
         />
       </div>
 
       <div className="flex gap-2">
-        <label className="bg-card focus-within:ring-ring flex h-14 min-w-0 flex-1 items-center gap-3 rounded-xl border px-4 focus-within:ring-2">
-          <Search className="text-muted-foreground size-5" aria-hidden="true" />
+        <label className="bg-chrome-foreground/8 focus-within:outline-chrome-foreground flex h-14 min-w-0 flex-1 items-center gap-3 rounded-full px-5 focus-within:outline-2 focus-within:outline-offset-2">
+          <Search className="text-chrome-foreground/60 size-5" aria-hidden="true" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find a guest"
             aria-label="Find a guest by name"
-            className="min-w-0 flex-1 bg-transparent text-lg outline-none"
+            className="placeholder:text-chrome-foreground/50 min-w-0 flex-1 bg-transparent text-lg outline-none"
           />
           {query && (
-            <button type="button" aria-label="Clear" onClick={() => setQuery("")}>
-              <X className="text-muted-foreground size-5" aria-hidden="true" />
+            <button
+              type="button"
+              aria-label="Clear"
+              onClick={() => setQuery("")}
+              className="hover:bg-chrome-foreground/10 grid size-8 place-items-center rounded-full"
+            >
+              <X className="text-chrome-foreground/70 size-5" aria-hidden="true" />
             </button>
           )}
         </label>
         <button
           type="button"
           onClick={() => setScanning(true)}
-          className="bg-primary text-primary-foreground flex h-14 items-center gap-2 rounded-xl px-5 font-semibold"
+          className="bg-chrome-foreground text-chrome focus-visible:outline-chrome-foreground flex h-14 items-center gap-2 rounded-full px-6 text-base font-semibold transition-transform outline-none focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.97]"
         >
           <Camera className="size-5" aria-hidden="true" />
           Scan
@@ -200,8 +216,10 @@ export function DoorMode({
               aria-pressed={showAll === value}
               onClick={() => setShowAll(value as boolean)}
               className={cn(
-                "rounded-full border px-3 py-1.5 font-medium",
-                showAll === value ? "bg-foreground text-background" : "bg-card",
+                "h-9 rounded-full px-4 font-semibold transition-colors",
+                showAll === value
+                  ? "bg-chrome-foreground text-chrome"
+                  : "bg-chrome-foreground/8 hover:bg-chrome-foreground/14",
               )}
             >
               {label as string}
@@ -217,22 +235,22 @@ export function DoorMode({
             <li
               key={g.id}
               className={cn(
-                "bg-card flex items-center gap-3 rounded-xl border p-3",
-                checked && "opacity-70",
+                "bg-chrome-foreground/6 rounded-block flex items-center gap-4 p-3 ps-4",
+                checked && "opacity-75",
               )}
             >
               <span
                 aria-hidden="true"
                 className={cn(
                   "grid size-11 flex-none place-items-center rounded-full text-sm font-bold",
-                  avatarTone(g.name),
+                  avatarTint(g.name),
                 )}
               >
                 {initials(g.name)}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-semibold">{g.name}</span>
-                <span className="text-muted-foreground block text-xs">
+                <span className="block truncate text-xl font-semibold">{g.name}</span>
+                <span className="text-chrome-foreground/65 block text-sm">
                   {[
                     g.status === "WAITLIST" ? "Waitlist" : null,
                     g.owes === null
@@ -249,8 +267,10 @@ export function DoorMode({
                 type="button"
                 onClick={() => checkIn(g, !checked)}
                 className={cn(
-                  "flex h-12 min-w-28 items-center justify-center gap-1.5 rounded-xl px-4 text-base font-semibold",
-                  checked ? "bg-success/15 text-success" : "bg-primary text-primary-foreground",
+                  "flex h-14 min-w-32 items-center justify-center gap-1.5 rounded-full px-5 text-lg font-semibold transition-[background-color,transform] active:scale-[0.97]",
+                  checked
+                    ? "bg-block-goal text-block-goal-foreground"
+                    : "bg-chrome-foreground text-chrome",
                 )}
                 aria-label={checked ? `Undo ${g.name}'s check-in` : `Check in ${g.name}`}
               >
@@ -266,7 +286,7 @@ export function DoorMode({
           );
         })}
         {shown.length === 0 && (
-          <li className="text-muted-foreground py-8 text-center text-sm">
+          <li className="text-chrome-foreground/70 py-10 text-center text-lg">
             {query
               ? "Nobody by that name. Add them from the guest list."
               : going.length === 0
@@ -280,13 +300,13 @@ export function DoorMode({
         <div
           role="status"
           className={cn(
-            "fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-2xl px-5 py-4 shadow-lg",
-            flash.tone === "ok" && "bg-success text-white",
-            flash.tone === "warn" && "bg-warning text-black",
-            flash.tone === "bad" && "bg-destructive text-white",
+            "rounded-block shadow-e3 fixed inset-x-4 bottom-[calc(var(--shell-bottom,0px)+1rem)] z-50 mx-auto max-w-xl px-6 py-5",
+            flash.tone === "ok" && "bg-block-goal text-block-goal-foreground",
+            flash.tone === "warn" && "bg-block-answer text-block-answer-foreground",
+            flash.tone === "bad" && "bg-block-alert text-block-alert-foreground",
           )}
         >
-          <p className="text-lg font-bold">{flash.title}</p>
+          <p className="text-xl font-bold">{flash.title}</p>
           {flash.detail && <p className="text-sm opacity-90">{flash.detail}</p>}
         </div>
       )}

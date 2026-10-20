@@ -16,9 +16,11 @@ import { InstagramLink } from "@/components/rsvp/instagram-link";
 import { MapEmbed } from "@/components/rsvp/map-embed";
 import { QrCode } from "@/components/rsvp/qr-code";
 import { RegistrationCard } from "@/components/rsvp/registration-card";
+import { BlockCard } from "@/components/ui/block-card";
+import { avatarTint } from "@/components/user-avatar";
+import { Gauge } from "@/components/ui/meters";
 import { appUrl } from "@/lib/app-url";
 import {
-  avatarTone,
   googleCalendarUrl,
   initials,
   mapsEmbedUrl,
@@ -168,6 +170,9 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
         <main className="mx-auto grid w-full max-w-[1000px] flex-1 gap-8 px-5 pt-2 pb-16 sm:px-8 md:grid-cols-[300px_minmax(0,1fr)] md:gap-12 md:pt-6">
           <aside className="flex flex-col gap-8">
             <Cover page={page} />
+            <div className="hidden md:block">
+              <Capacity page={page} />
+            </div>
             <div className="hidden flex-col gap-8 md:flex">{hostedAndGuests}</div>
           </aside>
 
@@ -178,7 +183,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                   <span
                     className={cn(
                       "grid size-7 place-items-center rounded-full text-[11px] font-bold",
-                      avatarTone(page.invitedBy),
+                      avatarTint(page.invitedBy),
                     )}
                   >
                     {initials(page.invitedBy)}
@@ -193,8 +198,8 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
               <div className="flex flex-col gap-3.5">
                 <InfoRow
                   tile={
-                    <span className="flex w-12 flex-col overflow-hidden rounded-xl border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-center">
-                      <span className="bg-banana text-banana-ink py-[2px] text-[10px] font-bold tracking-[0.08em]">
+                    <span className="rounded-tile flex w-12 flex-col overflow-hidden border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-center">
+                      <span className="bg-brand-accent text-brand-accent-foreground py-[2px] text-[11px] font-semibold lowercase first-letter:uppercase">
                         {tile.month}
                       </span>
                       <span className="font-heading py-0.5 text-[20px] leading-7">{tile.day}</span>
@@ -251,6 +256,11 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                   />
                 )}
               </div>
+            </div>
+
+            {/* On a phone the goal block sits by the form, not above the title. */}
+            <div className="md:hidden">
+              <Capacity page={page} />
             </div>
 
             <RegistrationCard
@@ -348,7 +358,7 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
                     </div>
                   )}
                   {page.locationDetails && (
-                    <div className="flex gap-3 rounded-2xl border border-(--rsvp-tile-line) bg-(--rsvp-tile) p-4">
+                    <div className="rounded-tile flex gap-3 border border-(--rsvp-tile-line) bg-(--rsvp-tile) p-4">
                       <DoorOpen
                         className="mt-0.5 size-5 flex-none text-(--rsvp-soft)"
                         aria-hidden="true"
@@ -401,6 +411,26 @@ export default async function RsvpPage({ params, searchParams }: PageProps<"/e/[
   );
 }
 
+/**
+ * The goal block: how full the event is, as a gauge. Only with a cap, and
+ * only when the host shows the count.
+ */
+function Capacity({ page }: { page: RsvpPageData }) {
+  if (!page.capacity || page.going === null) return null;
+  const left = Math.max(0, page.capacity - page.going);
+  return (
+    <BlockCard
+      tone="goal"
+      kicker={page.ended ? "Ended" : left === 0 ? "Full" : "Spots"}
+      title={left === 0 ? "Every spot is taken" : `${left} ${left === 1 ? "spot" : "spots"} left`}
+      figure={page.going}
+      figureLabel={`of ${page.capacity} going${page.waitlisting ? ` · ${page.waitlisting} waitlisted` : ""}`}
+      aside={<Gauge value={(page.going / page.capacity) * 100} size={132} />}
+      className="min-h-0 max-md:max-w-[440px]"
+    />
+  );
+}
+
 function Cover({ page }: { page: RsvpPageData }) {
   if (page.cover) {
     return (
@@ -410,7 +440,7 @@ function Cover({ page }: { page: RsvpPageData }) {
         alt=""
         width={960}
         height={960}
-        className="shadow-float aspect-square w-full rounded-[22px] object-cover max-md:max-w-[440px]"
+        className="shadow-e2 rounded-block aspect-square w-full object-cover ring-1 ring-(--rsvp-tile-line) max-md:max-w-[440px]"
       />
     );
   }
@@ -418,9 +448,9 @@ function Cover({ page }: { page: RsvpPageData }) {
   return (
     <div
       aria-hidden="true"
-      className="bg-banana grid aspect-square w-full place-items-center overflow-hidden rounded-[22px] max-md:max-w-[440px]"
+      className="bg-muted rounded-block grid aspect-square w-full place-items-center overflow-hidden bg-[radial-gradient(120%_90%_at_25%_12%,color-mix(in_oklab,var(--glow)_55%,transparent),transparent_70%)] ring-1 ring-(--rsvp-tile-line) max-md:max-w-[440px]"
     >
-      <span className="font-heading text-banana-ink text-[120px] leading-none tracking-[-0.05em]">
+      <span className="font-heading text-foreground text-[120px] leading-none tracking-[-0.05em]">
         {page.title.trim()[0]?.toUpperCase() ?? "B"}
       </span>
     </div>
@@ -429,7 +459,7 @@ function Cover({ page }: { page: RsvpPageData }) {
 
 function IconTile({ icon }: { icon: React.ReactNode }) {
   return (
-    <span className="grid size-12 place-items-center rounded-xl border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-(--rsvp-soft)">
+    <span className="grid size-12 place-items-center rounded-full border border-(--rsvp-tile-line) bg-(--rsvp-tile) text-(--rsvp-soft)">
       {icon}
     </span>
   );
@@ -458,9 +488,7 @@ function InfoRow({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-t border-(--rsvp-line) pt-5">
-      <h2 className="m-0 text-[13px] font-bold tracking-[0.06em] text-(--rsvp-soft) uppercase">
-        {title}
-      </h2>
+      <h2 className="m-0 text-[17px] font-semibold text-(--rsvp-fg)">{title}</h2>
       {children}
     </section>
   );
@@ -475,7 +503,7 @@ function HostedBy({ page }: { page: RsvpPageData }) {
             // eslint-disable-next-line @next/next/no-img-element -- a stored 64px WebP variant
             <img src={page.org.logoUrl} alt="" className="size-9 rounded-xl object-cover" />
           ) : (
-            <span className="bg-ink text-cream font-heading grid size-9 place-items-center rounded-xl text-[16px] ring-1 ring-(--rsvp-tile-line)">
+            <span className="bg-primary text-primary-foreground font-heading grid size-9 place-items-center rounded-xl text-[16px] ring-1 ring-(--rsvp-tile-line)">
               {page.org.name.trim()[0]?.toUpperCase()}
             </span>
           )}
@@ -494,8 +522,8 @@ function HostedBy({ page }: { page: RsvpPageData }) {
   );
 }
 
-/** Faces in the row before "+N". */
-const AVATARS = 8;
+/** Faces in the stack before "+N" (three, as everywhere). */
+const AVATARS = 3;
 /** Names in the list before "See everyone". */
 const LISTED = 6;
 
@@ -506,7 +534,7 @@ function GuestRow({ guest }: { guest: RsvpGuest }) {
         aria-hidden="true"
         className={cn(
           "grid size-8 flex-none place-items-center rounded-full text-[11px] font-bold",
-          guest.tone,
+          avatarTint(guest.name),
         )}
       >
         {guest.initials}
@@ -537,7 +565,7 @@ function Guests({ page }: { page: RsvpPageData }) {
                 className={cn(
                   "grid size-9 flex-none place-items-center rounded-full text-[12px] font-bold ring-2 ring-(--rsvp-ring)",
                   i > 0 && "-ml-2",
-                  g.tone,
+                  avatarTint(g.name),
                 )}
               >
                 {g.initials}

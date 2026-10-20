@@ -37,7 +37,7 @@ export function RunwayStatusLabel({
 }) {
   const { icon: Icon, className: tone } = TONE[runway.status];
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-sm font-medium", tone, className)}>
+    <span className={cn("inline-flex items-center gap-1.5 text-sm font-semibold", tone, className)}>
       <Icon className="size-4 shrink-0" aria-hidden="true" />
       {summary(runway, periodEndsOn)}
     </span>

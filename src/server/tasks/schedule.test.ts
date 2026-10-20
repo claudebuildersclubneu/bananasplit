@@ -89,9 +89,15 @@ describe("reminder keys and times", () => {
   });
 
   it("times each stage at 09:00 local: the lead before, the due date, the day after", () => {
-    expect(stageRunAt("upcoming", "2026-10-03", 2, NY)?.toISOString()).toBe("2026-10-01T13:00:00.000Z");
-    expect(stageRunAt("today", "2026-10-03", 2, NY)?.toISOString()).toBe("2026-10-03T13:00:00.000Z");
-    expect(stageRunAt("overdue", "2026-10-03", 2, NY)?.toISOString()).toBe("2026-10-04T13:00:00.000Z");
+    expect(stageRunAt("upcoming", "2026-10-03", 2, NY)?.toISOString()).toBe(
+      "2026-10-01T13:00:00.000Z",
+    );
+    expect(stageRunAt("today", "2026-10-03", 2, NY)?.toISOString()).toBe(
+      "2026-10-03T13:00:00.000Z",
+    );
+    expect(stageRunAt("overdue", "2026-10-03", 2, NY)?.toISOString()).toBe(
+      "2026-10-04T13:00:00.000Z",
+    );
     // No lead: the due-today reminder is the only one on the day.
     expect(stageRunAt("upcoming", "2026-10-03", 0, NY)).toBeNull();
   });
@@ -177,9 +183,9 @@ describe("scheduleTaskReminders (change-time)", () => {
       new Date("2026-10-16T15:00:00Z"),
     );
     expect(enqueuedReminders().map((r) => r.stage)).toEqual(["overdue"]);
-    expect(
-      await scheduleTaskReminders(db([]), org, { ...task, status: "COMPLETED" }, ["u1"]),
-    ).toBe(0);
+    expect(await scheduleTaskReminders(db([]), org, { ...task, status: "COMPLETED" }, ["u1"])).toBe(
+      0,
+    );
   });
 });
 
@@ -197,7 +203,12 @@ describe("scheduleOrgTaskJobs: the due-today and overdue sweep", () => {
     { userId: "quiet", user: { timezone: null, emailPreferences: {} } },
   ];
   const tasks = [
-    { id: "dueToday", dueDate: fromDateKey("2026-10-14"), ownerId: "owner", assignees: [{ userId: "collab" }, { userId: "quiet" }] },
+    {
+      id: "dueToday",
+      dueDate: fromDateKey("2026-10-14"),
+      ownerId: "owner",
+      assignees: [{ userId: "collab" }, { userId: "quiet" }],
+    },
     { id: "lateOne", dueDate: fromDateKey("2026-10-13"), ownerId: "owner", assignees: [] },
     { id: "leftOrg", dueDate: fromDateKey("2026-10-14"), ownerId: "gone", assignees: [] },
   ];
@@ -209,8 +220,10 @@ describe("scheduleOrgTaskJobs: the due-today and overdue sweep", () => {
   };
 
   beforeEach(() => {
-    vi.mocked(withSystemOrgTx).mockImplementation((async (_orgId: string, fn: (ctx: unknown) => unknown) =>
-      fn({ db })) as never);
+    vi.mocked(withSystemOrgTx).mockImplementation((async (
+      _orgId: string,
+      fn: (ctx: unknown) => unknown,
+    ) => fn({ db })) as never);
   });
 
   it("the daily fallback schedules today's 09:00 for the owner and opted-in collaborators", async () => {

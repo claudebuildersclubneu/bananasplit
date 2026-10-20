@@ -5,6 +5,7 @@ import { TaskPageEditor } from "@/components/tasks/task-page-editor";
 import { TasksProvider } from "@/components/tasks/tasks-context";
 import { can } from "@/lib/auth/permissions";
 import { effectiveTimezone, localDateKey } from "@/lib/tasks/dates";
+import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
@@ -28,7 +29,9 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
     if (!task) return null;
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
     const labels = await getOrgLabels(db, org.id);
-    const projects = await getOrgProjects(db, org.id, true);
+    // Live projects only: an archived one can't be picked (the field still
+    // shows the task's own project, archived or not, from task.project).
+    const projects = await getOrgProjects(db, org.id);
     const comments = await getComments(db, org.id, taskId);
     return { task, labels, projects, comments, tz: effectiveTimezone(me, org) };
   });
@@ -54,6 +57,7 @@ export default async function TaskPage({ params }: PageProps<"/app/[orgSlug]/tas
       members={members}
       labels={data.labels}
       projects={data.projects}
+      can={creationRights(can({ role }, "tasks.manageAll"), settings)}
     >
       <div className="mx-auto max-w-2xl space-y-4">
         <BackLink href={`/app/${orgSlug}/tasks`} label="Tasks" />

@@ -99,7 +99,7 @@ export function MemberRowActions({
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center justify-end gap-2">
         {ownerRowLocked ? (
-          <p className="text-muted-foreground text-xs">Only an owner can change an owner.</p>
+          <p className="text-muted-foreground text-[13px]">Only an owner can change an owner.</p>
         ) : canActOnRow ? (
           <Select
             value={currentRole}
@@ -122,7 +122,7 @@ export function MemberRowActions({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                size="icon"
+                size="icon-sm"
                 variant="ghost"
                 aria-label={`More actions for ${memberName}`}
                 disabled={isPending}
@@ -149,7 +149,9 @@ export function MemberRowActions({
         )}
       </div>
       {error && dialog === null && (
-        <p className="text-destructive max-w-xs text-right text-xs">{error}</p>
+        <p role="alert" className="text-destructive max-w-xs text-right text-[13px]">
+          {error}
+        </p>
       )}
 
       <Dialog open={dialog === "title"} onOpenChange={(open) => !open && setDialog(null)}>
@@ -181,7 +183,14 @@ export function MemberRowActions({
                 placeholder="No title"
               />
             </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            {error && (
+              <p
+                role="alert"
+                className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+              >
+                {error}
+              </p>
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setDialog(null)}>
                 Cancel
@@ -204,7 +213,14 @@ export function MemberRowActions({
               placeholder. Notes and comments they wrote stay.
             </DialogDescription>
           </DialogHeader>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && (
+            <p
+              role="alert"
+              className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+            >
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialog(null)}>
               Cancel
@@ -220,7 +236,7 @@ export function MemberRowActions({
                 )
               }
             >
-              {isPending ? "Removing…" : "Remove"}
+              {isPending ? "Removing…" : "Remove member"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -236,7 +252,14 @@ export function MemberRowActions({
               can&apos;t undo this yourself.
             </DialogDescription>
           </DialogHeader>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && (
+            <p
+              role="alert"
+              className="bg-tint-danger text-tint-danger-foreground rounded-tile p-3 text-sm"
+            >
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialog(null)}>
               Cancel

@@ -8,8 +8,10 @@ import { useMemo, useRef, useState } from "react";
 
 import { createNote } from "@/app/app/[orgSlug]/notes/actions";
 import { usePins } from "@/components/pins/pins-context";
-import { CommandDialog, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { CommandDialog, CommandList } from "@/components/ui/command";
 import { chipClass } from "@/components/ui/segmented";
+import { IconChip } from "@/components/ui/stat";
 import { toast } from "@/components/ui/toaster";
 import type { Role } from "@/generated/prisma/enums";
 import { can } from "@/lib/auth/permissions";
@@ -38,9 +40,20 @@ import { useWorkspaceSearch, type Searcher } from "./use-workspace-search";
  * Keys: ↑↓ move, ↵ opens, ⌘↵ (Ctrl+↵) opens in a new tab, Tab and
  * Shift+Tab step through the filters, Backspace in an empty box clears the
  * filter, Esc closes.
+ *
+ * Moonstone: a level-2 float (the dialog), a pill search field, results as
+ * soft tiles with their icon in a circle, the selected row tinted with the
+ * glow and marked ↵.
  */
 
 const NAV_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
+/**
+ * The selected row: in light, the glow mixed in lightly (the table's
+ * selected row); in dark, where the glow muddies, the stronger fill.
+ */
+const SELECTED_ROW =
+  "data-[selected=true]:bg-[color-mix(in_oklab,var(--glow)_16%,transparent)] dark:data-[selected=true]:bg-muted-strong/70";
 
 function Highlight({ text, terms }: { text: string; terms: readonly string[] | null }) {
   const ranges = terms ? highlightRanges(text, terms) : [];
@@ -50,7 +63,10 @@ function Highlight({ text, terms }: { text: string; terms: readonly string[] | n
   for (const [start, end] of ranges) {
     if (start > at) parts.push(text.slice(at, start));
     parts.push(
-      <mark key={start} className="bg-primary/15 text-foreground rounded-[2px] font-semibold">
+      <mark
+        key={start}
+        className="text-foreground decoration-glow bg-transparent font-semibold underline decoration-2 underline-offset-[3px]"
+      >
         {text.slice(start, end)}
       </mark>,
     );
@@ -60,9 +76,14 @@ function Highlight({ text, terms }: { text: string; terms: readonly string[] | n
   return <>{parts}</>;
 }
 
-function Kbd({ children }: { children: React.ReactNode }) {
+function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <kbd className="bg-muted text-muted-foreground inline-flex h-5 min-w-5 items-center justify-center rounded border px-1 font-sans text-[0.625rem] font-medium">
+    <kbd
+      className={cn(
+        "bg-muted-strong/60 text-foreground/75 inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 font-mono text-[11px] leading-none font-medium",
+        className,
+      )}
+    >
       {children}
     </kbd>
   );
@@ -244,32 +265,37 @@ export function CommandPalette({
         className="bg-popover text-popover-foreground flex min-h-0 flex-1 flex-col overflow-hidden"
         label="Search"
       >
-        <div className="flex items-center gap-2 border-b px-3">
-          <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
-          <CommandPrimitive.Input
-            ref={inputRef}
-            value={query}
-            onValueChange={changeQuery}
-            placeholder={placeholder}
-            maxLength={200}
-            className="placeholder:text-muted-foreground h-12 min-w-0 flex-1 bg-transparent text-base outline-hidden sm:text-sm"
-          />
-          {result.loading && typed && (
-            <Loader2
-              className="text-muted-foreground size-4 shrink-0 animate-spin"
+        <div className="px-3 pt-3 sm:px-4 sm:pt-4">
+          <div className="relative">
+            <Search
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2"
               aria-hidden="true"
             />
-          )}
-          <span className="hidden sm:inline-flex">
-            <Kbd>esc</Kbd>
-          </span>
+            <CommandPrimitive.Input
+              ref={inputRef}
+              value={query}
+              onValueChange={changeQuery}
+              placeholder={placeholder}
+              maxLength={200}
+              className="border-input bg-card placeholder:text-muted-foreground h-10 w-full min-w-0 rounded-full border ps-10 pe-10 text-base outline-none sm:pe-20 sm:text-sm"
+            />
+            <span className="pointer-events-none absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
+              {result.loading && typed && (
+                <Loader2
+                  className="text-muted-foreground size-4 shrink-0 animate-spin"
+                  aria-hidden="true"
+                />
+              )}
+              <Kbd className="hidden sm:inline-flex">esc</Kbd>
+            </span>
+          </div>
         </div>
 
         {scopes.length > 1 && (
           <div
             role="group"
             aria-label="Filter results"
-            className="no-scrollbar flex gap-1 overflow-x-auto border-b px-3 py-2"
+            className="no-scrollbar flex gap-1.5 overflow-x-auto [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-28px),transparent)] px-3 pt-3 pb-1 sm:[mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-32px),transparent)] sm:px-4"
           >
             {scopes.map((s) => (
               <button
@@ -287,35 +313,31 @@ export function CommandPalette({
         )}
 
         <CommandList
-          className="max-h-none min-h-0 flex-1 p-1 sm:max-h-[min(60vh,30rem)]"
+          className="max-h-none min-h-0 flex-1 scroll-py-2 px-2 pt-1 pb-2 sm:max-h-[min(60vh,30rem)]"
           onPointerMove={() => setNavigated(true)}
         >
           {result.error && (
             <div
               role="alert"
-              className="text-muted-foreground flex items-center gap-2 px-3 py-2 text-sm"
+              className="bg-tint-danger text-tint-danger-foreground rounded-tile mx-1 mt-2 flex items-center gap-2.5 p-3 text-sm"
             >
-              <AlertCircle className="text-destructive size-4 shrink-0" aria-hidden="true" />
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
               <span className="flex-1">Search didn&apos;t finish. Pages below still work.</span>
-              <button
-                type="button"
-                onClick={result.retry}
-                className="hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-              >
-                <RotateCw className="size-3" aria-hidden="true" />
+              <Button type="button" variant="outline" size="sm" onClick={result.retry}>
+                <RotateCw data-icon="inline-start" aria-hidden="true" />
                 Retry
-              </button>
+              </Button>
             </div>
           )}
 
           {showSkeleton && (
-            <div className="space-y-1 p-1" aria-hidden="true">
+            <div className="space-y-0.5 pt-2" aria-hidden="true">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg px-2 py-2">
-                  <div className="bg-muted size-8 animate-pulse rounded-md" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="bg-muted h-3 w-1/2 animate-pulse rounded" />
-                    <div className="bg-muted h-2.5 w-3/4 animate-pulse rounded" />
+                <div key={i} className="flex min-h-12 items-center gap-3 px-2.5 py-1.5">
+                  <div className="bg-muted size-9 shrink-0 animate-pulse rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <div className="bg-muted h-3 w-1/2 animate-pulse rounded-full" />
+                    <div className="bg-muted h-2.5 w-3/4 animate-pulse rounded-full" />
                   </div>
                 </div>
               ))}
@@ -324,22 +346,26 @@ export function CommandPalette({
 
           {showEmpty && (
             <div className="flex flex-col items-center gap-2 px-6 py-10 text-center text-sm">
-              <SearchX className="text-muted-foreground size-6" aria-hidden="true" />
-              <p>
+              <span className="bg-muted text-muted-foreground mb-1 grid size-12 place-items-center rounded-full">
+                <SearchX className="size-5" aria-hidden="true" />
+              </span>
+              <p className="heading text-[15px]">
                 Nothing {scope === "all" ? "" : `in ${scopeLabel.toLowerCase()} `}matches “{q.text}
                 ”.
               </p>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground max-w-[38ch]">
                 Every word has to match somewhere. Try fewer or shorter words.
               </p>
               {scope !== "all" && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => changeScope("all")}
-                  className="hover:bg-muted mt-1 rounded-md border px-2.5 py-1 text-xs"
+                  className="mt-1"
                 >
                   Search everything instead
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -355,40 +381,57 @@ export function CommandPalette({
             )}
 
           {groups.map((group) => (
-            <CommandGroup key={group.id} heading={group.heading}>
+            <CommandPrimitive.Group
+              key={group.id}
+              heading={group.heading}
+              className="**:[[cmdk-group-heading]]:eyebrow **:[[cmdk-group-heading]]:text-muted-foreground pt-1 **:[[cmdk-group-heading]]:px-2.5 **:[[cmdk-group-heading]]:pt-2.5 **:[[cmdk-group-heading]]:pb-1.5"
+            >
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const terms = item.highlight ? q.folded : null;
                 return (
-                  <CommandItem
+                  <CommandPrimitive.Item
                     key={item.key}
                     value={item.key}
                     onSelect={() => run(item)}
-                    className={cn("gap-3 py-1.5", item.more && "text-muted-foreground")}
+                    className={cn(
+                      "group/row rounded-field relative flex min-h-12 cursor-default items-center gap-3 px-2.5 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
+                      SELECTED_ROW,
+                      item.more && "text-muted-foreground data-[selected=true]:text-foreground",
+                    )}
                   >
-                    <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                    {item.more ? (
+                      <span className="grid size-9 shrink-0 place-items-center" aria-hidden="true">
+                        <Icon className="size-4" />
+                      </span>
+                    ) : (
+                      <IconChip
+                        icon={Icon}
+                        className="text-muted-foreground group-data-[selected=true]/row:text-foreground"
+                      />
+                    )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate">
+                      <span className={cn("block truncate", !item.more && "font-medium")}>
                         <Highlight text={item.title} terms={terms} />
                       </span>
                       {item.detail && (
-                        <span className="text-muted-foreground block truncate text-xs">
+                        <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                           <Highlight text={item.detail} terms={terms} />
                         </span>
                       )}
                     </span>
                     {item.meta && (
-                      <span
-                        data-slot="command-shortcut"
-                        className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums"
-                      >
+                      <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">
                         {item.meta}
                       </span>
                     )}
-                  </CommandItem>
+                    <Kbd className="bg-card ring-foreground/6 hidden ring-1 sm:group-data-[selected=true]/row:inline-flex">
+                      ↵
+                    </Kbd>
+                  </CommandPrimitive.Item>
                 );
               })}
-            </CommandGroup>
+            </CommandPrimitive.Group>
           ))}
         </CommandList>
 
@@ -398,21 +441,27 @@ export function CommandPalette({
             : ""}
         </div>
 
-        <div className="text-muted-foreground hidden items-center gap-4 border-t px-3 py-2 text-[0.6875rem] sm:flex">
-          <span className="flex items-center gap-1">
-            <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> move
+        <div className="bg-muted/50 text-muted-foreground hidden items-center gap-5 px-4 py-2.5 text-xs sm:flex">
+          <span className="flex items-center gap-1.5">
+            <span className="flex gap-1">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+            </span>
+            Move
           </span>
-          <span className="flex items-center gap-1">
-            <Kbd>↵</Kbd> open
+          <span className="flex items-center gap-1.5">
+            <Kbd>↵</Kbd> Open
           </span>
-          <span className="flex items-center gap-1">
-            <Kbd>{mod}</Kbd>
-            <Kbd>↵</Kbd> new tab
+          <span className="flex items-center gap-1.5">
+            <span className="flex gap-1">
+              <Kbd>{mod}</Kbd>
+              <Kbd>↵</Kbd>
+            </span>
+            New tab
           </span>
           {scopes.length > 1 && (
-            <span className="flex items-center gap-1">
-              <Kbd>tab</Kbd> filter
+            <span className="flex items-center gap-1.5">
+              <Kbd>tab</Kbd> Filter
             </span>
           )}
         </div>

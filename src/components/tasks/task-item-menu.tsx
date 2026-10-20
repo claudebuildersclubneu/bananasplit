@@ -65,7 +65,12 @@ export function TaskItemMenu({
                 .then(() => toast({ title: "Link copied", tone: "success", duration: 3_000 }))
                 .catch(() => toast({ title: "Couldn't copy the link", tone: "error" })),
           },
-          editable && { label: "Delete", icon: Trash2, destructive: true, onSelect: () => void remove() },
+          editable && {
+            label: "Delete",
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => void remove(),
+          },
         ]}
       />
       {/* The dialog is portalled, but its events still bubble to the card it sits in. */}

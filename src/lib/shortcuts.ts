@@ -116,7 +116,7 @@ export interface ShortcutSheetInput {
   sections: readonly { id: string; label: string }[];
   /** Owners and admins: the Admin panel. */
   isAdmin: boolean;
-  /** Board, Week, Table and Dashboard (not on the Free plan, which has the List). */
+  /** Board, Week, List, Table, Roadmap and Dashboard (not on the Free plan, which has a plain list). */
   taskViews?: boolean;
   /** The weekly update (not in a Personal space). */
   teamwork?: boolean;
@@ -151,7 +151,10 @@ export function shortcutGroups(input: ShortcutSheetInput): ShortcutGroup[] {
   if (has("tasks")) {
     const tasks: ShortcutRow[] = [];
     if (input.taskViews) {
-      tasks.push({ keys: [["1"], ["2"], ["3"], ["4"]], label: "Board, Week, Table or Dashboard" });
+      tasks.push({
+        keys: [["1"], ["2"], ["3"], ["4"], ["5"], ["6"]],
+        label: "Board, Week, List, Table, Roadmap or Dashboard",
+      });
     }
     tasks.push(
       { keys: [["/"]], label: "Search tasks" },

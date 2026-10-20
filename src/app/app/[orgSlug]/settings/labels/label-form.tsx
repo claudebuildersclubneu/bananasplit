@@ -1,19 +1,19 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { LABEL_COLOR_PALETTE, type LabelColor } from "@/lib/label-colors";
+import { toast } from "@/components/ui/toaster";
 
-import { createLabel } from "./actions";
+import { createTag } from "./actions";
 
+/** New tag: a name; the colour is the theme's next chart slot (recolour it in the list). */
 export function LabelForm({ orgId }: { orgId: string }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [color, setColor] = useState<LabelColor>(LABEL_COLOR_PALETTE[0]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -21,51 +21,45 @@ export function LabelForm({ orgId }: { orgId: string }) {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const result = await createLabel(orgId, { name, color });
-      if (result?.error) {
+      const result = await createTag(orgId, { name });
+      if ("error" in result) {
         setError(result.error);
         return;
       }
       setName("");
+      toast({
+        title: result.created
+          ? `Created tag “${result.tag.name}”`
+          : `“${result.tag.name}” is already a tag`,
+        tone: result.created ? "success" : "default",
+      });
       router.refresh();
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3">
-      <div className="grid gap-1.5">
-        <label htmlFor="label-name" className="text-sm font-medium">
-          New label
-        </label>
-        <Input
-          id="label-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Urgent"
-          required
-          className="w-48"
-        />
-      </div>
-      <div className="flex items-center gap-1.5">
-        {LABEL_COLOR_PALETTE.map((c) => (
-          <button
-            key={c}
-            type="button"
-            aria-label={`Color ${c}`}
-            aria-pressed={color === c}
-            onClick={() => setColor(c)}
-            className={cn(
-              "size-6 rounded-md ring-offset-2 outline-none",
-              color === c && "ring-ring ring-2",
-            )}
-            style={{ backgroundColor: c }}
-          />
-        ))}
-      </div>
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "Adding…" : "Add label"}
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
+      <label htmlFor="tag-name" className="sr-only">
+        New tag
+      </label>
+      <Input
+        id="tag-name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="New tag, like catering"
+        required
+        maxLength={60}
+        className="w-64"
+      />
+      <Button type="submit" variant="create" disabled={isPending || !name.trim()}>
+        <Plus className="size-4" aria-hidden="true" />
+        {isPending ? "Adding…" : "Add tag"}
       </Button>
-      {error && <p className="text-destructive w-full text-sm">{error}</p>}
+      {error && (
+        <p role="alert" className="text-destructive w-full text-sm">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

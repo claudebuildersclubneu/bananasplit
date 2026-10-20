@@ -64,7 +64,12 @@ export function reminderRunAt(dueKey: string, leadDays: number, tz: string): Dat
 }
 
 /** When `stage` goes out, or null when this recipient gets none (an upcoming reminder with no lead). */
-export function stageRunAt(stage: ReminderStage, dueKey: string, leadDays: number, tz: string): Date | null {
+export function stageRunAt(
+  stage: ReminderStage,
+  dueKey: string,
+  leadDays: number,
+  tz: string,
+): Date | null {
   switch (stage) {
     case "upcoming":
       return leadDays > 0 ? reminderRunAt(dueKey, leadDays, tz) : null;
@@ -111,7 +116,12 @@ export function enqueueReminder(
     orgId,
     kind: "task-reminder",
     key: reminderKey(input.taskId, input.dueKey, input.userId, input.stage),
-    payload: { taskId: input.taskId, userId: input.userId, dueDate: input.dueKey, stage: input.stage },
+    payload: {
+      taskId: input.taskId,
+      userId: input.userId,
+      dueDate: input.dueKey,
+      stage: input.stage,
+    },
     runAt: input.runAt,
     once: true,
     noKick: options.noKick,

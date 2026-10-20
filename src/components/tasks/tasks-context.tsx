@@ -22,6 +22,7 @@ import type {
   MemberOption,
   ProjectOption,
   TaskItem,
+  TasksCan,
   TasksOrg,
   TasksViewer,
 } from "./types";
@@ -46,6 +47,11 @@ interface TasksContextValue {
   labels: LabelOption[];
   projects: ProjectOption[];
   projectById: Map<string, ProjectOption>;
+  /** What the viewer may make on the spot (the club's creation rules). */
+  can: TasksCan;
+  /** A project or tag just made inline: usable at once, before the page refreshes. */
+  addProject: (project: ProjectOption) => void;
+  addLabel: (label: LabelOption) => void;
   /** Shows a short message (e.g. a refused optimistic change). */
   announce: (message: string) => void;
   /** Opens a task's detail panel from anywhere. */
@@ -65,6 +71,7 @@ export function TasksProvider({
   members,
   labels,
   projects,
+  can,
   children,
 }: {
   org: TasksOrg;
@@ -72,6 +79,8 @@ export function TasksProvider({
   members: MemberOption[];
   labels: LabelOption[];
   projects: ProjectOption[];
+  /** The club's creation rules for this viewer (admins only when left out). */
+  can?: TasksCan;
   children: React.ReactNode;
 }) {
   const [message, setMessage] = useState<string | null>(null);
@@ -115,6 +124,33 @@ export function TasksProvider({
     setOpen(true);
   }, []);
 
+  // Made inline in a picker: shown at once, and dropped again once the
+  // server's list (after refresh) carries them.
+  const [madeProjects, setMadeProjects] = useState<ProjectOption[]>([]);
+  const [madeLabels, setMadeLabels] = useState<LabelOption[]>([]);
+  const addProject = useCallback(
+    (p: ProjectOption) => setMadeProjects((xs) => [...xs.filter((x) => x.id !== p.id), p]),
+    [],
+  );
+  const addLabel = useCallback(
+    (l: LabelOption) => setMadeLabels((xs) => [...xs.filter((x) => x.id !== l.id), l]),
+    [],
+  );
+  const allProjects = useMemo(() => {
+    const known = new Set(projects.map((p) => p.id));
+    const extra = madeProjects.filter((p) => !known.has(p.id));
+    return extra.length === 0
+      ? projects
+      : [...projects, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, madeProjects]);
+  const allLabels = useMemo(() => {
+    const known = new Set(labels.map((l) => l.id));
+    const extra = madeLabels.filter((l) => !known.has(l.id));
+    return extra.length === 0
+      ? labels
+      : [...labels, ...extra].sort((a, b) => a.name.localeCompare(b.name));
+  }, [labels, madeLabels]);
+
   const value = useMemo<TasksContextValue>(
     () => ({
       org,
@@ -122,16 +158,33 @@ export function TasksProvider({
       actor: { userId: viewer.userId, isAdmin: viewer.isAdmin, subtree: viewer.chart.subtree },
       members,
       memberById: new Map(members.map((m) => [m.id, m])),
-      labels,
-      projects,
-      projectById: new Map(projects.map((p) => [p.id, p])),
+      labels: allLabels,
+      projects: allProjects,
+      projectById: new Map(allProjects.map((p) => [p.id, p])),
+      can: can ?? { createProjects: viewer.isAdmin, createTags: viewer.isAdmin },
+      addProject,
+      addLabel,
       announce,
       openTask,
       showTask,
       newTask,
       isLoadingTask,
     }),
-    [org, viewer, members, labels, projects, announce, openTask, showTask, newTask, isLoadingTask],
+    [
+      org,
+      viewer,
+      members,
+      allLabels,
+      allProjects,
+      can,
+      addProject,
+      addLabel,
+      announce,
+      openTask,
+      showTask,
+      newTask,
+      isLoadingTask,
+    ],
   );
 
   return (

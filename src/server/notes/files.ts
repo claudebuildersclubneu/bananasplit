@@ -1,12 +1,33 @@
 import mammoth from "mammoth";
 
 import type { Prisma } from "@/generated/prisma/client";
-import { DOCX, googleDocId, sniffNoteFile } from "@/lib/files/types";
+import { DOCX, googleDocId, sniffNoteFile, sniffNoteFileEdges } from "@/lib/files/types";
 import { trashCutoff } from "@/lib/notes/trash";
 import { withOrgTx, type TxClient } from "@/server/db/context";
 import { readZipDirectory, verifyZipEntries, SourceRejectedError } from "@/server/org-chart/extract";
 import { everyWord } from "@/server/search/where";
-import { deleteBlobs, getBlob, MAX_UPLOAD_BYTES, putBlob, randomKeyId } from "@/server/storage";
+import {
+  deleteBlobs,
+  getBlob,
+  MAX_UPLOAD_BYTES,
+  openBlob,
+  putBlob,
+  randomKeyId,
+  type BlobStream,
+} from "@/server/storage";
+import {
+  headDirectUpload,
+  inRouteMaxBytes,
+  isDirectUploadKey,
+  readDirectUploadEdges,
+} from "@/server/storage/direct";
+import {
+  checkUpload,
+  confirmFits,
+  crossedWarning,
+  UploadRefusedError,
+  warnStorage,
+} from "@/server/storage/quota";
 
 /**
  * Files on the Notes page (OrgFile): PDFs, Word, slides, images and text,
@@ -63,43 +84,121 @@ function cleanName(name: string): string {
   return (one.length > 200 ? one.slice(0, 200) : one) || "Untitled file";
 }
 
-/**
- * Stores an upload and records it, as the uploader. The blob is written
- * first (never inside a transaction); a failed row write deletes it.
- */
-export async function storeNoteFile(input: {
+interface NoteFileInput {
   orgId: string;
-  bytes: Buffer;
   filename: string;
   visibility: "PRIVATE" | "ORGANIZATION";
   noteId?: string | null;
   folderId?: string | null;
-}): Promise<NoteFileRow> {
+}
+
+/**
+ * The row for a stored blob, as the uploader, with the storage quota
+ * re-checked in the same transaction (confirmFits: the database's trigger
+ * has just counted the bytes) and the owners and admins told if this
+ * upload took the space past 80%.
+ */
+function recordNoteFile(
+  input: NoteFileInput,
+  file: { key: string; contentType: string; sizeBytes: number; excerpt: string | null },
+): Promise<NoteFileRow> {
+  return withOrgTx(input.orgId, async ({ db, userId, role }) => {
+    const row = await db.orgFile.create({
+      data: {
+        organizationId: input.orgId,
+        name: cleanName(input.filename),
+        contentType: file.contentType,
+        sizeBytes: file.sizeBytes,
+        storageKey: file.key,
+        visibility: input.visibility,
+        uploadedById: userId,
+        noteId: input.noteId ?? null,
+        folderId: input.folderId ?? null,
+        excerpt: file.excerpt,
+      },
+      select: fileSelect,
+    });
+    const fit = await confirmFits(db, input.orgId, file.sizeBytes, role);
+    if (crossedWarning(fit.space, fit)) await warnStorage(db, fit.space, fit.after, `file:${row.id}`);
+    return row;
+  });
+}
+
+/**
+ * Stores an upload that came through the route and records it, as the
+ * uploader. The upload gate runs first (the space includes notes and files
+ * and isn't paused, the plan's largest file, room left: UploadRefusedError
+ * otherwise); the blob is written next (never inside a transaction); a
+ * failed row write deletes it.
+ */
+export async function storeNoteFile(input: NoteFileInput & { bytes: Buffer }): Promise<NoteFileRow> {
   const contentType = sniffNoteFile(input.bytes, input.filename);
   if (!contentType) throw new FileRejectedError(UNSUPPORTED);
-  if (input.bytes.length > MAX_UPLOAD_BYTES) throw new FileRejectedError("Files are limited to 4 MB.", 413);
+  const refusal = await checkUpload(input.orgId, input.bytes.length, {
+    feature: "files",
+    routeMaxBytes: inRouteMaxBytes(),
+  });
+  if (refusal) throw new UploadRefusedError(refusal);
   const excerpt = await excerptOf(input.bytes, contentType);
   const stored = await putBlob("files", input.orgId, [randomKeyId()], input.bytes, { contentType });
   try {
-    return await withOrgTx(input.orgId, ({ db, userId }) =>
-      db.orgFile.create({
-        data: {
-          organizationId: input.orgId,
-          name: cleanName(input.filename),
-          contentType,
-          sizeBytes: input.bytes.length,
-          storageKey: stored.key,
-          visibility: input.visibility,
-          uploadedById: userId,
-          noteId: input.noteId ?? null,
-          folderId: input.folderId ?? null,
-          excerpt,
-        },
-        select: fileSelect,
-      }),
-    );
+    return await recordNoteFile(input, {
+      key: stored.key,
+      contentType,
+      sizeBytes: input.bytes.length,
+      excerpt,
+    });
   } catch (error) {
     await deleteBlobs([stored.key]).catch(() => undefined);
+    throw error;
+  }
+}
+
+/** The file already recorded under `key` (a repeated "complete"), if the caller can see it. */
+function findByKey(orgId: string, key: string): Promise<NoteFileRow | null> {
+  return withOrgTx(orgId, ({ db }) =>
+    db.orgFile.findFirst({ where: { organizationId: orgId, storageKey: key }, select: fileSelect }),
+  );
+}
+
+/**
+ * Records a file the browser uploaded straight to blob storage
+ * (src/server/storage/direct.ts, step 4), as the uploader. The size and
+ * type come from the store, never the browser; the bytes are sniffed from
+ * their first and last 64 KB; the gate runs again with the real size. A
+ * refused or unreadable upload is deleted from the store. Calling it again
+ * for the same key returns the same row.
+ */
+export async function recordDirectUpload(input: NoteFileInput & { key: string }): Promise<NoteFileRow> {
+  if (!isDirectUploadKey(input.orgId, input.key)) {
+    throw new FileRejectedError("That upload isn't one of this space's.", 400);
+  }
+  const existing = await findByKey(input.orgId, input.key);
+  if (existing) return existing;
+
+  const blob = await headDirectUpload(input.key);
+  if (!blob) throw new FileRejectedError("The upload didn't finish. Try again.", 404);
+  const drop = () => deleteBlobs([input.key]).catch(() => undefined);
+
+  const { head, tail } = await readDirectUploadEdges(input.key, blob.size);
+  const contentType = sniffNoteFileEdges(head, tail, input.filename);
+  if (!contentType) {
+    await drop();
+    throw new FileRejectedError(UNSUPPORTED);
+  }
+  const refusal = await checkUpload(input.orgId, blob.size, { feature: "files" });
+  if (refusal) {
+    await drop();
+    throw new UploadRefusedError(refusal);
+  }
+  const excerpt = contentType.startsWith("text/") ? await excerptOf(head, contentType) : null;
+  try {
+    return await recordNoteFile(input, { key: input.key, contentType, sizeBytes: blob.size, excerpt });
+  } catch (error) {
+    // A second "complete" for the same key may have won the race: keep its bytes.
+    const winner = await findByKey(input.orgId, input.key).catch(() => null);
+    if (winner) return winner;
+    await drop();
     throw error;
   }
 }
@@ -147,6 +246,24 @@ export async function readNoteFile(
   if (!blob) return null;
   const { storageKey: _key, ...row } = found;
   return { row, body: blob.body };
+}
+
+/** The file as a stream, for someone RLS lets see its row (the download route), else null. */
+export async function openNoteFile(
+  orgId: string,
+  fileId: string,
+): Promise<{ row: NoteFileRow; blob: BlobStream } | null> {
+  const found = await withOrgTx(orgId, ({ db }) =>
+    db.orgFile.findFirst({
+      where: { id: fileId, organizationId: orgId, deletedAt: null },
+      select: { ...fileSelect, storageKey: true },
+    }),
+  );
+  if (!found) return null;
+  const blob = await openBlob(found.storageKey);
+  if (!blob) return null;
+  const { storageKey: _key, ...row } = found;
+  return { row, blob };
 }
 
 /**

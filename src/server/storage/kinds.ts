@@ -15,6 +15,8 @@
  * Vercel Blob store, hence two stores.
  */
 
+import { PLAN_LIMITS } from "@/lib/billing/features";
+
 export type StoreName = "private" | "public";
 
 export interface StorageKind {
@@ -32,6 +34,11 @@ export interface StorageKind {
 }
 
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/** The largest single file any plan allows (PLAN_LIMITS: Team Advanced's 1 GB). */
+export const LARGEST_PLAN_FILE_BYTES = Math.max(
+  ...Object.values(PLAN_LIMITS).map((l) => l.maxFileBytes),
+);
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
@@ -81,7 +88,10 @@ export const STORAGE_KINDS = {
   files: {
     store: "private",
     scope: "org",
-    maxUploadBytes: MAX_UPLOAD_BYTES,
+    // The largest file any plan takes (Team Advanced); the plan's own limit
+    // is the upload gate's (src/server/storage/quota.ts). Over 4 MB they
+    // come straight from the browser (src/server/storage/direct.ts).
+    maxUploadBytes: LARGEST_PLAN_FILE_BYTES,
     contentTypes: NOTE_FILE_TYPES,
     description: "Files on the Notes page (PDF, Word, slides, images...): files/{orgId}/{randomId}",
   },

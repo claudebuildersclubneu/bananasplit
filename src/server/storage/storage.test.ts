@@ -16,6 +16,7 @@ import {
 } from "./drivers";
 import {
   assertBlobAllowed,
+  LARGEST_PLAN_FILE_BYTES,
   MAX_UPLOAD_BYTES,
   ORG_SCOPED_KINDS,
   parseStorageKey,
@@ -113,8 +114,13 @@ describe("storage kinds and keys", () => {
       for (const [kind, spec] of Object.entries(STORAGE_KINDS)) {
         expect(spec.contentTypes.length, kind).toBeGreaterThan(0);
         for (const type of spec.contentTypes) expect(type, kind).toMatch(/^[a-z]+\/[a-z0-9.+-]+$/);
-        expect(spec.maxUploadBytes, kind).toBeLessThanOrEqual(MAX_UPLOAD_BYTES);
+        // Notes files go up to the largest plan's file (over 4 MB straight to the store);
+        // everything else comes through a route body.
+        expect(spec.maxUploadBytes, kind).toBeLessThanOrEqual(
+          kind === "files" ? LARGEST_PLAN_FILE_BYTES : MAX_UPLOAD_BYTES,
+        );
       }
+      expect(LARGEST_PLAN_FILE_BYTES).toBe(1024 ** 3);
     });
   });
 

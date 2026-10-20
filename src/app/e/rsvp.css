@@ -1,18 +1,21 @@
 /*
  * Public RSVP pages (/e/[slug]): the page backgrounds a host picks
- * (src/lib/rsvp/backgrounds.ts) and the text colours that sit on them. The
- * registration card is always paper and ink; everything else follows the
- * tone through these variables.
+ * (src/lib/rsvp/backgrounds.ts) and the text colours that sit on them.
+ * Moonstone: the default backgrounds are the theme's own page (dark first,
+ * light one click away), so the text, tiles and lines are theme tokens.
+ * The dark photo-like backgrounds (night, pine, brick, navy, cover) keep
+ * their fixed colours and the light text that reads on them. The
+ * registration card is always a theme card.
  */
 
 .rsvp-page {
-  --rsvp-fg: var(--color-ink);
-  --rsvp-muted: var(--color-ink-muted);
-  --rsvp-soft: var(--color-ink-soft);
-  --rsvp-line: rgb(28 24 16 / 0.12);
-  --rsvp-tile: rgb(255 253 247 / 0.72);
-  --rsvp-tile-line: rgb(28 24 16 / 0.09);
-  --rsvp-ring: var(--color-cream);
+  --rsvp-fg: var(--foreground);
+  --rsvp-muted: var(--muted-foreground);
+  --rsvp-soft: var(--muted-foreground);
+  --rsvp-line: var(--border);
+  --rsvp-tile: var(--card);
+  --rsvp-tile-line: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --rsvp-ring: var(--background);
   color: var(--rsvp-fg);
 }
 
@@ -32,16 +35,18 @@
  * src/app/e/[slug]/page.tsx points the yellows at the club's accent)
  * "Tint" (id "peel") is a soft tint of that accent.
  */
+/* The default: the page itself, with the corona BrandRoot lights. */
 .rsvp-bg-banana {
-  background-color: var(--color-cream);
+  background-color: transparent;
 }
 
 .rsvp-bg-cream {
-  background-color: var(--color-paper);
+  background-color: var(--background);
 }
 
+/* "Tint": the glow mixed into the page. */
 .rsvp-bg-peel {
-  background-color: var(--color-butter);
+  background-color: color-mix(in oklab, var(--glow) 12%, var(--background));
 }
 
 .rsvp-bg-night {

@@ -74,5 +74,5 @@ export function DatabaseMenu({
       : null,
   ];
 
-  return <ItemMenu label={`More actions for ${name}`} items={items} />;
+  return <ItemMenu label={`More actions for ${name}`} items={items} className="border-input" />;
 }

@@ -1,11 +1,13 @@
-import { CLUB_PLANS } from "@/lib/billing/plans";
+import { PLAN_LIMITS, PLAN_NAMES } from "@/lib/billing/features";
+import { CLUB_PLANS, PERSONAL_PLANS } from "@/lib/billing/plans";
+import { formatStorage } from "@/lib/billing/storage";
 
 /**
  * The four plans as the pricing table and checkout show them (redesign
- * guide 11.1): two for one person, two for a club. The club rates come
- * from src/lib/billing/plans.ts, which billing reads too; the names,
- * limits and Personal Plus's price live here until billing knows the new
- * plans (the guide moves them to PLAN_LIMITS in src/lib/billing/features.ts).
+ * guide 11.1): two for one person, two for a club. Names, prices and
+ * limits all come from src/lib/billing, which the app's own plan page and
+ * upload checks read too, so the page can't promise something the app
+ * doesn't do.
  *
  * Checkout keeps its old query values: ?plan=club is Team and
  * ?plan=society is Team Advanced; ?plan=plus is Personal Plus.
@@ -13,14 +15,24 @@ import { CLUB_PLANS } from "@/lib/billing/plans";
 
 export type TierId = "free" | "plus" | "club" | "society";
 
+const TIER_PLAN = {
+  free: "FREE",
+  plus: "PERSONAL_PLUS",
+  club: "CLUB",
+  society: "SOCIETY",
+} as const satisfies Record<TierId, keyof typeof PLAN_LIMITS>;
+
 /** Personal Plus: $4 a month, or $36 a year (three months free). */
-export const PERSONAL_PLUS = { perMonth: 4, perYear: 36 } as const;
+export const PERSONAL_PLUS = {
+  perMonth: PERSONAL_PLANS.plus.perMonth,
+  perYear: PERSONAL_PLANS.plus.perYear,
+} as const;
 
 export const TIER_NAMES: Record<TierId, string> = {
-  free: "Personal Free",
-  plus: "Personal Plus",
-  club: "Team",
-  society: "Team Advanced",
+  free: PLAN_NAMES.FREE,
+  plus: PLAN_NAMES.PERSONAL_PLUS,
+  club: PLAN_NAMES.CLUB,
+  society: PLAN_NAMES.SOCIETY,
 };
 
 export interface TierLimits {
@@ -30,11 +42,26 @@ export interface TierLimits {
   members: string;
 }
 
+function days(n: number): string {
+  if (n % 365 === 0) return n === 365 ? "1 year" : `${n / 365} years`;
+  return n === 1 ? "1 day" : `${n} days`;
+}
+
+function limitsFor(tier: TierId): TierLimits {
+  const l = PLAN_LIMITS[TIER_PLAN[tier]];
+  return {
+    storage: formatStorage(l.storageBytes),
+    largestFile: formatStorage(l.maxFileBytes),
+    noteHistory: days(l.noteHistoryDays),
+    members: l.members === null ? "Unlimited" : String(l.members),
+  };
+}
+
 export const TIER_LIMITS: Record<TierId, TierLimits> = {
-  free: { storage: "1 GB", largestFile: "10 MB", noteHistory: "7 days", members: "1" },
-  plus: { storage: "25 GB", largestFile: "250 MB", noteHistory: "1 year", members: "1" },
-  club: { storage: "100 GB", largestFile: "250 MB", noteHistory: "90 days", members: "Unlimited" },
-  society: { storage: "500 GB", largestFile: "1 GB", noteHistory: "1 year", members: "Unlimited" },
+  free: limitsFor("free"),
+  plus: limitsFor("plus"),
+  club: limitsFor("club"),
+  society: limitsFor("society"),
 };
 
 /** What a club plan costs per member per semester. */

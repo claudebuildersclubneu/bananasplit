@@ -77,7 +77,6 @@ export function RangePicker({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
           className="max-w-full justify-start"
           aria-label={`Date range: ${label}`}
         >
@@ -103,7 +102,7 @@ export function RangePicker({
                 <button
                   type="button"
                   onClick={() => go(p.id === "term" ? {} : { range: p.id })}
-                  className="hover:bg-muted/60 focus-visible:bg-muted flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm outline-none"
+                  className="hover:bg-muted focus-visible:bg-muted rounded-field flex h-9 w-full items-center justify-between px-3 text-left text-sm outline-none"
                 >
                   <span className={cn(selected && "font-medium")}>{p.label}</span>
                   {selected ? (
@@ -114,12 +113,12 @@ export function RangePicker({
             );
           })}
         </ul>
-        <div className="mt-1 border-t pt-1">
+        <div className="border-border/70 mt-1 border-t pt-1">
           {!custom ? (
             <button
               type="button"
               onClick={() => setCustom(true)}
-              className="hover:bg-muted/60 focus-visible:bg-muted flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm outline-none"
+              className="hover:bg-muted focus-visible:bg-muted rounded-field flex h-9 w-full items-center justify-between px-3 text-left text-sm outline-none"
             >
               <span className={cn(preset === "custom" && "font-medium")}>Custom range…</span>
               {preset === "custom" ? (

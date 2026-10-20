@@ -48,10 +48,10 @@ function Block({
   aside?: React.ReactNode;
 }) {
   return (
-    <div className="border-ink/10 flex flex-col gap-3 border-t pt-4">
+    <div className="border-border flex flex-col gap-3 border-t pt-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-[15px] font-bold">
-          <span className="text-ink-soft">{icon}</span>
+          <span className="text-muted-foreground">{icon}</span>
           {title}
         </h3>
         {aside}
@@ -100,7 +100,9 @@ export function ChipIn({
     <span
       className={cn(
         "rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap",
-        paid.confirmed ? "bg-leaf text-leaf-ink" : "bg-butter text-honey",
+        paid.confirmed
+          ? "bg-tint-success text-tint-success-foreground"
+          : "bg-tint-accent text-tint-accent-foreground",
       )}
     >
       {paid.confirmed ? "Paid" : "Waiting for the host"}
@@ -117,7 +119,7 @@ export function ChipIn({
       }
       aside={badge}
     >
-      <p className="text-ink-muted m-0 text-[14px] leading-[1.5]">
+      <p className="text-muted-foreground m-0 text-[14px] leading-[1.5]">
         {paid
           ? paid.confirmed
             ? `The host got your ${formatCents(paid.cents ?? owes)}. You're all set.`
@@ -162,7 +164,7 @@ export function ChipIn({
           type="button"
           onClick={sayPaid}
           disabled={pending}
-          className="text-ink w-fit cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline disabled:opacity-50"
+          className="text-foreground w-fit cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline disabled:opacity-50"
         >
           {pending ? "Saving…" : `I've paid ${formatCents(owes)}`}
         </button>
@@ -189,7 +191,7 @@ export function TicketStub({
       title="Your ticket"
       aside={
         checkedIn ? (
-          <span className="bg-leaf text-leaf-ink rounded-full px-2.5 py-1 text-[12px] font-bold">
+          <span className="bg-tint-success text-tint-success-foreground rounded-full px-2.5 py-1 text-[12px] font-bold">
             Checked in
           </span>
         ) : null
@@ -198,20 +200,20 @@ export function TicketStub({
       <div className="flex items-center gap-4">
         <a
           href={ticketUrl}
-          className="border-ink/10 block size-[92px] flex-none overflow-hidden rounded-xl border bg-white p-1"
+          className="border-border rounded-field block size-[92px] flex-none overflow-hidden border bg-white p-1"
           aria-label="Open your ticket full screen"
         >
           {qr}
         </a>
         <div className="flex min-w-0 flex-col gap-1.5">
-          <p className="text-ink-muted m-0 text-[14px] leading-[1.5]">
+          <p className="text-muted-foreground m-0 text-[14px] leading-[1.5]">
             {checkedIn
               ? "You're in. Enjoy it."
               : "Show this at the door and the host scans you in. It's in your email too."}
           </p>
           <a
             href={ticketUrl}
-            className="text-ink w-fit text-[14px] font-semibold underline-offset-4 hover:underline"
+            className="text-foreground w-fit text-[14px] font-semibold underline-offset-4 hover:underline"
           >
             Open full screen
           </a>
@@ -254,16 +256,16 @@ export function InviteFriends({
       title="Bring your friends"
       aside={
         invitedCount > 0 ? (
-          <span className="bg-banana text-banana-ink rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap">
+          <span className="bg-brand-accent text-brand-accent-foreground rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap">
             {invitedCount} joined with your link
           </span>
         ) : null
       }
     >
-      <p className="text-ink-muted m-0 text-[14px] leading-[1.5]">
+      <p className="text-muted-foreground m-0 text-[14px] leading-[1.5]">
         Your own link. Friends who open it see you invited them, and the host sees who brought who.
       </p>
-      <div className="border-ink/12 bg-oat flex items-center gap-2 rounded-full border py-1 pr-1 pl-4">
+      <div className="border-border bg-muted flex items-center gap-2 rounded-full border py-1 pr-1 pl-4">
         <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
           {inviteUrl.replace(/^https?:\/\//, "")}
         </span>
@@ -330,16 +332,16 @@ export function BringList({
             <li
               key={item.id}
               className={cn(
-                "flex items-center gap-3 rounded-2xl border px-4 py-3",
+                "rounded-tile flex items-center gap-3 border px-4 py-3",
                 item.mine
-                  ? "border-ink/20 bg-butter text-ink"
+                  ? "border-input bg-tint-accent text-foreground"
                   : "border-(--rsvp-tile-line) bg-(--rsvp-tile)",
               )}
             >
               <Gift
                 className={cn(
                   "size-[18px] flex-none",
-                  item.mine ? "text-honey" : "text-(--rsvp-soft)",
+                  item.mine ? "text-tint-accent-foreground" : "text-(--rsvp-soft)",
                 )}
                 aria-hidden="true"
               />
@@ -350,7 +352,7 @@ export function BringList({
                 <span
                   className={cn(
                     "text-[13px] leading-[1.4]",
-                    item.mine ? "text-ink-muted" : "text-(--rsvp-muted)",
+                    item.mine ? "text-muted-foreground" : "text-(--rsvp-muted)",
                   )}
                 >
                   {item.mine

@@ -158,24 +158,35 @@ different shapes; the other two are pieces of work you do. So the five are
 **layouts** of one filtered question, sharing one toolbar, and the other two
 became **destinations** in the header.
 
-| Layout       | What it is good at                                                                                                                                                                                           | Key |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
-| **Week**     | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week. The first thing you see.                                                         | `1` |
-| **Board**    | Moving work along: Not started, In progress, **Blocked**, Completed. Dragging into Blocked asks what it's blocked on. Completed shows the last 14 days.                                                      | `2` |
-| **Table**    | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                            | `3` |
-| **Calendar** | Due dates on a month. Drag an event to move its date, or drag an undated task onto a day.                                                                                                                    | `4` |
-| **Team**     | A lane per person down your reporting line (owners and admins can pick any position or the whole chart), with open hires, advisors and an unpositioned bucket. Each lane header has **New task for {name}**. | `5` |
+| Layout        | What it is good at                                                                                                                                                                                                                                                                                                                     | Key |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| **Board**     | Moving work along: Not started, In progress, **Blocked**, Completed. Cards are stories and tasks (each shows its epic); **Swimlanes by epic** (`?lanes=epic`) gives each epic a row, and dragging a card into another lane moves it into that epic. Dragging into Blocked asks what it's blocked on. Completed shows the last 14 days. | `1` |
+| **Week**      | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week.                                                                                                                                                                                                            | `2` |
+| **List**      | Open work grouped by epic (stories with their tasks under them, roll-up progress), then everything outside an epic. A club without epics gets one plain list. A quick add on top takes `#tags`. The Free plan's only view.                                                                                                             | `3` |
+| **Table**     | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                                                                                                                                                      | `4` |
+| **Roadmap**   | Epics on a week timeline, grouped by project: each bar runs from the epic's start to its due date with its progress filled in, and this week is marked.                                                                                                                                                                                | `5` |
+| **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by project and person.                                                                                                                                                                                                                                    | `6` |
+
+Due dates also show on the main Calendar (its Tasks layer). A **stat strip**
+heads every layout: Open, Due this week, Overdue (one click shows them) and
+Done this week, for the toolbar's question.
 
 | Destination       | What it is                                                                  |
 | ----------------- | --------------------------------------------------------------------------- |
 | **Sunday update** | The weekly composer (below). Carries a dot until you have posted this week. |
 
-The toolbar above the layouts is the same in all five:
+The toolbar above the layouts is the same in all of them, a row of pills:
 
 - **Scope** — _Mine_, _My team_ (only if you have reports) or _Everyone_.
+- **Person**, **Project** (there even before the first project: its menu
+  can make one) and **Tag**.
 - **Search** — by title; `/` focuses it from anywhere, Enter applies it.
-- **Filter** — status, visibility, label, project.
+- **Filter** — status and visibility.
 - Active filters show as removable pills with **Clear all**.
+
+Finishing a task is one click on its circle: it fills, springs and pops
+three seeds (not under reduced motion), and a toast says "Done: {title}"
+with **Undo**, which puts it back as it was.
 
 All of it lives in the URL, so a filtered view is a link you can paste into
 Slack and the Back button does the obvious thing. Switching layout keeps the
@@ -188,7 +199,7 @@ line at the top (`3 overdue · 2 due today · 1 blocked · 1 flagged`) filters t
 just those in one click. The **Blockers** filter (blocked plus overdue,
 org-wide) is the exec-sync agenda.
 
-Keyboard: `1`–`5` switch layout, `/` focuses search, `c` starts a task.
+Keyboard: `1`–`6` switch layout, `/` focuses search, `c` starts a task.
 
 Deep links other sections use, all unchanged:
 
@@ -211,19 +222,38 @@ remove **themselves** as a collaborator on any task they can see, and take
 ownership of a task that has no owner. Nothing else — no title, status or
 due-date edits, and never removing somebody else's ownership.
 
-### Who can change the project list
+### Projects
 
-**Owners and admins only.** Projects are org-wide structure: everyone sees
-the same list in the project filter, and the Claude Builders Club set comes
-from **Bootstrap CBC workspace**. So creating, archiving and unarchiving a
-project all need the same permission. Every member still files tasks into
-any project and filters by it. Ask an owner or admin for a new project.
+**Tasks › Projects** lists the club's projects with their colour, lead,
+status (active, on hold, done), start and target dates and progress (done
+over all, epics left out). A project's own view is the workspace filtered to
+it (`?project=`). Every project picker (the form's field, the sentence, the
+toolbar's Project pill) can make one on the spot: type a name and pick
+**Create project “…”**. A new project takes the theme's next chart colour
+unless one is picked. Archived projects never appear in pickers; a task
+still filed under one shows it, marked archived, until somebody moves it.
 
-A project also has a colour, a lead (a member; cleared when they leave), a
-status (active, on hold, done) and start and target dates. The database
-already lets every member create projects, and tags (recording who made
-each), while the club's `memberCanCreateProjects` / `memberCanCreateTags`
-settings are on (the default); the app still asks for an owner or admin.
+| Who                                                                     | May                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------- |
+| Every member, while **Members can create projects** is on (the default) | Create and edit (rename, recolour, lead, status, dates) |
+| The project's lead                                                      | Edit it (even with the switch off), archive, unarchive  |
+| Owners and admins                                                       | All of it, and delete (its tasks stay, unfiled)         |
+
+The switch lives on **Settings › Tags**. The checks are in the server
+actions (`src/lib/tasks/projects.ts`); the Project INSERT policy reads the
+same switch, and DELETE is owners' and admins'.
+
+### Tags
+
+Tags (stored as labels) are typed on the spot: the tag field finds, toggles
+and offers **Create tag “catering”**, which takes the theme's next chart
+colour. Names are unique regardless of case, so typing "Catering" picks
+"catering" instead of making a second. `#tag` in a title (the composer,
+the Sentence title, the List's quick add) tags the task: "Book a
+photographer #showcase". Who may make new tags is **Members can create
+tags** on **Settings › Tags** (everyone by default); owners and admins
+rename, recolour, merge (with suggestions for near-duplicates like
+"Design" and "designs") and delete there.
 
 ### Handing work down
 
@@ -259,7 +289,20 @@ Every task is an **epic**, a **story** or a **task**, and the database keeps
 the nesting to that order: an epic is always top-level, a story sits at the
 top or under an epic, a task at the top, under an epic or under a story.
 Breaking a task into subtasks makes it a story (the subtasks are tasks).
-The app still nests one level; epics come with the work on them.
+
+- **Epic** (layers): a big outcome that spans weeks. It holds stories and
+  tasks, and its progress rolls up from both levels.
+- **Story** (bookmark): a deliverable one person owns; it holds tasks.
+- **Task** (check-square): a single step.
+
+The editor's **Type** offers only the types that fit where the task stands,
+and the server checks again with plain-language refusals ("A task inside a
+story can't be broken down any further.") before the database's trigger
+would refuse (`src/lib/tasks/hierarchy.ts`). Moving a childless task into a
+story makes it a task; moving an empty epic into an epic makes it a story.
+Epics have no start date of their own: the Roadmap starts a bar when the
+epic was made, or at its earliest dated piece of work. Clubs that never
+make an epic see exactly the old one-level subtasks.
 
 ### Sunday updates
 

@@ -13,15 +13,18 @@ export type PollStatusTone = "open" | "closed" | "scheduled";
 export function PollStatusBadge({ tone, children }: { tone: PollStatusTone; children: ReactNode }) {
   if (tone === "open") {
     return (
-      <Badge variant="outline" className="gap-1.5">
-        <span aria-hidden className="bg-success size-1.5 rounded-full" />
+      <Badge variant="success" className="gap-2">
+        <span
+          aria-hidden
+          className="bg-success size-1.5 rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,var(--success)_25%,transparent)]"
+        />
         {children}
       </Badge>
     );
   }
   const Icon = tone === "scheduled" ? CalendarCheck : Lock;
   return (
-    <Badge variant="secondary">
+    <Badge variant={tone === "scheduled" ? "info" : "secondary"}>
       <Icon aria-hidden />
       {children}
     </Badge>

@@ -15,7 +15,7 @@ export default function EventNotFound() {
         <h1 className="font-heading text-[40px] leading-[1.05] tracking-[-0.03em]">
           This event isn&apos;t here
         </h1>
-        <p className="text-ink-muted max-w-[420px] text-[16px]">
+        <p className="text-muted-foreground max-w-[420px] text-[16px]">
           The link may be mistyped, or the host turned off sign-ups or removed the event. Ask
           whoever sent it for a new one.
         </p>

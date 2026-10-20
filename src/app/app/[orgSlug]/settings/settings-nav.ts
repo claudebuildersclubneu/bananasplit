@@ -52,12 +52,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     personal: true,
   },
   {
-    label: "Plan",
+    label: "Plan and storage",
     segment: "plan",
-    description: "Your club's trial, and Club or Society: what each includes.",
+    description: "Your club's trial, Team or Team Advanced, and what your files use.",
+    personalDescription: "Personal Free or Personal Plus, and what your files use.",
     icon: "Gem",
     group: "Club",
     permission: "settings.view",
+    personal: true,
   },
   {
     label: "Sidebar",
@@ -87,9 +89,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     feature: "overview",
   },
   {
-    label: "Labels",
+    label: "Tags",
     segment: "labels",
-    description: "The shared label palette for tasks.",
+    description: "Tags for tasks, and who can create tags and projects.",
     icon: "Tags",
     group: "Club",
     permission: "labels.write",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCircle2, Palette, TriangleAlert } from "lucide-react";
+import { Check, CheckCircle2, Flag, Palette, Plus, TriangleAlert } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,11 +12,13 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   useTransition,
 } from "react";
 
 import { OrgBrand } from "@/components/theme/org-brand";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -31,8 +33,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ACCENT_SCALE_NAMES, accentScale, withAccent, type AccentScale } from "@/lib/theme/accent";
 import { formatRatio } from "@/lib/theme/color";
+import { tokenStyle } from "@/lib/theme/css";
 import { contrastWarnings, type ContrastWarning } from "@/lib/theme/contrast";
-import { deriveDarkRoles, deriveTheme, TOKEN_NAMES, type DerivedTheme } from "@/lib/theme/derive";
+import {
+  deriveDarkRoles,
+  deriveTheme,
+  TOKEN_NAMES,
+  type DerivedTheme,
+  type TokenMap,
+} from "@/lib/theme/derive";
 import {
   CUSTOM_PRESET_ID,
   DEFAULT_PRESET_ID,
@@ -61,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { saveThemeStep } from "@/app/onboarding/profile/actions";
 
 import { resetOrgTheme, saveOrgTheme } from "./actions";
+import { choiceClass, THEME_SECTION } from "./choice";
 import { LookAndFeel } from "./look-and-feel";
 import { ThemePreview } from "./theme-preview";
 
@@ -69,6 +79,8 @@ const CustomThemeEditor = dynamic(() => import("./custom-editor"), {
   ssr: false,
   loading: () => <p className="text-muted-foreground text-sm">Loading the editor…</p>,
 });
+
+const noopSubscribe = () => () => {};
 
 export interface ThemeDraft {
   preset: string;
@@ -93,7 +105,7 @@ const MODE_OPTIONS: { value: ThemeModeValue; label: string; hint: string }[] = [
 ];
 
 const LOGO_OPTIONS: { value: LogoDisplayValue; label: string; hint: string }[] = [
-  { value: "LOGO_AND_NAME", label: "Logo and name", hint: "A square mark beside the org name." },
+  { value: "LOGO_AND_NAME", label: "Logo and name", hint: "A square mark beside the club name." },
   {
     value: "LOGO_ONLY",
     label: "Logo only",
@@ -139,7 +151,7 @@ export function ThemeSettings({
   /** The viewer's own theme, which is what they see instead of this one. */
   personalThemeName?: string | null;
 }) {
-  const { setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const router = useRouter();
   const [usingOwn, setUsingOwn] = useState(personalThemeName !== null);
   const [switching, startSwitch] = useTransition();
@@ -152,6 +164,11 @@ export function ThemeSettings({
   // Radio groups are named per instance: a page Next keeps hidden (Activity)
   // or a streamed copy must not share a group with the visible one.
   const groupId = useId();
+  const hydrated = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   // The whole-app preview ends when this page is hidden or left.
   useLayoutEffect(() => () => setPreviewApp(false), []);
 
@@ -274,20 +291,24 @@ export function ThemeSettings({
   const isCustom = draft.preset === CUSTOM_PRESET_ID || !findPreset(draft.preset);
   const lightWarnings = warnings.filter((w) => w.mode === "light");
   const darkWarnings = warnings.filter((w) => w.mode === "dark");
+  // Preset cards render in the mode the viewer is in, like the app around them
+  // (dark, Moonstone's first mode, until the client knows).
+  const cardMode: ColorMode = hydrated && resolvedTheme === "light" ? "light" : "dark";
+  const savedPreset = findPreset(saved.preset) ? saved.preset : CUSTOM_PRESET_ID;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-4.5 pb-4">
       <WholeAppPreview enabled={previewApp} tokens={tokens} accents={accents} style={draft.style} />
 
-      <section aria-labelledby="theme-presets" className="space-y-3">
+      <section aria-labelledby="theme-presets" className={THEME_SECTION}>
         <SectionHeading id="theme-presets" title="Palette">
           Start from a preset, or choose Custom to pick each colour. Every preset passes WCAG AA in
-          light and dark.
+          light and dark, and each card shows it in the mode you&apos;re in.
         </SectionHeading>
         <div
           role="radiogroup"
           aria-labelledby="theme-presets"
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
         >
           {THEME_PRESETS.map((preset) => (
             <PresetCard
@@ -295,8 +316,15 @@ export function ThemeSettings({
               group={`${groupId}-preset`}
               name={preset.name}
               description={preset.description}
-              light={preset.light}
-              dark={preset.dark}
+              tokens={presetTokens(preset)[cardMode]}
+              mode={cardMode}
+              badge={
+                savedPreset === preset.id
+                  ? "In use"
+                  : preset.id === DEFAULT_PRESET_ID
+                    ? "Default"
+                    : null
+              }
               selected={draft.preset === preset.id}
               onSelect={() => choosePreset(preset)}
             />
@@ -305,8 +333,9 @@ export function ThemeSettings({
             group={`${groupId}-preset`}
             name="Custom"
             description="Your own five colours for light, and optionally dark."
-            light={draft.light}
-            dark={draft.dark ?? deriveDarkRoles(draft.light)}
+            tokens={tokens[cardMode]}
+            mode={cardMode}
+            badge={savedPreset === CUSTOM_PRESET_ID ? "In use" : null}
             selected={isCustom}
             onSelect={chooseCustom}
             icon
@@ -315,25 +344,23 @@ export function ThemeSettings({
       </section>
 
       {isCustom && (
-        <section aria-labelledby="theme-custom" className="space-y-3">
+        <section aria-labelledby="theme-custom" className={THEME_SECTION}>
           <SectionHeading id="theme-custom" title="Custom colours">
             Pick the five roles. Everything else (borders, muted text, hover states, charts, success
             and warning colours) is derived from them.
           </SectionHeading>
-          <div className="rounded-xl border p-4">
-            <CustomThemeEditor
-              light={draft.light}
-              dark={draft.dark}
-              onChange={({ light, dark }) => update({ preset: CUSTOM_PRESET_ID, light, dark })}
-            />
-          </div>
+          <CustomThemeEditor
+            light={draft.light}
+            dark={draft.dark}
+            onChange={({ light, dark }) => update({ preset: CUSTOM_PRESET_ID, light, dark })}
+          />
         </section>
       )}
 
-      <section aria-labelledby="theme-look" className="space-y-3">
+      <section aria-labelledby="theme-look" className={THEME_SECTION}>
         <SectionHeading id="theme-look" title="Look and feel">
-          Fine-tune the palette: your own accent colour for highlights, badges and charts, plus
-          corners, text size and fonts. These apply to everyone, on every page of the club.
+          Fine-tune the palette: your own accent colour for highlights, badges and charts, the glow,
+          plus corners, text size and fonts. These apply to everyone, on every page of the club.
         </SectionHeading>
         <LookAndFeel
           groupId={`${groupId}-look`}
@@ -345,11 +372,11 @@ export function ThemeSettings({
         />
       </section>
 
-      <section aria-labelledby="theme-preview" className="space-y-3">
+      <section aria-labelledby="theme-preview" className={THEME_SECTION}>
         <SectionHeading id="theme-preview" title="Preview">
-          Unsaved changes show here first.
+          Your colours on a mini Overview, in light and dark. Unsaved changes show here first.
         </SectionHeading>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-5">
           <ThemePreview
             tokens={tokens.light}
             accents={accents.light}
@@ -365,7 +392,7 @@ export function ThemeSettings({
             orgName={orgName}
           />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="bg-muted/40 rounded-tile flex items-center gap-3 p-3">
           <Switch id="preview-app" checked={previewApp} onCheckedChange={setPreviewApp} />
           <Label htmlFor="preview-app" className="font-normal">
             Preview on the whole app until I save or leave this page
@@ -373,13 +400,13 @@ export function ThemeSettings({
         </div>
       </section>
 
-      <section aria-labelledby="theme-contrast" className="space-y-3" aria-live="polite">
+      <section aria-labelledby="theme-contrast" className={THEME_SECTION} aria-live="polite">
         <SectionHeading id="theme-contrast" title="Contrast check">
           WCAG AA: 4.5:1 for text, 3:1 for the focus ring and chart colours. A theme that fails can
           still be saved, but some members may struggle to read it.
         </SectionHeading>
         {warnings.length === 0 ? (
-          <p className="text-success flex items-center gap-2 text-sm font-medium">
+          <p className="bg-tint-success text-tint-success-foreground rounded-tile flex items-center gap-2 px-3.5 py-3 text-sm font-semibold">
             <CheckCircle2 className="size-4" aria-hidden="true" />
             Passes WCAG AA in light and dark.
           </p>
@@ -396,7 +423,7 @@ export function ThemeSettings({
         )}
       </section>
 
-      <section aria-labelledby="theme-mode" className="space-y-3">
+      <section aria-labelledby="theme-mode" className={THEME_SECTION}>
         <SectionHeading id="theme-mode" title="Light and dark mode">
           The mode members see until they pick their own in the user menu.
         </SectionHeading>
@@ -407,7 +434,7 @@ export function ThemeSettings({
           value={draft.mode}
           onChange={(mode) => update({ mode })}
         />
-        <div className="flex items-start gap-3 rounded-lg border p-3">
+        <div className="bg-muted/40 rounded-tile flex items-start gap-3 p-3.5">
           <Switch
             id="lock-mode"
             checked={draft.lockMode}
@@ -426,15 +453,15 @@ export function ThemeSettings({
         </div>
       </section>
 
-      <section aria-labelledby="theme-logo" className="space-y-3">
+      <section aria-labelledby="theme-logo" className={THEME_SECTION}>
         <SectionHeading id="theme-logo" title="Logo display">
-          How the logo shows in the sidebar and on the org&apos;s public poll and invite pages.{" "}
+          How the logo shows in the sidebar and on the club&apos;s public poll and invite pages.{" "}
           {hasLogo ? (
             <>
               Change the logo in{" "}
               <Link
                 href={`/app/${orgSlug}/settings/general`}
-                className="text-primary underline underline-offset-4"
+                className="text-foreground font-medium underline underline-offset-4"
               >
                 General
               </Link>
@@ -445,11 +472,11 @@ export function ThemeSettings({
               No logo yet: upload one in{" "}
               <Link
                 href={`/app/${orgSlug}/settings/general`}
-                className="text-primary underline underline-offset-4"
+                className="text-foreground font-medium underline underline-offset-4"
               >
                 General
               </Link>
-              . Until then the sidebar shows the org&apos;s initials in the primary colour.
+              . Until then the sidebar shows the club&apos;s initials in the primary colour.
             </>
           )}
         </SectionHeading>
@@ -460,12 +487,13 @@ export function ThemeSettings({
           value={draft.logoDisplay}
           onChange={(logoDisplay) => update({ logoDisplay })}
         />
-        <div className="bg-sidebar text-sidebar-foreground w-64 rounded-lg border p-3">
+        <div className="bg-sidebar text-sidebar-foreground rounded-tile ring-foreground/6 w-64 p-3 ring-1">
           <OrgBrand name={orgName} logo={logo} display={draft.logoDisplay} />
         </div>
       </section>
 
-      <div className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky bottom-[var(--shell-bottom,0px)] z-10 -mx-4 flex flex-wrap items-center gap-3 border-t px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      {/* The one commit for the whole page: a floating bar that stays in reach. */}
+      <div className="glass-light text-foreground sticky bottom-[calc(var(--shell-bottom,0px)+1rem)] z-10 flex flex-wrap items-center gap-2 rounded-[1.75rem] p-2 sm:rounded-full">
         <Button onClick={save} disabled={isPending || !dirty}>
           {isPending ? "Saving…" : "Save theme"}
         </Button>
@@ -485,7 +513,7 @@ export function ThemeSettings({
           <p
             role="status"
             className={cn(
-              "text-sm",
+              "px-2 text-sm font-medium",
               status.kind === "error"
                 ? "text-destructive"
                 : warnings.length > 0
@@ -496,9 +524,14 @@ export function ThemeSettings({
             {status.text}
           </p>
         )}
-        {!status && dirty && <p className="text-muted-foreground text-sm">Unsaved changes</p>}
+        {!status && dirty && (
+          <p className="text-muted-foreground inline-flex items-center gap-2 px-2 text-sm">
+            <span aria-hidden="true" className="bg-glow size-2 rounded-full" />
+            Unsaved changes
+          </p>
+        )}
         {status?.kind === "ok" && usingOwn && (
-          <p className="text-warning flex flex-wrap items-center gap-2 text-sm">
+          <p className="text-warning flex flex-wrap items-center gap-2 px-2 text-sm">
             Everyone else sees it now. You still see your own theme ({personalThemeName}).
             <Button
               type="button"
@@ -527,6 +560,17 @@ export function ThemeSettings({
   );
 }
 
+/** A preset's tokens, derived once (presets never change at runtime). */
+const presetTokenCache = new Map<string, DerivedTheme>();
+function presetTokens(preset: ThemePreset): DerivedTheme {
+  let derived = presetTokenCache.get(preset.id);
+  if (!derived) {
+    derived = deriveTheme(preset.light, preset.dark, preset.glow ?? null);
+    presetTokenCache.set(preset.id, derived);
+  }
+  return derived;
+}
+
 function SectionHeading({
   id,
   title,
@@ -538,7 +582,7 @@ function SectionHeading({
 }) {
   return (
     <div className="space-y-1">
-      <h2 id={id} className="text-base font-semibold">
+      <h2 id={id} className="heading text-[17px]">
         {title}
       </h2>
       <p className="text-muted-foreground max-w-prose text-sm">{children}</p>
@@ -546,23 +590,26 @@ function SectionHeading({
   );
 }
 
-/** The palette as colour chips. Decorative: the preset's name and description label the radio. */
-function Swatches({ roles }: { roles: ThemeRoles }) {
-  return (
-    <span className="flex h-6 overflow-hidden rounded-md border" aria-hidden="true">
-      {ROLE_KEYS.map((key) => (
-        <span key={key} className="flex-1" style={{ backgroundColor: roles[key] }} />
-      ))}
-    </span>
-  );
-}
+const BLOCKS = [
+  { label: "Coming up", className: "bg-block-quiet text-block-quiet-foreground" },
+  { label: "Act now", className: "bg-block-alert text-block-alert-foreground" },
+  { label: "Your answer", className: "bg-block-answer text-block-answer-foreground" },
+  { label: "Progress", className: "bg-block-goal text-block-goal-foreground" },
+] as const;
 
+/**
+ * One preset (guide section 18): its own page, buttons, block colours and
+ * chart slots, rendered from its tokens in a scoped wrapper. The radio is
+ * the whole card; the sample is decorative (the name and description label
+ * the radio).
+ */
 function PresetCard({
   group,
   name,
   description,
-  light,
-  dark,
+  tokens,
+  mode,
+  badge,
   selected,
   onSelect,
   icon = false,
@@ -570,8 +617,9 @@ function PresetCard({
   group: string;
   name: string;
   description: string;
-  light: ThemeRoles;
-  dark: ThemeRoles;
+  tokens: TokenMap;
+  mode: ColorMode;
+  badge?: string | null;
   selected: boolean;
   onSelect: () => void;
   icon?: boolean;
@@ -579,24 +627,73 @@ function PresetCard({
   return (
     <label
       className={cn(
-        "bg-card text-card-foreground has-focus-visible:ring-ring/50 relative flex cursor-pointer flex-col gap-3 rounded-xl border p-4 transition-colors has-focus-visible:ring-3",
-        selected ? "border-primary ring-primary ring-1" : "hover:border-foreground/30",
+        "rounded-card group/preset relative block cursor-pointer transition-[transform,box-shadow] duration-200 ease-(--ease-ink) hover:-translate-y-0.5 motion-reduce:transform-none",
+        "has-focus-visible:outline-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-4",
+        selected ? "ring-foreground ring-offset-card ring-2 ring-offset-2" : "hover:shadow-e2",
       )}
     >
       <input type="radio" name={group} checked={selected} onChange={onSelect} className="sr-only" />
-      <span className="flex items-center gap-2 pr-6">
-        {icon && <Palette className="text-muted-foreground size-4" aria-hidden="true" />}
-        <span className="font-medium">{name}</span>
-      </span>
-      {selected && (
-        <span className="bg-primary text-primary-foreground absolute top-3 right-3 flex size-5 items-center justify-center rounded-full">
-          <Check className="size-3" aria-hidden="true" />
+      <span
+        style={{ ...tokenStyle(tokens), colorScheme: mode }}
+        className={cn(
+          "bg-background text-foreground ring-foreground/8 rounded-card relative isolate flex h-full flex-col gap-3 overflow-hidden p-4.5 ring-1",
+          mode === "dark" && "dark",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 -top-16 -z-10 h-40 bg-[radial-gradient(70%_80%_at_30%_0%,color-mix(in_oklab,var(--glow)_22%,transparent),transparent_75%)]"
+        />
+        <span className="flex items-center gap-2 pr-7">
+          {icon && <Palette className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />}
+          <span className="heading truncate text-[17px]">{name}</span>
+          {badge && (
+            <Badge variant="secondary" className="ml-auto">
+              {badge}
+            </Badge>
+          )}
         </span>
-      )}
-      <span className="text-muted-foreground text-xs">{description}</span>
-      <span className="grid gap-1.5">
-        <Swatches roles={light} />
-        <Swatches roles={dark} />
+        {selected && (
+          <span className="bg-primary text-primary-foreground absolute top-4 right-4 grid size-5 place-items-center rounded-full">
+            <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+          </span>
+        )}
+        <span className="text-muted-foreground min-h-9 text-[13px] leading-snug">
+          {description}
+        </span>
+        <span aria-hidden="true" className="flex flex-wrap items-center gap-1.5">
+          <span className={buttonVariants({ variant: "create", size: "sm" })}>
+            <Plus aria-hidden="true" />
+            New task
+          </span>
+          <span className={buttonVariants({ size: "sm" })}>Save</span>
+          <Badge variant="destructive">
+            <Flag aria-hidden="true" />
+            Urgent
+          </Badge>
+        </span>
+        <span aria-hidden="true" className="grid grid-cols-4 gap-1.5">
+          {BLOCKS.map((b) => (
+            <span
+              key={b.label}
+              className={cn(
+                "flex h-12 items-end rounded-[12px] p-2 text-[11px] leading-tight font-semibold",
+                b.className,
+              )}
+            >
+              {b.label}
+            </span>
+          ))}
+        </span>
+        <span aria-hidden="true" className="flex items-center gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <span
+              key={n}
+              className="size-3 rounded-full"
+              style={{ background: `var(--chart-${n})` }}
+            />
+          ))}
+        </span>
       </span>
     </label>
   );
@@ -616,25 +713,19 @@ function OptionGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-labelledby={labelledBy} className="grid gap-2 sm:grid-cols-3">
+    <div role="radiogroup" aria-labelledby={labelledBy} className="grid gap-2.5 sm:grid-cols-3">
       {options.map((option) => (
-        <label
-          key={option.value}
-          className={cn(
-            "has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm has-focus-visible:ring-3",
-            value === option.value && "border-primary ring-primary ring-1",
-          )}
-        >
+        <label key={option.value} className={choiceClass(value === option.value)}>
           <input
             type="radio"
             name={name}
             value={option.value}
             checked={value === option.value}
             onChange={() => onChange(option.value)}
-            className="accent-primary mt-0.5 size-4 shrink-0"
+            className="accent-foreground mt-0.5 size-4 shrink-0"
           />
           <span className="space-y-0.5">
-            <span className="block font-medium">{option.label}</span>
+            <span className="block font-semibold">{option.label}</span>
             <span className="text-muted-foreground block text-xs">{option.hint}</span>
           </span>
         </label>
@@ -657,28 +748,26 @@ function WarningList({
   const title = mode === "light" ? "Light" : "Dark";
   if (warnings.length === 0) {
     return (
-      <div className="self-start rounded-lg border p-3">
-        <p className="text-success flex items-center gap-2 text-sm font-medium">
-          <CheckCircle2 className="size-4" aria-hidden="true" />
-          {title}: passes AA
-        </p>
-      </div>
+      <p className="bg-tint-success text-tint-success-foreground rounded-tile flex items-center gap-2 self-start px-3.5 py-3 text-sm font-semibold">
+        <CheckCircle2 className="size-4" aria-hidden="true" />
+        {title}: passes AA
+      </p>
     );
   }
   return (
-    <div className="border-warning/40 bg-warning/5 space-y-3 self-start rounded-lg border p-3">
-      <p className="text-warning flex items-center gap-2 text-sm font-medium">
+    <div className="bg-muted/50 rounded-tile space-y-3 self-start p-4">
+      <p className="text-warning flex items-center gap-2 text-sm font-semibold">
         <TriangleAlert className="size-4" aria-hidden="true" />
         {title}: {warnings.length} {warnings.length === 1 ? "pair fails" : "pairs fail"} AA
       </p>
-      <ul className="space-y-3">
+      <ul className="divide-border/70 divide-y">
         {warnings.map((warning) => (
           <li
             key={`${warning.mode}-${warning.pair}`}
-            className="flex flex-wrap items-center gap-3 text-sm"
+            className="flex flex-wrap items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0"
           >
             <span
-              className="flex h-8 w-12 shrink-0 items-center justify-center rounded-md border text-xs font-semibold"
+              className="rounded-field ring-foreground/10 flex h-8 w-12 shrink-0 items-center justify-center text-xs font-semibold ring-1"
               style={{ backgroundColor: warning.bg, color: warning.fg }}
               aria-hidden="true"
             >
@@ -718,8 +807,8 @@ function ResetButton({ disabled, onConfirm }: { disabled: boolean; onConfirm: ()
         <DialogHeader>
           <DialogTitle>Reset the theme?</DialogTitle>
           <DialogDescription>
-            Everyone goes back to the default colours, the device&apos;s light or dark mode, and the
-            logo beside the name. You can pick a theme again at any time.
+            Everyone goes back to the default colours (Moonstone), the device&apos;s light or dark
+            mode, and the logo beside the name. You can pick a theme again at any time.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

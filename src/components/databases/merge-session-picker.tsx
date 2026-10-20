@@ -5,7 +5,10 @@ import { useState, useTransition } from "react";
 
 import { mergeSessionsAction } from "@/app/app/[orgSlug]/databases/actions";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Input } from "@/components/ui/input";
 
+import { nativeSelectClass, notice } from "./styles";
 import { useViewParams } from "./view-params";
 
 /**
@@ -36,6 +39,7 @@ export function MergeSessionPicker({
 }) {
   const router = useRouter();
   const view = useViewParams();
+  const [confirmEl, confirm] = useConfirm();
   const [open, setOpen] = useState(startOpen);
   const [survivor, setSurvivor] = useState(candidates?.[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -44,22 +48,23 @@ export function MergeSessionPicker({
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         Merge into another session…
       </Button>
     );
   }
   return (
-    <div className="space-y-2 rounded-xl border p-3 text-sm">
+    <div className="bg-muted/60 rounded-tile space-y-3 p-4 text-sm">
+      {confirmEl}
       <p>
-        Merge <strong>{loserTitle}</strong> into:
+        Merge <strong className="font-semibold">{loserTitle}</strong> into:
       </p>
       {candidates && candidates.length > 0 ? (
         <select
           value={survivor}
           onChange={(e) => setSurvivor(e.target.value)}
           aria-label="Session to keep"
-          className="border-input bg-background h-8 w-full rounded-lg border px-2"
+          className={nativeSelectClass}
         >
           {candidates.map((c) => (
             <option key={c.id} value={c.id}>
@@ -68,21 +73,26 @@ export function MergeSessionPicker({
           ))}
         </select>
       ) : (
-        <input
+        <Input
           value={survivor}
           onChange={(e) => setSurvivor(e.target.value.trim())}
           placeholder="Session id (from the Sessions table)"
           aria-label="Session id to keep"
-          className="border-input bg-background h-8 w-full rounded-lg border px-2 font-mono text-xs"
+          className="font-mono text-xs md:text-xs"
         />
       )}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="destructive"
           disabled={pending || !survivor}
-          onClick={() => {
-            if (!window.confirm("Merge these sessions? This cannot be undone.")) return;
+          onClick={async () => {
+            const ok = await confirm({
+              title: "Merge these sessions?",
+              description: `${loserTitle} is removed and everything on it moves to the session you keep. This can't be undone.`,
+              confirmLabel: "Merge session",
+            });
+            if (!ok) return;
             setError(null);
             start(async () => {
               const r = await mergeSessionsAction(organizationId, survivor, loserId);
@@ -98,7 +108,7 @@ export function MergeSessionPicker({
             });
           }}
         >
-          Merge
+          Merge session
         </Button>
         {(!startOpen || onCancel) && (
           <Button
@@ -111,11 +121,11 @@ export function MergeSessionPicker({
         )}
       </div>
       {error && (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className={notice.error}>
           {error}
         </p>
       )}
-      {done && <p className="text-success text-xs">{done}</p>}
+      {done && <p className={notice.success}>{done}</p>}
     </div>
   );
 }

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { SUCCESS_TEXT } from "@/lib/status-tones";
+import { cn } from "@/lib/utils";
 
+import { nativeSelectClass, SettingsCard, SettingsStatus } from "../settings-card";
 import {
   type PrivacyInput,
   updateBallotVisibility,
@@ -17,18 +18,6 @@ import {
 } from "./actions";
 
 type Status = { tone: "ok" | "error"; text: string } | null;
-
-function StatusLine({ status }: { status: Status }) {
-  if (!status) return null;
-  return (
-    <p
-      role="status"
-      className={status.tone === "error" ? "text-destructive text-sm" : `text-sm ${SUCCESS_TEXT}`}
-    >
-      {status.text}
-    </p>
-  );
-}
 
 const VISIBILITY_OPTIONS = [
   { value: "MEMBERS", label: "All members" },
@@ -49,10 +38,12 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 py-3">
-      <div className="max-w-md">
-        <Label htmlFor={id}>{label}</Label>
-        <p className="text-muted-foreground text-xs">{help}</p>
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4 first:pt-0 last:pb-0">
+      <div className="max-w-md min-w-0 flex-1 basis-64">
+        <Label htmlFor={id} className="font-semibold">
+          {label}
+        </Label>
+        <p className="text-muted-foreground mt-1 text-[13px]">{help}</p>
       </div>
       {children}
     </div>
@@ -77,7 +68,6 @@ export function PrivacyForm({
 
   return (
     <form
-      className="divide-y rounded-lg border px-4"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         setStatus(null);
@@ -92,87 +82,97 @@ export function PrivacyForm({
         });
       }}
     >
-      <Row
-        id="results-visible"
-        label="Members see ballot results"
-        help="Aggregated results only, never who voted for what."
+      <SettingsCard
+        title="Members, contacts and the public feed"
+        description="What members can see of each other and of your website's contacts, and what the club publishes."
+        status={status && <SettingsStatus status={status} />}
+        footer={
+          canEdit && (
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          )
+        }
       >
-        <Switch
-          id="results-visible"
-          checked={value.ballotResultsVisibleToMembers}
-          disabled={!canEdit}
-          onCheckedChange={(v) => set("ballotResultsVisibleToMembers", v)}
-        />
-      </Row>
-      <Row
-        id="min-cell"
-        label="Smallest result group shown to members"
-        help="Choices with fewer votes than this show as “fewer than N”, so a small group's votes can't be singled out."
-      >
-        <Input
-          id="min-cell"
-          type="number"
-          min={1}
-          max={50}
-          className="w-24"
-          value={value.ballotMinCellSize}
-          disabled={!canEdit}
-          onChange={(e) => set("ballotMinCellSize", Number(e.target.value))}
-        />
-      </Row>
-      <Row
-        id="member-emails"
-        label="Members see each other's emails"
-        help="On the Members page. Owners and admins always see them."
-      >
-        <Switch
-          id="member-emails"
-          checked={value.showMemberEmailsToMembers}
-          disabled={!canEdit}
-          onCheckedChange={(v) => set("showMemberEmailsToMembers", v)}
-        />
-      </Row>
-      <Row
-        id="contact-emails"
-        label="Who sees website contacts' emails"
-        help="In the People, Attendance and Signups databases."
-      >
-        <select
-          id="contact-emails"
-          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
-          value={value.contactEmailVisibility}
-          disabled={!canEdit}
-          onChange={(e) =>
-            set("contactEmailVisibility", e.target.value as PrivacyInput["contactEmailVisibility"])
-          }
-        >
-          {VISIBILITY_OPTIONS.filter((o) => o.value !== "HIDDEN").map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </Row>
-      <Row
-        id="public-events"
-        label="Public events feed"
-        help="Publishes upcoming PUBLIC events at /api/public/{your URL}/events for your website. Internal events are never included."
-      >
-        <Switch
-          id="public-events"
-          checked={value.publicEventsEnabled}
-          disabled={!canEdit}
-          onCheckedChange={(v) => set("publicEventsEnabled", v)}
-        />
-      </Row>
-      {canEdit && (
-        <div className="flex items-center gap-3 py-3">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Saving…" : "Save privacy settings"}
-          </Button>
-          <StatusLine status={status} />
+        <div className="divide-border/70 divide-y">
+          <Row
+            id="results-visible"
+            label="Members see ballot results"
+            help="Aggregated results only, never who voted for what."
+          >
+            <Switch
+              id="results-visible"
+              checked={value.ballotResultsVisibleToMembers}
+              disabled={!canEdit}
+              onCheckedChange={(v) => set("ballotResultsVisibleToMembers", v)}
+            />
+          </Row>
+          <Row
+            id="min-cell"
+            label="Smallest result group shown to members"
+            help="Choices with fewer votes than this show as “fewer than N”, so a small group's votes can't be singled out."
+          >
+            <Input
+              id="min-cell"
+              type="number"
+              min={1}
+              max={50}
+              className="w-24 tabular-nums"
+              value={value.ballotMinCellSize}
+              disabled={!canEdit}
+              onChange={(e) => set("ballotMinCellSize", Number(e.target.value))}
+            />
+          </Row>
+          <Row
+            id="member-emails"
+            label="Members see each other's emails"
+            help="On the Members page. Owners and admins always see them."
+          >
+            <Switch
+              id="member-emails"
+              checked={value.showMemberEmailsToMembers}
+              disabled={!canEdit}
+              onCheckedChange={(v) => set("showMemberEmailsToMembers", v)}
+            />
+          </Row>
+          <Row
+            id="contact-emails"
+            label="Who sees website contacts' emails"
+            help="In the People, Attendance and Signups databases."
+          >
+            <select
+              id="contact-emails"
+              className={cn(nativeSelectClass, "w-auto min-w-48")}
+              value={value.contactEmailVisibility}
+              disabled={!canEdit}
+              onChange={(e) =>
+                set(
+                  "contactEmailVisibility",
+                  e.target.value as PrivacyInput["contactEmailVisibility"],
+                )
+              }
+            >
+              {VISIBILITY_OPTIONS.filter((o) => o.value !== "HIDDEN").map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <Row
+            id="public-events"
+            label="Public events feed"
+            help="Publishes upcoming public events at /api/public/{your URL}/events for your website. Internal events are never included."
+          >
+            <Switch
+              id="public-events"
+              checked={value.publicEventsEnabled}
+              disabled={!canEdit}
+              onCheckedChange={(v) => set("publicEventsEnabled", v)}
+            />
+          </Row>
         </div>
-      )}
+      </SettingsCard>
     </form>
   );
 }
@@ -191,47 +191,48 @@ export function BallotVisibilityForm({
   const [status, setStatus] = useState<Status>(null);
   const [isPending, startTransition] = useTransition();
   return (
-    <div className="space-y-2 rounded-lg border p-4">
-      <Label htmlFor="ballot-visibility">Who can see individual votes</Label>
-      <p className="text-muted-foreground text-xs">
-        Who voted for what in ballots and elections. Everyone else sees only aggregated results.
-        {canEdit ? "" : " Only an owner can change this."}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <select
-          id="ballot-visibility"
-          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
-          value={value}
-          disabled={!canEdit}
-          onChange={(e) => setValue(e.target.value)}
-        >
-          <option value="OWNER_ONLY">Owners only (default)</option>
-          <option value="OWNER_AND_ADMINS">Owners and admins</option>
-          <option value="NOBODY">Nobody (also left out of exports)</option>
-        </select>
-        {canEdit && (
-          <Button
-            variant="outline"
-            disabled={isPending || value === initial}
-            onClick={() =>
-              startTransition(async () => {
-                setStatus(null);
-                const result = await updateBallotVisibility(orgId, value);
-                setStatus(
-                  result.error
-                    ? { tone: "error", text: result.error }
-                    : { tone: "ok", text: "Saved." },
-                );
-                if (!result.error) router.refresh();
-              })
-            }
+    <form
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        if (!canEdit) return;
+        startTransition(async () => {
+          setStatus(null);
+          const result = await updateBallotVisibility(orgId, value);
+          setStatus(
+            result.error ? { tone: "error", text: result.error } : { tone: "ok", text: "Saved." },
+          );
+          if (!result.error) router.refresh();
+        });
+      }}
+    >
+      <SettingsCard
+        title="Ballots"
+        description={`Who can see who voted for what in ballots and elections. Everyone else sees only aggregated results.${canEdit ? "" : " Only an owner can change this."}`}
+        status={status && <SettingsStatus status={status} />}
+        footer={
+          canEdit && (
+            <Button type="submit" disabled={isPending || value === initial}>
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          )
+        }
+      >
+        <div className="grid max-w-md gap-1.5">
+          <Label htmlFor="ballot-visibility">Who can see individual votes</Label>
+          <select
+            id="ballot-visibility"
+            className={nativeSelectClass}
+            value={value}
+            disabled={!canEdit}
+            onChange={(e) => setValue(e.target.value)}
           >
-            {isPending ? "Saving…" : "Save"}
-          </Button>
-        )}
-      </div>
-      <StatusLine status={status} />
-    </div>
+            <option value="OWNER_ONLY">Owners only (default)</option>
+            <option value="OWNER_AND_ADMINS">Owners and admins</option>
+            <option value="NOBODY">Nobody (also left out of exports)</option>
+          </select>
+        </div>
+      </SettingsCard>
+    </form>
   );
 }
 
@@ -252,14 +253,15 @@ export function DatabaseVisibilityRow({
   const [status, setStatus] = useState<Status>(null);
   const [isPending, startTransition] = useTransition();
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 p-3">
-      <label htmlFor={`db-${id}`} className="text-sm font-medium">
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+      <label htmlFor={`db-${id}`} className="min-w-0 truncate text-sm font-semibold">
         {name}
       </label>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <SettingsStatus status={status} />
         <select
           id={`db-${id}`}
-          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
+          className={cn(nativeSelectClass, "w-auto min-w-48")}
           defaultValue={initial}
           disabled={!canEdit || isPending}
           onChange={(e) => {
@@ -282,7 +284,6 @@ export function DatabaseVisibilityRow({
             </option>
           ))}
         </select>
-        <StatusLine status={status} />
       </div>
     </li>
   );

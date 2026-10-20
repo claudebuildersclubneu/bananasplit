@@ -1,5 +1,5 @@
 import { escapeHtml, subjectLine } from "@/server/email/escape";
-import { layout, paragraph, type RenderedEmail } from "@/server/email/templates";
+import { EMAIL_COLORS as C, layout, paragraph, type RenderedEmail } from "@/server/email/templates";
 
 /**
  * Task email templates (Phase 6). Every value is escaped (escapeHtml), every
@@ -36,7 +36,7 @@ function factsHtml(facts: TaskFacts): string {
   const rows = factRows(facts)
     .map(
       ([k, v]) =>
-        `<tr><td style="padding:4px 12px 4px 0;color:#71717a;vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="padding:4px 0;font-weight:${k === "Task" ? 600 : 400}">${escapeHtml(v)}</td></tr>`,
+        `<tr><td style="padding:4px 12px 4px 0;color:${C.muted};vertical-align:top;white-space:nowrap">${escapeHtml(k)}</td><td style="padding:4px 0;font-weight:${k === "Task" ? 600 : 400}">${escapeHtml(v)}</td></tr>`,
     )
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px">${rows}</table>`;
@@ -49,7 +49,7 @@ function factsText(facts: TaskFacts): string {
 }
 
 function note(text: string): string {
-  return `<p style="margin:0 0 16px;padding:10px 12px;border-radius:6px;background:#fef3c7;color:#78350f;font-size:14px">${escapeHtml(text)}</p>`;
+  return `<p style="margin:0 0 16px;padding:10px 12px;border-radius:10px;background:${C.page};border:1px solid ${C.line};color:${C.ink};font-size:14px">${escapeHtml(text)}</p>`;
 }
 
 export const FLAGGED_NOTE =
@@ -121,7 +121,7 @@ export function taskMentionedEmail(input: {
 }): RenderedEmail {
   const lead = `${input.actorName} mentioned you in ${input.where === "comment" ? "a comment on" : "the description of"} a task in ${input.orgName}.`;
   const quote = input.excerpt
-    ? `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid #d4d4d8;color:#3f3f46">${escapeHtml(input.excerpt)}</blockquote>`
+    ? `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid ${C.line};color:${C.muted}">${escapeHtml(input.excerpt)}</blockquote>`
     : "";
   return layout({
     subject: `${input.actorName} mentioned you: ${input.task.title}`,
@@ -144,7 +144,7 @@ export function taskCommentedEmail(input: {
 }): RenderedEmail {
   const lead = `${input.actorName} commented on a task you're on in ${input.orgName}.`;
   const quote = input.excerpt
-    ? `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid #d4d4d8;color:#3f3f46">${escapeHtml(input.excerpt)}</blockquote>`
+    ? `<blockquote style="margin:0 0 16px;padding:8px 12px;border-left:3px solid ${C.line};color:${C.muted}">${escapeHtml(input.excerpt)}</blockquote>`
     : "";
   return layout({
     subject: `New comment: ${input.task.title}`,
@@ -173,7 +173,9 @@ export function taskReminderEmail(input: {
     ? `${which.charAt(0).toUpperCase()}${which.slice(1)} is overdue.`
     : `Reminder: ${which} is due ${input.when}.`;
   return layout({
-    subject: input.overdue ? `Overdue: ${input.task.title}` : `Due ${input.when}: ${input.task.title}`,
+    subject: input.overdue
+      ? `Overdue: ${input.task.title}`
+      : `Due ${input.when}: ${input.task.title}`,
     eyebrow: input.orgName,
     bodyHtml: paragraph(lead) + factsHtml(input.task),
     bodyText: [lead, factsText(input.task)].join("\n\n"),
@@ -229,10 +231,10 @@ export function taskDigestEmail(input: {
       `<ul style="margin:0 0 8px;padding-left:20px">${items
         .map((i) => {
           const due = i.dueLabel
-            ? ` <span style="color:#71717a">&middot; ${escapeHtml(i.dueLabel)}</span>`
+            ? ` <span style="color:${C.muted}">&middot; ${escapeHtml(i.dueLabel)}</span>`
             : "";
           const extra = i.note
-            ? ` <span style="color:#71717a">&middot; ${escapeHtml(i.note)}</span>`
+            ? ` <span style="color:${C.muted}">&middot; ${escapeHtml(i.note)}</span>`
             : "";
           return `<li style="margin:0 0 4px">${escapeHtml(i.title)}${due}${extra}</li>`;
         })
