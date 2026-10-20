@@ -83,6 +83,8 @@
   --color-primary-hover: var(--primary-hover);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-create: var(--create);
+  --color-create-foreground: var(--create-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -138,6 +140,9 @@
   --accent-foreground: #111318;
   --brand-accent: #111318;
   --brand-accent-foreground: #ffffff;
+  /* Create buttons: white in light, lit by the glow (derive.ts says why). */
+  --create: #ffffff;
+  --create-foreground: #111318;
   --destructive: #db0018;
   --destructive-foreground: #ffffff;
   --success: #007c3e;
@@ -230,6 +235,8 @@
   --accent-foreground: #eef0f4;
   --brand-accent: #eef0f4;
   --brand-accent-foreground: #0c0d10;
+  --create: #eef0f4;
+  --create-foreground: #0c0d10;
   --destructive: #ff655a;
   --destructive-foreground: #000000;
   --success: #5bcc80;

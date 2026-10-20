@@ -21,8 +21,10 @@ What changed for every club, where it lives, and what it needs. Stacked on
 
 ## Navigation, Overview, pins
 
-- The sidebar is three short groups (your work, Club, Data) with Settings at
-  the bottom. People is in it; Reports moved into Databases.
+- The sidebar is three short groups (your work, Club, Data), then Pinned;
+  Personal and your clubs sit at its foot, apart from the pins (they scroll
+  on their own when there are many). The Admin panel is in the club menu,
+  not the sidebar. People is in the Club group; Reports moved into Databases.
 - The pin button in the top bar pins any page, note, task, file, database or
   person. Pins show in the sidebar and on the Overview. `Pin` rows are the
   member's own (RLS on user and org); labels are looked up live under RLS,

@@ -442,7 +442,7 @@ export function EventCalendar({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="create"
-                    className="border-brand-accent-foreground/15 rounded-l-none border-l pr-3 pl-2.5"
+                    className="border-create-foreground/15 rounded-l-none border-l pr-3 pl-2.5"
                     style={{ boxShadow: "none" }}
                     aria-label="More ways to add events"
                   >

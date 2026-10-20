@@ -160,12 +160,12 @@ became **destinations** in the header.
 
 | Layout        | What it is good at                                                                                                                                                                                                                                                                                                                     | Key |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| **Board**     | Moving work along: Not started, In progress, **Blocked**, Completed. Cards are stories and tasks (each shows its epic); **Swimlanes by epic** (`?lanes=epic`) gives each epic a row, and dragging a card into another lane moves it into that epic. Dragging into Blocked asks what it's blocked on. Completed shows the last 14 days. | `1` |
-| **Week**      | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week.                                                                                                                                                                                                            | `2` |
-| **List**      | Open work grouped by epic (stories with their tasks under them, roll-up progress), then everything outside an epic. A club without epics gets one plain list. A quick add on top takes `#tags`. The Free plan's only view.                                                                                                             | `3` |
-| **Table**     | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                                                                                                                                                      | `4` |
-| **Roadmap**   | Epics on a week timeline, the ones still going first: each bar runs from the epic's start date (or, without one, when it was made or its earliest dated work) to its due date with its progress filled in, and this week is marked.                                                                                                    | `5` |
-| **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by epic and person.                                                                                                                                                                                                                                       | `6` |
+| **Dashboard** | Where the work in view stands (a mix bar), what's worth a look, and progress by epic and person.                                                                                                                                                                                                                                       | `1` |
+| **Board**     | Moving work along: Not started, In progress, **Blocked**, Completed. Cards are stories and tasks (each shows its epic); **Swimlanes by epic** (`?lanes=epic`) gives each epic a row, and dragging a card into another lane moves it into that epic. Dragging into Blocked asks what it's blocked on. Completed shows the last 14 days. | `2` |
+| **Week**      | What is owed and by when: Overdue / Today / Tomorrow / Next 7 days / Later / No due date, plus what was finished this week.                                                                                                                                                                                                            | `3` |
+| **List**      | Open work grouped by epic (stories with their tasks under them, roll-up progress), then everything outside an epic. A club without epics gets one plain list. A quick add on top takes `#tags`. The Free plan's only view.                                                                                                             | `4` |
+| **Table**     | Filtering and bulk editing: 50 a page, sortable, hideable columns, bulk status, owner and delete.                                                                                                                                                                                                                                      | `5` |
+| **Roadmap**   | Epics on a week timeline, the ones still going first: each bar runs from the epic's start date (or, without one, when it was made or its earliest dated work) to its due date with its progress filled in, and this week is marked.                                                                                                    | `6` |
 
 Due dates also show on the main Calendar (its Tasks layer). A **stat strip**
 heads every layout: Open, Due this week, Overdue (one click shows them) and
@@ -178,11 +178,12 @@ Done this week, for the toolbar's question.
 The toolbar above the layouts is the same in all of them, a row of pills:
 
 - **Scope** — _Mine_, _My team_ (only if you have reports) or _Everyone_.
-- **Person**, **Epic** (there even before the first epic: its menu can
-  make one) and **Tag**. Filtering to an epic shows it, its stories and
+- **Filters** — one chip; hover it (or focus or tap it) and it slides out
+  **Person**, **Epic** (there even before the first epic: its menu can make
+  one), **Tag** and **Status** (status and visibility), staying open while
+  one of their menus is. Filtering to an epic shows it, its stories and
   their tasks; new tasks from the header or the quick add go into it.
 - **Search** — by title; `/` focuses it from anywhere, Enter applies it.
-- **Filter** — status and visibility.
 - Active filters show as removable pills with **Clear all**.
 
 Finishing a task is one click on its circle: it fills, springs and pops
@@ -191,7 +192,14 @@ with **Undo**, which puts it back as it was.
 
 All of it lives in the URL, so a filtered view is a link you can paste into
 Slack and the Back button does the obvious thing. Switching layout keeps the
-filters, and the layout you used last is remembered per person.
+filters. Tasks always opens on the **Board**; Dashboard comes first in the
+switcher, Board second.
+
+**New task** (the header, `c`, Add to epic, a lane's +) opens a centred
+dialog laid out like New event: Title; Type and Priority; Owner and Part of
+(or an epic's Colour); When (Starts for epics and stories, Due); then More
+details for the description, tags (made on the spot), who else is involved,
+status and who can see it. An existing task still opens in the side panel.
 
 **Blocked is not a bucket in the Week.** A blocked task still has a due date,
 and hiding it in a bucket of its own is how a blocker survives three weeks

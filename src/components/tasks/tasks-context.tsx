@@ -15,6 +15,7 @@ import type { TaskAccessSubject, TaskActor } from "@/lib/tasks/access";
 import type { TaskVisibilitySubject } from "@/lib/tasks/visibility";
 import { cn } from "@/lib/utils";
 
+import { NewTaskDialog } from "./new-task-dialog";
 import { TaskDetailSheet } from "./task-detail-sheet";
 import type { TaskEditorDefaults } from "./task-editor";
 import type {
@@ -197,7 +198,7 @@ export function TasksProvider({
     <TasksContext.Provider value={value}>
       {children}
       <TaskDetailSheet
-        open={open}
+        open={open && task !== null}
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) setTask(null);
@@ -206,6 +207,15 @@ export function TasksProvider({
         defaults={defaults}
         onOpenTask={openTask}
         busy={isLoadingTask}
+      />
+      {/* A new task opens centred, like New event; an existing one in the side panel. */}
+      <NewTaskDialog
+        open={open && task === null}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setTask(null);
+        }}
+        defaults={defaults}
       />
       <div
         role="status"

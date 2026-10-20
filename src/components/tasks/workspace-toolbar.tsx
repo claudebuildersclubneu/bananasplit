@@ -9,6 +9,7 @@ import {
   Columns3,
   Layers,
   Gauge,
+  ListFilter,
   Lock,
   SlidersHorizontal,
   Table2,
@@ -20,7 +21,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/user-avatar";
@@ -150,10 +150,15 @@ export function WorkspaceToolbar() {
               {scope.label}
             </Chip>
           ))}
+        </div>
+
+        {/* Filters: one chip that slides out Person, Epic, Tag and Status. */}
+        <FiltersMenu count={ws.filterCount + (ws.query.epicId ? 1 : 0)}>
           {members.length > 1 && <PersonFilter />}
           <EpicFilter />
           {labels.length > 0 && <TagFilter />}
-        </div>
+          <StatusFilter />
+        </FiltersMenu>
 
         <div className="ms-auto flex flex-1 items-center justify-end gap-2 sm:flex-none">
           <TaskSearch
@@ -162,55 +167,6 @@ export function WorkspaceToolbar() {
             initial={ws.query.q ?? ""}
             onCommit={commitSearch}
           />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <SlidersHorizontal className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Filter</span>
-                {ws.filterCount > 0 && (
-                  <Badge className="h-4 min-w-4 px-1 text-[10px]">{ws.filterCount}</Badge>
-                )}
-                <ChevronDown className="size-3.5 opacity-60" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => ws.setFilters({ status: undefined })}>
-                Any status
-                {!ws.query.status && <Check className="ms-auto size-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => ws.setFilters({ status: "open" })}>
-                Open (not completed)
-                {ws.query.status === "open" && <Check className="ms-auto size-4" />}
-              </DropdownMenuItem>
-              {Object.values(TaskStatus).map((s) => (
-                <DropdownMenuItem key={s} onSelect={() => ws.setFilters({ status: s })}>
-                  {STATUS_LABELS[s]}
-                  {ws.query.status === s && <Check className="ms-auto size-4" />}
-                </DropdownMenuItem>
-              ))}
-
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Visibility</DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => ws.setFilters({ visibility: undefined })}>
-                Everything I can see
-                {!ws.query.visibility && <Check className="ms-auto size-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => ws.setFilters({ visibility: TaskVisibility.PRIVATE })}
-              >
-                <Lock className="size-4" aria-hidden="true" /> Private only
-                {ws.query.visibility === TaskVisibility.PRIVATE && (
-                  <Check className="ms-auto size-4" />
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => ws.setFilters({ visibility: TaskVisibility.ORG })}>
-                Open to the club
-                {ws.query.visibility === TaskVisibility.ORG && <Check className="ms-auto size-4" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -591,5 +547,121 @@ function FilterPill({
         <X className="size-3" />
       </button>
     </span>
+  );
+}
+
+/** Status and who can see it, as the last of the Filters pills. */
+function StatusFilter() {
+  const ws = useWorkspace();
+  const active = Boolean(ws.query.status || ws.query.visibility);
+  const label = ws.query.status
+    ? ws.query.status === "open"
+      ? "Open"
+      : STATUS_LABELS[ws.query.status]
+    : ws.query.visibility === TaskVisibility.PRIVATE
+      ? "Private only"
+      : "Status";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Filter by status or visibility"
+          className={chipClass(active)}
+        >
+          <ListFilter className="size-3.5" aria-hidden="true" />
+          <span className="max-w-36 truncate">{label}</span>
+          <ChevronDown className="size-3 opacity-60" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel>Status</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={() => ws.setFilters({ status: undefined })}>
+          Any status
+          {!ws.query.status && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => ws.setFilters({ status: "open" })}>
+          Open (not completed)
+          {ws.query.status === "open" && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        {Object.values(TaskStatus).map((s) => (
+          <DropdownMenuItem key={s} onSelect={() => ws.setFilters({ status: s })}>
+            {STATUS_LABELS[s]}
+            {ws.query.status === s && <Check className="ms-auto size-4" />}
+          </DropdownMenuItem>
+        ))}
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Visibility</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={() => ws.setFilters({ visibility: undefined })}>
+          Everything I can see
+          {!ws.query.visibility && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => ws.setFilters({ visibility: TaskVisibility.PRIVATE })}>
+          <Lock className="size-4" aria-hidden="true" /> Private only
+          {ws.query.visibility === TaskVisibility.PRIVATE && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => ws.setFilters({ visibility: TaskVisibility.ORG })}>
+          Open to the club
+          {ws.query.visibility === TaskVisibility.ORG && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The Filters chip. Hover it (or focus it, or tap it) and the filter pills
+ * slide out beside it; it stays open while one of their menus is open, and
+ * folds away again once the pointer leaves.
+ */
+function FiltersMenu({ count, children }: { count: number; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [open, setOpen] = useState(false);
+  const show = () => {
+    if (timer.current) clearTimeout(timer.current);
+    setOpen(true);
+  };
+  const hideSoon = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      // A pill's menu is open (it lives in a portal): stay out until it closes.
+      if (ref.current?.querySelector('[aria-expanded="true"], [data-state="open"]')) return;
+      setOpen(false);
+    }, 250);
+  };
+  return (
+    <div
+      ref={ref}
+      className="flex items-center gap-1"
+      onPointerEnter={show}
+      onPointerLeave={hideSoon}
+      onFocus={show}
+      onBlur={(e) => {
+        if (!ref.current?.contains(e.relatedTarget as Node | null)) hideSoon();
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={count > 0 ? `Filters, ${count} on` : "Filters"}
+        onClick={() => setOpen((v) => !v)}
+        className={chipClass(open || count > 0)}
+      >
+        <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+        Filters
+        {count > 0 && <Badge className="h-4 min-w-4 px-1 text-[10px]">{count}</Badge>}
+      </button>
+      <div
+        inert={!open}
+        className={cn(
+          "grid transition-[grid-template-columns,opacity] duration-200 ease-(--ease-ink) motion-reduce:transition-none",
+          open ? "grid-cols-[1fr] opacity-100" : "pointer-events-none grid-cols-[0fr] opacity-0",
+        )}
+      >
+        <div className="flex min-w-0 items-center gap-1 overflow-hidden p-0.5">{children}</div>
+      </div>
+    </div>
   );
 }

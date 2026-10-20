@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -57,7 +56,6 @@ import {
   parseScope,
   parseWorkspaceQuery,
   TASK_LIST_VIEW,
-  TASKS_VIEW_COOKIE,
   type WorkspaceQuery,
 } from "./views";
 
@@ -91,10 +89,9 @@ export default async function TasksPage({
     redirect(`/app/${orgSlug}/calendar`);
   }
 
-  const cookieStore = await cookies();
-  const parsed = parseWorkspaceQuery(query, cookieStore.get(TASKS_VIEW_COOKIE)?.value);
-  // The Free plan has the List only: any other ?view= (or a remembered
-  // layout) opens the List too, so a typed URL doesn't reach the others.
+  const parsed = parseWorkspaceQuery(query);
+  // The Free plan has the List only: any other ?view= opens the List too,
+  // so a typed URL doesn't reach the others.
   const simple = !spaceIncludes(org, "taskViews");
   // The weekly update is work between people: a Personal space has every
   // layout but not the update.

@@ -78,8 +78,8 @@ export function WorkspaceHeader({
     [epicId],
   );
 
-  // The single keys (src/lib/shortcuts.ts, listed on the ⌘/ sheet): 1-4
-  // switch layout (4 is the dashboard), c starts a task, m / t / e pick
+  // The single keys (src/lib/shortcuts.ts, listed on the ⌘/ sheet): 1-6
+  // switch layout (1 is the dashboard, 2 the board), c starts a task, m / t / e pick
   // whose work, x clears the filters, u opens the weekly update. Typing in a
   // field never triggers them, nor does a key an open menu uses.
   useEffect(() => {
@@ -161,7 +161,7 @@ export function WorkspaceHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="create"
-                    className="border-brand-accent-foreground/20 rounded-l-none border-l ps-2.5 pe-3"
+                    className="border-create-foreground/15 rounded-l-none border-l ps-2.5 pe-3"
                     aria-label="More ways to add tasks"
                   >
                     <ChevronDown className="size-4" aria-hidden="true" />
