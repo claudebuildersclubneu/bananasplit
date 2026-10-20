@@ -128,10 +128,10 @@ export async function completeProfileSetup(page: Page, next: "join" | "create"):
   await page.getByRole("button", { name: "Finish later" }).click();
   // Personal's home (docs/features/personal-and-clubs.md).
   await page.waitForURL(/\/app\/me-[a-z0-9]+$/);
-  await page
-    .getByRole("main")
-    .getByRole("link", { name: next === "join" ? "Join a club" : "Start a club" })
-    .click();
+  // "Start a club" is a link on Personal's home; joining is a code field
+  // there, so the join flow opens its page (where emailed invites list too).
+  if (next === "join") await page.goto("/onboarding/join");
+  else await page.getByRole("main").getByRole("link", { name: "Start a club" }).click();
   await page.waitForURL(next === "join" ? /\/onboarding\/join/ : /\/onboarding\/organization$/);
 }
 
