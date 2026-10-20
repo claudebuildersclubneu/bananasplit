@@ -455,7 +455,8 @@ export function NotesLibrary({
               )}
             >
               <span className="truncate">
-                Note · {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
+                {view === "list" ? "Note · " : ""}
+                {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
               </span>
               {(n.sharedWithMe || n.shareCount > 0 || n.memberCanEdit) && (
                 <span className="truncate">
