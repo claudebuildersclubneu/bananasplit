@@ -2,15 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { CheckCheck, CircleAlert, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { CheckCheck, CircleAlert, ListTree, Plus, Trash2, Type, Undo2 } from "lucide-react";
 
 import {
   discardDraftAction,
   publishDraftAction,
   saveDraftAction,
 } from "@/app/app/[orgSlug]/org-chart/actions";
+import { setMemberTitle } from "@/app/app/[orgSlug]/settings/members/actions";
 import { Badge } from "@/components/ui/badge";
+import { Segmented } from "@/components/ui/segmented";
+import { toast } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -41,7 +44,9 @@ import type { ChartNodeDTO, ChartWarning, OpenItem } from "@/lib/org-chart/types
 import { hasErrors, validateChart, type ValidationIssue } from "@/lib/org-chart/validate";
 
 import type { EditorMember } from "./member-picker";
+import { OutlineEditor } from "./outline-editor";
 import { flattenOutline, OutlineTree } from "./outline-tree";
+import { TitleSync } from "./title-sync";
 import { PositionEditor } from "./position-editor";
 
 const ChartCanvas = dynamic(() => import("../chart-canvas"), {
@@ -72,14 +77,29 @@ export interface DraftEditorProps {
   };
   positions: DraftPosition[];
   members: EditorMember[];
+  /** OWNER/ADMIN may invite (the "invite" link on unknown names). */
+  canInvite?: boolean;
+  /** May set members' titles (title sync). */
+  canSetTitles?: boolean;
 }
 
-export function DraftEditor({ orgId, orgSlug, version, positions: initial, members }: DraftEditorProps) {
+/** Autosave this long after the last change. */
+export const AUTOSAVE_MS = 1500;
+const HISTORY_LIMIT = 50;
+
+export function DraftEditor({
+  orgId,
+  orgSlug,
+  version,
+  positions: initial,
+  members: initialMembers,
+  canInvite = false,
+  canSetTitles = false,
+}: DraftEditorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [positions, setPositions] = useState<DraftPosition[]>(initial);
   const [openItems, setOpenItems] = useState<OpenItem[]>(version.openItems);
-  const [editVersion, setEditVersion] = useState(version.editVersion);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [conflict, setConflict] = useState(false);
@@ -88,6 +108,17 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
   const [discardOpen, setDiscardOpen] = useState(false);
   const [setTitles, setSetTitles] = useState(false);
   const [tab, setTab] = useState("outline");
+  const [mode, setMode] = useState<"type" | "positions">(searchParams.get("mode") === "positions" ? "positions" : "type");
+  const [outlineKey, setOutlineKey] = useState(0);
+  const [members, setMembers] = useState<EditorMember[]>(initialMembers);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const history = useRef<DraftPosition[][]>([]);
+  const [historySize, setHistorySize] = useState(0);
+  const lastPush = useRef(0);
+  const changes = useRef(0);
+  const editVersionRef = useRef(version.editVersion);
+  const inFlight = useRef(false);
 
   const initialSelected = (() => {
     const key = searchParams.get("position");
@@ -120,15 +151,59 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  /** Keeps `current` for Undo; a burst of typing keeps one step per pause. */
+  function remember(current: DraftPosition[], force: boolean) {
+    const now = Date.now();
+    if (!force && now - lastPush.current < 800) return;
+    lastPush.current = now;
+    history.current = [...history.current.slice(-(HISTORY_LIMIT - 1)), current];
+    setHistorySize(history.current.length);
+  }
+
+  const onTyped = useCallback((next: DraftPosition[]) => {
+    remember(positions, false);
+    setPositions(next);
+    changes.current += 1;
+    setDirty(true);
+    setStatus(null);
+     
+  }, [positions]);
+
+  const undo = useCallback(() => {
+    const previous = history.current.pop();
+    setHistorySize(history.current.length);
+    if (!previous) return;
+    setPositions(previous);
+    changes.current += 1;
+    setDirty(true);
+    setOutlineKey((k) => k + 1);
+  }, []);
+
+  // Cmd/Ctrl+Z outside text fields undoes the last chart change (fields keep their own undo).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo]);
+
   const update = useCallback((next: DraftPosition[] | null, message?: string) => {
     if (!next) {
       if (message) setStatus({ tone: "error", text: message });
       return;
     }
+    remember(positions, true);
     setPositions(next);
+    changes.current += 1;
     setDirty(true);
     setStatus(null);
-  }, []);
+     
+  }, [positions]);
 
   const onMove = useCallback(
     (dragId: string, targetId: string, zone: DropZone) =>
@@ -139,7 +214,7 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
   async function save(): Promise<number | null> {
     const payload = {
       versionId: version.id,
-      editVersion,
+      editVersion: editVersionRef.current,
       openItems: openItems.filter((o) => o.question.trim()),
       positions: positions.map((p) => ({
         id: p.id,
@@ -157,29 +232,65 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
         rank: p.rank,
       })),
     };
-    const result = await saveDraftAction(orgId, payload);
+    const mark = changes.current;
+    inFlight.current = true;
+    setSaving(true);
+    let result: Awaited<ReturnType<typeof saveDraftAction>>;
+    try {
+      result = await saveDraftAction(orgId, payload);
+    } catch {
+      setSaveError(true);
+      return null;
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
     if (!result.ok) {
       setStatus({ tone: "error", text: result.error });
+      setSaveError(true);
       if ("conflict" in result && result.conflict) setConflict(true);
       return null;
     }
+    setSaveError(false);
     const ids = "ids" in result ? result.ids : {};
     const remap = (id: string | null) => (id && ids[id] ? ids[id] : id);
     setPositions((current) => current.map((p) => ({ ...p, id: remap(p.id) as string, reportsTo: remap(p.reportsTo) })));
     setSelectedId((id) => remap(id));
-    setEditVersion(result.editVersion);
-    setDirty(false);
+    editVersionRef.current = result.editVersion;
+    history.current = history.current.map((snap) =>
+      snap.map((p) => ({ ...p, id: remap(p.id) as string, reportsTo: remap(p.reportsTo) })),
+    );
+    // Still unsaved if something changed while the save was on its way.
+    if (changes.current === mark) setDirty(false);
     return result.editVersion;
   }
 
   const onSave = () =>
     startTransition(async () => {
-      if ((await save()) !== null) setStatus({ tone: "info", text: "Draft saved." });
+      if ((await save()) !== null) setStatus(null);
     });
+
+  // Drafts save themselves a moment after the last change (one save at a time).
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    if (!dirty || conflict || saveError) return;
+    const id = window.setTimeout(() => {
+      if (!inFlight.current) void saveRef.current();
+    }, AUTOSAVE_MS);
+    return () => window.clearTimeout(id);
+  }, [dirty, conflict, saveError, positions, openItems, saving]);
+
+  async function settled() {
+    for (let i = 0; i < 100 && inFlight.current; i++) await new Promise((r) => setTimeout(r, 100));
+  }
 
   const onPublish = () =>
     startTransition(async () => {
-      const current = dirty ? await save() : editVersion;
+      await settled();
+      const current = dirty ? await save() : editVersionRef.current;
       if (current === null) return;
       const result = await publishDraftAction(orgId, version.id, { setTitles, expectedEditVersion: current });
       if (!result.ok) {
@@ -234,16 +345,40 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
           <span className="font-medium">Draft v{version.number}</span>
           <Badge variant="outline">{sourceLabel(version.source)}</Badge>
           <span className="text-muted-foreground" role="status" aria-live="polite">
-            {pending ? "Working…" : dirty ? "Unsaved changes" : "All changes saved"}
+            {saving
+              ? "Saving…"
+              : saveError
+                ? "Couldn't save"
+                : pending
+                  ? "Working…"
+                  : dirty
+                    ? "Unsaved changes"
+                    : "All changes saved"}
           </span>
+          {saveError && !conflict && (
+            <Button type="button" variant="link" size="sm" onClick={() => setSaveError(false)}>
+              Retry
+            </Button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={historySize === 0}
+            title="Undo the last change (⌘Z outside a text field)"
+          >
+            <Undo2 aria-hidden="true" />
+            Undo
+          </Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => setDiscardOpen(true)} disabled={pending}>
             <Trash2 className="size-4" aria-hidden="true" />
             Discard
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onSave} disabled={pending || !dirty || conflict}>
-            Save draft
+          <Button type="button" variant="outline" size="sm" onClick={onSave} disabled={pending || saving || !dirty || conflict}>
+            Save now
           </Button>
           <Button type="button" size="sm" onClick={() => setPublishOpen(true)} disabled={pending || conflict}>
             Review and publish
@@ -279,6 +414,39 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
         }}
       />
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Segmented
+          label="Editor"
+          value={mode}
+          onSelect={(v) => {
+            setMode(v as "type" | "positions");
+            setOutlineKey((k) => k + 1);
+          }}
+          options={[
+            { value: "type", label: "Type it", icon: Type },
+            { value: "positions", label: "Edit positions", icon: ListTree },
+          ]}
+        />
+        <p className="text-muted-foreground text-[13px]">
+          {mode === "type"
+            ? "Write the chart as an outline. Responsibilities and decisions live in Edit positions."
+            : "Move, link and describe each position."}
+        </p>
+      </div>
+
+      {mode === "type" ? (
+        <OutlineEditor
+          key={outlineKey}
+          positions={positions}
+          members={members}
+          onChange={onTyped}
+          previewNodes={previewNodes}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          orgSlug={orgSlug}
+          canInvite={canInvite}
+        />
+      ) : (
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section aria-label="Chart structure" className="bg-card min-w-0 rounded-xl border p-3">
           <Tabs value={tab} onValueChange={setTab}>
@@ -372,10 +540,32 @@ export function DraftEditor({ orgId, orgSlug, version, positions: initial, membe
         </section>
       </div>
 
+      )}
+
+      <TitleSync
+        positions={positions}
+        members={members}
+        canSetTitles={canSetTitles}
+        onUseMemberTitle={(positionId, title) => {
+          update(positions.map((p) => (p.id === positionId ? { ...p, title } : p)));
+          setOutlineKey((k) => k + 1);
+        }}
+        onSetMemberTitle={async (userId, title) => {
+          const result = await setMemberTitle(orgId, userId, title);
+          if (result && "error" in result && result.error) {
+            toast({ title: result.error, tone: "error" });
+            return;
+          }
+          setMembers((list) => list.map((m) => (m.id === userId ? { ...m, title } : m)));
+          toast({ title: `Updated: ${membersById.get(userId)?.name ?? "the member"}'s title`, tone: "success" });
+        }}
+      />
+
       <OpenItemsEditor
         items={openItems}
         onChange={(items) => {
           setOpenItems(items);
+          changes.current += 1;
           setDirty(true);
         }}
       />

@@ -176,7 +176,6 @@ export function WeekGrid({
                 <span aria-hidden className="cal-week__dow">
                   {DOW[weekdayOf(key)]}
                 </span>
-                <br aria-hidden />
                 <span aria-hidden className="cal-week__date">
                   {Number(key.slice(8, 10))}
                 </span>
@@ -278,6 +277,7 @@ function Slot({
         width: `calc(${width}% - 4px)`,
       }}
       data-internal={item.visibility === "INTERNAL" ? "true" : undefined}
+      data-rsvp={item.rsvp === "YES" ? "yes" : undefined}
       data-compact={compact ? "true" : undefined}
       aria-expanded={open}
       aria-label={itemLabel(
@@ -320,6 +320,7 @@ function AllDayChip({
       style={{ ...itemStyle(item), marginTop: 0 }}
       data-internal={item.visibility === "INTERNAL" && !item.task ? "true" : undefined}
       data-task={item.task ? (item.task.done ? "done" : "open") : undefined}
+      data-rsvp={item.rsvp === "YES" ? "yes" : undefined}
       aria-expanded={open}
       aria-label={itemLabel(
         item,

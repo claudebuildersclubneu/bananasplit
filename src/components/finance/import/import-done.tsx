@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, RotateCcw, Upload } from "lucide-react";
+import { ArrowRight, Check, Loader2, RotateCcw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
 import { formatCents } from "@/lib/finance/money";
+import { cn } from "@/lib/utils";
+
+import { ImportPanel } from "./panel";
 
 /** What an import did, for the last screen (and the setup guide). */
 export type ImportSummary =
@@ -68,80 +71,94 @@ export function ImportDone({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4.5">
       {confirmElement}
-      <div className="flex items-start gap-3 rounded-xl border p-5">
-        <CheckCircle2 className="text-success mt-0.5 size-6 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 space-y-2">
-          {summary.kind === "transactions" ? (
-            <>
-              <h2 className="heading text-lg">
-                {undone
-                  ? "Import undone"
-                  : `${summary.partial ? "Partly imported" : "Imported"}: ${summary.created.toLocaleString()} transaction${summary.created === 1 ? "" : "s"}`}
-              </h2>
-              {!undone && (
-                <ul className="text-muted-foreground space-y-1 text-sm">
-                  <li>
-                    {formatCents(summary.inCents)} in and {formatCents(summary.outCents)} out
-                  </li>
-                  {summary.periods.map((p) => (
-                    <li key={p.label}>
-                      {p.count.toLocaleString()} into {p.label}
-                      {p.created ? " (a new budget year)" : ""}
+      <ImportPanel embedded={embedded}>
+        <div className="flex items-start gap-4">
+          {/* Filled circle: done. An undone import goes back to a plain circle. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-full",
+              undone
+                ? "bg-muted text-muted-foreground"
+                : "bg-block-goal text-block-goal-foreground",
+            )}
+          >
+            {undone ? <RotateCcw className="size-5" /> : <Check className="size-5 stroke-[2.5]" />}
+          </span>
+          <div className="min-w-0 space-y-2 pt-1">
+            {summary.kind === "transactions" ? (
+              <>
+                <h2 className="heading text-[17px]">
+                  {undone
+                    ? "Import undone"
+                    : `${summary.partial ? "Partly imported" : "Imported"}: ${summary.created.toLocaleString()} transaction${summary.created === 1 ? "" : "s"}`}
+                </h2>
+                {!undone && (
+                  <ul className="text-muted-foreground space-y-1 text-sm">
+                    <li className="figure">
+                      {formatCents(summary.inCents)} in and {formatCents(summary.outCents)} out
                     </li>
-                  ))}
-                  {summary.categoriesCreated.length > 0 && (
-                    <li>
-                      New categories: {summary.categoriesCreated.slice(0, 12).join(", ")}
-                      {summary.categoriesCreated.length > 12 ? "…" : ""}
-                    </li>
-                  )}
-                  {summary.skipped.length > 0 && (
-                    <li>
-                      {summary.skipped.length} left out: {summary.skipped[0].reason}
-                      {summary.skipped.length > 1 ? " (and others)" : ""}
-                    </li>
-                  )}
-                </ul>
+                    {summary.periods.map((p) => (
+                      <li key={p.label}>
+                        {p.count.toLocaleString()} into {p.label}
+                        {p.created ? " (a new budget year)" : ""}
+                      </li>
+                    ))}
+                    {summary.categoriesCreated.length > 0 && (
+                      <li>
+                        New categories: {summary.categoriesCreated.slice(0, 12).join(", ")}
+                        {summary.categoriesCreated.length > 12 ? "…" : ""}
+                      </li>
+                    )}
+                    {summary.skipped.length > 0 && (
+                      <li>
+                        {summary.skipped.length} left out: {summary.skipped[0].reason}
+                        {summary.skipped.length > 1 ? " (and others)" : ""}
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <>
+                <h2 className="heading text-[17px]">Budget saved for {summary.periodLabel}</h2>
+                <p className="text-muted-foreground figure text-sm">
+                  {summary.created} new categor{summary.created === 1 ? "y" : "ies"},{" "}
+                  {summary.updated} updated · {formatCents(summary.totalCents)} budgeted.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 sm:pl-15">
+          {/* The dashboard is a Finance tab; the next step is what was imported. */}
+          {!embedded && (
+            <Button asChild>
+              <Link href={summary.kind === "budget" ? `${base}/budget` : `${base}/transactions`}>
+                {summary.kind === "budget" ? "Open the budget" : "See the transactions"}
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={onAnother}>
+            <Upload aria-hidden="true" />
+            Import another file
+          </Button>
+          {summary.kind === "transactions" && !undone && summary.created > 0 && (
+            <Button type="button" variant="ghost" onClick={() => void undo()} disabled={busy}>
+              {busy ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <RotateCcw aria-hidden="true" />
               )}
-            </>
-          ) : (
-            <>
-              <h2 className="heading text-lg">Budget saved for {summary.periodLabel}</h2>
-              <p className="text-muted-foreground text-sm">
-                {summary.created} new categor{summary.created === 1 ? "y" : "ies"},{" "}
-                {summary.updated} updated · {formatCents(summary.totalCents)} budgeted.
-              </p>
-            </>
+              Undo this import
+            </Button>
           )}
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {summary.kind === "transactions" && !undone && summary.created > 0 && (
-          <Button type="button" variant="outline" onClick={() => void undo()} disabled={busy}>
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <RotateCcw className="size-4" aria-hidden="true" />
-            )}
-            Undo this import
-          </Button>
-        )}
-        <Button type="button" variant="outline" onClick={onAnother}>
-          <Upload className="size-4" aria-hidden="true" />
-          Import another file
-        </Button>
-        {/* The dashboard is a Finance tab; the next step is what was imported. */}
-        {!embedded && (
-          <Button asChild>
-            <Link href={summary.kind === "budget" ? `${base}/budget` : `${base}/transactions`}>
-              {summary.kind === "budget" ? "Open the budget" : "See the transactions"}
-            </Link>
-          </Button>
-        )}
-      </div>
+      </ImportPanel>
     </div>
   );
 }

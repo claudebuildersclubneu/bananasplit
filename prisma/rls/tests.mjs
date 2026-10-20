@@ -2131,6 +2131,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "secret_write",
         "set_ics_token_hash",
         "slug_available",
+        // Moonstone: the nightly counter repair (service path, its org only).
+        "storage_reconcile",
         // Moonstone: Organization.storageUsedBytes, kept by a trigger the
         // writers can't bypass (they have no UPDATE on the column).
         "storage_used_track",
@@ -2434,6 +2436,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       note_cycle_guard: "",
       note_parent_visible: "",
       note_comment_guard: "",
+      // The nightly job's counter repair (service path, its org context only).
+      storage_reconcile: "s",
     };
     await tcase(
       "T27f",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Clock, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -69,10 +69,13 @@ export function SyncWatcher({
 
   if (gaveUp) {
     return (
-      <p role="status" className="border-warning/40 bg-warning/10 rounded-lg border p-3 text-sm">
-        The sync is taking longer than a minute. It runs in the background and will finish on its
-        own — reload this page, or check the sync panel on the Databases page, to see where it got
-        to. Locally, run <span className="font-mono">pnpm jobs:drain</span>.
+      <p role="status" className="bg-muted/60 rounded-tile flex gap-2.5 p-3 text-sm">
+        <Clock className="text-warning mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          The sync is taking longer than a minute. It runs in the background and will finish on its
+          own — reload this page, or check the sync panel on the Databases page, to see where it got
+          to. Locally, run <span className="font-mono">pnpm jobs:drain</span>.
+        </span>
       </p>
     );
   }
@@ -80,8 +83,8 @@ export function SyncWatcher({
   const written = progress?.streams.reduce((n, s) => n + s.rows, 0) ?? 0;
 
   return (
-    <div role="status" aria-live="polite" className="bg-muted/40 space-y-2 rounded-lg border p-4">
-      <p className="flex items-center gap-2 text-sm font-medium">
+    <div role="status" aria-live="polite" className="bg-muted/60 rounded-tile space-y-2 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold">
         <Loader2
           className="text-muted-foreground size-4 motion-safe:animate-spin"
           aria-hidden="true"
@@ -94,7 +97,7 @@ export function SyncWatcher({
           : "Reading sessions, check-ins, signups and ballots. This usually takes a few seconds."}
       </p>
       {progress?.streams.some((s) => s.rows > 0) ? (
-        <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
           {progress.streams
             .filter((s) => s.rows > 0)
             .map((s) => (

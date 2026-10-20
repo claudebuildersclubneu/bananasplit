@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toaster";
+import { IconChip } from "@/components/ui/stat";
 import { cn } from "@/lib/utils";
 
 import { copyGuestPollLink, copyPollLink } from "./copy-link";
@@ -116,14 +117,14 @@ function Section({
 }) {
   const id = `polls-${title.toLowerCase()}`;
   return (
-    <section className="space-y-2" aria-labelledby={id}>
-      <h2 id={id} className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {title} <span className="tabular-nums">({polls.length})</span>
+    <section className="space-y-3" aria-labelledby={id}>
+      <h2 id={id} className="heading flex items-center gap-2 text-[17px]">
+        {title} <Badge variant="secondary">{polls.length}</Badge>
       </h2>
       {polls.length === 0 ? (
-        <p className="text-muted-foreground rounded-xl border border-dashed p-4 text-sm">{empty}</p>
+        <p className="text-muted-foreground bg-muted hatch rounded-tile p-4 text-sm">{empty}</p>
       ) : (
-        <ul className="bg-card divide-y overflow-hidden rounded-xl border">
+        <ul className="bg-card text-card-foreground ring-foreground/6 edge rounded-card p-2 ring-1">
           {polls.map((poll) => (
             <PollRow
               key={poll.id}
@@ -150,22 +151,18 @@ function PollRow({
   const kind = KINDS[poll.kind];
   const Icon = kind.icon;
   return (
-    <li className="group hover:bg-muted/40 relative flex items-center gap-3 px-4 py-3 transition-colors">
-      <div className="min-w-0 flex-1 space-y-1">
+    <li className="group hover:bg-muted rounded-tile [&+&]:before:border-border/70 relative flex items-center gap-3.5 px-3 py-3 transition-colors hover:before:border-transparent [&+&]:before:absolute [&+&]:before:top-0 [&+&]:before:right-3 [&+&]:before:left-[3.75rem] [&+&]:before:border-t">
+      <IconChip icon={Icon} />
+      <div className="min-w-0 flex-1 space-y-1.5">
         {/* The link covers the row; the pin and the menu sit above it. */}
         <Link
           href={poll.href}
-          className="focus-visible:after:ring-ring/50 block truncate text-sm font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-3 focus-visible:after:ring-inset"
+          className="focus-visible:after:outline-foreground block truncate text-[15px] font-semibold outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2"
         >
           {poll.title}
         </Link>
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-          {showKind && (
-            <Badge variant="outline" className="text-muted-foreground font-normal">
-              <Icon aria-hidden />
-              {kind.label}
-            </Badge>
-          )}
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
+          {showKind && <Badge variant="secondary">{kind.label}</Badge>}
           <PollStatusBadge tone={poll.status.tone}>{poll.status.label}</PollStatusBadge>
           <span>{poll.meta}</span>
         </div>

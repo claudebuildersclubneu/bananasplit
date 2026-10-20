@@ -1,18 +1,37 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import {
   importDefinitionAction,
   updateDefinitionAction,
 } from "@/app/app/[orgSlug]/databases/actions";
+import { SettingsCard } from "@/app/app/[orgSlug]/settings/settings-card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-const selectClass = "border-input bg-background h-8 rounded-lg border px-2 text-sm";
+import { fileInputClass, nativeSelectClass } from "./styles";
+
+/** The line beside a card's Save: what happened, or what went wrong. */
+function Status({ error, notice }: { error: string | null; notice: string | null }) {
+  if (error)
+    return (
+      <p role="alert" className="text-tint-danger-foreground text-sm">
+        {error}
+      </p>
+    );
+  if (notice)
+    return (
+      <p role="status" className="text-tint-success-foreground text-sm">
+        {notice}
+      </p>
+    );
+  return null;
+}
 
 /**
  * Paste (or load) a poll definition: the website's src/lib/polls/<slug>.json
@@ -37,7 +56,6 @@ export function DefinitionImportForm({
 
   return (
     <form
-      className="space-y-3 rounded-xl border p-4"
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
@@ -60,71 +78,99 @@ export function DefinitionImportForm({
         });
       }}
     >
-      <h2 className="text-sm font-semibold">Import a poll definition</h2>
-      <div className="grid gap-1">
-        <Label htmlFor="def-file">Poll file</Label>
-        <input
-          id="def-file"
-          type="file"
-          accept="application/json,.json"
-          className="file:border-border file:bg-background hover:file:bg-muted text-sm file:mr-3 file:h-7 file:cursor-pointer file:rounded-lg file:border file:px-2.5 file:text-[0.8rem] file:font-medium"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (file) setJson(await file.text());
-          }}
-        />
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor="def-json">…or paste its JSON</Label>
-        <Textarea
-          id="def-json"
-          rows={8}
-          className="font-mono text-xs"
-          value={json}
-          onChange={(e) => setJson(e.target.value)}
-          placeholder='{ "slug": "info-session-2026-09", "title": "…", "sections": [ … ] }'
-        />
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="grid gap-1">
-          <Label htmlFor="def-session">Linked session</Label>
-          <select
-            id="def-session"
-            value={linked}
-            onChange={(e) => setLinked(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">None</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+      <SettingsCard
+        title="Import a poll definition"
+        description="The website's poll file, as is. Importing it again updates the poll and recounts its ballots."
+        footer={
+          <Button type="submit" disabled={pending || json.trim().length < 2}>
+            {pending ? "Importing…" : "Import"}
+          </Button>
+        }
+        status={<Status error={error} notice={notice} />}
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="def-file">Poll file</Label>
+          <input
+            id="def-file"
+            type="file"
+            accept="application/json,.json"
+            className={fileInputClass}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) setJson(await file.text());
+            }}
+          />
         </div>
-        <label className="flex items-center gap-2 self-end text-sm">
-          <input type="checkbox" checked={isTest} onChange={(e) => setIsTest(e.target.checked)} />
-          Test poll (never counted)
-        </label>
-      </div>
-      {error && (
-        <p role="alert" className="text-destructive text-sm">
-          {error}
-        </p>
-      )}
-      {notice && <p className="text-success text-sm">{notice}</p>}
-      <Button type="submit" size="sm" disabled={pending || json.trim().length < 2}>
-        {pending ? "Importing…" : "Import"}
-      </Button>
+        <div className="grid gap-1.5">
+          <Label htmlFor="def-json">…or paste its JSON</Label>
+          <Textarea
+            id="def-json"
+            rows={8}
+            className="font-mono text-xs md:text-xs"
+            value={json}
+            onChange={(e) => setJson(e.target.value)}
+            placeholder='{ "slug": "info-session-2026-09", "title": "…", "sections": [ … ] }'
+          />
+        </div>
+        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="def-session">Linked session</Label>
+            <select
+              id="def-session"
+              value={linked}
+              onChange={(e) => setLinked(e.target.value)}
+              className={nativeSelectClass}
+            >
+              <option value="">None</option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <TestPollCheckbox id="def-test" checked={isTest} onCheckedChange={(v) => setIsTest(v)} />
+        </div>
+      </SettingsCard>
     </form>
   );
 }
 
-/** Edit a definition's title, window, linked session and test flag. */
+function TestPollCheckbox({
+  id,
+  name,
+  checked,
+  defaultChecked,
+  onCheckedChange,
+}: {
+  id: string;
+  name?: string;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+}) {
+  return (
+    <label htmlFor={id} className="flex h-10 items-center gap-2.5 text-sm">
+      <Checkbox
+        id={id}
+        name={name}
+        checked={checked}
+        defaultChecked={defaultChecked}
+        onCheckedChange={onCheckedChange ? (v) => onCheckedChange(v === true) : undefined}
+      />
+      Test poll (never counted)
+    </label>
+  );
+}
+
+/** Edit a definition's title, window, linked session and test flag: one settings card. */
 export function DefinitionEditForm({
   organizationId,
   definition,
   sessions,
+  title,
+  description,
+  action,
 }: {
   organizationId: string;
   definition: {
@@ -136,6 +182,11 @@ export function DefinitionEditForm({
     isTest: boolean;
   };
   sessions: { id: string; label: string }[];
+  /** The card's title and the line under it (the poll's slug and counts). */
+  title: ReactNode;
+  description?: ReactNode;
+  /** Top right of the card: the Test chip. */
+  action?: ReactNode;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +194,6 @@ export function DefinitionEditForm({
   const [pending, start] = useTransition();
   return (
     <form
-      className="grid gap-2 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);
@@ -166,64 +216,72 @@ export function DefinitionEditForm({
         });
       }}
     >
-      <div className="grid gap-1 sm:col-span-2">
-        <Label htmlFor={`t-${definition.id}`}>Title</Label>
-        <Input
-          id={`t-${definition.id}`}
-          name="title"
-          defaultValue={definition.title}
-          maxLength={300}
-        />
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor={`o-${definition.id}`}>Opens</Label>
-        <Input
-          id={`o-${definition.id}`}
-          name="opensAt"
-          type="datetime-local"
-          defaultValue={definition.opensAt}
-        />
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor={`c-${definition.id}`}>Closes</Label>
-        <Input
-          id={`c-${definition.id}`}
-          name="closesAt"
-          type="datetime-local"
-          defaultValue={definition.closesAt}
-        />
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor={`l-${definition.id}`}>Linked session</Label>
-        <select
-          id={`l-${definition.id}`}
-          name="linkedEventId"
-          defaultValue={definition.linkedEventId ?? ""}
-          className={selectClass}
-        >
-          <option value="">None</option>
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="flex items-center gap-2 self-end text-sm">
-        <input type="checkbox" name="isTest" defaultChecked={definition.isTest} />
-        Test poll (never counted)
-      </label>
-      <div className="flex items-center gap-3 sm:col-span-2">
-        <Button type="submit" size="sm" variant="outline" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        {error && (
-          <span role="alert" className="text-destructive text-sm">
-            {error}
-          </span>
-        )}
-        {notice && <span className="text-success text-sm">{notice}</span>}
-      </div>
+      <SettingsCard
+        title={title}
+        description={description}
+        action={action}
+        footer={
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        }
+        status={<Status error={error} notice={notice} />}
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5 sm:col-span-2">
+            <Label htmlFor={`t-${definition.id}`}>Title</Label>
+            <Input
+              id={`t-${definition.id}`}
+              name="title"
+              defaultValue={definition.title}
+              maxLength={300}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`o-${definition.id}`}>Opens</Label>
+            <Input
+              id={`o-${definition.id}`}
+              name="opensAt"
+              type="datetime-local"
+              className="tabular-nums"
+              defaultValue={definition.opensAt}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor={`c-${definition.id}`}>Closes</Label>
+            <Input
+              id={`c-${definition.id}`}
+              name="closesAt"
+              type="datetime-local"
+              className="tabular-nums"
+              defaultValue={definition.closesAt}
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor={`l-${definition.id}`}>Linked session</Label>
+            <select
+              id={`l-${definition.id}`}
+              name="linkedEventId"
+              defaultValue={definition.linkedEventId ?? ""}
+              className={nativeSelectClass}
+            >
+              <option value="">None</option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="self-end">
+            <TestPollCheckbox
+              id={`x-${definition.id}`}
+              name="isTest"
+              defaultChecked={definition.isTest}
+            />
+          </div>
+        </div>
+      </SettingsCard>
     </form>
   );
 }

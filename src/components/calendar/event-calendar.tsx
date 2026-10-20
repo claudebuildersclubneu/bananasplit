@@ -2,6 +2,7 @@
 
 import {
   CalendarClock,
+  CalendarDays,
   CalendarX2,
   ChevronDown,
   ChevronLeft,
@@ -15,6 +16,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { moveEvent } from "@/app/app/[orgSlug]/calendar/actions";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -343,18 +345,20 @@ export function EventCalendar({
           .filter(Boolean)
           .join(" · ");
 
+  const filtered = range.kinds.length > 0 || Boolean(range.visibility);
   const emptyState = (
-    <div className="cal-empty">
-      <p className="cal-empty__title">{emptyTitle(range)}</p>
-      <p className="cal-empty__body">
-        {range.kinds.length > 0 || range.visibility
+    <EmptyState
+      icon={CalendarDays}
+      title={emptyTitle(range)}
+      description={
+        filtered
           ? "No event here matches the filters. Clear them to see everything in this window."
           : canManage
             ? "Add a meeting, a social or any event. It shows here, and on your website if you make it public."
-            : "Sessions the board schedules show up here. You will be notified when you are invited to one."}
-      </p>
-      <div className="mt-1 flex gap-2">
-        {(range.kinds.length > 0 || range.visibility) && (
+            : "Sessions the board schedules show up here. You'll be notified when you're invited to one."
+      }
+      action={
+        filtered ? (
           <Button
             size="sm"
             variant="outline"
@@ -362,76 +366,87 @@ export function EventCalendar({
           >
             Clear filters
           </Button>
-        )}
-        {canManage && range.kinds.length === 0 && !range.visibility && (
-          <Button size="sm" onClick={() => openCreate(null)}>
-            New event
-          </Button>
-        )}
-      </div>
-    </div>
+        ) : undefined
+      }
+    />
   );
 
   return (
     <div className="cal space-y-4">
       <div className="cal-head">
         <div className="cal-head__label">
-          <h2 className="cal-head__month">{rangeLabel(range, monthKey, dayCount)}</h2>
-          <p className="cal-head__count">
-            {countLabel}
-            {isPending && <span className="ml-2 opacity-70">Loading…</span>}
-          </p>
-        </div>
-
-        {/*
-          On a phone this is two rows rather than three: stepping and
-          creating on one, the view switcher spanning the width below it.
-          Letting four blocks wrap on their own put "New event" alone on a
-          line of its own and cost a band of screen where it is scarcest.
-        */}
-        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              size="icon-sm"
+              size="icon"
               onClick={() => step(-1)}
               aria-label={prevLabel(range.view)}
             >
-              <ChevronLeft aria-hidden className="size-4" />
+              <ChevronLeft aria-hidden className="size-5" />
             </Button>
             <Button
               variant="outline"
-              size="icon-sm"
+              size="icon"
               onClick={() => step(1)}
               aria-label={nextLabel(range.view)}
             >
-              <ChevronRight aria-hidden className="size-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToday}
-              disabled={isTodayInWindow(range, todayKey, dayCount)}
-            >
-              Today
+              <ChevronRight aria-hidden className="size-5" />
             </Button>
           </div>
+          <div className="min-w-0">
+            <h2 className="cal-head__month">{rangeLabel(range, monthKey, dayCount)}</h2>
+            <p className="cal-head__count">
+              {countLabel}
+              {isPending && <span className="ml-2 opacity-70">Loading…</span>}
+            </p>
+          </div>
+        </div>
+
+        {/*
+          On a phone this is two rows rather than three: Today and creating
+          on one, the view switcher spanning the width below it. Letting the
+          blocks wrap on their own put "New event" alone on a line of its own
+          and cost a band of screen where it is scarcest.
+        */}
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+          <Button
+            variant="outline"
+            onClick={goToday}
+            disabled={isTodayInWindow(range, todayKey, dayCount)}
+          >
+            Today
+          </Button>
+
+          <Segmented
+            label="Calendar view"
+            className="order-last w-full md:order-none md:w-auto [&>*]:flex-1 md:[&>*]:flex-none"
+            value={range.view}
+            onSelect={(v) => setView(v as CalendarView)}
+            options={VIEW_LABELS.map(({ view, label }) => ({ value: view, label }))}
+          />
 
           {canManage && (
-            // New event, with "From a screenshot" folded into its menu.
-            <div className="ml-auto flex md:order-3 md:ml-0">
-              <Button size="sm" className="rounded-r-none" onClick={() => openCreate(null)}>
+            // The one create action: New event, with "From a screenshot"
+            // folded into its menu. One glow for the pair, not one each.
+            <div className="glow-halo ml-auto flex rounded-full md:ml-0">
+              <Button
+                variant="create"
+                className="rounded-r-none"
+                style={{ boxShadow: "none" }}
+                onClick={() => openCreate(null)}
+              >
                 <Plus className="size-4" aria-hidden="true" />
                 New event
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    size="sm"
-                    className="border-primary-foreground/25 rounded-l-none border-l px-1.5"
+                    variant="create"
+                    className="border-brand-accent-foreground/15 rounded-l-none border-l pr-3 pl-2.5"
+                    style={{ boxShadow: "none" }}
                     aria-label="More ways to add events"
                   >
-                    <ChevronDown className="size-3.5" aria-hidden="true" />
+                    <ChevronDown className="size-4" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
@@ -452,14 +467,6 @@ export function EventCalendar({
               </DropdownMenu>
             </div>
           )}
-
-          <Segmented
-            label="Calendar view"
-            className="order-last w-full md:order-2 md:w-auto [&>*]:flex-1 md:[&>*]:flex-none"
-            value={range.view}
-            onSelect={(v) => setView(v as CalendarView)}
-            options={VIEW_LABELS.map(({ view, label }) => ({ value: view, label }))}
-          />
         </div>
       </div>
 
@@ -479,7 +486,7 @@ export function EventCalendar({
                 <span aria-hidden className="cal-chip__dot" />
                 Tasks
               </button>
-              <span aria-hidden className="bg-border mx-0.5 h-4 w-px shrink-0" />
+              <span aria-hidden className="bg-border mx-1 h-5 w-px shrink-0" />
             </>
           )}
           <span className="sr-only" id="cal-kind-filter-label">
@@ -594,22 +601,23 @@ export function EventCalendar({
 
       <div className="cal-legend">
         <span className="cal-legend__item">
-          <Globe aria-hidden className="size-3" /> Public: on the website
+          <Globe aria-hidden className="size-3.5" /> Public: on the website
         </span>
         <span className="cal-legend__item">
-          <span
-            aria-hidden
-            className="border-muted-foreground/70 inline-block h-3 w-5 rounded-sm border border-dashed"
-          />
+          <span aria-hidden className="cal-legend__pill" data-internal="true" />
           Internal: board and members only
+        </span>
+        <span className="cal-legend__item">
+          <span aria-hidden className="cal-legend__pill" data-rsvp="yes" />
+          Solid: you&apos;re going
         </span>
         {canManage && (
           <>
             <span className="cal-legend__item">
-              <CalendarClock aria-hidden className="size-3" /> Syncing to Google
+              <CalendarClock aria-hidden className="size-3.5" /> Syncing to Google
             </span>
             <span className="cal-legend__item">
-              <CalendarX2 aria-hidden className="size-3" /> Google sync failed
+              <CalendarX2 aria-hidden className="size-3.5" /> Google sync failed
             </span>
           </>
         )}

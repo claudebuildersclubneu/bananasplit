@@ -14,6 +14,7 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { agendaDays } from "@/lib/calendar/grid";
 
+import { shortDay } from "./day-label";
 import { type CalendarItem, timeRange } from "./item";
 import { itemStyle, KIND_META, RSVP_META, SYNC_META, VISIBILITY_META } from "./kinds";
 
@@ -60,8 +61,10 @@ export function AgendaList({
             id={`agenda-${day.key}`}
             data-today={day.key === todayKey ? "true" : undefined}
           >
-            <span className="cal-agenda__date">{dayHeading(day.key)}</span>
-            <span className="cal-agenda__rel">{relativeDay(day.key, todayKey)}</span>
+            <span className="cal-agenda__date">{shortDay(day.key, todayKey)}</span>
+            {relativeDay(day.key, todayKey) && (
+              <span className="cal-agenda__rel">{relativeDay(day.key, todayKey)}</span>
+            )}
           </h3>
           {day.items.map((item) => (
             <AgendaRow
@@ -139,7 +142,7 @@ function AgendaRow({
         )}
         {item.rsvp && (
           <Badge
-            variant={item.rsvp === "YES" ? "default" : item.rsvp === "NO" ? "outline" : "secondary"}
+            variant={item.rsvp === "YES" ? "success" : item.rsvp === "NO" ? "outline" : "secondary"}
           >
             {RSVP_META[item.rsvp].short}
           </Badge>
@@ -173,24 +176,12 @@ function isMultiDay(item: CalendarItem): boolean {
   return end.getDate() !== start.getDate() && end.getTime() - start.getTime() > 0;
 }
 
-const headingFmt = new Intl.DateTimeFormat(undefined, {
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-  timeZone: "UTC",
-});
-
-function dayHeading(dayKey: string): string {
-  return headingFmt.format(new Date(`${dayKey}T00:00:00Z`));
-}
-
-/** "Today", "Tomorrow", "Yesterday", "In 5 days", "12 days ago". */
+/** Beside the day: "Yesterday", "In 5 days", "12 days ago" (Today and Tomorrow say it already). */
 function relativeDay(dayKey: string, todayKey: string): string {
   const days = Math.round(
     (Date.parse(`${dayKey}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / 86_400_000,
   );
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
+  if (days === 0 || days === 1) return "";
   if (days === -1) return "Yesterday";
   return days > 0 ? `In ${days} days` : `${-days} days ago`;
 }

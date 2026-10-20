@@ -50,7 +50,7 @@ export function RegistrationCard(props: RegistrationCardProps) {
   return (
     <section
       aria-label="Registration"
-      className="border-ink/8 bg-paper text-ink shadow-card rounded-[24px] border p-5 sm:p-6"
+      className="border-border bg-card text-foreground shadow-e1 rounded-block border p-5 sm:p-6"
     >
       {props.viewer ? (
         <Signed {...props} viewer={props.viewer} />
@@ -66,9 +66,7 @@ export function RegistrationCard(props: RegistrationCardProps) {
 function CardHeader({ badge }: { badge?: React.ReactNode }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
-      <h2 className="text-ink-soft text-[13px] font-bold tracking-[0.06em] uppercase">
-        Registration
-      </h2>
+      <h2 className="text-muted-foreground text-[15px] font-semibold">Registration</h2>
       {badge}
     </div>
   );
@@ -79,13 +77,13 @@ function Closed({ reason }: { reason: ClosedReason }) {
   return (
     <>
       <CardHeader />
-      <div className="bg-oat flex items-start gap-3 rounded-2xl p-4">
-        <span className="bg-sand text-ink-muted grid size-9 flex-none place-items-center rounded-full">
+      <div className="bg-muted rounded-tile flex items-start gap-3 p-4">
+        <span className="bg-sand text-muted-foreground grid size-9 flex-none place-items-center rounded-full">
           <Lock className="size-4" aria-hidden="true" />
         </span>
         <span className="flex flex-col gap-0.5">
           <span className="text-[16px] font-bold">{copy.title}</span>
-          <span className="text-ink-muted text-[14px]">{copy.body}</span>
+          <span className="text-muted-foreground text-[14px]">{copy.body}</span>
         </span>
       </div>
     </>
@@ -101,7 +99,7 @@ function SpotsBadge({
 }) {
   if (waitlistOnly) {
     return (
-      <span className="bg-butter text-honey rounded-full px-2.5 py-1 text-[12px] font-bold">
+      <span className="bg-tint-accent text-tint-accent-foreground rounded-full px-2.5 py-1 text-[12px] font-bold">
         Waitlist open
       </span>
     );
@@ -112,7 +110,9 @@ function SpotsBadge({
     <span
       className={cn(
         "rounded-full px-2.5 py-1 text-[12px] font-bold whitespace-nowrap",
-        few ? "bg-banana text-banana-ink" : "bg-leaf text-leaf-ink",
+        few
+          ? "bg-brand-accent text-brand-accent-foreground"
+          : "bg-tint-success text-tint-success-foreground",
       )}
     >
       {few ? `Only ${spotsLeft} left` : `${spotsLeft} spots left`}
@@ -174,18 +174,18 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCa
   return (
     <>
       <CardHeader badge={<SpotsBadge spotsLeft={spotsLeft} waitlistOnly={waitlistOnly} />} />
-      <p className="text-ink-muted mb-5 text-[15px] leading-[1.5]">
+      <p className="text-muted-foreground mb-5 text-[15px] leading-[1.5]">
         {waitlistOnly
           ? "This event is full. Join the waitlist and we'll email you the moment a spot opens up."
           : "Save your spot below. You'll get a confirmation by email."}
       </p>
       {cost && !waitlistOnly && (
-        <p className="bg-oat text-ink -mt-2 mb-5 rounded-2xl px-4 py-3 text-[14px] leading-[1.5]">
+        <p className="bg-muted text-foreground rounded-tile -mt-2 mb-5 px-4 py-3 text-[14px] leading-[1.5]">
           <span className="font-bold">
             {cost.mode === "SPLIT" ? "About " : ""}
             {formatCents(cost.shareIfJoining)} to chip in
           </span>
-          <span className="text-ink-muted">
+          <span className="text-muted-foreground">
             {" "}
             {cost.mode === "SPLIT" ? "(your share, and it shrinks as more people join)" : "each"}
             {cost.payWith.length > 0
@@ -239,7 +239,7 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCa
           id="rsvp-instagram"
           label={
             <>
-              Instagram <span className="text-ink-soft font-normal">(optional)</span>
+              Instagram <span className="text-muted-foreground font-normal">(optional)</span>
             </>
           }
         >
@@ -255,7 +255,7 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCa
             {...bind("instagram")}
             {...invalid("instagram")}
           />
-          <span id="rsvp-instagram-hint" className="text-ink-soft text-[13px]">
+          <span id="rsvp-instagram-hint" className="text-muted-foreground text-[13px]">
             Shown next to your name on the guest list, so people can find you.
           </span>
         </BrandField>
@@ -272,7 +272,7 @@ function SignUpForm({ slug, waitlistOnly, spotsLeft, via, cost }: RegistrationCa
         <button type="submit" disabled={pending} className={cn(pill({ raised: true }), "w-full")}>
           {pending ? "Saving your spot…" : waitlistOnly ? "Join the waitlist" : "Register"}
         </button>
-        <p className="text-ink-faint m-0 text-[12px] leading-[1.5]">
+        <p className="text-muted-foreground/70 m-0 text-[12px] leading-[1.5]">
           We&apos;ll email your confirmation and text you a reminder before it starts. Message and
           data rates may apply; reply STOP to opt out of texts. Only the hosts see your email and
           number.
@@ -315,7 +315,9 @@ function Signed({
         <span
           className={cn(
             "grid size-12 flex-none place-items-center rounded-full",
-            going ? "bg-banana text-banana-ink" : "bg-butter text-honey",
+            going
+              ? "bg-brand-accent text-brand-accent-foreground"
+              : "bg-tint-accent text-tint-accent-foreground",
           )}
         >
           {going ? (
@@ -328,7 +330,7 @@ function Signed({
           <h2 className="font-heading text-[26px] leading-[1.1] tracking-[-0.02em]">
             {going ? `You're going, ${viewer.firstName}!` : "You're on the waitlist"}
           </h2>
-          <p className="text-ink-muted m-0 text-[14px] leading-[1.5]">
+          <p className="text-muted-foreground m-0 text-[14px] leading-[1.5]">
             {going
               ? `Your confirmation went to ${viewer.email}. We'll send a reminder before it starts.`
               : `You're number ${viewer.waitlistPosition ?? 1} in line. If a spot opens up it's yours, and we'll email ${viewer.email}.`}
@@ -367,7 +369,7 @@ function Signed({
 
       {signedExtras && <div className="mt-5 flex flex-col gap-4">{signedExtras}</div>}
 
-      <div className="border-ink/10 mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+      <div className="border-border mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         {confirming ? (
           <>
             <span className="text-[14px] font-semibold">
@@ -385,7 +387,10 @@ function Signed({
                 type="button"
                 disabled={pending}
                 onClick={cancel}
-                className={cn(pill({ size: "sm" }), "bg-brick hover:bg-brick/90")}
+                className={cn(
+                  pill({ size: "sm" }),
+                  "bg-block-alert text-block-alert-foreground hover:bg-block-alert/90",
+                )}
               >
                 {pending ? "Cancelling…" : "Yes, cancel"}
               </button>
@@ -393,13 +398,13 @@ function Signed({
           </>
         ) : (
           <>
-            <span className="text-ink-muted text-[14px]">
+            <span className="text-muted-foreground text-[14px]">
               {going ? "Can't make it anymore?" : "Changed your mind?"}
             </span>
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="text-ink cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline"
+              className="text-foreground cursor-pointer text-[14px] font-semibold underline-offset-4 hover:underline"
             >
               {going ? "Can't go" : "Leave the waitlist"}
             </button>

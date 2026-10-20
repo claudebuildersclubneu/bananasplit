@@ -7,6 +7,8 @@ import { AvailabilityEditor } from "@/components/onboarding/availability-editor"
 import { Button } from "@/components/ui/button";
 import type { Availability } from "@/lib/availability";
 
+import { SettingsCard } from "../settings/settings-card";
+
 /** Profile > When you can't meet: the onboarding A5 editor, editable. */
 export function AvailabilityForm({ initial }: { initial: Availability }) {
   const [value, setValue] = useState(initial);
@@ -29,21 +31,26 @@ export function AvailabilityForm({ initial }: { initial: Availability }) {
   }
 
   return (
-    <div className="max-w-md space-y-4">
-      <AvailabilityEditor value={value} onChange={setValue} />
-      <div className="flex items-center gap-3">
-        <Button type="button" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
+    <SettingsCard
+      title="When you can't meet"
+      description="Click or drag to block hours in a typical week, or add rules. Teammates see “busy,” never the reason."
+      status={
         <span
           aria-live="polite"
-          className={
-            status?.ok === false ? "text-destructive text-sm" : "text-muted-foreground text-sm"
-          }
+          className={status?.ok === false ? "text-destructive" : "text-success"}
         >
           {status?.text}
         </span>
+      }
+      footer={
+        <Button type="button" onClick={save} disabled={pending}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+      }
+    >
+      <div className="max-w-md">
+        <AvailabilityEditor value={value} onChange={setValue} />
       </div>
-    </div>
+    </SettingsCard>
   );
 }

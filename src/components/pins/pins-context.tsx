@@ -135,10 +135,10 @@ export function PinToggle({
       }}
       onPointerDown={(e) => e.stopPropagation()}
       className={cn(
-        "bg-background/90 hover:bg-muted text-muted-foreground hover:text-foreground grid size-7 shrink-0 place-items-center rounded-lg transition-opacity",
+        "bg-background/90 hover:bg-muted text-muted-foreground hover:text-foreground focus-visible:outline-foreground grid size-8 shrink-0 place-items-center rounded-full transition-[opacity,background-color,transform] outline-none focus-visible:outline-2 active:scale-[0.94]",
         className,
         // A pinned item always shows its pin, even where the toggle only appears on hover.
-        on && "text-primary opacity-100",
+        on && "text-foreground opacity-100",
       )}
     >
       <Pin className={cn("size-3.5", on && "fill-current")} aria-hidden="true" />
@@ -157,22 +157,24 @@ function PickerRow({ item }: { item: PinnableItem }) {
         disabled={pending}
         aria-pressed={on}
         className={cn(
-          "hover:bg-accent/60 flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
-          on && "bg-primary/5",
+          "hover:bg-muted/60 rounded-field focus-visible:outline-foreground flex w-full items-center gap-3 px-2.5 py-2 text-left transition-colors outline-none focus-visible:outline-2",
+          on && "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)]",
         )}
       >
-        <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+        <span className="bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1">
+          <Icon className="size-[18px]" aria-hidden="true" />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{item.label}</span>
-          <span className="text-muted-foreground block truncate text-xs">
+          <span className="block truncate text-sm font-semibold">{item.label}</span>
+          <span className="text-muted-foreground block truncate text-[13px]">
             {PIN_KIND_LABELS[item.kind]}
             {item.detail ? ` · ${item.detail}` : ""}
           </span>
         </span>
         <span
           className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium",
-            on ? "border-primary/40 text-primary" : "text-muted-foreground",
+            "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold",
+            on ? "bg-primary text-primary-foreground" : "border-input text-foreground border",
           )}
         >
           {on ? (

@@ -27,6 +27,8 @@ import type { MemberVisibility } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import type { CustomDatabase } from "@/server/databases/custom";
 
+import { notice } from "../styles";
+
 const WHO: { value: MemberVisibility; label: string; hint: string }[] = [
   { value: "MEMBERS", label: "Everyone in the club", hint: "Every member can open it." },
   { value: "ADMINS", label: "Owners and admins", hint: "Members don't see it at all." },
@@ -82,7 +84,7 @@ export function DatabaseSettingsDialog({
       title: `Archive ${database.name}?`,
       description:
         "It disappears from Databases for everyone. Nothing is deleted: its rows stay in your club's data and in the owner's export.",
-      confirmLabel: "Archive",
+      confirmLabel: "Archive database",
       run: async () => (await archiveDatabaseAction(orgId, database.id)).error,
     });
     if (!ok) return;
@@ -128,8 +130,10 @@ export function DatabaseSettingsDialog({
                 <label
                   key={w.value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3",
-                    visibility === w.value ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+                    "rounded-tile flex cursor-pointer items-start gap-3 p-3.5 transition-colors",
+                    visibility === w.value
+                      ? "bg-card ring-foreground ring-2"
+                      : "bg-muted/60 hover:bg-muted",
                   )}
                 >
                   <input
@@ -151,7 +155,7 @@ export function DatabaseSettingsDialog({
               ))}
             </div>
           </fieldset>
-          <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+          <div className="bg-muted/60 rounded-tile flex items-start justify-between gap-4 p-3.5">
             <div className="space-y-0.5">
               <Label htmlFor="db-member-edit" className="text-sm font-medium">
                 Members can add and edit rows
@@ -174,18 +178,13 @@ export function DatabaseSettingsDialog({
             can&apos;t open what&apos;s limited to admins, whatever page or link they use.
           </p>
           {error && (
-            <p className="text-destructive text-sm" role="alert">
+            <p className={notice.error} role="alert">
               {error}
             </p>
           )}
         </div>
         <DialogFooter className="sm:justify-between">
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive"
-            onClick={() => void archive()}
-          >
+          <Button type="button" variant="destructive" onClick={() => void archive()}>
             <Archive aria-hidden="true" />
             Archive database
           </Button>

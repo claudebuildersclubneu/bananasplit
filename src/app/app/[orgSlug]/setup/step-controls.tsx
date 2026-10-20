@@ -76,7 +76,7 @@ export function SkipButton({
         {isPending ? "Skipping…" : label}
       </Button>
       {error ? (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className="text-destructive text-[13px]">
           {error}
         </p>
       ) : null}
@@ -96,7 +96,7 @@ export function ResumeButton({ orgId, step }: { orgId: string; step: SetupStepId
         {isPending ? "Working…" : "Set this up after all"}
       </Button>
       {error ? (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className="text-destructive text-[13px]">
           {error}
         </p>
       ) : null}
@@ -178,7 +178,7 @@ export function FinishButton({
         {isPending ? "Saving…" : done ? "Reopen setup" : "Done for now"}
       </Button>
       {error ? (
-        <p role="alert" className="text-destructive text-xs">
+        <p role="alert" className="text-destructive text-[13px]">
           {error}
         </p>
       ) : null}

@@ -30,11 +30,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
+import { IconChip } from "@/components/ui/stat";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
 import { DATABASE_TEMPLATES } from "@/lib/databases/templates";
 import { readTableFile, SpreadsheetError, type SheetData } from "@/lib/finance/import/sheet";
 import { cn } from "@/lib/utils";
 import type { ImportSummary } from "@/server/databases/custom";
+
+import { StepPills } from "../step-pills";
+import { nativeSelectClass, notice } from "../styles";
+import { TableFrame } from "../table-frame";
+
+const IMPORT_STEPS = ["Choose a file", "Check the preview", "Import"] as const;
 
 const TEMPLATE_ICONS: Record<string, LucideIcon> = {
   Table2,
@@ -205,7 +220,7 @@ export function NewDatabaseDialog({
     >
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm">
+          <Button variant="create">
             <Plus aria-hidden="true" />
             New database
           </Button>
@@ -231,7 +246,7 @@ export function NewDatabaseDialog({
         />
 
         {mode === "template" ? (
-          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Template">
+          <div className="grid gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="Template">
             {DATABASE_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] ?? Table2;
               const active = t.id === templateId;
@@ -243,28 +258,20 @@ export function NewDatabaseDialog({
                   aria-checked={active}
                   onClick={() => setTemplateId(t.id)}
                   className={cn(
-                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
-                    active
-                      ? "border-primary bg-primary/5 ring-primary ring-1"
-                      : "hover:bg-muted/50",
+                    "rounded-tile focus-visible:outline-foreground flex items-start gap-3 p-3.5 text-left transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
+                    active ? "bg-card ring-foreground ring-2" : "bg-muted/60 hover:bg-muted",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "grid size-9 shrink-0 place-items-center rounded-lg",
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" aria-hidden="true" />
-                  </span>
+                  <IconChip
+                    icon={Icon}
+                    className={cn(active && "bg-primary text-primary-foreground ring-0")}
+                  />
                   <span className="min-w-0 space-y-0.5">
-                    <span className="block text-sm font-medium">{t.name}</span>
+                    <span className="block text-sm font-semibold">{t.name}</span>
                     <span className="text-muted-foreground block text-xs leading-relaxed">
                       {t.description}
                     </span>
-                    <span className="text-muted-foreground/80 block truncate text-[11px]">
+                    <span className="text-muted-foreground block truncate pt-0.5 text-xs">
                       {t.fields.map((f) => f.name).join(" · ")}
                     </span>
                   </span>
@@ -273,7 +280,12 @@ export function NewDatabaseDialog({
             })}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <StepPills
+              steps={IMPORT_STEPS}
+              current={pending ? 2 : sheet ? 1 : 0}
+              label="Import steps"
+            />
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -282,10 +294,10 @@ export function NewDatabaseDialog({
                 e.preventDefault();
                 void choose(e.dataTransfer.files?.[0] ?? null);
               }}
-              className="hover:bg-muted/40 flex w-full flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center"
+              className="hover:bg-muted/40 border-border rounded-block focus-visible:outline-foreground flex w-full flex-col items-center gap-2.5 border-[1.5px] border-dashed p-6 text-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
             >
-              <Upload className="text-muted-foreground size-6" aria-hidden="true" />
-              <span className="text-sm font-medium">
+              <IconChip icon={Upload} />
+              <span className="text-sm font-semibold">
                 {reading
                   ? "Reading it…"
                   : file
@@ -316,7 +328,7 @@ export function NewDatabaseDialog({
                   id="new-db-sheet"
                   value={sheet?.name ?? ""}
                   onChange={(e) => setSheetName(e.target.value)}
-                  className="border-input h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
+                  className={nativeSelectClass}
                 >
                   {sheets.map((s) => (
                     <option key={s.name} value={s.name}>
@@ -345,7 +357,7 @@ export function NewDatabaseDialog({
         </div>
 
         {error && (
-          <p className="text-destructive text-sm" role="alert">
+          <p className={notice.error} role="alert">
             {error}
           </p>
         )}
@@ -386,36 +398,30 @@ function SheetPreviewTable({ sheet }: { sheet: SheetPreview }) {
         {sheet.columnCount} {sheet.columnCount === 1 ? "field" : "fields"}
         {sheet.columnCount > 60 && " (the first 60 come in)"}
       </p>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-xs">
-          <thead className="bg-muted/60">
-            <tr>
+      <TableFrame bare maxHeight="none">
+        <Table>
+          <TableHeader>
+            <TableRow>
               {Array.from({ length: columns }, (_, i) => (
-                <th key={i} className="px-2 py-1.5 text-left font-medium whitespace-nowrap">
-                  {header?.[i]?.trim() || `Column ${i + 1}`}
-                </th>
+                <TableHead key={i}>{header?.[i]?.trim() || `Column ${i + 1}`}</TableHead>
               ))}
-              {more > 0 && (
-                <th className="text-muted-foreground px-2 py-1.5 text-left font-normal whitespace-nowrap">
-                  +{more} more
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
+              {more > 0 && <TableHead className="font-normal">+{more} more</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row, r) => (
-              <tr key={r} className="border-t">
+              <TableRow key={r}>
                 {Array.from({ length: columns }, (_, i) => (
-                  <td key={i} className="max-w-40 truncate px-2 py-1.5 whitespace-nowrap">
+                  <TableCell key={i} className="h-10 max-w-40 truncate text-[13px]">
                     {row[i] ?? ""}
-                  </td>
+                  </TableCell>
                 ))}
-                {more > 0 && <td />}
-              </tr>
+                {more > 0 && <TableCell className="h-10" />}
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableFrame>
     </div>
   );
 }

@@ -65,8 +65,9 @@ const GRANTS = {
   OrgCreationCode: ["", "", ""],
   OrgDeletionLog: ["", "", ""],
   OrgExport: ["SI", "SIUD", ""],
-  // Notes page files: shared or private to the uploader; no DELETE (soft).
-  OrgFile: ["SIU", "S", ""],
+  // Notes page files: shared or private to the uploader. DELETE only once
+  // trashed (Empty trash for the uploader or an admin; the nightly purge).
+  OrgFile: ["SIUD", "SD", ""],
   OrgIntegration: ["SIUD", "SIUD", ""],
   // Onboarding invite code: admins manage it, no DELETE (rotate or turn off).
   OrgJoinCode: ["SIU", "SU", ""],
@@ -2763,7 +2764,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
   );
   await tcase(
     "P-PIN-02",
-    "OrgFile: shared files reach every member, private ones only the uploader; only the uploader or an admin changes one",
+    "OrgFile: shared files reach every member, private ones only the uploader; only the uploader or an admin changes one, and deletes it once trashed",
     "app_user",
     A("u_memberA"),
     async (q) => {
@@ -2780,7 +2781,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         q,
         `INSERT INTO "OrgFile" ("id","organizationId","name","contentType","sizeBytes","storageKey","uploadedById") VALUES ('f_3','org_A','X.pdf','application/pdf',10,'files/org_A/c','u_treasA')`,
       );
-      s.delete = await tryq(q, `DELETE FROM "OrgFile"`);
+      s.delete_live = await rc(q, `DELETE FROM "OrgFile"`);
       await q(`SELECT app.set_context('u_treasA','org_A')`);
       s.treas_sees = await count(q, `SELECT count(*) n FROM "OrgFile"`);
       s.treas_renames = await rc(
@@ -2790,6 +2791,10 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       await q(`SELECT app.set_context('u_adminA','org_A')`);
       s.admin_sees = await count(q, `SELECT count(*) n FROM "OrgFile"`);
       s.admin_removes = await rc(q, `UPDATE "OrgFile" SET "deletedAt" = now() WHERE "id" = 'f_1'`);
+      await q(`SELECT app.set_context('u_treasA','org_A')`);
+      s.treas_deletes_trashed = await rc(q, `DELETE FROM "OrgFile" WHERE "id" = 'f_1'`);
+      await q(`SELECT app.set_context('u_adminA','org_A')`);
+      s.admin_deletes_trashed = await rc(q, `DELETE FROM "OrgFile" WHERE "id" = 'f_1'`);
       await q(`SELECT app.set_context('u_memberB','org_B')`);
       s.other_org_sees = await count(q, `SELECT count(*) n FROM "OrgFile"`);
       return s;
@@ -2799,11 +2804,13 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
         shared: 1,
         private: 1,
         as_someone_else: "42501",
-        delete: "42501",
+        delete_live: 0,
         treas_sees: 1,
         treas_renames: 0,
         admin_sees: 1,
         admin_removes: 1,
+        treas_deletes_trashed: 0,
+        admin_deletes_trashed: 1,
         other_org_sees: 0,
       },
     },

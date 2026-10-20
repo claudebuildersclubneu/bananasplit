@@ -1,4 +1,4 @@
-import { Info } from "lucide-react";
+import { CalendarClock, Info } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 
@@ -18,6 +18,7 @@ function Missing() {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <EmptyState
+        icon={CalendarClock}
         title="This poll isn't available"
         description="The link may be mistyped, or the poll was deleted. Ask whoever sent it for a new one."
         className="w-full max-w-md"
@@ -41,7 +42,9 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
   const loaded = await withSystemOrgTx(organizationId, async ({ db }) => {
     const poll = await getPollSource(db, organizationId, pollId);
     if (!poll) return { poll, isMember: false, memberNames: new Map<string, string>() };
-    const isMember = userId ? (await db.membership.count({ where: { organizationId, userId } })) > 0 : false;
+    const isMember = userId
+      ? (await db.membership.count({ where: { organizationId, userId } })) > 0
+      : false;
     // Guests see who they're meeting: members by name, as in the app.
     const memberNames = await getPollMemberNames(db, organizationId, poll);
     return { poll, isMember, memberNames };
@@ -66,14 +69,14 @@ export default async function PublicPollPage({ params }: PageProps<"/poll/[pollI
   const isOpen = !poll.finalizedEventId && !(poll.closesAt && poll.closesAt < new Date());
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 p-6">
+    <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
       <PollResponder
         poll={view}
         respondAs={viewer.kind}
         canFinalize={false}
         notices={
           session && !isMember ? (
-            <div className="bg-muted/40 flex gap-2 rounded-xl border p-3 text-sm" role="note">
+            <div className="bg-muted rounded-tile flex gap-2.5 p-3.5 text-sm" role="note">
               <Info aria-hidden className="text-muted-foreground mt-0.5 size-4 shrink-0" />
               <p>
                 You&apos;re signed in, but not a member of the organization running this poll, so

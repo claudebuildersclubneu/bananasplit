@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/page-header";
 import { can } from "@/lib/auth/permissions";
 import { resolveSidebar } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug } from "@/server/db/context";
@@ -20,10 +21,22 @@ export default async function SidebarSettingsPage({
   if (!can({ role }, "settings.view")) {
     return <SettingsNoAccess title="Sidebar" who="owners and admins" />;
   }
+  const groups = resolveSidebar(settings?.sidebar);
+  const items = groups.flatMap((g) => g.items);
+  const hidden = items.filter((i) => i.hidden).length;
+  const customized = settings?.sidebar != null;
+  const summary = [
+    `${items.length - hidden} section${items.length - hidden === 1 ? "" : "s"} shown`,
+    hidden > 0 ? `${hidden} hidden` : null,
+    customized ? "customized for the club" : "the default layout",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="page-title">Sidebar</h1>
+    <div className="space-y-7.5">
+      <div className="space-y-3">
+        <PageHeader title="Sidebar" description={summary} />
         <p className="text-muted-foreground max-w-prose text-sm">
           Make {organization.name}&apos;s sidebar fit how your club works: hide what you don&apos;t
           use, drag sections into the order you want or under another heading, and rename them.
@@ -32,8 +45,8 @@ export default async function SidebarSettingsPage({
       </div>
       <SidebarEditor
         orgId={organization.id}
-        initial={resolveSidebar(settings?.sidebar)}
-        customized={settings?.sidebar != null}
+        initial={groups}
+        customized={customized}
         canEdit={can({ role }, "settings.general.write")}
       />
     </div>
