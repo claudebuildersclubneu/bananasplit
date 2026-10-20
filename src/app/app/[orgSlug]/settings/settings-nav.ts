@@ -80,9 +80,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     feature: "themes",
   },
   {
-    label: "Labels",
+    label: "Tags",
     segment: "labels",
-    description: "The shared label palette for tasks.",
+    description: "Tags for tasks, and who can create tags and projects.",
     icon: "Tags",
     group: "Club",
     permission: "labels.write",
