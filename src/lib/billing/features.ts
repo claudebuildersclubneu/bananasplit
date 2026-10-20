@@ -48,7 +48,7 @@ export const PLAN_FEATURES = {
   rsvp: "FREE",
   /** Tasks. */
   tasks: "FREE",
-  /** Board, Week and Table, and the calendar's Tasks layer. */
+  /** Board, Week, Table, Roadmap and Dashboard, and the calendar's Tasks layer. */
   taskViews: "FREE",
   /** Availability polls and question polls. */
   polls: "FREE",
@@ -246,12 +246,12 @@ export function featuresOf(plan: PricedPlan): PlanFeature[] {
 export const FEATURE_LABELS: Record<PlanFeature, string> = {
   rsvp: "RSVP pages",
   tasks: "Tasks",
-  taskViews: "Board, Week and Table views",
+  taskViews: "Board, Week, Table, Roadmap and Dashboard views",
   polls: "Polls",
   admin: "Settings",
   overview: "The Overview",
   teamwork: "Weekly updates",
-  labels: "Task labels",
+  labels: "Tags",
   files: "Notes and files",
   people: "People and the org chart",
   finance: "Finance",

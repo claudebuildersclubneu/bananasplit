@@ -30,7 +30,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
         <span className="bg-card text-destructive grid size-9 shrink-0 place-items-center rounded-full">
           <AlertTriangle className="size-[18px]" aria-hidden="true" />
         </span>
-        <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="min-w-0 flex-[1_1_15rem] space-y-0.5">
           <p className="heading text-[15px]">{next.title} has stopped working.</p>
           <p className="text-sm">
             {next.title === "Club website data"
@@ -56,7 +56,7 @@ export function SetupPrompt({ orgSlug, state }: { orgSlug: string; state: SetupS
       <span className="bg-card ring-foreground/6 grid size-9 shrink-0 place-items-center rounded-full shadow-[var(--edge-highlight)] ring-1">
         <Plug className="size-[18px]" aria-hidden="true" />
       </span>
-      <div className="min-w-0 flex-1 space-y-0.5">
+      <div className="min-w-0 flex-[1_1_15rem] space-y-0.5">
         <p className="heading text-[15px]">
           {state.connectedCount === 0
             ? "Connect your club's accounts to fill this place up"

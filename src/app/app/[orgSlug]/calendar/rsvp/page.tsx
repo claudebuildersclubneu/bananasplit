@@ -189,7 +189,7 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="space-y-7.5">
       <PageHeader
         title={sectionLabel(ctx.settings?.sidebar, "rsvps")}
         description={

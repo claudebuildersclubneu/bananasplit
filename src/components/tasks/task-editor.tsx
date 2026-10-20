@@ -289,13 +289,13 @@ export function TaskEditor({
         subtasks > 0
           ? `Its ${subtasks} subtask${subtasks === 1 ? "" : "s"} go${subtasks === 1 ? "es" : ""} with it. You can undo this right after.`
           : "You can undo this right after.",
-      confirmLabel: "Delete task",
+      confirmLabel: `Delete ${typeLabel(type).toLowerCase()}`,
       run: async () => (await deleteTask(org.id, task.id)).error,
     });
     if (!ok) return;
     (onDeleted ?? onDone)?.();
     toast({
-      title: "Task deleted",
+      title: `${typeLabel(type)} deleted`,
       description: task.title,
       action: {
         label: "Undo",
@@ -362,13 +362,12 @@ export function TaskEditor({
       {task && canEdit && (
         <Button
           type="button"
-          variant="ghost"
-          className="text-muted-foreground hover:text-destructive -ms-2"
+          variant="destructive"
           onClick={() => void remove()}
           disabled={isPending}
         >
           <Trash2 className="size-4" aria-hidden="true" />
-          Delete
+          Delete {typeLabel(type).toLowerCase()}
         </Button>
       )}
       <span className="flex-1" />

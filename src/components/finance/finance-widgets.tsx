@@ -23,7 +23,7 @@ import { BlockCard } from "@/components/ui/block-card";
 import { Gauge, MixBar, TickMeter } from "@/components/ui/meters";
 import { IconChip } from "@/components/ui/stat";
 import type { DashboardData, DashboardTransaction } from "@/app/app/[orgSlug]/finance/queries";
-import { formatCents } from "@/lib/finance/money";
+import { formatCents, formatDollars } from "@/lib/finance/money";
 import { SETUP_STEPS, stepDone, type FinanceSetupState } from "@/lib/finance/setup";
 import type { WidgetTypeId } from "@/lib/finance/widgets";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,8 @@ const INCOME_LABEL: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = { SUBMITTED: "To approve", APPROVED: "To pay back" };
 
-const money = (cents: number) => formatCents(cents).replace(/\.00$/, "");
+/** Money outside tables: whole dollars ("$1,830"); tables keep the cents. */
+const money = (cents: number) => formatDollars(cents);
 
 /** Axis money: $0, $500, $1.5K, $12K. */
 const axisMoney = (cents: number) => {
@@ -292,7 +293,7 @@ export function WidgetBody({
     case "balance":
       return (
         <Big
-          value={formatCents(data.balanceCents)}
+          value={money(data.balanceCents)}
           sub={period?.label ?? "No budget period yet"}
           tone={data.balanceCents < 0 ? "bad" : undefined}
         />
@@ -309,15 +310,15 @@ export function WidgetBody({
       const spent = data.categories.reduce((sum, c) => sum + c.spentCents, 0);
       return (
         <Big
-          value={formatCents(data.totalAllocatedCents)}
-          sub={`${formatCents(spent)} spent of it`}
+          value={money(data.totalAllocatedCents)}
+          sub={`${money(spent)} spent of it`}
         />
       );
     }
     case "owed":
       return (
         <Big
-          value={formatCents(data.outstandingReimbursementsCents)}
+          value={money(data.outstandingReimbursementsCents)}
           sub={
             <Link
               href={`/app/${orgSlug}/finance/transactions?kind=EXPENSE`}
@@ -338,7 +339,7 @@ export function WidgetBody({
                 href={`/app/${orgSlug}/finance/transactions?status=SUBMITTED`}
                 className="hover:text-foreground underline-offset-4 hover:underline"
               >
-                {formatCents(data.pendingApproval.cents)} to review
+                {money(data.pendingApproval.cents)} to review
               </Link>
             ) : (
               "Nothing to review"

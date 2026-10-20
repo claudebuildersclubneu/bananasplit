@@ -288,7 +288,21 @@ export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): To
   const goal = whiteLabelBlock(dark ? 0.47 : 0.45, 0.085, 165);
   const answerForeground = onFill(accent, palette);
 
-  const info = p.C >= 0.1 ? primary : chart2;
+  // Info notes take the brand colour, unless it sits near the danger red
+  // (a coral or brick club), where an info note would read as an error:
+  // then the second chart colour, or a plain blue if that is red too.
+  const dangerHue = hexToOklch(destructive).h;
+  const nearDanger = (hex: string) => {
+    const c = hexToOklch(hex);
+    const gap = Math.abs(((c.h - dangerHue + 540) % 360) - 180);
+    return c.C >= 0.06 && gap < 35;
+  };
+  const info =
+    p.C >= 0.1 && !nearDanger(primary)
+      ? primary
+      : !nearDanger(chart2)
+        ? chart2
+        : oklchToHex({ L: dark ? 0.7 : 0.55, C: 0.13, h: 250 });
   const [tintDanger, tintDangerInk] = tintPair(surface, destructive, dark ? 0.2 : 0.15, dark);
   const [tintAccent, tintAccentInk] = tintPair(surface, accent, dark ? 0.18 : 0.26, dark);
   const [tintSuccess, tintSuccessInk] = tintPair(surface, success, dark ? 0.2 : 0.15, dark);

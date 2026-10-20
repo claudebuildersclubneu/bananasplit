@@ -53,6 +53,7 @@ import { familyOf } from "@/lib/files/types";
 import { personalUpNext } from "@/lib/personal/up-next";
 import { ago } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
+import { orgInitials } from "@/lib/theme/logo";
 
 import { DueTaskRow } from "./due-task-row";
 import { PersonalShortcuts } from "./personal-shortcuts";
@@ -328,7 +329,7 @@ function ClubRow({
         // eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP variant
         <img src={logo} alt="" width={36} height={36} className="size-9 shrink-0 rounded-full" />
       ) : (
-        <TileIcon className="text-xs font-semibold">{club.name.slice(0, 2).toUpperCase()}</TileIcon>
+        <TileIcon className="text-xs font-semibold">{orgInitials(club.name)}</TileIcon>
       )}
       <span className="min-w-0 flex-1 space-y-1">
         <span className="flex items-center gap-2">

@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gauge, TickMeter } from "@/components/ui/meters";
 import { toast } from "@/components/ui/toaster";
-import { formatCents, parseDollarsToCents } from "@/lib/finance/money";
+import { formatCents, formatDollars, parseDollarsToCents } from "@/lib/finance/money";
 
 import { tickUnitCents } from "./budget-ticks";
 import { formatPeriodRange, PERIOD_PRESETS, type PeriodDraft } from "@/lib/finance/periods";
@@ -243,11 +243,11 @@ export function BudgetView({
               <dl className="flex gap-6 text-right">
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Budgeted</dt>
-                  <dd className="numeral mt-1 text-[22px]">{formatCents(totals.budget)}</dd>
+                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.budget)}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Spent</dt>
-                  <dd className="numeral mt-1 text-[22px]">{formatCents(totals.spent)}</dd>
+                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.spent)}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Left</dt>
@@ -257,7 +257,7 @@ export function BudgetView({
                       totals.budget - totals.spent < 0 && "text-destructive",
                     )}
                   >
-                    {formatCents(totals.budget - totals.spent)}
+                    {formatDollars(totals.budget - totals.spent)}
                   </dd>
                 </div>
               </dl>
@@ -287,7 +287,7 @@ export function BudgetView({
             </ul>
             {categories.length > 0 && (
               <p className="text-muted-foreground px-2.5 pt-1 pb-2 text-xs">
-                One tick per {formatCents(unit).replace(/\.00$/, "")}
+                One tick per {formatDollars(unit)}
               </p>
             )}
           </div>
