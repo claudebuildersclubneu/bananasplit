@@ -38,10 +38,10 @@ export function SetupShell({
     <div className="flex flex-1 flex-col items-center px-4 pb-5 sm:px-6">
       <header className="flex h-[72px] w-full flex-none items-center justify-between gap-4 sm:px-4 lg:px-10">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Link href="/" className="text-ink" data-plain>
+          <Link href="/" className="text-foreground" data-plain>
             <Logo size={26} textSize={19} />
           </Link>
-          <span className="text-ink-faint ml-1.5 hidden truncate text-[14px] sm:inline">
+          <span className="text-muted-foreground ml-1.5 hidden truncate text-[14px] sm:inline">
             Setting up {subject}
           </span>
         </div>
@@ -55,19 +55,20 @@ export function SetupShell({
 
 /** "Save and exit" / "Sign out": 14px, semibold, muted. */
 export const exitClass =
-  "text-ink-muted hover:text-ink cursor-pointer border-none bg-transparent p-0 text-[14px] font-semibold";
+  "text-muted-foreground hover:text-foreground cursor-pointer border-none bg-transparent p-0 text-[14px] font-semibold";
 
 /**
- * Named steps joined by 1.5px lines: done is ink with a check, the current
- * one cream with a 2px ink ring and a bold label, the rest a muted outline.
- * Lines are ink up to the current step. Below md only the current label
- * shows.
+ * Numbered steps joined by 1.5px lines (Moonstone tokens): done is the
+ * primary with a check, the current one a ring and a bold label, the rest
+ * a muted outline. Lines are filled up to the current step. Every label
+ * shows from xl; below that only the current one, and none on a phone
+ * (the card says "Step 5 of 8").
  */
 export function SetupStepper({ steps, current }: { steps: readonly string[]; current: number }) {
   return (
     <ol
       aria-label="Setup steps"
-      className="m-0 flex w-full max-w-[1080px] list-none items-center gap-2 p-0 pt-2 pb-7 sm:gap-3"
+      className="m-0 flex w-full max-w-[1080px] list-none items-center gap-1.5 p-0 pt-2 pb-7 sm:gap-3"
     >
       {steps.map((label, i) => {
         const n = i + 1;
@@ -79,29 +80,31 @@ export function SetupStepper({ steps, current }: { steps: readonly string[]; cur
               aria-current={here ? "step" : undefined}
               className={cn(
                 "flex items-center gap-2 text-[14px] whitespace-nowrap",
-                done && "text-ink-muted font-semibold",
-                here && "text-ink font-bold",
-                !done && !here && "text-ink-faint font-medium",
+                done && "text-muted-foreground font-semibold",
+                here && "text-foreground font-bold",
+                !done && !here && "text-muted-foreground font-medium",
               )}
             >
               <span
                 className={cn(
-                  "grid size-6 flex-none place-items-center rounded-full text-[11px]",
-                  done && "bg-ink text-cream font-extrabold",
-                  here && "bg-paper border-ink border-2 font-extrabold",
-                  !done && !here && "border-ink/22 text-ink-faint border-[1.5px] font-bold",
+                  "grid size-5 flex-none place-items-center rounded-full text-[11px] sm:size-6",
+                  done && "bg-primary text-primary-foreground font-extrabold",
+                  here && "bg-card border-foreground border-2 font-extrabold",
+                  !done && !here && "border-foreground/22 text-muted-foreground border-[1.5px] font-bold",
                 )}
               >
                 {done ? <Check className="size-3" strokeWidth={3.5} aria-label="Done" /> : n}
               </span>
-              <span className={cn(!here && "sr-only md:not-sr-only")}>{label}</span>
+              <span className={cn(here ? "max-sm:sr-only" : "sr-only xl:not-sr-only")}>
+                {label}
+              </span>
             </span>
             {n < steps.length && (
               <span
                 aria-hidden="true"
                 className={cn(
-                  "h-[1.5px] min-w-2 flex-1 sm:min-w-4",
-                  n < current ? "bg-ink" : "bg-ink/15",
+                  "h-[1.5px] min-w-1 flex-1 sm:min-w-4",
+                  n < current ? "bg-primary" : "bg-foreground/15",
                 )}
               />
             )}
@@ -118,14 +121,14 @@ export function SetupStepper({ steps, current }: { steps: readonly string[]; cur
  */
 export function SetupCard({ preview, children }: { preview?: ReactNode; children: ReactNode }) {
   return (
-    <div className="bg-paper border-ink/10 shadow-frame-soft flex w-full max-w-[1080px] gap-3 rounded-[30px] border p-3 lg:min-h-[668px]">
+    <div className="bg-card text-card-foreground edge ring-foreground/6 rounded-shell flex w-full max-w-[1080px] gap-2.5 p-2.5 ring-1 lg:min-h-[640px]">
       <div className="flex min-w-0 flex-1 flex-col px-4 pt-6 pb-4 sm:px-8 sm:pt-7 sm:pb-5">
         {children}
       </div>
       {preview && (
         <aside
           aria-label="Preview"
-          className="bg-oat hidden w-[380px] flex-none flex-col gap-3 rounded-[20px] p-6 lg:flex"
+          className="bg-muted glow-corner hidden w-[380px] flex-none flex-col gap-3 rounded-[calc(var(--radius-shell)-0.625rem)] p-6 lg:flex"
         >
           {preview}
         </aside>
@@ -148,14 +151,14 @@ export function StepIntro({
 }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <span className="text-ink-soft text-[13px] font-semibold">
+      <span className="text-muted-foreground text-[13px] font-semibold">
         Step {index} of {total}
       </span>
-      <h1 className="font-heading m-0 text-[38px] leading-[1.05] font-normal tracking-[-0.03em]">
+      <h1 className="page-title m-0 text-[34px] sm:text-[40px]">
         {title}
       </h1>
       {children && (
-        <p className="text-ink-muted m-0 max-w-[440px] text-[15px] leading-[1.55]">{children}</p>
+        <p className="text-muted-foreground m-0 max-w-[440px] text-[15px] leading-[1.55]">{children}</p>
       )}
     </div>
   );
@@ -167,7 +170,7 @@ export function StepBody({ children, className }: { children: ReactNode; classNa
 }
 
 const footerTextButton =
-  "text-ink-muted hover:text-ink flex cursor-pointer items-center gap-2 border-none bg-transparent p-0 text-[15px] font-semibold disabled:cursor-default disabled:opacity-60";
+  "text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 border-none bg-transparent p-0 text-[15px] font-semibold disabled:cursor-default disabled:opacity-60";
 
 /**
  * Back (an arrow and the word) on the left; Skip and the Continue pill on
@@ -187,7 +190,7 @@ export function StepFooter({
     <div className="mt-auto flex flex-wrap items-center justify-between gap-4 pt-5">
       {back ? (
         "href" in back ? (
-          <Link href={back.href} className={cn(footerTextButton, "text-ink-muted")}>
+          <Link href={back.href} className={cn(footerTextButton, "text-muted-foreground")}>
             <ArrowLeft />
             Back
           </Link>
@@ -270,7 +273,7 @@ export function AddRowButton({ onClick, children }: { onClick: () => void; child
     <button
       type="button"
       onClick={onClick}
-      className="border-ink/25 text-ink-muted hover:bg-cream flex h-[50px] w-full cursor-pointer items-center rounded-xl border border-dashed bg-transparent px-4 text-left text-[15px] font-semibold transition-colors"
+      className="text-muted-foreground hover:text-foreground flex h-12 w-full cursor-pointer items-center rounded-tile hatch bg-muted px-4 text-left text-[15px] font-semibold transition-colors"
     >
       + {children}
     </button>
@@ -284,7 +287,7 @@ export function RemoveButton({ label, onClick }: { label: string; onClick: () =>
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="text-ink-ghost hover:text-ink flex-none cursor-pointer border-none bg-transparent p-0 text-[18px] leading-none"
+      className="text-muted-foreground hover:text-foreground flex-none cursor-pointer border-none bg-transparent p-0 text-[18px] leading-none"
     >
       ×
     </button>
@@ -292,14 +295,14 @@ export function RemoveButton({ label, onClick }: { label: string; onClick: () =>
 }
 
 /** Stand-in avatar colours for people in a preview. */
-export const PREVIEW_AVATAR_TONES = ["bg-wheat", "bg-ink", "bg-dusk", "bg-spot"] as const;
+export const PREVIEW_AVATAR_TONES = ["bg-avatar-1", "bg-primary", "bg-avatar-3", "bg-avatar-4"] as const;
 
 /** The preview's header: "Preview" and what it shows. */
 export function PreviewHeader({ meta, label = "Preview" }: { meta?: ReactNode; label?: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-ink-soft text-[13px] font-semibold">{label}</span>
-      {meta && <span className="text-ink-faint text-[12px]">{meta}</span>}
+      <span className="text-muted-foreground text-[13px] font-semibold">{label}</span>
+      {meta && <span className="text-muted-foreground text-[12px]">{meta}</span>}
     </div>
   );
 }
@@ -308,7 +311,7 @@ export function PreviewHeader({ meta, label = "Preview" }: { meta?: ReactNode; l
 export function PreviewTile({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={cn("bg-paper shadow-tile flex flex-col gap-2.5 rounded-[14px] p-3.5", className)}
+      className={cn("bg-card shadow-e1 rounded-tile flex flex-col gap-2.5 p-3.5", className)}
     >
       {children}
     </div>
@@ -318,7 +321,7 @@ export function PreviewTile({ children, className }: { children: ReactNode; clas
 /** An outlined chip with a colour dot: a label on a task. */
 export function DotChip({ color, children }: { color: string; children: ReactNode }) {
   return (
-    <span className="text-ink-muted border-ink/12 inline-flex min-w-0 items-center gap-1.5 rounded-full border px-[9px] py-[3px] text-[12px] font-semibold">
+    <span className="text-muted-foreground border-foreground/12 inline-flex min-w-0 items-center gap-1.5 rounded-full border px-[9px] py-[3px] text-[12px] font-semibold">
       <span className="size-[7px] flex-none rounded-full" style={{ backgroundColor: color }} />
       <span className="truncate">{children}</span>
     </span>
@@ -331,7 +334,7 @@ export function StepError({ message }: { message?: string | null }) {
   return (
     <p
       role="alert"
-      className="bg-destructive/8 text-destructive m-0 mt-3 rounded-xl px-3.5 py-2.5 text-[14px]"
+      className="bg-tint-danger text-tint-danger-foreground rounded-field m-0 mt-3 px-3.5 py-2.5 text-[14px]"
     >
       {message}
     </p>

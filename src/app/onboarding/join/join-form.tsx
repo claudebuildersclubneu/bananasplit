@@ -94,7 +94,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
             </>
           }
           badge={
-            <span className="bg-leaf text-leaf-ink flex-none rounded-full px-2.5 py-[5px] text-[12px] font-bold">
+            <span className="bg-tint-success text-tint-success-foreground flex-none rounded-full px-2.5 py-[5px] text-[12px] font-bold">
               ✓ Found
             </span>
           }
@@ -107,7 +107,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
         </p>
       )}
       {empty && !error && (
-        <span className="text-ink-soft text-[14px]">
+        <span className="text-muted-foreground text-[14px]">
           Tip: you can paste the whole code into the first box.
         </span>
       )}
@@ -126,7 +126,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
             pill(),
             // The design's resting state: sand until the code is complete.
             !ready &&
-              "bg-sand text-ink-faint hover:bg-sand hover:text-ink-faint disabled:opacity-100",
+              "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground disabled:opacity-100",
           )}
         >
           {joining
@@ -139,8 +139,8 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
         </button>
       )}
 
-      <div className="text-ink-muted flex justify-between gap-4 text-[14px]">
-        <Link href="/onboarding/organization" className="text-ink-muted font-semibold">
+      <div className="text-muted-foreground flex justify-between gap-4 text-[14px]">
+        <Link href="/onboarding/organization" className="text-muted-foreground font-semibold">
           Starting a new club instead?
         </Link>
         <button
@@ -149,7 +149,7 @@ export function JoinForm({ initialCode }: { initialCode: string }) {
             edit(emptyCode());
             setTimeout(() => boxes.current?.querySelector("input")?.focus(), 0);
           }}
-          className="text-ink-muted cursor-pointer border-none bg-transparent p-0 font-semibold"
+          className="text-muted-foreground cursor-pointer border-none bg-transparent p-0 font-semibold"
         >
           Clear
         </button>

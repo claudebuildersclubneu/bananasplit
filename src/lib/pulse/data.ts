@@ -139,8 +139,10 @@ export function pulseHeadline(data: PulseIssueData): string {
 
 /** "Fall Showcase 5 · Recruitment 3 · Club operations 1" (projects with work done, most first). */
 export function pulseProjectLine(data: PulseIssueData, max = 4): string {
-  return [...data.byProject]
-    .filter((p) => p.done > 0)
+  const done = data.byProject.filter((p) => p.done > 0);
+  // Only loose tasks: "No project 2" says nothing the count doesn't.
+  if (done.every((p) => p.projectId === null)) return "";
+  return done
     .sort((a, b) => b.done - a.done || a.name.localeCompare(b.name))
     .slice(0, max)
     .map((p) => `${p.name} ${p.done}`)
