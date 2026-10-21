@@ -35,19 +35,24 @@ const WHO: { value: MemberVisibility; label: string; hint: string }[] = [
   { value: "OWNER", label: "Owners only", hint: "For the most sensitive data." },
 ];
 
-/** A database's name, who can see and edit it, and archiving it. Owners and admins. */
+/**
+ * A database's name, who can see and edit it, and archiving it. Owners and
+ * admins. In Personal it's its owner's alone, so there's no one to choose.
+ */
 export function DatabaseSettingsDialog({
   orgId,
   orgSlug,
   database,
   open,
   onOpenChange,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
   database: CustomDatabase;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [confirmEl, confirm] = useConfirm();
@@ -82,8 +87,9 @@ export function DatabaseSettingsDialog({
   async function archive() {
     const ok = await confirm({
       title: `Archive ${database.name}?`,
-      description:
-        "It disappears from Databases for everyone. Nothing is deleted: its rows stay in your club's data and in the owner's export.",
+      description: personal
+        ? "It disappears from Databases. Nothing is deleted: its rows stay in your data and in your export."
+        : "It disappears from Databases for everyone. Nothing is deleted: its rows stay in your club's data and in the owner's export.",
       confirmLabel: "Archive database",
       run: async () => (await archiveDatabaseAction(orgId, database.id)).error,
     });
@@ -99,7 +105,8 @@ export function DatabaseSettingsDialog({
         <DialogHeader>
           <DialogTitle>Database settings</DialogTitle>
           <DialogDescription>
-            Everything here is saved in Bananasplit and only your club can see it.
+            Everything here is saved in Bananasplit and only {personal ? "you" : "your club"} can
+            see it.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -123,60 +130,67 @@ export function DatabaseSettingsDialog({
               placeholder="What this database is for"
             />
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">Who can see it</legend>
-            <div className="grid gap-2">
-              {WHO.map((w) => (
-                <label
-                  key={w.value}
-                  className={cn(
-                    "rounded-tile flex cursor-pointer items-start gap-3 p-3.5 transition-colors",
-                    visibility === w.value
-                      ? "bg-card ring-foreground ring-2"
-                      : "bg-muted/60 hover:bg-muted",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="db-visibility"
-                    value={w.value}
-                    checked={visibility === w.value}
-                    onChange={() => setVisibility(w.value)}
-                    className="accent-primary mt-1"
-                  />
-                  <span className="space-y-0.5">
-                    <span className="flex items-center gap-1.5 text-sm font-medium">
-                      {w.value !== "MEMBERS" && <Lock className="size-3.5" aria-hidden="true" />}
-                      {w.label}
-                    </span>
-                    <span className="text-muted-foreground block text-xs">{w.hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="bg-muted/60 rounded-tile flex items-start justify-between gap-4 p-3.5">
-            <div className="space-y-0.5">
-              <Label htmlFor="db-member-edit" className="text-sm font-medium">
-                Members can add and edit rows
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                Off: members only read it. Owners and admins always edit, and only they change
-                fields or delete rows for good.
+          {!personal && (
+            <>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Who can see it</legend>
+                <div className="grid gap-2">
+                  {WHO.map((w) => (
+                    <label
+                      key={w.value}
+                      className={cn(
+                        "rounded-tile flex cursor-pointer items-start gap-3 p-3.5 transition-colors",
+                        visibility === w.value
+                          ? "bg-card ring-foreground ring-2"
+                          : "bg-muted/60 hover:bg-muted",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="db-visibility"
+                        value={w.value}
+                        checked={visibility === w.value}
+                        onChange={() => setVisibility(w.value)}
+                        className="accent-primary mt-1"
+                      />
+                      <span className="space-y-0.5">
+                        <span className="flex items-center gap-1.5 text-sm font-medium">
+                          {w.value !== "MEMBERS" && (
+                            <Lock className="size-3.5" aria-hidden="true" />
+                          )}
+                          {w.label}
+                        </span>
+                        <span className="text-muted-foreground block text-xs">{w.hint}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="bg-muted/60 rounded-tile flex items-start justify-between gap-4 p-3.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="db-member-edit" className="text-sm font-medium">
+                    Members can add and edit rows
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Off: members only read it. Owners and admins always edit, and only they change
+                    fields or delete rows for good.
+                  </p>
+                </div>
+                <Switch
+                  id="db-member-edit"
+                  checked={visibility === "MEMBERS" && memberCanEdit}
+                  disabled={visibility !== "MEMBERS"}
+                  onCheckedChange={setMemberCanEdit}
+                />
+              </div>
+              <p className="text-muted-foreground flex gap-2 text-xs">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                The database itself enforces these: other clubs can never read your data, and
+                members can&apos;t open what&apos;s limited to admins, whatever page or link they
+                use.
               </p>
-            </div>
-            <Switch
-              id="db-member-edit"
-              checked={visibility === "MEMBERS" && memberCanEdit}
-              disabled={visibility !== "MEMBERS"}
-              onCheckedChange={setMemberCanEdit}
-            />
-          </div>
-          <p className="text-muted-foreground flex gap-2 text-xs">
-            <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            The database itself enforces these: other clubs can never read your data, and members
-            can&apos;t open what&apos;s limited to admins, whatever page or link they use.
-          </p>
+            </>
+          )}
           {error && (
             <p className={notice.error} role="alert">
               {error}

@@ -171,13 +171,14 @@ describe("the sidebar in each space", () => {
   const nav = (space: Space, showLocked = false) =>
     navSections("me", visibleSidebar(null), { space, showLocked }).flatMap((s) => s.items);
 
-  it("gives Personal its own six: Home, Tasks, Calendar, Files, Find a time and RSVPs", () => {
+  it("gives Personal its own seven: Home, Tasks, Calendar, Files, Databases, Find a time and RSVPs", () => {
     const items = nav(PERSONAL, true);
     expect(items.map((i) => i.label)).toEqual([
       "Home",
       "Tasks",
       "Calendar",
       "Files",
+      "Databases",
       "Find a time",
       "RSVPs",
     ]);
@@ -186,6 +187,7 @@ describe("the sidebar in each space", () => {
       "/app/me/tasks",
       "/app/me/calendar",
       "/app/me/notes",
+      "/app/me/databases",
       "/app/me/calendar/find-a-time",
       "/app/me/calendar/rsvp",
     ]);

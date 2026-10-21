@@ -140,6 +140,13 @@ export interface NoteEditorShellProps {
    */
   collab?: NoteCollabSession | null;
   workspace?: NoteWorkspace;
+  /** A Personal space: the note is its owner's alone, so there's no Share button. */
+  personal?: boolean;
+  /**
+   * Offer "Make tasks from this note" (an AI import): clubs, and Personal
+   * Plus, which has AI; Personal Free doesn't.
+   */
+  canMakeTasks?: boolean;
 }
 
 const EMPTY_WORKSPACE: NoteWorkspace = {
@@ -183,6 +190,8 @@ export function NoteEditorShell({
   sharing,
   collab = null,
   workspace = EMPTY_WORKSPACE,
+  personal = false,
+  canMakeTasks = true,
 }: NoteEditorShellProps) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
@@ -710,13 +719,15 @@ export function NoteEditorShell({
           ) : (
             <Badge variant="secondary">View only</Badge>
           )}
-          <ShareNoteDialog
-            orgId={orgId}
-            orgSlug={orgSlug}
-            noteId={note.id}
-            title={title}
-            sharing={sharing}
-          />
+          {!personal && (
+            <ShareNoteDialog
+              orgId={orgId}
+              orgSlug={orgSlug}
+              noteId={note.id}
+              title={title}
+              sharing={sharing}
+            />
+          )}
           <Button
             type="button"
             variant="outline"
@@ -792,7 +803,7 @@ export function NoteEditorShell({
               },
               { label: "Download Markdown", icon: Download, onSelect: () => void download("md") },
               { label: "Copy link", icon: Link2, onSelect: copyLink, separated: true },
-              {
+              canMakeTasks && {
                 label: "Make tasks from this note",
                 icon: ListChecks,
                 onSelect: () =>

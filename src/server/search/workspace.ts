@@ -30,6 +30,7 @@ import {
   type ServerGroupId,
 } from "@/lib/search/types";
 import { dueDateKey, formatDueKey } from "@/lib/tasks/dates";
+import { LISTED_DEFINITIONS } from "@/server/databases/types";
 import type { TxClient } from "@/server/db/context";
 import { noteVisibleSql } from "@/server/notes/visibility";
 import { listRecent } from "@/server/pins";
@@ -64,6 +65,8 @@ export interface SearchViewer {
   hiddenSections: ReadonlySet<SectionId>;
   /** The published org chart, if any. */
   orgChartVersionId: string | null;
+  /** A Personal space: its databases are its owner's, not the club's. */
+  personal?: boolean;
 }
 
 /** Hits per group in "All"; a filtered search shows more. */
@@ -746,6 +749,7 @@ async function searchDatabases(ctx: Ctx): Promise<SearchGroup> {
     where: {
       organizationId: viewer.orgId,
       archivedAt: null,
+      ...LISTED_DEFINITIONS,
       ...everyWord<Prisma.DatabaseDefinitionWhereInput>(q.terms, (c) => [
         { name: c },
         { key: c },
@@ -769,7 +773,10 @@ async function searchDatabases(ctx: Ctx): Promise<SearchGroup> {
     hit("database", d.key, {
       title: d.name,
       href: `${ctx.base}/databases/${d.key}`,
-      detail: join(DATABASE_KIND[d.kind] ?? null, d.tag),
+      detail: join(
+        d.kind === "CUSTOM" && viewer.personal ? "Database" : (DATABASE_KIND[d.kind] ?? null),
+        d.tag,
+      ),
       meta: null,
       score: scoreFields(
         [

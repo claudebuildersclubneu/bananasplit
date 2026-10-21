@@ -1,6 +1,14 @@
 "use client";
 
-import { CalendarClock, CalendarDays, CheckSquare, Ticket, type LucideIcon } from "lucide-react";
+import {
+  CalendarClock,
+  CalendarDays,
+  CheckSquare,
+  Database,
+  FolderOpen,
+  Ticket,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 import { segmentedItem, segmentedTrack } from "@/components/ui/segmented";
@@ -9,6 +17,8 @@ import { cn } from "@/lib/utils";
 const SHORTCUTS: readonly { path: string; label: string; icon: LucideIcon }[] = [
   { path: "/tasks", label: "Tasks", icon: CheckSquare },
   { path: "/calendar", label: "Calendar", icon: CalendarDays },
+  { path: "/notes", label: "Files", icon: FolderOpen },
+  { path: "/databases", label: "Databases", icon: Database },
   { path: "/calendar/find-a-time", label: "Find a time", icon: CalendarClock },
   { path: "/calendar/rsvp", label: "RSVPs", icon: Ticket },
 ];

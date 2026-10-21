@@ -3,7 +3,7 @@ import { SectionTitle } from "./section-title";
 const FAQS = [
   {
     q: "Do I need a club to make RSVP pages?",
-    a: "No. Every account comes with Personal, free: RSVP pages with sign-ups, waitlists, QR check-in and invite links, plus your own tasks, calendar, availability polls, notes and files (1 GB, or 25 GB with Personal Plus). Start a club when you want to run things with others.",
+    a: "No. Every account comes with Personal, free: RSVP pages with sign-ups, waitlists, QR check-in and invite links, plus your own tasks, calendar, availability polls, notes and files (1 GB, or 25 GB with Personal Plus), and databases. Start a club when you want to run things with others.",
   },
   {
     q: "Does it cost anything to join a club?",

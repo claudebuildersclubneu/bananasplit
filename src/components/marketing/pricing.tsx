@@ -76,7 +76,7 @@ function tiers(signedIn: boolean, checkout: boolean): readonly Tier[] {
       bullets: [
         "Tasks, calendar, find a time and RSVPs",
         <>
-          Notes and files{" "}
+          Notes, files and databases{" "}
           <Badge variant="accent" className="ml-0.5 h-5 px-2 align-[1px] text-[11px]">
             New
           </Badge>
@@ -170,6 +170,7 @@ const SECTIONS: readonly Section[] = [
       { feature: "A calendar and find a time", marks: [true, true, true, true] },
       { feature: "RSVP pages, waitlists and QR check-in", marks: [true, true, true, true] },
       { feature: "Notes and files", marks: [true, true, true, true] },
+      { feature: "Databases and spreadsheets with CSV import", marks: [true, true, true, true] },
       { feature: "Tags and the weekly pulse", marks: [true, true, true, true] },
       { feature: "Join any club", marks: [true, true, true, true] },
     ],
@@ -189,7 +190,10 @@ const SECTIONS: readonly Section[] = [
       { feature: "The club's Overview and weekly updates", marks: [false, false, true, true] },
       { feature: "Member directory and org chart", marks: [false, false, true, true] },
       { feature: "Finance board and reimbursements", marks: [false, false, true, true] },
-      { feature: "Databases with CSV import, and reports", marks: [false, false, true, true] },
+      {
+        feature: "Attendance, sign-up and vote databases, and reports",
+        marks: [false, false, true, true],
+      },
       {
         feature: "Data connections",
         marks: [

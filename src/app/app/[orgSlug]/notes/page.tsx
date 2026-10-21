@@ -8,7 +8,7 @@ import { NotesNewMenu } from "@/components/notes/notes-new-menu";
 import { PageHeader } from "@/components/page-header";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
-import { spaceLimits } from "@/lib/billing/space";
+import { isPersonalSpace, spaceLimits } from "@/lib/billing/space";
 import { sectionLabel } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
@@ -36,7 +36,7 @@ export const metadata: Metadata = { title: "Files" };
  * Files (at /notes): the club's notes and uploaded files in one list, filed
  * in shared folders. "New" starts a blank note or a template, turns a Word
  * document or Google Doc into a note (previewed first), uploads a file, or
- * makes a folder.
+ * makes a folder. In Personal they're all its owner's, with no sharing.
  */
 export default async function NotesPage({
   params,
@@ -50,6 +50,7 @@ export default async function NotesPage({
   // `tab` narrows the list to one kind; without it, notes and files show together.
   const kind = query.tab === "files" || query.tab === "notes" ? query.tab : "all";
   const isAdmin = can({ role }, "settings.view");
+  const personal = isPersonalSpace(org);
 
   const str = (v: unknown) => (typeof v === "string" && v !== "all" ? v : undefined);
   const visibility = str(query.visibility) as "PRIVATE" | "ORGANIZATION" | "SHARED" | undefined;
@@ -147,7 +148,7 @@ export default async function NotesPage({
               limitBytes={storage.limitBytes}
               maxFileBytes={storage.maxFileBytes}
               parts={storageParts}
-              personal={org.kind === "PERSONAL"}
+              personal={personal}
               href={storage.canManage ? `/app/${orgSlug}/settings/plan/storage` : null}
             />
             <NotesNewMenu
@@ -156,6 +157,7 @@ export default async function NotesPage({
               folders={data.folders.map((f) => ({ id: f.id, name: f.name }))}
               currentFolderId={uploadFolder}
               maxFileBytes={storage.maxFileBytes}
+              personal={personal}
             />
           </>
         }
@@ -163,7 +165,12 @@ export default async function NotesPage({
       <SpaceStorageBanner orgSlug={orgSlug} />
       {/* Notes-only view and the trash take no uploads. */}
       {kind !== "notes" && !inTrash && (
-        <FilesDropZone orgId={org.id} folderId={uploadFolder} storage={storage} />
+        <FilesDropZone
+          orgId={org.id}
+          folderId={uploadFolder}
+          storage={storage}
+          personal={personal}
+        />
       )}
       <NotesLibrary
         orgId={org.id}
@@ -219,7 +226,8 @@ export default async function NotesPage({
             files: data.trash.files,
           }
         }
-        filters={<NotesListFilters members={members} />}
+        filters={<NotesListFilters members={members} personal={personal} />}
+        personal={personal}
       />
     </div>
   );

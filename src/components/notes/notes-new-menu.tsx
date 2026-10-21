@@ -133,7 +133,8 @@ function FolderSelect({
  * Files › New: a blank note or one from a template, an uploaded file, a
  * Word document or Google Doc turned into a note (with a preview first, so
  * you see what came across before it's made), or a folder. Everything lands
- * in the folder you're looking at unless you pick another.
+ * in the folder you're looking at unless you pick another. In Personal
+ * there's no one to share with, so nothing asks who can see it: it's yours.
  */
 export function NotesNewMenu({
   orgId,
@@ -141,6 +142,7 @@ export function NotesNewMenu({
   folders,
   currentFolderId,
   maxFileBytes,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
@@ -148,6 +150,8 @@ export function NotesNewMenu({
   currentFolderId: string | null;
   /** The plan's largest file (PLAN_LIMITS), for the upload dialog's copy. */
   maxFileBytes?: number;
+  /** A Personal space: everything is private to its owner. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<Dialogs>(null);
@@ -155,7 +159,7 @@ export function NotesNewMenu({
   const [error, setError] = useState<string | null>(null);
   const [googleUrl, setGoogleUrl] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [visibility, setVisibility] = useState<Visibility>("ORGANIZATION");
+  const [visibility, setVisibility] = useState<Visibility>(personal ? "PRIVATE" : "ORGANIZATION");
   const [folderId, setFolderId] = useState<string | null>(currentFolderId);
   const [keepOriginal, setKeepOriginal] = useState(true);
   const [pending, start] = useTransition();
@@ -325,10 +329,12 @@ export function NotesNewMenu({
           />
         </label>
         <FolderSelect folders={folders} value={folderId} onChange={setFolderId} />
-        <div className="grid gap-1">
-          <span className="text-muted-foreground text-xs font-medium">Who can see it</span>
-          <VisibilityPicker value={visibility} onChange={setVisibility} />
-        </div>
+        {!personal && (
+          <div className="grid gap-1">
+            <span className="text-muted-foreground text-xs font-medium">Who can see it</span>
+            <VisibilityPicker value={visibility} onChange={setVisibility} />
+          </div>
+        )}
         {draft.file && (
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -426,8 +432,9 @@ export function NotesNewMenu({
           <DialogHeader>
             <DialogTitle>New folder</DialogTitle>
             <DialogDescription>
-              Folders are shared with the club; private notes stay private inside them. Drag notes
-              and files onto a folder to file them.
+              {personal
+                ? "Drag notes and files onto a folder to file them."
+                : "Folders are shared with the club; private notes stay private inside them. Drag notes and files onto a folder to file them."}
             </DialogDescription>
           </DialogHeader>
           <NewFolderForm
@@ -552,7 +559,7 @@ export function NotesNewMenu({
               here in the app.
             </DialogDescription>
           </DialogHeader>
-          <VisibilityPicker value={visibility} onChange={setVisibility} />
+          {!personal && <VisibilityPicker value={visibility} onChange={setVisibility} />}
           <FolderSelect folders={folders} value={folderId} onChange={setFolderId} />
           <button
             type="button"

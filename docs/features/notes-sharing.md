@@ -55,6 +55,13 @@ reconnects at once with a token for what they may do now: a viewer who
 became an editor can type, an editor who became a viewer watches, and
 someone who lost access sees "This note is no longer available to you".
 
+## In Personal
+
+A Personal space has one member, so its notes and uploads are always its
+owner's: they're made private, nothing asks who can see them, there's no
+Share button, and Files has no "who can see it" or "added by" filter and no
+lock marks.
+
 ## Tables in notes
 
 The toolbar's **Table** button opens a size picker: hover the grid (up to

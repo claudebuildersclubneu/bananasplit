@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
  * while files are dragged over it. Any number of files at once, one after
  * another, each with its own line. The space's storage sits in the page
  * header beside New note (StorageChip); here, only the largest file the
- * plan takes, and a full space turns the zone off.
+ * plan takes, and a full space turns the zone off. Uploads are shared with
+ * the club, or in Personal private to its owner.
  */
 
 export interface DropZoneStorage {
@@ -40,11 +41,14 @@ export function FilesDropZone({
   orgId,
   folderId,
   storage,
+  personal = false,
 }: {
   orgId: string;
   /** Uploads land in the folder being viewed. */
   folderId: string | null;
   storage: DropZoneStorage;
+  /** A Personal space: uploads are private, like everything there. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -76,6 +80,7 @@ export function FilesDropZone({
       patch(item.key, { state: "uploading" });
       const result = await uploadNoteFile(orgId, file, {
         folderId,
+        visibility: personal ? "PRIVATE" : undefined,
         onProgress: (p) => patch(item.key, { percent: p }),
       });
       if (result.ok) {

@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { can } from "@/lib/auth/permissions";
+import { isPersonalSpace, spaceIncludes } from "@/lib/billing/space";
 import { sectionLabel } from "@/lib/nav/sidebar";
 import { fmtDateTime } from "@/server/databases/format";
 import { listDatabases } from "@/server/databases/views";
@@ -96,7 +97,11 @@ const VISIBILITY_COPY: Record<string, string> = {
   HIDDEN: "Hidden from members",
 };
 
-/** The Databases index: the databases this viewer may open (Settings > Privacy decides). */
+/**
+ * The Databases index: the databases this viewer may open (Settings > Privacy
+ * decides). In Personal, only the ones its owner makes: no built-in club
+ * data, data source or reports.
+ */
 export default async function DatabasesPage({
   params,
   searchParams,
@@ -106,9 +111,16 @@ export default async function DatabasesPage({
   if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role, user, settings } = await getOrgContextBySlug(orgSlug);
+  const personal = isPersonalSpace(organization);
   const isAdmin = can({ role }, "databases.write");
-  const canConnect = can({ role }, "integrations.write");
-  const showReports = Boolean(reportTier(role)) && can({ role }, "reports.view");
+  // A data source fills a club's built-in databases; Personal Plus's data
+  // connection is for calendar sync.
+  const connections = !personal && spaceIncludes(organization, "integrations");
+  const canConnect = connections && can({ role }, "integrations.write");
+  const showReports =
+    spaceIncludes(organization, "reports") &&
+    Boolean(reportTier(role)) &&
+    can({ role }, "reports.view");
 
   const { databases, counts, sync, dataStep, pinned } = await withOrgTx(
     organization.id,
@@ -142,7 +154,7 @@ export default async function DatabasesPage({
           });
         }
       }
-      const sync = isAdmin ? await loadSyncStatus(db, organization.id) : null;
+      const sync = isAdmin && connections ? await loadSyncStatus(db, organization.id) : null;
       const setup = canConnect ? await loadSetupState(db, organization.id) : null;
       const data = setup?.steps.find((s) => s.step.id === "data") ?? null;
       const dataStep: SetupStepView | null = data
@@ -225,7 +237,7 @@ export default async function DatabasesPage({
                   {VISIBILITY_COPY[d.memberVisibility]}
                 </Badge>
               )}
-              {isAdmin && (
+              {isAdmin && !personal && (
                 <Badge variant="secondary" title={`Stored in ${sourceOf(d)}`}>
                   <span
                     aria-hidden="true"
@@ -286,11 +298,15 @@ export default async function DatabasesPage({
       <PageHeader
         title={sectionLabel(settings?.sidebar, "databases")}
         description={summary}
-        actions={isAdmin && <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} />}
+        actions={
+          isAdmin && (
+            <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} personal={personal} />
+          )
+        }
         tabs={<DatabasesTabs orgSlug={orgSlug} showReports={showReports} />}
       />
 
-      {databases.length === 0 ? (
+      {databases.length === 0 && !personal ? (
         <EmptyState
           icon={Database}
           title="No databases are visible to you"
@@ -306,12 +322,21 @@ export default async function DatabasesPage({
         <section aria-labelledby="db-setup" className="space-y-4.5">
           <div className="space-y-1.5">
             <h2 id="db-setup" className="heading text-[17px]">
-              Add your club&apos;s data
+              {personal ? "Make your first database" : <>Add your club&apos;s data</>}
             </h2>
             <p className="text-muted-foreground flex items-start gap-2 text-sm">
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              Everything is stored in Bananasplit and saved as you type: there&apos;s no database to
-              set up, and no other club can see your data.
+              {personal ? (
+                <>
+                  Everything is stored in Bananasplit and saved as you type: there&apos;s no
+                  database to set up, and only you can see them.
+                </>
+              ) : (
+                <>
+                  Everything is stored in Bananasplit and saved as you type: there&apos;s no
+                  database to set up, and no other club can see your data.
+                </>
+              )}
             </p>
           </div>
 
@@ -323,13 +348,15 @@ export default async function DatabasesPage({
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <p className="font-semibold">Make a database</p>
                     <p className="text-muted-foreground text-sm">
-                      A member roster, equipment, merch orders, sponsors: start from a template or
-                      from scratch, with the fields you choose.
+                      {personal
+                        ? "A reading list, your classes, job applications, anything you keep track of: start blank and add the fields you choose."
+                        : "A member roster, equipment, merch orders, sponsors: start from a template or from scratch, with the fields you choose."}
                     </p>
                   </div>
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     trigger={
                       <Button variant="outline">
                         <Plus aria-hidden="true" />
@@ -350,6 +377,7 @@ export default async function DatabasesPage({
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     defaultTemplateId="spreadsheet"
                     trigger={
                       <Button variant="outline">
@@ -388,6 +416,7 @@ export default async function DatabasesPage({
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     defaultMode="import"
                     trigger={
                       <Button variant="outline">
@@ -397,41 +426,46 @@ export default async function DatabasesPage({
                     }
                   />
                 </li>
-                <li className={setupRow}>
-                  <IconChip icon={CalendarDays} />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-semibold">Start from the calendar</p>
-                    <p className="text-muted-foreground text-sm">
-                      No website? Every event you add to the calendar becomes a session here, ready
-                      for check-ins.
-                    </p>
-                  </div>
-                  <Button asChild variant="outline">
-                    <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
-                  </Button>
-                </li>
-                <li className={setupRow}>
-                  <IconChip icon={Globe} />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-semibold">
-                      Already have a club website database?{" "}
-                      <span className="text-muted-foreground font-normal">Optional</span>
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      If your site keeps check-ins, sign-ups and votes in Supabase, connect it and
-                      they sync in. You don&apos;t need one to use Databases.
-                    </p>
-                  </div>
-                  <Button asChild variant={connecting ? "secondary" : "ghost"}>
-                    <Link
-                      href={`/app/${orgSlug}/databases?connect=1#connect`}
-                      scroll={false}
-                      aria-current={connecting ? "step" : undefined}
-                    >
-                      Connect
-                    </Link>
-                  </Button>
-                </li>
+                {/* A club's built-in data: sessions from its calendar, and its website's. */}
+                {!personal && (
+                  <>
+                    <li className={setupRow}>
+                      <IconChip icon={CalendarDays} />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="font-semibold">Start from the calendar</p>
+                        <p className="text-muted-foreground text-sm">
+                          No website? Every event you add to the calendar becomes a session here,
+                          ready for check-ins.
+                        </p>
+                      </div>
+                      <Button asChild variant="outline">
+                        <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
+                      </Button>
+                    </li>
+                    <li className={setupRow}>
+                      <IconChip icon={Globe} />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="font-semibold">
+                          Already have a club website database?{" "}
+                          <span className="text-muted-foreground font-normal">Optional</span>
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                          If your site keeps check-ins, sign-ups and votes in Supabase, connect it
+                          and they sync in. You don&apos;t need one to use Databases.
+                        </p>
+                      </div>
+                      <Button asChild variant={connecting ? "secondary" : "ghost"}>
+                        <Link
+                          href={`/app/${orgSlug}/databases?connect=1#connect`}
+                          scroll={false}
+                          aria-current={connecting ? "step" : undefined}
+                        >
+                          Connect
+                        </Link>
+                      </Button>
+                    </li>
+                  </>
+                )}
               </ul>
             </CardContent>
           </Card>
@@ -450,17 +484,22 @@ export default async function DatabasesPage({
               </CardContent>
             </Card>
           )}
-          {connecting && !dataStep && (
+          {connecting && !dataStep && !personal && (
             <p className="text-muted-foreground text-sm">
               Only owners and admins can connect a data source.
             </p>
           )}
 
-          <p className="text-muted-foreground text-sm">
-            <Link href={`/app/${orgSlug}/databases?all=1`} className="underline underline-offset-2">
-              Show the empty databases anyway
-            </Link>
-          </p>
+          {!personal && (
+            <p className="text-muted-foreground text-sm">
+              <Link
+                href={`/app/${orgSlug}/databases?all=1`}
+                className="underline underline-offset-2"
+              >
+                Show the empty databases anyway
+              </Link>
+            </p>
+          )}
         </section>
       ) : (
         <>
@@ -476,7 +515,7 @@ export default async function DatabasesPage({
               </h2>
               <span className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
                 <ShieldCheck className="size-3.5" aria-hidden="true" />
-                Saved as you type. Only your club can see them.
+                Saved as you type. Only {personal ? "you" : "your club"} can see them.
               </span>
             </div>
             <ul className={GRID}>
@@ -487,6 +526,7 @@ export default async function DatabasesPage({
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     trigger={
                       <button
                         type="button"
