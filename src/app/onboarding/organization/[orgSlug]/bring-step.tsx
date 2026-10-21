@@ -85,17 +85,8 @@ export function BringStep({
         setError(result.error);
         return;
       }
-      // What moved leaves the list; what's left can still come.
-      setShown(
-        shown
-          .map((s) => ({
-            ...s,
-            groups: s.groups
-              .map((g) => ({ ...g, items: g.items.filter((i) => !ticked.has(i.id)) }))
-              .filter((g) => g.items.length > 0),
-          }))
-          .filter((s) => s.groups.length > 0),
-      );
+      // What moved leaves the list, with what came along; what's left can still come.
+      setShown(result.sections);
       setMoved([...moved, result.summary]);
       setTicked(new Set());
     });
