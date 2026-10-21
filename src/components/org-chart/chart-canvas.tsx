@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 import type { ExportNode } from "@/lib/org-chart/export";
 import { effectiveParents, layoutOrgChart, NODE_HEIGHT, NODE_WIDTH } from "@/lib/org-chart/layout";
-import { chartTeams } from "@/lib/org-chart/teams";
+import { chartTeams, type NamedTeam } from "@/lib/org-chart/teams";
 import { nodeVariant, type ChartNodeDTO } from "@/lib/org-chart/types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,8 @@ import { PositionNode, subtitleFor, type PositionFlowNode } from "./position-nod
 
 export interface ChartCanvasProps {
   nodes: readonly ChartNodeDTO[];
+  /** The teams the chart names; without them teams come from its shape. */
+  teams?: readonly NamedTeam[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   /** Center this node; change `nonce` to center it again. */
@@ -81,6 +83,7 @@ function initials(name: string): string {
 
 function Canvas({
   nodes,
+  teams: namedTeams,
   selectedId = null,
   onSelect,
   focus,
@@ -100,7 +103,7 @@ function Canvas({
 
   // Teams (colour slots) and each position's descendants, on the whole chart.
   const { colorOf, descendantsOf, parents, teamLeads } = useMemo(() => {
-    const teams = chartTeams(nodes);
+    const teams = chartTeams(nodes, namedTeams);
     const slotOf = new Map(teams.teams.map((t) => [t.key, t.slot]));
     const colorOf = new Map<string, string>();
     for (const [positionId, teamKey] of teams.teamOfPosition) {
@@ -123,7 +126,7 @@ function Canvas({
       .filter((t) => t.key !== "leadership" && t.leadId && (descendantsOf.get(t.leadId) ?? 0) > 0)
       .map((t) => t.leadId as string);
     return { colorOf, descendantsOf, parents, teamLeads };
-  }, [nodes]);
+  }, [nodes, namedTeams]);
 
   const visible = useMemo(() => {
     if (collapsed.size === 0) return nodes;

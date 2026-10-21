@@ -1,5 +1,6 @@
 "use client";
 
+import type { NamedTeam } from "@/lib/org-chart/teams";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -46,6 +47,8 @@ export interface OutlineEditorProps {
   members: EditorMember[];
   onChange: (next: DraftPosition[]) => void;
   previewNodes: ChartNodeDTO[];
+  /** The teams the draft names, for the preview's colours. */
+  teams?: NamedTeam[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   orgSlug: string;
@@ -118,6 +121,7 @@ export function OutlineEditor({
   members,
   onChange,
   previewNodes,
+  teams,
   selectedId,
   onSelect,
   orgSlug,
@@ -464,6 +468,7 @@ export function OutlineEditor({
           ) : (
             <ChartCanvas
               nodes={previewNodes}
+              teams={teams}
               selectedId={selectedId}
               onSelect={(id) => {
                 onSelect(id);

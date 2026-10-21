@@ -113,6 +113,7 @@ export default async function DraftPage({
     decidesAlone: p.decidesAlone,
     sourceQuote: p.sourceQuote,
     rank: p.rank,
+    teamId: p.teamId,
   }));
 
   return (
@@ -138,6 +139,7 @@ export default async function DraftPage({
             editVersion: version.editVersion,
             warnings: version.warnings,
             openItems: version.openItems,
+            teams: version.teams,
           }}
           positions={positions}
           canInvite={can({ role }, "members.invite")}

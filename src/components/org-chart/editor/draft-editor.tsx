@@ -1,5 +1,6 @@
 "use client";
 
+import type { NamedTeam } from "@/lib/org-chart/teams";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -46,6 +47,7 @@ import { hasErrors, validateChart, type ValidationIssue } from "@/lib/org-chart/
 import type { EditorMember } from "./member-picker";
 import { OutlineEditor } from "./outline-editor";
 import { flattenOutline, OutlineTree } from "./outline-tree";
+import { TeamsEditor } from "./teams-editor";
 import { TitleSync } from "./title-sync";
 import { PositionEditor } from "./position-editor";
 
@@ -74,6 +76,8 @@ export interface DraftEditorProps {
     editVersion: number;
     warnings: ChartWarning[];
     openItems: OpenItem[];
+    /** The teams this draft names. */
+    teams: NamedTeam[];
   };
   positions: DraftPosition[];
   members: EditorMember[];
@@ -100,6 +104,7 @@ export function DraftEditor({
   const searchParams = useSearchParams();
   const [positions, setPositions] = useState<DraftPosition[]>(initial);
   const [openItems, setOpenItems] = useState<OpenItem[]>(version.openItems);
+  const [teams, setTeams] = useState<NamedTeam[]>(version.teams);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const [conflict, setConflict] = useState(false);
@@ -216,6 +221,7 @@ export function DraftEditor({
       versionId: version.id,
       editVersion: editVersionRef.current,
       openItems: openItems.filter((o) => o.question.trim()),
+      teams,
       positions: positions.map((p) => ({
         id: p.id,
         title: p.title,
@@ -230,6 +236,7 @@ export function DraftEditor({
         responsibilities: p.responsibilities.filter((b) => b.trim()),
         decidesAlone: p.decidesAlone.filter((b) => b.trim()),
         rank: p.rank,
+        teamId: p.teamId ?? null,
       })),
     };
     const mark = changes.current;
@@ -333,6 +340,7 @@ export function DraftEditor({
           responsibilities: p.responsibilities,
           decidesAlone: p.decidesAlone,
           rank: p.rank,
+          teamId: p.teamId ?? null,
         };
       }),
     [positions, membersById],
@@ -441,6 +449,7 @@ export function DraftEditor({
           members={members}
           onChange={onTyped}
           previewNodes={previewNodes}
+          teams={teams}
           selectedId={selectedId}
           onSelect={setSelectedId}
           orgSlug={orgSlug}
@@ -498,6 +507,7 @@ export function DraftEditor({
                 {tab === "preview" && (
                   <ChartCanvas
                     nodes={previewNodes}
+                    teams={teams}
                     selectedId={selectedId}
                     onSelect={(id) => {
                       setSelectedId(id);
@@ -541,6 +551,20 @@ export function DraftEditor({
       </div>
 
       )}
+
+      <TeamsEditor
+        teams={teams}
+        positions={positions}
+        members={members}
+        onTeams={(next) => {
+          setTeams(next);
+          changes.current += 1;
+          setDirty(true);
+        }}
+        onAssign={(positionId, teamId) =>
+          update(positions.map((p) => (p.id === positionId ? { ...p, teamId } : p)))
+        }
+      />
 
       <TitleSync
         positions={positions}

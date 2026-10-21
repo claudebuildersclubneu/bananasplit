@@ -37,17 +37,19 @@ import { HashTagHint } from "./tag-menu";
 import { LabelsField, PeopleField, PRIORITY_OPTIONS, STATUS_OPTIONS } from "./task-fields";
 import type { TaskEditorDefaults } from "./task-editor";
 import { useTasks } from "./tasks-context";
+import { useRubberReveal } from "./use-rubber-reveal";
 import { useHashTags } from "./use-hash-tags";
 
 const NONE = "__none";
 
 /**
- * New task, as a centred dialog built like New event
- * (src/components/calendar/event-form-dialog.tsx): a title and a due date
- * are all it takes; the type, owner, priority and where it sits share a
- * row each; description, tags, who else is involved, the status and who
- * can see it fold under More details. Editing an existing task keeps the
- * side panel (TaskDetailSheet), where its subtasks and comments live.
+ * New task, as a centred dialog (editing a task is centred too, in
+ * TaskDetailSheet). The window opens on the essentials, in this order:
+ * title, type and priority, owner and who else, the epic and the due date.
+ * The rest (description, tags, status, who can see it, a start date for
+ * epics and stories) sits just below, reached by scrolling, never a click:
+ * a short scroll stretches and springs back like a rubber band, a longer
+ * one carries on to the details (useRubberReveal).
  */
 export function NewTaskDialog({
   open,
@@ -60,7 +62,7 @@ export function NewTaskDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] gap-4 overflow-x-hidden overflow-y-auto sm:max-w-lg">
+      <DialogContent className="flex h-[min(86vh,640px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         {open && (
           <NewTaskForm
             key={`${defaults?.parentTaskId ?? "top"}-${defaults?.type ?? ""}-${defaults?.status ?? ""}`}
@@ -86,6 +88,9 @@ function NewTaskForm({
   const [isPending, startTransition] = useTransition();
   const saving = useRef(false);
   const moreId = useId();
+  const scroller = useRef<HTMLDivElement>(null);
+  const details = useRef<HTMLDivElement>(null);
+  const band = useRubberReveal(scroller, details);
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TaskTypeValue>(defaults?.type ?? "TASK");
@@ -97,7 +102,6 @@ function NewTaskForm({
   const [dueDate, setDueDate] = useState(defaults?.dueDate ?? "");
   const [startDate, setStartDate] = useState("");
   const [color, setColor] = useState<string | null>(null);
-  const [showMore, setShowMore] = useState(false);
   const [description, setDescription] = useState("");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -148,7 +152,7 @@ function NewTaskForm({
   async function save() {
     setError(null);
     if (status === TaskStatus.BLOCKED && !blockedReason.trim()) {
-      setShowMore(true);
+      band.reveal();
       setError("Say what it's blocked on.");
       return;
     }
@@ -221,9 +225,9 @@ function NewTaskForm({
           void submit(e);
         }
       }}
-      className="contents"
+      className="flex min-h-0 flex-1 flex-col"
     >
-      <DialogHeader>
+      <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
         <DialogTitle>New {noun}</DialogTitle>
         <DialogDescription>
           {isEpic
@@ -232,223 +236,245 @@ function NewTaskForm({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4">
-        <div className="grid content-start gap-1.5">
-          <Label htmlFor="task-title">Title</Label>
-          <Input
-            id="task-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            autoFocus
-            required
-            maxLength={200}
-            placeholder={isEpic ? "e.g. Fall Showcase" : "e.g. Book the room (#tag to tag it)"}
-          />
-          <HashTagHint title={title} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
-          <div className="grid content-start gap-1.5">
-            <Label htmlFor="task-type">Type</Label>
-            <Select value={type} onValueChange={(v) => pickType(v as TaskTypeValue)}>
-              <SelectTrigger id="task-type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {typeChoices.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">
-              {TASK_TYPES.find((t) => t.value === type)?.hint}
-            </p>
-          </div>
-          <div className="grid content-start gap-1.5">
-            <Label htmlFor="task-priority">Priority</Label>
-            <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-              <SelectTrigger id="task-priority" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
-          <div className="grid content-start gap-1.5">
-            <Label htmlFor="task-owner">Owner</Label>
-            <Select
-              value={ownerId ?? NONE}
-              onValueChange={(v) => setOwnerId(v === NONE ? null : v)}
-            >
-              <SelectTrigger id="task-owner" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {!ownerRequired && <SelectItem value={NONE}>Nobody yet</SelectItem>}
-                {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.id === viewer.userId ? `${m.name ?? "Me"} (you)` : (m.name ?? "Member")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {ownerAbove && (
-              <p className="text-warning text-xs">Above your level: this will be flagged.</p>
-            )}
-          </div>
-          {isEpic ? (
+      {/*
+        The essentials fill the window; the rest waits just below. At the top,
+        scrolling down stretches it like a rubber band and springs back
+        (useRubberReveal); pull past the threshold and it glides on to the
+        details. From there it scrolls normally.
+      */}
+      <div
+        ref={scroller}
+        className="min-h-0 flex-1 [scrollbar-width:thin] overflow-x-hidden overflow-y-auto overscroll-contain"
+      >
+        <div
+          style={{ transform: band.offset ? `translateY(${band.offset}px)` : undefined }}
+          className={cn(
+            "min-h-full",
+            band.springing &&
+              "transition-transform duration-500 ease-(--ease-spring) motion-reduce:transition-none",
+          )}
+        >
+          <div
+            className="flex min-h-full flex-col gap-4 px-6 pt-2 pb-4"
+            style={band.pageHeight ? { minHeight: band.pageHeight } : undefined}
+          >
             <div className="grid content-start gap-1.5">
-              <span className="text-sm leading-none font-medium">Colour</span>
-              <div
-                role="radiogroup"
-                aria-label="Epic colour"
-                className="flex flex-wrap gap-1.5 pt-1"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={color === null}
-                  aria-label="Theme colour"
-                  onClick={() => setColor(null)}
-                  className={cn(
-                    "focus-glow hatch bg-muted size-6 rounded-full",
-                    color === null && "ring-foreground ring-offset-card ring-2 ring-offset-2",
-                  )}
-                />
-                {LABEL_COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    role="radio"
-                    aria-checked={color === c}
-                    aria-label={`Colour ${c}`}
-                    onClick={() => setColor(c)}
-                    className={cn(
-                      "focus-glow size-6 rounded-full",
-                      color === c && "ring-foreground ring-offset-card ring-2 ring-offset-2",
-                    )}
-                    style={{ background: c }}
-                  />
-                ))}
-              </div>
+              <Label htmlFor="task-title">Title</Label>
+              <Input
+                id="task-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+                required
+                maxLength={200}
+                placeholder={isEpic ? "e.g. Fall Showcase" : "e.g. Book the room (#tag to tag it)"}
+              />
+              <HashTagHint title={title} />
             </div>
-          ) : (
-            <div className="grid content-start gap-1.5">
-              <Label htmlFor="task-parent">Part of</Label>
-              <Select
-                value={parentTaskId ?? NONE}
-                onValueChange={(v) => setParentTaskId(v === NONE ? null : v)}
-              >
-                <SelectTrigger id="task-parent" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Not in an epic</SelectItem>
-                  {parentChoices
-                    .filter((p) => p.type === "EPIC")
-                    .flatMap((epic) => [
-                      epic,
-                      ...parentChoices.filter(
-                        (s) => s.type === "STORY" && s.parentTaskId === epic.id,
-                      ),
-                    ])
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.type === "EPIC" ? (
-                          <span
-                            aria-hidden
-                            className="size-2 shrink-0 rounded-full"
-                            style={{ background: epicColor(p) }}
-                          />
-                        ) : (
-                          <span aria-hidden className="w-2 shrink-0" />
-                        )}
-                        <span
-                          className={cn("truncate", p.type === "STORY" && "text-muted-foreground")}
-                        >
-                          {p.title}
-                        </span>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-type">Type</Label>
+                <Select value={type} onValueChange={(v) => pickType(v as TaskTypeValue)}>
+                  <SelectTrigger id="task-type" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typeChoices.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
                       </SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">When</legend>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {hasStart && (
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid content-start gap-1.5">
-                <Label htmlFor="task-start">Starts</Label>
-                <Input
-                  id="task-start"
-                  type="date"
-                  value={startDate}
-                  max={dueDate || undefined}
-                  onChange={(e) => setStartDate(e.target.value)}
+                <Label htmlFor="task-priority">Priority</Label>
+                <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                  <SelectTrigger id="task-priority" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-owner">Owner</Label>
+                <Select
+                  value={ownerId ?? NONE}
+                  onValueChange={(v) => setOwnerId(v === NONE ? null : v)}
+                >
+                  <SelectTrigger id="task-owner" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!ownerRequired && <SelectItem value={NONE}>Nobody yet</SelectItem>}
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.id === viewer.userId ? `${m.name ?? "Me"} (you)` : (m.name ?? "Member")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {ownerAbove && (
+                  <p className="text-warning text-xs">Above your level: this will be flagged.</p>
+                )}
+              </div>
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-involved">Who else</Label>
+                <PeopleField
+                  id="task-involved"
+                  value={assigneeIds}
+                  onChange={setAssigneeIds}
+                  exclude={ownerId}
                 />
               </div>
-            )}
-            <div className="grid content-start gap-1.5">
-              <Label htmlFor="task-due">Due</Label>
-              <Input
-                id="task-due"
-                type="date"
-                value={dueDate}
-                min={startDate || undefined}
-                required={dueRequired}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
             </div>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            {dueRequired
-              ? "Every task in this club needs a due date."
-              : "Leave it blank for no due date."}
-          </p>
-        </fieldset>
 
-        <div>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 border-t pt-3 text-sm font-medium transition-colors"
-            aria-expanded={showMore}
-            aria-controls={moreId}
-            onClick={() => setShowMore((v) => !v)}
-          >
-            <ChevronDown
-              aria-hidden
-              className={cn("size-4 transition-transform", showMore && "rotate-180")}
-            />
-            {showMore ? "Fewer details" : "More details"}
-            {!showMore && (
-              <span className="text-muted-foreground/80 ml-1 text-xs font-normal">
-                description, tags, people, status, who can see it
-              </span>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+              {isEpic ? (
+                <div className="grid content-start gap-1.5">
+                  <span className="text-sm leading-none font-medium">Colour</span>
+                  <div
+                    role="radiogroup"
+                    aria-label="Epic colour"
+                    className="flex flex-wrap gap-1.5 pt-1"
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={color === null}
+                      aria-label="Theme colour"
+                      onClick={() => setColor(null)}
+                      className={cn(
+                        "focus-glow hatch bg-muted size-6 rounded-full",
+                        color === null && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                      )}
+                    />
+                    {LABEL_COLOR_PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={color === c}
+                        aria-label={`Colour ${c}`}
+                        onClick={() => setColor(c)}
+                        className={cn(
+                          "focus-glow size-6 rounded-full",
+                          color === c && "ring-foreground ring-offset-card ring-2 ring-offset-2",
+                        )}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid content-start gap-1.5">
+                  <Label htmlFor="task-parent">Epic</Label>
+                  <Select
+                    value={parentTaskId ?? NONE}
+                    onValueChange={(v) => setParentTaskId(v === NONE ? null : v)}
+                  >
+                    <SelectTrigger id="task-parent" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Not in an epic</SelectItem>
+                      {parentChoices
+                        .filter((p) => p.type === "EPIC")
+                        .flatMap((epic) => [
+                          epic,
+                          ...parentChoices.filter(
+                            (s) => s.type === "STORY" && s.parentTaskId === epic.id,
+                          ),
+                        ])
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.type === "EPIC" ? (
+                              <span
+                                aria-hidden
+                                className="size-2 shrink-0 rounded-full"
+                                style={{ background: epicColor(p) }}
+                              />
+                            ) : (
+                              <span aria-hidden className="w-2 shrink-0" />
+                            )}
+                            <span
+                              className={cn(
+                                "truncate",
+                                p.type === "STORY" && "text-muted-foreground",
+                              )}
+                            >
+                              {p.title}
+                            </span>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="task-due">Due</Label>
+                <Input
+                  id="task-due"
+                  type="date"
+                  value={dueDate}
+                  min={startDate || undefined}
+                  required={dueRequired}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+                {dueRequired && (
+                  <p className="text-muted-foreground text-xs">
+                    Every task in this club needs a due date.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-destructive text-sm" role="alert">
+                {error}
+              </p>
             )}
-          </button>
-        </div>
 
-        {showMore && (
-          <div id={moreId} className="space-y-4">
+            {/* The way down to the rest: a nudge, not a button. */}
+            <p
+              aria-hidden="true"
+              className="text-muted-foreground mt-auto flex flex-col items-center gap-0.5 pt-4 text-xs"
+            >
+              {band.offset < -30
+                ? "Keep scrolling for more details"
+                : "Scroll for description, tags, status and who can see it"}
+              <ChevronDown
+                className={cn(
+                  "size-4 transition-transform",
+                  band.offset < -30 ? "translate-y-1" : "motion-safe:animate-bounce",
+                )}
+              />
+            </p>
+          </div>
+
+          <div
+            ref={details}
+            id={moreId}
+            className="flex min-h-full flex-col gap-4 border-t px-6 pt-5 pb-4"
+            style={band.pageHeight ? { minHeight: band.pageHeight } : undefined}
+          >
+            <h3 className="heading text-[15px]">More details</h3>
             <div className="grid content-start gap-1.5">
               <Label htmlFor="task-description">Description</Label>
               <Textarea
                 id="task-description"
                 value={description}
-                rows={3}
+                rows={4}
                 maxLength={20000}
                 placeholder="Markdown works"
                 onChange={(e) => setDescription(e.target.value)}
@@ -461,15 +487,6 @@ function NewTaskForm({
                 labels={labels}
                 value={labelIds}
                 onChange={setLabelIds}
-              />
-            </div>
-            <div className="grid content-start gap-1.5">
-              <Label htmlFor="task-involved">Also involved</Label>
-              <PeopleField
-                id="task-involved"
-                value={assigneeIds}
-                onChange={setAssigneeIds}
-                exclude={ownerId}
               />
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
@@ -511,6 +528,18 @@ function NewTaskForm({
                 )}
               </div>
             </div>
+            {hasStart && (
+              <div className="grid content-start gap-1.5 sm:max-w-[50%]">
+                <Label htmlFor="task-start">Starts</Label>
+                <Input
+                  id="task-start"
+                  type="date"
+                  value={startDate}
+                  max={dueDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+            )}
             {status === TaskStatus.BLOCKED && (
               <div className="grid content-start gap-1.5">
                 <Label htmlFor="task-blocked">Blocked on</Label>
@@ -523,26 +552,23 @@ function NewTaskForm({
                 />
               </div>
             )}
+            {error && (
+              <p className="text-destructive text-sm" role="alert">
+                {error}
+              </p>
+            )}
           </div>
-        )}
-
-        {error && (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
-        )}
+        </div>
       </div>
 
       {confirmElement}
-      <DialogFooter className="flex items-center justify-end">
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isPending || !title.trim()}>
-            {isPending ? "Creating…" : `Create ${noun}`}
-          </Button>
-        </div>
+      <DialogFooter className="m-0 shrink-0 border-t px-6 py-4">
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isPending || !title.trim()}>
+          {isPending ? "Creating…" : `Create ${noun}`}
+        </Button>
       </DialogFooter>
     </form>
   );

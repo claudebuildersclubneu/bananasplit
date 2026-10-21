@@ -4,7 +4,6 @@ import {
   AlarmClock,
   ArrowLeft,
   CalendarRange,
-  ChevronDown,
   CircleCheck,
   CircleDot,
   ClipboardPaste,
@@ -20,14 +19,10 @@ import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
 import { WorkspaceToolbar } from "@/components/tasks/workspace-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CreateSplitButton } from "@/components/ui/create-split-button";
 import { Stat, StatStrip } from "@/components/ui/stat";
 import type { TaskStats } from "@/server/tasks/queries";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   hasModifier,
   isTypingTarget,
@@ -141,54 +136,34 @@ export function WorkspaceHeader({
           )}
 
           {/* New task (the screen's one create), with more ways in its menu. */}
-          {ws.simple ? (
-            <Button variant="create" title="New task (c)" onClick={() => newTask(inEpic)}>
-              <Plus className="size-4" aria-hidden="true" />
-              New task
-            </Button>
-          ) : (
-            <div className="flex">
-              <Button
-                variant="create"
-                className="rounded-r-none pe-3"
-                title="New task (c)"
-                onClick={() => newTask(inEpic)}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                New task
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="create"
-                    className="border-create-foreground/15 rounded-l-none border-l ps-2.5 pe-3"
-                    aria-label="More ways to add tasks"
-                  >
-                    <ChevronDown className="size-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuItem onSelect={() => newTask(inEpic)}>
-                    <Plus className="size-4" aria-hidden="true" />
-                    New task
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => newTask({ type: "EPIC" })}>
-                    <Layers className="size-4" aria-hidden="true" />
-                    New epic
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setImporting(true)}>
-                    <ClipboardPaste className="size-4" aria-hidden="true" />
-                    <span className="flex flex-col">
-                      Paste a list
-                      <span className="text-muted-foreground text-xs">
-                        A to-do list or meeting notes, turned into tasks
-                      </span>
+          <CreateSplitButton
+            label="New task"
+            title="New task (c)"
+            onClick={() => newTask(inEpic)}
+            menuLabel="More ways to add tasks"
+          >
+            {!ws.simple && (
+              <>
+                <DropdownMenuItem onSelect={() => newTask(inEpic)}>
+                  <Plus className="size-4" aria-hidden="true" />
+                  New task
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => newTask({ type: "EPIC" })}>
+                  <Layers className="size-4" aria-hidden="true" />
+                  New epic
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setImporting(true)}>
+                  <ClipboardPaste className="size-4" aria-hidden="true" />
+                  <span className="flex flex-col">
+                    Paste a list
+                    <span className="text-muted-foreground text-xs">
+                      A to-do list or meeting notes, turned into tasks
                     </span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
+                  </span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </CreateSplitButton>
         </div>
       </div>
 

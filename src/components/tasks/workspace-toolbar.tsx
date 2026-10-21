@@ -15,10 +15,13 @@ import {
   Table2,
   Tag,
   UserRound,
+  UsersRound,
+  Globe,
+  Rows3,
   X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Children, useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,30 +67,6 @@ const LAYOUT_ICONS = {
   table: Table2,
   dashboard: Gauge,
 } as const;
-
-function Chip({
-  active,
-  onClick,
-  children,
-  title,
-}: {
-  active?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      className={chipClass(Boolean(active))}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function WorkspaceToolbar() {
   const { org, labels, parentById, members } = useTasks();
@@ -138,17 +117,20 @@ export function WorkspaceToolbar() {
           />
         )}
 
-        {/* Scope: whose work. The team option only exists if you have reports. */}
+        {/*
+          Scope: whose work, as icons that open up to say what they are on
+          hover or focus. The team option only exists if you have reports.
+        */}
         <div className="flex items-center gap-1" role="group" aria-label="Whose tasks">
           {ws.scopes.map((scope) => (
-            <Chip
+            <ExpandChip
               key={scope.value}
+              icon={SCOPE_ICONS[scope.value]}
+              label={scope.label}
               active={ws.query.scope === scope.value && !pinnedMember}
               onClick={() => ws.setScope(scope.value)}
               title={SCOPE_KEYS[scope.value] && `${scope.label} (${SCOPE_KEYS[scope.value]})`}
-            >
-              {scope.label}
-            </Chip>
+            />
           ))}
         </div>
 
@@ -161,6 +143,8 @@ export function WorkspaceToolbar() {
         </FiltersMenu>
 
         <div className="ms-auto flex flex-1 items-center justify-end gap-2 sm:flex-none">
+          {/* How the board is grouped, beside the search: its own menu, not a toggle on the board. */}
+          {ws.query.view === "board" && <GroupMenu />}
           <TaskSearch
             key={ws.query.q ?? ""}
             inputRef={searchRef}
@@ -610,6 +594,85 @@ function StatusFilter() {
   );
 }
 
+const SCOPE_ICONS: Record<string, typeof UserRound> = {
+  mine: UserRound,
+  team: UsersRound,
+  all: Globe,
+};
+
+/**
+ * A chip that is just its icon until you hover or focus it, then opens up
+ * to say what it is (Mine, My team, Everyone). Filled when it's on.
+ */
+function ExpandChip({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  title,
+}: {
+  icon: typeof UserRound;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={label}
+      title={title ?? label}
+      onClick={onClick}
+      className={cn(chipClass(active), "group/expand gap-0 px-3")}
+    >
+      <Icon className="size-4 flex-none" aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity,margin] duration-300 ease-(--ease-ink) group-hover/expand:ms-1.5 group-hover/expand:max-w-32 group-hover/expand:opacity-100 group-focus-visible/expand:ms-1.5 group-focus-visible/expand:max-w-32 group-focus-visible/expand:opacity-100 motion-reduce:transition-none"
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+/** Group the board: none, or a lane per epic (?lanes=epic). */
+function GroupMenu() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const lanes = searchParams.get("lanes") === "epic";
+  const set = (value: "epic" | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("lanes", value);
+    else params.delete("lanes");
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className={chipClass(lanes)} aria-label="Group the board">
+          <Rows3 className="size-3.5" aria-hidden="true" />
+          {lanes ? "Grouped by epic" : "Group"}
+          <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuLabel>Group the board</DropdownMenuLabel>
+        <DropdownMenuItem onSelect={() => set(null)}>
+          No groups
+          {!lanes && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => set("epic")}>
+          <Layers className="size-4" aria-hidden="true" /> By epic
+          {lanes && <Check className="ms-auto size-4" />}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /**
  * The Filters chip. Hover it (or focus it, or tap it) and the filter pills
  * slide out beside it; it stays open while one of their menus is open, and
@@ -617,20 +680,47 @@ function StatusFilter() {
  */
 function FiltersMenu({ count, children }: { count: number; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  const pills = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
+  const pillList = Children.toArray(children);
   const show = () => {
     if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     setOpen(true);
   };
+  // Only a pill's own menu (it lives in a portal) keeps the row out; the
+  // Filters chip's aria-expanded doesn't count, or it would never close.
+  const pillMenuOpen = () =>
+    Boolean(pills.current?.querySelector('[aria-expanded="true"], [data-state="open"]'));
+  // A short grace period, started once: moving the pointer around outside
+  // doesn't keep pushing it back (which made it feel slow to fold).
   const hideSoon = () => {
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) return;
     timer.current = setTimeout(() => {
-      // A pill's menu is open (it lives in a portal): stay out until it closes.
-      if (ref.current?.querySelector('[aria-expanded="true"], [data-state="open"]')) return;
+      timer.current = null;
+      if (pillMenuOpen()) return;
       setOpen(false);
-    }, 250);
+    }, 120);
   };
+
+  // While it's out: once the pointer is anywhere but the chip, the pills or
+  // an open pill menu, fold it away (also after a pill's menu closes with
+  // the pointer already elsewhere, when no pointerleave would fire).
+  useEffect(() => {
+    if (!open) return;
+    const onMove = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (ref.current?.contains(target)) return show();
+      if (target.closest("[data-radix-popper-content-wrapper]")) return;
+      hideSoon();
+    };
+    document.addEventListener("pointermove", onMove);
+    return () => document.removeEventListener("pointermove", onMove);
+    // show/hideSoon only touch refs and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   return (
     <div
       ref={ref}
@@ -656,11 +746,30 @@ function FiltersMenu({ count, children }: { count: number; children: React.React
       <div
         inert={!open}
         className={cn(
-          "grid transition-[grid-template-columns,opacity] duration-200 ease-(--ease-ink) motion-reduce:transition-none",
-          open ? "grid-cols-[1fr] opacity-100" : "pointer-events-none grid-cols-[0fr] opacity-0",
+          "grid transition-[grid-template-columns] duration-[380ms] ease-(--ease-ink) motion-reduce:transition-none",
+          open ? "grid-cols-[1fr]" : "pointer-events-none grid-cols-[0fr]",
         )}
       >
-        <div className="flex min-w-0 items-center gap-1 overflow-hidden p-0.5">{children}</div>
+        {/*
+          The pills slide out one after another, and fold back in the other
+          order (last one first) while the row closes up behind them.
+        */}
+        <div ref={pills} className="flex min-w-0 items-center gap-1 overflow-hidden p-0.5">
+          {pillList.map((pill, i) => (
+            <span
+              key={i}
+              className={cn(
+                "flex transition-[opacity,transform] duration-200 ease-(--ease-ink) motion-reduce:transition-none",
+                open ? "translate-x-0 opacity-100" : "-translate-x-3 opacity-0",
+              )}
+              style={{
+                transitionDelay: `${(open ? i : pillList.length - 1 - i) * 40}ms`,
+              }}
+            >
+              {pill}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { CalendarClock, CalendarSync, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
+import { NewEventButton } from "@/components/calendar/new-event-button";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
@@ -164,6 +165,7 @@ export default async function CalendarPage({
                 </Link>
               </Button>
             )}
+            {canManage && <NewEventButton />}
           </>
         }
       />

@@ -293,6 +293,9 @@ export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): To
   const goal = whiteLabelBlock(dark ? 0.47 : 0.45, 0.085, 165);
   const answerForeground = onFill(accent, palette);
   const inkAccent = !dark && accent.toLowerCase() === text.toLowerCase();
+  // A monochrome dark theme's accent is the pearl text colour, which reads
+  // as grey on a button: create buttons go pure white there instead.
+  const pearlAccent = dark && accent.toLowerCase() === text.toLowerCase();
 
   // Info notes take the brand colour, unless it sits near the danger red
   // (a coral or brick club), where an info note would read as an error:
@@ -333,8 +336,8 @@ export function deriveTokens(roles: ThemeRoles, options: DeriveOptions = {}): To
     "accent-foreground": text,
     "brand-accent": accent,
     "brand-accent-foreground": answerForeground,
-    create: inkAccent ? surface : accent,
-    "create-foreground": inkAccent ? text : answerForeground,
+    create: inkAccent ? surface : pearlAccent ? WHITE : accent,
+    "create-foreground": inkAccent ? text : pearlAccent ? background : answerForeground,
     destructive,
     "destructive-foreground": onFill(destructive, [WHITE, BLACK]),
     success,

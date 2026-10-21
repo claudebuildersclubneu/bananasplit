@@ -2064,6 +2064,9 @@ model OrgChartVersion {
   warnings         Json                  @default("[]")
   /// Optimistic concurrency for the draft editor.
   editVersion      Int                   @default(1)
+  /// The teams this chart names, [{ id, name }] in order (src/lib/org-chart/teams.ts).
+  /// Positions pick one (OrgChartPosition.teamId); copied with the positions.
+  teams                Json      @default("[]")
   createdById      String
   publishedById    String?
   publishedAt      DateTime?
@@ -2106,6 +2109,9 @@ model OrgChartPosition {
   sourceQuote      String[]           @default([])
   /// Fractional-indexing sibling order.
   rank             String
+  /// The team (an id from its version's teams) this position is on; none:
+  /// its manager's team, up to Leadership.
+  teamId           String?
   createdAt        DateTime           @default(now())
 
   version   OrgChartVersion    @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Cascade)

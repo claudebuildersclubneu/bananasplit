@@ -5,15 +5,16 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -22,7 +23,6 @@ import { TaskCard } from "@/components/tasks/task-card";
 import { ProgressBar, TaskTypeChip } from "@/components/tasks/task-type";
 import { useTasks } from "@/components/tasks/tasks-context";
 import type { TaskItem } from "@/components/tasks/types";
-import { chipClass } from "@/components/ui/segmented";
 import { TaskStatus } from "@/generated/prisma/enums";
 import { STATUS_ORDER, statusTransitionData } from "@/lib/tasks/status";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,24 @@ function parseDropId(id: string): { lane: string | null; status: TaskStatus } | 
   const [a, b] = id.includes(":") ? id.split(":") : [null, id];
   return b && STATUSES.has(b) ? { lane: a, status: b as TaskStatus } : null;
 }
+
+/**
+ * Where a dragged card is over: what's under the pointer (a card there, for
+ * its place in the order, else the column), never the dragged card's own
+ * placeholder, falling back to the biggest overlap when the pointer is in a
+ * gap. closestCorners measured corner distances, so a short or empty target
+ * column usually lost to a card back in the source column and the card
+ * snapped home.
+ */
+const boardCollision: CollisionDetection = (args) => {
+  const droppableContainers = args.droppableContainers.filter((c) => c.id !== args.active.id);
+  const within = pointerWithin({ ...args, droppableContainers });
+  if (within.length > 0) {
+    const card = within.find((c) => parseDropId(String(c.id)) === null);
+    return card ? [card] : within;
+  }
+  return rectIntersection({ ...args, droppableContainers });
+};
 
 /**
  * The kanban board (react-query holds the optimistic order). Cards are the
@@ -262,25 +280,12 @@ export function KanbanBoard({
   return (
     <>
       {blockedPrompt}
-      {hasEpics && (
-        <div className="mb-4 flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={showLanes}
-            onClick={() => setParam("lanes", showLanes ? null : "epic")}
-            className={chipClass(showLanes)}
-          >
-            <Layers aria-hidden="true" />
-            Swimlanes by epic
-          </button>
-        </div>
-      )}
       <DndContext
         // A fixed id: dnd-kit's own counter differs between the server and
         // the browser, which broke hydration (aria-describedby).
         id="tasks-kanban"
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={boardCollision}
         onDragStart={handleDragStart}
         onDragEnd={(e) => void handleDragEnd(e)}
         onDragCancel={() => setActiveTask(null)}

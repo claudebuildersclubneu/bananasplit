@@ -1,17 +1,15 @@
 "use client";
 
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 import { TaskEditor, type TaskEditorDefaults } from "./task-editor";
 import type { TaskItem } from "./types";
 
 /**
- * The one task surface.
- *
- * A side panel rather than a centred modal: you keep the list you came from
- * in view, which matters when you are working down a week or dragging a
- * board. On a phone it takes the full width, because there is nothing to
- * keep in view anyway.
+ * The one task surface: a centred window, like New task and the epic
+ * dialog, so creating and editing always happen in the same place in the
+ * middle of the screen (never a panel from the side). Its body scrolls;
+ * the header and footer stay put.
  *
  * It renders once, at the top of the workspace, and every layout opens it
  * through useTasks().openTask / showTask. Purely presentational: the
@@ -36,17 +34,16 @@ export function TaskDetailSheet({
   const heading = task ? task.title : defaults?.parentTaskId ? "New subtask" : "New task";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
         aria-busy={busy}
         showCloseButton={false}
-        className="bg-background gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[460px]"
+        className="bg-background flex h-[min(88vh,860px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[640px]"
       >
-        <SheetTitle className="sr-only">{heading}</SheetTitle>
-        <SheetDescription className="sr-only">
+        <DialogTitle className="sr-only">{heading}</DialogTitle>
+        <DialogDescription className="sr-only">
           Edit this task, its people, its subtasks, its comments and who can see it.
-        </SheetDescription>
+        </DialogDescription>
         {open && (
           <TaskEditor
             key={
@@ -59,7 +56,7 @@ export function TaskDetailSheet({
             onOpenTask={onOpenTask}
           />
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
