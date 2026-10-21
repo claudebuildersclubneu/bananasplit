@@ -69,6 +69,8 @@ Every number lives in `src/lib/billing/features.ts` (`PLAN_LIMITS`,
 - **Send to a club** (`src/server/storage/send-to-club.ts`): a copy of a
   Personal note or file into one of your clubs, shared there and counted
   toward the club's storage.
+  Moving them instead (Move to a club, below) takes the originals, with
+  their ids, history and comments.
 
 ## Sign-up and onboarding
 
@@ -139,8 +141,9 @@ had hidden Polls (Find a time) or Calendar (RSVPs).
 
 The last club setup step (`/onboarding/organization/{slug}/bring`, B7)
 lists the creator's Personal event pages, other calendar events (upcoming
-and the last month), availability and question polls, and open top-level
-tasks and epics in one list, none ticked; skipped when there's nothing to bring.
+and the last month), availability and question polls, open top-level
+tasks and epics, folders, top-level notes and uploads in one list, none
+ticked; skipped when there's nothing to bring.
 `?bring={id}`, or the item remembered by "Start a club" on
 `/app/{personal slug}/move?item={id}` (Move to a club), starts ticked.
 `/app/{personal slug}/move` also lists the clubs you own or run, each
@@ -156,3 +159,44 @@ responses, options and votes; a poll's scheduled event comes along. Tasks
 move with subtasks, comments, activity and reminders; labels are matched in
 the club by name or made there. (Projects became epics, which move like
 any top-level task.)
+
+Files (added 2026-10-21, migration `20261021120000_move_personal_files`,
+same function; `src/server/personal/move-files.ts`):
+
+- **What comes along.** A folder brings its live notes and uploads; a note
+  brings every live sub-page under it and the uploads it (or a sub-page)
+  shows as an image or a file card. So the list's Files section leaves out
+  uploads a live note shows: they move with their note. Notes keep their
+  ids, comments and version history; uploads keep their ids.
+- **Private to you.** Personal content is its owner's alone, and it stays
+  that way in the club: moved notes and uploads land PRIVATE to the mover
+  (a note's "every member can edit" is off and any share dropped) until
+  they share them.
+- **Folders** are matched in the club by name (case-insensitive) or made
+  there with the same name and colour. A picked folder moves itself (id
+  kept) when the club has no folder of that name; otherwise its contents go
+  into the club's, and the Personal folder goes. Trashed notes and uploads
+  stay in Personal's trash, let go of anything that moved (a sub-page in
+  the trash ends up at the top level).
+- **Upload bytes.** They are stored under the space's id
+  (`files/{orgId}/...`), so the app copies each one under the club's id
+  before the move and deletes the Personal copy after it commits; a failed
+  move deletes the copies instead (and the storage sweep catches any
+  left). The function refuses (40001, "try again") when a copy is missing,
+  so a file never moves without its bytes.
+- **Image links.** A note's images link to `/api/orgs/{orgId}/files/{id}`.
+  The move points them at the club in the body, the live document (rebuilt
+  by the app with the same edit an autosave makes, so comment anchors keep
+  their places) and the version history. A Personal note that stays but
+  shows a moved upload loses that image; links between pages that moved
+  and pages that stayed stop opening.
+- **Storage.** Uploads and note history count toward the club's storage
+  after the move (and stop counting in Personal), so the move goes through
+  the club's upload gate: not paused, each file within its plan's largest
+  file, and room for all of it, checked before copying and again in the
+  move's transaction. Crossing 80% sends the usual notice.
+
+Not built yet: custom databases. They need Databases in Personal
+(`claude/personal-files-databases`, which hides the built-ins with
+`LISTED_DEFINITIONS`), then the same move with a new key when the club
+already uses theirs.
