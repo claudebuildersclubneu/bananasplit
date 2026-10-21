@@ -32,6 +32,7 @@ import { importGoogleEvents } from "@/app/app/[orgSlug]/calendar/sync/actions";
 import { authDb, disconnectAll } from "@/server/db/clients";
 import { withSystemOrgTx } from "@/server/db/context";
 import { resolveOrgMailRouting } from "@/server/email/mailer";
+import { NO_PUBLIC_CALENDAR } from "@/server/google-calendar/requests";
 import { getSecret, setSecret } from "@/server/secrets";
 import { secretLast4 } from "@/server/secrets/fingerprint";
 import { createOrganization } from "@/server/settings/org-creation";
@@ -45,6 +46,7 @@ import {
   resolveActor,
   saveClaude,
   saveEmailSender,
+  saveGoogleCalendars,
   saveNetlifyHook,
   sendTestEmail,
 } from "./service";
@@ -388,6 +390,29 @@ describe.skipIf(!dbReady)("integrations against the local database", () => {
     expect(await callback(first.state, first.cookie)).toBe("wrong_user");
   });
 
+  it("nothing is imported before a public calendar is chosen, nor once public mirroring is off", async () => {
+    // Connected above with no calendar chosen yet.
+    expect(await importGoogleEvents(orgId, "dry-run")).toEqual({ error: NO_PUBLIC_CALENDAR });
+    const actor = await resolveActor(orgId);
+    expect(
+      await saveGoogleCalendars(orgId, actor, {
+        publicCalendarId: null,
+        internalCalendarId: "events@group.calendar.google.com",
+      }),
+    ).toMatchObject({ ok: true });
+    const dto = (await loadIntegrations(orgId)).find((d) => d.provider === "GOOGLE_CALENDAR")!;
+    expect(dto.config).toMatchObject({
+      publicCalendarId: null,
+      internalCalendarId: "events@group.calendar.google.com",
+    });
+    expect(await importGoogleEvents(orgId, "dry-run")).toEqual({ error: NO_PUBLIC_CALENDAR });
+    const jobs = await client.query(
+      `SELECT id FROM "Job" WHERE "organizationId" = $1 AND kind = 'google-import'`,
+      [orgId],
+    );
+    expect(jobs.rows).toHaveLength(0);
+  });
+
   it("disconnect stops the connection and queues the Google revoke", async () => {
     const actor = await resolveActor(orgId);
     expect(await disconnectGoogle(orgId, actor)).toMatchObject({ ok: true });
@@ -405,6 +430,13 @@ describe.skipIf(!dbReady)("integrations against the local database", () => {
     sessionUser.current = owner;
     const { cookie, state } = await start(orgId);
     expect(await callback(state, cookie)).toBe("connected");
+    // Reconnecting keeps the choice: still no public calendar, still nothing to import.
+    expect(await importGoogleEvents(orgId, "dry-run")).toEqual({ error: NO_PUBLIC_CALENDAR });
+    expect(
+      await saveGoogleCalendars(orgId, await resolveActor(orgId), {
+        publicCalendarId: "club@gmail.example",
+      }),
+    ).toMatchObject({ ok: true });
     // The Google Calendar settings page's import card (the calendar's SyncPanel) runs this action.
     expect(await importGoogleEvents(orgId, "dry-run")).toEqual({});
     const importJob = await client.query(

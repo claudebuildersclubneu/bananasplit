@@ -572,8 +572,9 @@ export function GoogleCalendarPanel({
             }
           >
             <p className="text-muted-foreground text-sm">
-              Bananasplit asks only to manage the events it creates and to list your calendars. It
-              never reads other events.
+              Bananasplit asks to manage events on the calendars you own and to list your calendars.
+              It adds and changes only the events it mirrors. It reads your other events only when
+              you run the import, and only on the public events calendar you choose.
             </p>
           </SettingsCard>
         </form>
@@ -619,6 +620,10 @@ export function GoogleCalendarPanel({
                     </option>
                   ))}
                 </select>
+                <p className="text-muted-foreground text-[13px]">
+                  The import reads existing events from this calendar too. Without one, public
+                  events stay off Google and nothing is imported.
+                </p>
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="gcal-internal">Internal events calendar (optional)</Label>
