@@ -3770,7 +3770,7 @@ runSuite("rls-phases", async ({ tcase, clients }) => {
       ('of_PA_trip','org_PA','tickets.txt','text/plain',30,'files/org_PA/trip01','PRIVATE','u_adminA','nf_PA_trips'),
       ('of_PB','org_PB','b.txt','text/plain',5,'files/org_PB/b01','PRIVATE','u_ownerB',NULL);
     INSERT INTO "Note" ("id","organizationId","title","contentJson","contentText","visibility","authorId","updatedById","updatedAt","folderId","yjsState") VALUES
-      ('n_PA','org_PA','Packing','{"type":"doc","content":[{"type":"image","attrs":{"src":"/api/orgs/org_PA/files/of_PA_img","fileId":"of_PA_img"}}]}','','PRIVATE','u_adminA','u_adminA',now(),'nf_PA_docs','\x00'::bytea);
+      ('n_PA','org_PA','Packing','{"type":"doc","content":[{"type":"image","attrs":{"src":"/api/orgs/org_PA/files/of_PA_img","fileId":"of_PA_img"}}]}','','PRIVATE','u_adminA','u_adminA',now(),'nf_PA_docs',decode('00','hex'));
     INSERT INTO "Note" ("id","organizationId","parentId","title","contentJson","contentText","visibility","authorId","updatedById","updatedAt","deletedAt") VALUES
       ('n_PA_sub','org_PA','n_PA','Day one','{"type":"doc"}','','PRIVATE','u_adminA','u_adminA',now(),NULL),
       ('n_PA_old','org_PA','n_PA','Old plan','{"type":"doc"}','','PRIVATE','u_adminA','u_adminA',now(),now());

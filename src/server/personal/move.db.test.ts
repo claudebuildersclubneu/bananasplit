@@ -503,7 +503,7 @@ describe("Bring anything in? against the local database", () => {
     });
     const history = (await ownerDb.noteVersion.findUniqueOrThrow({ where: { id: ids.version } }))
       .sizeBytes;
-    const bytes = files.reduce((n, f) => n + f.sizeBytes, 0) + history;
+    const fileBytes = files.reduce((n, f) => n + f.sizeBytes, 0);
     const [clubBefore, spaceBefore] = [await storageUsed(clubId), await storageUsed(spaceId)];
 
     const result = await movePersonalItems(maya.id, clubId, {
@@ -584,9 +584,11 @@ describe("Bring anything in? against the local database", () => {
     const opened = await openNoteFile(clubId, up.image);
     expect(opened?.row.contentType).toBe("image/png");
 
-    // Their bytes and the history count in the club now, not in Personal.
-    expect(await storageUsed(clubId)).toBe(clubBefore + bytes);
-    expect(await storageUsed(spaceId)).toBe(spaceBefore - bytes);
+    // Their bytes and the history count in the club now, not in Personal
+    // (the version's size changed with its link: the ids differ in length).
+    expect(version.sizeBytes).toBe(history + clubId.length - spaceId.length);
+    expect(await storageUsed(clubId)).toBe(clubBefore + fileBytes + version.sizeBytes);
+    expect(await storageUsed(spaceId)).toBe(spaceBefore - fileBytes - history);
 
     const b = await loadBringable(maya.id);
     expect(b!.notes).toEqual([]);

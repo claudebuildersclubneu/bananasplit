@@ -4,7 +4,8 @@
 -- alongside its events, polls and tasks. Same function, five more
 -- arguments, all optional, so a call with the first six still means what
 -- it did (20261013190000_move_personal_items, which documents events,
--- polls and tasks; that part is unchanged below except where noted).
+-- polls and tasks, as 20261020130000_projects_into_epics left it, without
+-- projectId; that part is unchanged below except where noted).
 --
 -- app.move_personal_items(p_from_org, p_to_org, p_event_ids, p_poll_ids,
 --                         p_question_poll_ids, p_task_ids,
@@ -366,7 +367,6 @@ BEGIN
 
     UPDATE public."Task" t
        SET "organizationId" = p_to_org,
-           "projectId" = NULL,
            "parentTaskId" = NULL,
            "ownerId" = CASE
              WHEN t."ownerId" IS NOT NULL AND EXISTS (
