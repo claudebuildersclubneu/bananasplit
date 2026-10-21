@@ -64,6 +64,22 @@ export function formatUsed(used: number, limit: number): string {
   return text;
 }
 
+/**
+ * Bytes in the unit the plan's allowance is given in, the way the guide
+ * writes the meter: "0 GB of 500 GB", "62.4 GB of 100 GB", "312 MB of
+ * 1 GB" stays "0.3 GB". One decimal, trailing ".0" dropped; anything above
+ * zero but under a tenth reads "<0.1 GB", so a used space never shows 0.
+ */
+export function formatInLimitUnit(bytes: number, limit: number): string {
+  const unit = limit >= GB ? GB : MB;
+  const name = unit === GB ? "GB" : "MB";
+  const n = Math.max(0, bytes) / unit;
+  if (n === 0) return `0 ${name}`;
+  if (n < 0.1) return `<0.1 ${name}`;
+  // Never round up to look full: floor to the tenth.
+  return `${trim(Math.floor(n * 10) / 10, 1)} ${name}`;
+}
+
 /** What the gate needs to know about the space. */
 export interface StorageSpace extends SpaceInfo {
   /** Organization.storageUsedBytes (a BIGINT: Prisma hands back a bigint). */

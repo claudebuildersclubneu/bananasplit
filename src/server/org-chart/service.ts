@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { parseNamedTeams, type NamedTeam } from "@/lib/org-chart/teams";
 import { z } from "zod";
 
 import {
@@ -383,13 +384,15 @@ export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
   let writes: PositionWrite[] = [];
   let openItems: Prisma.InputJsonValue = [];
   let warnings: Prisma.InputJsonValue = [];
+  let teams: Prisma.InputJsonValue = [];
   if (from === "current") {
     if (!active) throw new OrgChartError("There is no published chart to edit yet. Start a blank draft instead.", 409);
     const source = await db.orgChartVersion.findFirst({
       where: { id: active, organizationId },
-      select: { openItems: true, positions: { select: positionSelect } },
+      select: { openItems: true, teams: true, positions: { select: positionSelect } },
     });
     if (!source) throw new OrgChartError("The published chart could not be loaded.", 404);
+    teams = source.teams as Prisma.InputJsonValue;
     const members = await memberIndex(db, organizationId);
     writes = rowsToWrites(source.positions, { memberIds: members.ids, userNames: members.names });
     openItems = source.openItems as Prisma.InputJsonValue;
@@ -435,6 +438,7 @@ export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
       parseMethod: from === "starter" ? OrgChartParseMethod.TEMPLATE : OrgChartParseMethod.MANUAL,
       openItems,
       warnings,
+      teams,
       createdById: ctx.userId,
     },
   });
@@ -463,9 +467,14 @@ export const SaveDraftSchema = z.object({
         responsibilities: z.array(z.string().max(2000)).max(100),
         decidesAlone: z.array(z.string().max(2000)).max(100),
         rank: z.string().max(200),
+        teamId: z.string().min(1).max(40).nullable().optional(),
       }),
     )
     .max(LIMITS.positions),
+  teams: z
+    .array(z.object({ id: z.string().min(1).max(40), name: z.string().trim().min(1).max(60) }))
+    .max(40)
+    .optional(),
   openItems: z.array(z.object({ who: z.string().max(1000), question: z.string().max(2000) })).max(100),
 });
 
@@ -496,6 +505,7 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
     data: {
       editVersion: { increment: 1 },
       openItems: normalizeOpenItems(input.openItems) as unknown as Prisma.InputJsonValue,
+      ...(input.teams ? { teams: input.teams as unknown as Prisma.InputJsonValue } : {}),
     },
   });
   if (bumped.count !== 1) {
@@ -523,6 +533,20 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
   const existingById = new Map(existing.map((e) => [e.id, e]));
   const members = await memberIndex(db, organizationId);
   const clientIds = new Set(input.positions.map((p) => p.id));
+
+  // A position can only be on a team the draft names.
+  const teamIds = new Set(
+    (
+      input.teams ??
+      ((
+        await db.orgChartVersion.findFirst({
+          where: { id: input.versionId, organizationId },
+          select: { teams: true },
+        })
+      )?.teams as { id: string }[] | undefined) ??
+      []
+    ).map((t) => t.id),
+  );
 
   const takenKeys = new Set<string>();
   for (const p of input.positions) {
@@ -558,6 +582,7 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
       decidesAlone: cleanBullets(p.decidesAlone, LIMITS.bullets, LIMITS.bullet),
       sourceQuote: row?.sourceQuote ?? [],
       rank: RANK.test(p.rank) ? p.rank : null,
+      teamId: p.teamId && teamIds.has(p.teamId) ? p.teamId : null,
     };
   });
 
@@ -726,6 +751,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
       number: true,
       status: true,
       openItems: true,
+      teams: true,
       positions: { select: positionSelect, orderBy: [{ rank: "asc" }, { id: "asc" }] },
     },
   });
@@ -750,6 +776,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
       source: OrgChartSource.ROLLBACK,
       basedOnVersionId: source.id,
       openItems: source.openItems as Prisma.InputJsonValue,
+      teams: source.teams as Prisma.InputJsonValue,
       createdById: ctx.userId,
     },
   });
@@ -858,6 +885,8 @@ export interface VersionDetail {
     openItems: OpenItem[];
     warnings: ChartWarning[];
     isActive: boolean;
+    /** The teams this version names (src/lib/org-chart/teams.ts). */
+    teams: NamedTeam[];
   };
   positions: (PositionRow & { user: UserPublic | null })[];
 }
@@ -886,6 +915,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
       publishedAt: true,
       openItems: true,
       warnings: true,
+      teams: true,
       positions: {
         select: { ...positionSelect, user: { select: userPublicSelect } },
         orderBy: [{ rank: "asc" }, { id: "asc" }],
@@ -894,7 +924,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
   });
   if (!row) return null;
   const active = await activeVersionId(db, organizationId);
-  const { positions, openItems, warnings, parseReport, parseUsage, ...version } = row;
+  const { positions, openItems, warnings, parseReport, parseUsage, teams, ...version } = row;
   const usage = (parseUsage ?? null) as { costUsd?: number | null } | null;
   return {
     version: {
@@ -904,6 +934,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
       parseReport: parseReport && typeof parseReport === "object" ? (parseReport as unknown as ParseReport) : null,
       parseCostUsd: typeof usage?.costUsd === "number" ? usage.costUsd : null,
       isActive: row.id === active,
+      teams: parseNamedTeams(teams),
     },
     positions,
   };

@@ -82,6 +82,8 @@ export interface ChartNodeDTO {
   responsibilities: string[];
   decidesAlone: string[];
   rank: string;
+  /** The team it's on (src/lib/org-chart/teams.ts). */
+  teamId?: string | null;
 }
 
 /** How a node renders: a linked member, a placeholder (named but not on the portal) or an open hire. */

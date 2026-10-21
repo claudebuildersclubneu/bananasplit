@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SpaceInfo } from "./space";
 import {
   crossesWarning,
+  formatInLimitUnit,
   formatStorage,
   formatUsed,
   storageLevel,
@@ -133,5 +134,17 @@ describe("formatStorage", () => {
     expect(formatUsed(100 * GB - 1024, 100 * GB)).toBe("99.9 GB");
     expect(formatUsed(100 * GB, 100 * GB)).toBe("100 GB");
     expect(formatUsed(62 * GB, 100 * GB)).toBe("62 GB");
+  });
+});
+
+describe("formatInLimitUnit", () => {
+  const GB = 1024 ** 3;
+  const MB = 1024 ** 2;
+  it("reads the meter in the allowance's unit, as the guide writes it", () => {
+    expect(formatInLimitUnit(0, 500 * GB)).toBe("0 GB");
+    expect(formatInLimitUnit(62.45 * GB, 100 * GB)).toBe("62.4 GB");
+    expect(formatInLimitUnit(312 * MB, 1 * GB)).toBe("0.3 GB");
+    expect(formatInLimitUnit(18 * 1024, 500 * GB)).toBe("<0.1 GB");
+    expect(formatInLimitUnit(5 * MB, 512 * MB)).toBe("5 MB");
   });
 });

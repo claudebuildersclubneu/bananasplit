@@ -1,5 +1,6 @@
 "use client";
 
+import type { NamedTeam } from "@/lib/org-chart/teams";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
@@ -26,6 +27,7 @@ export function ChartView({
   orgSlug,
   orgName,
   nodes,
+  teams,
   mode,
   listFallback,
   canEdit,
@@ -36,6 +38,8 @@ export function ChartView({
   /** Printed on the exported chart. */
   orgName?: string;
   nodes: ChartNodeDTO[];
+  /** The teams the chart names (src/lib/org-chart/teams.ts). */
+  teams?: NamedTeam[];
   mode: "chart" | "list";
   /** The server-rendered list (list view, and the canvas fallback). */
   listFallback: React.ReactNode;
@@ -111,6 +115,7 @@ export function ChartView({
           <div className={cn("absolute inset-0", !ready && "invisible")}>
             <ChartCanvas
               nodes={nodes}
+              teams={teams}
               selectedId={selected?.id ?? null}
               onSelect={onSelect}
               focus={focus}

@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 
+import { parseNamedTeams, type NamedTeam } from "@/lib/org-chart/teams";
 import { OrgChartVersionStatus } from "@/generated/prisma/client";
 import { orgChart } from "@/server/cache/tags";
 import { withSystemOrgTx } from "@/server/db/context";
@@ -39,6 +40,7 @@ export interface ChartPosition {
   responsibilities: string[];
   decidesAlone: string[];
   rank: string;
+  teamId: string | null;
 }
 
 export interface PublishedOrgChart {
@@ -47,6 +49,8 @@ export interface PublishedOrgChart {
   /** ISO timestamp (cached payloads are JSON). */
   publishedAt: string | null;
   positions: ChartPosition[];
+  /** The teams it names (src/lib/org-chart/teams.ts). */
+  teams: NamedTeam[];
 }
 
 async function loadPublishedOrgChart(orgId: string): Promise<PublishedOrgChart | null> {
@@ -62,7 +66,7 @@ async function loadPublishedOrgChart(orgId: string): Promise<PublishedOrgChart |
         organizationId: orgId,
         status: OrgChartVersionStatus.PUBLISHED,
       },
-      select: { id: true, number: true, publishedAt: true },
+      select: { id: true, number: true, publishedAt: true, teams: true },
     });
     if (!version) return null;
     const positions = await db.orgChartPosition.findMany({
@@ -80,6 +84,7 @@ async function loadPublishedOrgChart(orgId: string): Promise<PublishedOrgChart |
         responsibilities: true,
         decidesAlone: true,
         rank: true,
+        teamId: true,
         user: { select: userPublicSelect },
       },
     });
@@ -88,6 +93,7 @@ async function loadPublishedOrgChart(orgId: string): Promise<PublishedOrgChart |
       number: version.number,
       publishedAt: version.publishedAt ? version.publishedAt.toISOString() : null,
       positions,
+      teams: parseNamedTeams(version.teams),
     };
   });
 }

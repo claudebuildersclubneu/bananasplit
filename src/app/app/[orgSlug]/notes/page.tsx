@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 
 import { SpaceStorageBanner } from "@/components/billing/space-storage-banner";
+import { StorageChip } from "@/components/billing/storage-chip";
+import { FilesDropZone } from "@/components/notes/files-drop-zone";
 import { NotesLibrary } from "@/components/notes/notes-library";
 import { NotesNewMenu } from "@/components/notes/notes-new-menu";
 import { PageHeader } from "@/components/page-header";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
 import { can } from "@/lib/auth/permissions";
+import { spaceLimits } from "@/lib/billing/space";
 import { sectionLabel } from "@/lib/nav/sidebar";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listDeletedNoteFiles, listNoteFiles } from "@/server/notes/files";
@@ -14,6 +17,8 @@ import { countNoteShares } from "@/server/notes/sharing";
 import { noteVisibleWhere } from "@/server/notes/visibility";
 import { listPins } from "@/server/pins";
 import { planGate } from "@/server/billing/plan-gate";
+import { canManageStorage, readStorageUsed } from "@/server/storage/quota";
+import { storageBreakdown } from "@/server/storage/usage";
 
 import { NotesListFilters } from "./notes-list-filters";
 import {
@@ -107,6 +112,19 @@ export default async function NotesPage({
     };
   }).catch(handleAuthErrorInPage);
 
+  const limits = spaceLimits(org);
+  const [usedBytes, storageParts] = await Promise.all([
+    readStorageUsed(org.id),
+    storageBreakdown(org.id),
+  ]);
+  const storage = {
+    usedBytes,
+    limitBytes: limits.storageBytes,
+    maxFileBytes: limits.maxFileBytes,
+    canManage: canManageStorage(role),
+  };
+  const uploadFolder = folderId && folderId !== "none" ? folderId : null;
+
   const members = data.memberships.map((m) => ({
     userId: m.userId,
     name: m.user.name,
@@ -122,15 +140,31 @@ export default async function NotesPage({
       <PageHeader
         title={sectionLabel(settings?.sidebar, "notes")}
         actions={
-          <NotesNewMenu
-            orgId={org.id}
-            orgSlug={orgSlug}
-            folders={data.folders.map((f) => ({ id: f.id, name: f.name }))}
-            currentFolderId={folderId && folderId !== "none" ? folderId : null}
-          />
+          <>
+            {/* The space's storage, split by what uses it, beside the create button. */}
+            <StorageChip
+              usedBytes={storage.usedBytes}
+              limitBytes={storage.limitBytes}
+              maxFileBytes={storage.maxFileBytes}
+              parts={storageParts}
+              personal={org.kind === "PERSONAL"}
+              href={storage.canManage ? `/app/${orgSlug}/settings/plan/storage` : null}
+            />
+            <NotesNewMenu
+              orgId={org.id}
+              orgSlug={orgSlug}
+              folders={data.folders.map((f) => ({ id: f.id, name: f.name }))}
+              currentFolderId={uploadFolder}
+              maxFileBytes={storage.maxFileBytes}
+            />
+          </>
         }
       />
       <SpaceStorageBanner orgSlug={orgSlug} />
+      {/* Notes-only view and the trash take no uploads. */}
+      {kind !== "notes" && !inTrash && (
+        <FilesDropZone orgId={org.id} folderId={uploadFolder} storage={storage} />
+      )}
       <NotesLibrary
         orgId={org.id}
         orgSlug={orgSlug}

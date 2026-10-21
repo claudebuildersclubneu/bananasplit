@@ -1,11 +1,12 @@
 "use client";
 
 import { FileSpreadsheet, ListChecks, Plus, Receipt } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { ItemMenu } from "@/components/item-menu";
-import { Button } from "@/components/ui/button";
+import { CreateSplitButton } from "@/components/ui/create-split-button";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 import { TransactionDialog } from "./transaction-dialog";
 
@@ -17,9 +18,9 @@ const CREATE: Record<Create, { label: string; icon: typeof Plus }> = {
 };
 
 /**
- * Finance's header actions, the same on every finance page: one primary
- * button and, for owners and treasurers, a "…" menu with the rest (the
- * other kind of new entry, Import, the setup guide). A treasurer's primary
+ * Finance's header actions, the same on every finance page: the shared
+ * create split button, its chevron holding the rest for owners and
+ * treasurers (the other kind of new entry, Import, the setup guide). A treasurer's primary
  * is Add transaction, or Request a reimbursement on their own
  * reimbursements; everyone else can only ask to be paid back.
  */
@@ -45,32 +46,42 @@ export function FinanceActions({
     !isFinance || pathname === `${base}/my-reimbursements` ? "request" : "transaction";
   const other: Create = primary === "request" ? "transaction" : "request";
   const PrimaryIcon = CREATE[primary].icon;
+  const OtherIcon = CREATE[other].icon;
 
   return (
     <>
-      <Button type="button" variant="create" onClick={() => setOpen(primary)}>
-        <PrimaryIcon className="size-4" aria-hidden="true" />
-        {CREATE[primary].label}
-      </Button>
-      {isFinance && (
-        <ItemMenu
-          label="More finance actions"
-          items={[
-            {
-              label: CREATE[other].label,
-              icon: CREATE[other].icon,
-              onSelect: () => setOpen(other),
-            },
-            {
-              label: "Import a spreadsheet",
-              icon: FileSpreadsheet,
-              href: `${base}/import`,
-              separated: true,
-            },
-            { label: "Setup guide", icon: ListChecks, href: `${base}/setup` },
-          ]}
-        />
-      )}
+      <CreateSplitButton
+        label={CREATE[primary].label}
+        icon={<PrimaryIcon className="size-4" aria-hidden="true" />}
+        onClick={() => setOpen(primary)}
+        menuLabel="More finance actions"
+      >
+        {isFinance && (
+          <>
+            <DropdownMenuItem onSelect={() => setOpen(primary)}>
+              <PrimaryIcon className="size-4" aria-hidden="true" />
+              {CREATE[primary].label}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setOpen(other)}>
+              <OtherIcon className="size-4" aria-hidden="true" />
+              {CREATE[other].label}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={`${base}/import`}>
+                <FileSpreadsheet className="size-4" aria-hidden="true" />
+                Import a spreadsheet
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`${base}/setup`}>
+                <ListChecks className="size-4" aria-hidden="true" />
+                Setup guide
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
+      </CreateSplitButton>
       <TransactionDialog
         orgId={orgId}
         open={open !== null}

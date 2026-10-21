@@ -11,10 +11,12 @@ import {
   type PricedPlan,
 } from "@/lib/billing/features";
 import { CLUB_PLANS, dollars, PERSONAL_PLANS } from "@/lib/billing/plans";
-import { spaceStatus, trialDaysLeft } from "@/lib/billing/space";
+import { spaceLimits, spaceStatus, trialDaysLeft } from "@/lib/billing/space";
 import { formatStorage } from "@/lib/billing/storage";
+import { StorageMeter } from "@/components/billing/storage-meter";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { readStorageUsed } from "@/server/storage/quota";
+import { storageBreakdown } from "@/server/storage/usage";
 
 import { SettingsNoAccess } from "../settings-no-access";
 import { PlanCards, type PlanCard } from "./plan-cards";
@@ -105,7 +107,10 @@ export default async function PlanSettingsPage({
   const status = spaceStatus(organization);
   const days = trialDaysLeft(organization);
   const canSwitch = can({ role }, "org.plan.write");
-  const usedBytes = await readStorageUsed(organization.id);
+  const [usedBytes, storageParts] = await Promise.all([
+    readStorageUsed(organization.id),
+    storageBreakdown(organization.id),
+  ]);
   const [first, second] = planChoicesFor(organization.kind);
   const cards = [card(first!, null), card(second!, first!)];
 
@@ -144,6 +149,15 @@ export default async function PlanSettingsPage({
         orgSlug={organization.slug}
         title={status === "paused" ? "Choose a plan" : "Plan and storage"}
         description={summary}
+      />
+      <StorageMeter
+        usedBytes={usedBytes}
+        limitBytes={spaceLimits(organization).storageBytes}
+        maxFileBytes={spaceLimits(organization).maxFileBytes}
+        planName={PLAN_NAMES[organization.plan]}
+        parts={storageParts}
+        personal={personal}
+        href={`/app/${organization.slug}/settings/plan/storage`}
       />
       <PlanCards
         orgId={organization.id}

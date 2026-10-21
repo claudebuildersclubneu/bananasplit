@@ -70,12 +70,14 @@ export default async function OrgChartPage({
     responsibilities: p.responsibilities,
     decidesAlone: p.decidesAlone,
     rank: p.rank,
+    teamId: p.teamId,
   }));
+  const namedTeams = chart?.teams ?? [];
 
   const hrefFor = (key: string) =>
     `${base}?${mode === "list" ? "view=list&" : ""}position=${encodeURIComponent(key)}`;
 
-  const teamCount = chartTeams(nodes).teams.length;
+  const teamCount = chartTeams(nodes, namedTeams).teams.length;
   const openCount = nodes.filter((n) => n.isOpen).length;
   const published =
     chart &&
@@ -121,6 +123,7 @@ export default async function OrgChartPage({
             orgSlug={orgSlug}
             orgName={organization.name}
             nodes={nodes}
+            teams={namedTeams}
             mode={mode}
             canEdit={canEdit}
             draftHref={draftHref}

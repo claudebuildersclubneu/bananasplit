@@ -3,7 +3,6 @@
 import { generateJSON, generateText } from "@tiptap/core";
 import {
   CalendarDays,
-  ChevronDown,
   FileText,
   FileUp,
   FolderPlus,
@@ -13,7 +12,6 @@ import {
   Loader2,
   Lock,
   NotebookPen,
-  Plus,
   Target,
   Upload,
   Users,
@@ -26,6 +24,7 @@ import { importNote } from "@/app/app/[orgSlug]/notes/actions";
 import { DocumentPreview } from "@/components/notes/file-preview";
 import { NewFolderForm } from "@/components/notes/new-folder-form";
 import { Button } from "@/components/ui/button";
+import { CreateSplitButton } from "@/components/ui/create-split-button";
 import {
   Dialog,
   DialogContent,
@@ -35,17 +34,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
+import { formatStorage } from "@/lib/billing/storage";
 import { NOTE_FILE_ACCEPT } from "@/lib/files/types";
 import { uploadNoteFile } from "@/lib/files/upload";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
@@ -143,11 +140,14 @@ export function NotesNewMenu({
   orgSlug,
   folders,
   currentFolderId,
+  maxFileBytes,
 }: {
   orgId: string;
   orgSlug: string;
   folders: { id: string; name: string }[];
   currentFolderId: string | null;
+  /** The plan's largest file (PLAN_LIMITS), for the upload dialog's copy. */
+  maxFileBytes?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<Dialogs>(null);
@@ -370,68 +370,56 @@ export function NotesNewMenu({
 
   return (
     <>
-      {/* The commonest thing after a new note, one click away (also under New). */}
-      <Button type="button" variant="outline" size="sm" onClick={() => show("upload")}>
-        <Upload className="size-4" aria-hidden="true" />
-        Upload
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="create" size="sm" disabled={pending}>
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Plus className="size-4" aria-hidden="true" />
-            )}
-            New
-            <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuItem onSelect={() => fromTemplate(null)}>
-            <NotebookPen className="size-4" aria-hidden="true" />
-            New note
-          </DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <LayoutTemplate className="size-4" aria-hidden="true" />
-              Note from a template
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-64">
-              {NOTE_TEMPLATES.map((t) => {
-                const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
-                return (
-                  <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
-                    <Icon className="size-4" aria-hidden="true" />
-                    <span className="flex flex-col">
-                      {t.title}
-                      <span className="text-muted-foreground text-xs">{t.description}</span>
-                    </span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => show("upload")}>
-            <Upload className="size-4" aria-hidden="true" />
-            Upload a file
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => show("word")}>
-            <FileText className="size-4" aria-hidden="true" />
-            Import a Word document
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => show("google")}>
-            <Globe className="size-4" aria-hidden="true" />
-            Import a Google Doc
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => show("folder")}>
-            <FolderPlus className="size-4" aria-hidden="true" />
-            New folder
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* New note, with every other way to add something under its chevron. */}
+      <CreateSplitButton
+        label="New note"
+        pending={pending}
+        onClick={() => fromTemplate(null)}
+        menuLabel="More ways to add notes and files"
+      >
+        <DropdownMenuItem onSelect={() => fromTemplate(null)}>
+          <NotebookPen className="size-4" aria-hidden="true" />
+          New note
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <LayoutTemplate className="size-4" aria-hidden="true" />
+            Note from a template
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-64">
+            {NOTE_TEMPLATES.map((t) => {
+              const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
+              return (
+                <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
+                  <Icon className="size-4" aria-hidden="true" />
+                  <span className="flex flex-col">
+                    {t.title}
+                    <span className="text-muted-foreground text-xs">{t.description}</span>
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => show("upload")}>
+          <Upload className="size-4" aria-hidden="true" />
+          Upload a file
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => show("word")}>
+          <FileText className="size-4" aria-hidden="true" />
+          Import a Word document
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => show("google")}>
+          <Globe className="size-4" aria-hidden="true" />
+          Import a Google Doc
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => show("folder")}>
+          <FolderPlus className="size-4" aria-hidden="true" />
+          New folder
+        </DropdownMenuItem>
+      </CreateSplitButton>
 
       <Dialog open={open === "folder"} onOpenChange={(o) => setOpen(o ? "folder" : null)}>
         <DialogContent className="sm:max-w-sm">
@@ -559,8 +547,9 @@ export function NotesNewMenu({
           <DialogHeader>
             <DialogTitle>Upload a file</DialogTitle>
             <DialogDescription>
-              PDFs, Word, PowerPoint, Excel, images, text and CSV, up to 4 MB. It opens right here
-              in the app.
+              PDFs, Word, PowerPoint, Excel, images, text and CSV
+              {maxFileBytes ? `, up to ${formatStorage(maxFileBytes)} each` : ""}. It opens right
+              here in the app.
             </DialogDescription>
           </DialogHeader>
           <VisibilityPicker value={visibility} onChange={setVisibility} />

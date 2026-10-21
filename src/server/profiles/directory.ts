@@ -1,6 +1,6 @@
 import { Prisma, type Role } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/permissions";
-import { chartTeams, type ChartTeams } from "@/lib/org-chart/teams";
+import { chartTeams, parseNamedTeams, type ChartTeams } from "@/lib/org-chart/teams";
 import { parseStoredLinks, type ProfileLink } from "@/lib/profile/links";
 import { effectiveTimezone } from "@/lib/profile/timezone";
 import { parseQuery } from "@/lib/search/text";
@@ -116,11 +116,22 @@ export async function loadChartForPeople(db: Db, organizationId: string): Promis
           isAdvisor: true,
           isOpen: true,
           rank: true,
+          teamId: true,
           user: { select: userPublicSelect },
         },
       })
     : [];
-  return { positions, teams: chartTeams(positions) };
+  const named = versionId
+    ? parseNamedTeams(
+        (
+          await db.orgChartVersion.findFirst({
+            where: { id: versionId, organizationId },
+            select: { teams: true },
+          })
+        )?.teams,
+      )
+    : [];
+  return { positions, teams: chartTeams(positions, named) };
 }
 
 function teamNamesByUser(teams: ChartTeams): Map<string, string> {
