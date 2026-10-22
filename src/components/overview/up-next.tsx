@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { BlockCard } from "@/components/ui/block-card";
 import type { UpNextSlot } from "@/lib/overview/up-next";
+import { cn } from "@/lib/utils";
 import type { UpNextBlock } from "@/server/overview/up-next";
 
 import { FaceStack, OpenLink } from "./bits";
@@ -25,7 +26,7 @@ export function UpNext({
         <h2 id="up-next-heading" className="heading text-[17px]">
           Up next
         </h2>
-        <span className="text-muted-foreground text-sm">The next 7 days</span>
+        <span className="text-muted-foreground text-sm max-md:hidden">The next 7 days</span>
         <span className="flex-1" />
         <OpenLink href={calendarHref} label="Open the calendar" />
       </div>
@@ -35,8 +36,9 @@ export function UpNext({
           Nothing needs you this week: no deadlines, votes or meetings.
         </div>
       ) : (
-        <div className="-mx-1 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-1 pb-1.5 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
-          {slots.map(({ item, moreAlerts }) => (
+        <div className="-mx-1 flex snap-x snap-mandatory [scrollbar-width:none] gap-3.5 overflow-x-auto px-1 pb-1.5 max-sm:-mx-4 max-sm:scroll-px-4 max-sm:px-4 sm:grid sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
+          {/* A phone: just the next one, full width (the ↗ opens the rest). */}
+          {slots.map(({ item, moreAlerts }, index) => (
             <BlockCard
               key={`${item.kind}:${item.id}`}
               tone={item.tone}
@@ -44,14 +46,8 @@ export function UpNext({
               title={item.title}
               subtitle={item.subtitle}
               href={item.href}
-              figure={
-                moreAlerts > 0 ? `+${moreAlerts}` : item.figure
-              }
-              figureLabel={
-                moreAlerts > 0
-                  ? `more due today or overdue`
-                  : item.figureLabel
-              }
+              figure={moreAlerts > 0 ? `+${moreAlerts}` : item.figure}
+              figureLabel={moreAlerts > 0 ? `more due today or overdue` : item.figureLabel}
               aside={<FaceStack people={item.faces} total={item.facesTotal} />}
               action={
                 <Link
@@ -62,7 +58,11 @@ export function UpNext({
                   <ArrowUpRight className="size-4" aria-hidden="true" />
                 </Link>
               }
-              className="min-h-[13.75rem] w-[82%] shrink-0 snap-start sm:w-auto"
+              className={cn(
+                "min-h-[13.75rem] w-[82%] shrink-0 snap-start max-sm:min-h-44 sm:w-auto",
+                "max-md:w-full",
+                index > 0 && "max-md:hidden",
+              )}
             />
           ))}
         </div>

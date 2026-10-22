@@ -388,7 +388,7 @@
 
 /*
  * Liquid glass, for floating chrome only (the collapsed sidebar and its
- * peek, the tool capsule, toasts, the phone tab bar, the section nav):
+ * peek, the tool capsule, toasts, the phone menu button, the section nav):
  * the chrome colour, frosted, with an inner edge and a top highlight.
  * Chromium also bends the backdrop through an SVG displacement filter
  * (#lg-refract, mounted once by the app shell) when the root has

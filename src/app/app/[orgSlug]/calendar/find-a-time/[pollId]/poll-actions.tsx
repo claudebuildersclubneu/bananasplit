@@ -19,6 +19,9 @@ import { deletePoll } from "../../polls/actions";
  * "…" menu for the rest. Delete is for the poll's creator or an owner/admin
  * (deletePoll checks again). Left alone, a poll deletes itself 10 days after
  * the last day it offers (src/lib/polls/expiry.ts).
+ *
+ * `compact` (a phone's): all of it in the one "…" menu, Delete last, and no
+ * pin, as a task's page has it.
  */
 export function AvailabilityPollActions({
   orgId,
@@ -28,6 +31,7 @@ export function AvailabilityPollActions({
   isOpen,
   canDelete,
   scheduled,
+  compact = false,
 }: {
   orgId: string;
   orgSlug: string;
@@ -38,6 +42,7 @@ export function AvailabilityPollActions({
   canDelete: boolean;
   /** A scheduled poll's event stays on the calendar. */
   scheduled: boolean;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [confirmElement, confirm] = useConfirm();
@@ -55,6 +60,37 @@ export function AvailabilityPollActions({
     if (!deleted) return;
     toast({ title: "Poll deleted", description: title });
     router.push(`/app/${orgSlug}/calendar/find-a-time`);
+  }
+
+  if (compact) {
+    return (
+      <>
+        {confirmElement}
+        <ItemMenu
+          label="Poll actions"
+          items={[
+            isOpen && {
+              label: "Copy guest link",
+              icon: UserPlus,
+              onSelect: () => copyGuestPollLink(pollId),
+            },
+            { label: "Copy member link", icon: Link2, onSelect: () => copyPollLink(href) },
+            isOpen && {
+              label: "Open guest view",
+              icon: ExternalLink,
+              onSelect: () => window.open(`/poll/${pollId}`, "_blank", "noopener,noreferrer"),
+            },
+            canDelete && {
+              label: "Delete poll",
+              icon: Trash2,
+              destructive: true,
+              separated: true,
+              onSelect: () => void remove(),
+            },
+          ]}
+        />
+      </>
+    );
   }
 
   return (

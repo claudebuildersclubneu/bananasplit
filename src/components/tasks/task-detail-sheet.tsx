@@ -1,6 +1,7 @@
 "use client";
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 import { TaskEditor, type TaskEditorDefaults } from "./task-editor";
 import type { TaskItem } from "./types";
@@ -10,8 +11,8 @@ import type { TaskItem } from "./types";
  *
  * A side panel rather than a centred modal: you keep the list you came from
  * in view, which matters when you are working down a week or dragging a
- * board. On a phone it takes the full width, because there is nothing to
- * keep in view anyway.
+ * board. On a phone it is a card in the middle of the screen, as New event
+ * is, rather than a panel down the side.
  *
  * It renders once, at the top of the workspace, and every layout opens it
  * through useTasks().openTask / showTask. Purely presentational: the
@@ -41,7 +42,14 @@ export function TaskDetailSheet({
         side="right"
         aria-busy={busy}
         showCloseButton={false}
-        className="bg-background gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[460px]"
+        className={cn(
+          "bg-background gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[460px]",
+          // A phone: the event form's card (DialogContent) instead of a side panel.
+          "max-md:bg-popover max-md:ring-foreground/6 max-md:rounded-card max-md:shadow-e2 max-md:overflow-hidden max-md:border-0 max-md:ring-1",
+          "max-md:-translate-x-1/2 max-md:-translate-y-1/2 max-md:data-[side=right]:inset-auto max-md:data-[side=right]:top-1/2 max-md:data-[side=right]:left-1/2",
+          "max-md:data-[side=right]:h-[min(85svh,46rem)] max-md:data-[side=right]:w-[calc(100%-2rem)]",
+          "max-md:data-open:zoom-in-95 max-md:data-closed:zoom-out-95 max-md:data-[side=right]:data-open:slide-in-from-right-0 max-md:data-[side=right]:data-closed:slide-out-to-right-0",
+        )}
       >
         <SheetTitle className="sr-only">{heading}</SheetTitle>
         <SheetDescription className="sr-only">

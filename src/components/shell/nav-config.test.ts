@@ -4,14 +4,7 @@ import { settingsNavItems, isSettingsItemActive } from "@/app/app/[orgSlug]/sett
 
 import { resolveSidebar, sectionLabel, toConfig, visibleSidebar } from "@/lib/nav/sidebar";
 
-import {
-  createActions,
-  isExactPage,
-  isLinkActive,
-  navSections,
-  tabBarLinks,
-  type NavSection,
-} from "./nav-config";
+import { createActions, isExactPage, isLinkActive, navSections } from "./nav-config";
 
 const links = (raw: unknown = null) =>
   navSections("cbc", visibleSidebar(raw)).flatMap((s) => s.items);
@@ -239,46 +232,9 @@ describe("the sidebar in each space", () => {
   });
 });
 
-describe("the phone tab bar and the create menu", () => {
+describe("the create menu", () => {
   const sections = (space: Space, raw: unknown = null, showLocked = false) =>
     navSections("me", visibleSidebar(raw), { space, showLocked });
-  const hrefs = (tabs: ReturnType<typeof tabBarLinks>) => ({
-    home: tabs.home?.href,
-    tasks: tabs.tasks?.href,
-    calendar: tabs.calendar?.href,
-  });
-
-  it("puts a club's Overview, Tasks and Calendar on the tab bar", () => {
-    expect(hrefs(tabBarLinks(sections(club("SOCIETY"))))).toEqual({
-      home: "/app/me",
-      tasks: "/app/me/tasks",
-      calendar: "/app/me/calendar",
-    });
-    expect(tabBarLinks(sections(club("SOCIETY"))).home?.label).toBe("Overview");
-  });
-
-  it("puts Personal's Home first", () => {
-    const tabs = tabBarLinks(sections(PERSONAL));
-    expect(tabs.home?.label).toBe("Home");
-    expect(hrefs(tabs)).toEqual({
-      home: "/app/me",
-      tasks: "/app/me/tasks",
-      calendar: "/app/me/calendar",
-    });
-  });
-
-  it("leaves off a section the club hid or the plan locks, and keeps the club's names", () => {
-    const groups = resolveSidebar(null);
-    groups[0].items.find((i) => i.id === "calendar")!.hidden = true;
-    groups[0].items.find((i) => i.id === "tasks")!.label = "To-dos";
-    const tabs = tabBarLinks(sections(club("SOCIETY"), toConfig(groups)));
-    expect(tabs.calendar).toBeUndefined();
-    expect(tabs.tasks?.label).toBe("To-dos");
-    const locked: NavSection[] = [
-      { id: "main", label: null, items: [{ ...item("Tasks"), locked: true }] },
-    ];
-    expect(tabBarLinks(locked).tasks).toBeUndefined();
-  });
 
   it("offers what the space has: task, event, note, poll and Find a time", () => {
     const all = createActions(sections(club("SOCIETY")), { canCreateEvents: true });

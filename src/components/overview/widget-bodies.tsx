@@ -74,28 +74,31 @@ export interface WeekDay {
   events: { id: string; title: string; time: string }[];
 }
 
-/** Seven day tiles, today in the accent. */
+/**
+ * Seven day tiles, today in the accent. On a phone they stack as one row
+ * per day (the day on the left, its events beside it), so a free day is a
+ * line, not a tall empty tile.
+ */
 export function WeekStrip({ orgSlug, days }: { orgSlug: string; days: WeekDay[] }) {
   return (
-    <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
+    <ol className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1 max-sm:gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
       {days.map((d) => (
         <li
           key={d.key}
           aria-current={d.isToday ? "date" : undefined}
           className={cn(
             "rounded-tile flex min-h-28 min-w-0 flex-col gap-2 p-3",
-            d.isToday
-              ? "bg-brand-accent text-brand-accent-foreground glow-halo"
-              : "bg-muted/60",
+            "max-sm:min-h-0 max-sm:flex-row max-sm:items-start max-sm:gap-3 max-sm:py-2.5",
+            d.isToday ? "bg-brand-accent text-brand-accent-foreground glow-halo" : "bg-muted/60",
           )}
         >
-          <p className="flex items-baseline gap-1.5">
+          <p className="flex items-baseline gap-1.5 max-sm:w-24 max-sm:shrink-0">
             <span className={cn("text-[13px] font-medium", !d.isToday && "text-muted-foreground")}>
               {d.isToday ? "Today" : d.weekday}
             </span>
             <span className="numeral text-[22px]">{d.date}</span>
           </p>
-          <ul className="space-y-1.5">
+          <ul className="space-y-1.5 max-sm:min-w-0 max-sm:flex-1 max-sm:self-center">
             {d.events.length === 0 && (
               <li className={cn("text-[12px]", d.isToday ? "opacity-70" : "text-muted-foreground")}>
                 Free
@@ -127,7 +130,13 @@ export function WeekStrip({ orgSlug, days }: { orgSlug: string; days: WeekDay[] 
   );
 }
 
-const TICK_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-4)", "var(--chart-3)", "var(--chart-5)"];
+const TICK_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-4)",
+  "var(--chart-3)",
+  "var(--chart-5)",
+];
 
 /** "today" and "tomorrow" read lower-case mid-sentence; day names keep their capital. */
 function closesWord(word: string): string {
@@ -153,7 +162,10 @@ export function PollList({
         title="No open polls"
         description="Questions to vote on and times to find show here."
         action={
-          <Link href={`/app/${orgSlug}/calendar/polls`} className="text-sm font-semibold underline underline-offset-4">
+          <Link
+            href={`/app/${orgSlug}/calendar/polls`}
+            className="text-sm font-semibold underline underline-offset-4"
+          >
             Start a poll
           </Link>
         }
@@ -215,7 +227,10 @@ export function NoteList({
         size="compact"
         title="No notes yet"
         action={
-          <Link href={`/app/${orgSlug}/notes`} className="text-sm font-semibold underline underline-offset-4">
+          <Link
+            href={`/app/${orgSlug}/notes`}
+            className="text-sm font-semibold underline underline-offset-4"
+          >
             Write the first one
           </Link>
         }
@@ -227,7 +242,9 @@ export function NoteList({
       {notes.map((n) => (
         <li key={n.id} className="min-w-0">
           <Link href={`/app/${orgSlug}/notes/${n.id}`} className={tileClass}>
-            <TileIcon>{n.visibility === "PRIVATE" ? <Lock aria-label="Private" /> : <NotebookText />}</TileIcon>
+            <TileIcon>
+              {n.visibility === "PRIVATE" ? <Lock aria-label="Private" /> : <NotebookText />}
+            </TileIcon>
             <TileText
               title={n.title || "Untitled note"}
               sub={`${n.updatedBy?.name ?? "Someone"} · ${formatDistanceToNow(n.updatedAt, { addSuffix: true })}`}
@@ -265,7 +282,10 @@ export function FileList({
               <TileIcon>
                 <Icon />
               </TileIcon>
-              <TileText title={f.name} sub={formatDistanceToNow(f.createdAt, { addSuffix: true })} />
+              <TileText
+                title={f.name}
+                sub={formatDistanceToNow(f.createdAt, { addSuffix: true })}
+              />
             </Link>
           </li>
         );

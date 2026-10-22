@@ -209,7 +209,8 @@ export function PollForm({
               disabled={{ before: today }}
               max={MAX_DATES}
               aria-labelledby="poll-dates-label"
-              className="w-fit rounded-lg border [--cell-size:--spacing(9)]"
+              // Bigger days on a phone, so the month fills the width.
+              className="w-fit rounded-lg border [--cell-size:--spacing(9)] max-md:[--cell-size:--spacing(11)]"
             />
           </div>
           <div className="grid content-start gap-1.5">

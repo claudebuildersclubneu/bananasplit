@@ -18,10 +18,13 @@ import { useEffect, useState } from "react";
 
 import { ActionItemsImport } from "@/components/ai/action-items-import";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
+import { OpenTasksBar, taskStatsSegments } from "@/components/tasks/open-tasks-bar";
 import { WorkspaceToolbar } from "@/components/tasks/workspace-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PHONE_SMALL_CREATE } from "@/components/page-header";
 import { Stat, StatStrip } from "@/components/ui/stat";
+import { cn } from "@/lib/utils";
 import type { TaskStats } from "@/server/tasks/queries";
 import {
   DropdownMenu,
@@ -117,18 +120,19 @@ export function WorkspaceHeader({
   }, [startNew, newTask, projectId, searchParams, router, pathname]);
 
   return (
-    <div className="mb-[30px] space-y-[30px]">
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <h1 className="page-title mr-auto">{title}</h1>
+    <div className="mb-[30px] space-y-[30px] max-md:mb-5 max-md:space-y-4">
+      {/* On a phone: the title, and New task at the top right (Projects is in Filters). */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3 max-md:flex-nowrap max-md:items-center">
+        <h1 className="page-title mr-auto max-md:min-w-0">{title}</h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={cn("flex flex-wrap items-center gap-2", PHONE_SMALL_CREATE)}>
           {inDestination ? (
             <Button variant="ghost" onClick={() => ws.setView("board")}>
               <ArrowLeft className="size-4" aria-hidden="true" />
               Back to tasks
             </Button>
           ) : (
-            <Button variant="outline" asChild>
+            <Button variant="outline" className="max-md:hidden" asChild>
               <Link href={`/app/${org.slug}/tasks/projects`}>
                 <FolderKanban className="size-4" aria-hidden="true" />
                 Projects
@@ -198,8 +202,16 @@ export function WorkspaceHeader({
         </div>
       </div>
 
+      {/*
+        A phone gets the numbers as one row: how many are open, and one bar,
+        to scale, of what's overdue, due this week, for later and done this
+        week (the colours; the bar's label reads them out).
+      */}
       {!inDestination && stats && (
-        <StatStrip>
+        <OpenTasksBar open={stats.open} className="md:hidden" segments={taskStatsSegments(stats)} />
+      )}
+      {!inDestination && stats && (
+        <StatStrip className="max-md:hidden">
           <Stat icon={CircleDot} value={stats.open} label="Open" />
           <Stat icon={CalendarRange} value={stats.dueThisWeek} label="Due this week" />
           <Stat

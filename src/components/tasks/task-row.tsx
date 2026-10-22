@@ -89,7 +89,8 @@ export function TaskRow({
         <span className="flex min-w-0 items-center gap-1.5">
           {priv && <PrivateMark />}
           {task.type === "STORY" && <TaskTypeChip type="STORY" iconOnly />}
-          <span className="min-w-0 truncate text-[15px] leading-snug">
+          {/* Two lines on a phone, where one cut most titles off. */}
+          <span className="min-w-0 truncate text-[15px] leading-snug max-md:line-clamp-2 max-md:whitespace-normal">
             {showParent && task.parentTask && (
               <span className="text-muted-foreground">{task.parentTask.title} / </span>
             )}

@@ -136,7 +136,7 @@ export function EventCalendar({
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // ?new=1 (the create menu's "New event") and ?new=rsvp (the RSVPs page's
-  // "New event with RSVPs", its RSVP page switched on) arrive with New event
+  // "New event", its RSVP page switched on) arrive with New event
   // open. The state is adjusted while rendering, not in an effect, so it
   // also works when the calendar is already on screen.
   const asked = canManage ? searchParams.get(NEW_EVENT_PARAM) : null;
@@ -403,14 +403,14 @@ export function EventCalendar({
         </div>
 
         {/*
-          On a phone this is two rows rather than three: Today and creating
-          on one, the view switcher spanning the width below it. Letting the
-          blocks wrap on their own put "New event" alone on a line of its own
-          and cost a band of screen where it is scarcest.
+          On a phone this is the view switcher alone, spanning the width,
+          its names centred: the arrows step back and forth, New event is
+          in the page header, and Today is a computer thing.
         */}
         <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
           <Button
             variant="outline"
+            className="max-md:hidden"
             onClick={goToday}
             disabled={isTodayInWindow(range, todayKey, dayCount)}
           >
@@ -419,7 +419,7 @@ export function EventCalendar({
 
           <Segmented
             label="Calendar view"
-            className="order-last w-full md:order-none md:w-auto [&>*]:flex-1 md:[&>*]:flex-none"
+            className="order-last w-full md:order-none md:w-auto [&>*]:flex-1 max-md:[&>*]:justify-center md:[&>*]:flex-none"
             value={range.view}
             onSelect={(v) => setView(v as CalendarView)}
             options={VIEW_LABELS.map(({ view, label }) => ({ value: view, label }))}
@@ -428,7 +428,9 @@ export function EventCalendar({
           {canManage && (
             // The one create action: New event, with "From a screenshot"
             // folded into its menu. One glow for the pair, not one each.
-            <div className="glow-halo ml-auto flex rounded-full md:ml-0">
+            // Not on a phone: there New event is in the page header, at
+            // the top right (NewEventButton).
+            <div className="glow-halo ml-auto flex rounded-full max-md:hidden md:ml-0">
               <Button
                 variant="create"
                 className="rounded-r-none"
@@ -557,6 +559,32 @@ export function EventCalendar({
             chipProps={dragProps}
             dayProps={dayDropProps}
           />
+        )}
+
+        {/*
+          On a phone the month's chips are colour bars with no room for a
+          title, so the month's events follow the grid as a list you can
+          read (the List view's), the way phone calendars pair the two.
+        */}
+        {range.view === "dayGridMonth" && count > 0 && (
+          <section className="mt-6 md:hidden" aria-labelledby="cal-month-list">
+            <h2
+              id="cal-month-list"
+              className="text-muted-foreground mb-1 px-1 text-[13px] font-semibold"
+            >
+              This month
+            </h2>
+            <AgendaList
+              items={items}
+              fromKey={range.fromKey}
+              dayCount={dayCount}
+              todayKey={todayKey}
+              openId={peek?.id ?? null}
+              onOpen={openPeek}
+              showSync={canManage}
+              emptyState={null}
+            />
+          </section>
         )}
 
         {(range.view === "timeGridWeek" || range.view === "timeGridDay") && (

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -57,12 +57,16 @@ import {
   isDestination,
   parseScope,
   parseWorkspaceQuery,
+  PHONE_HIDDEN_LAYOUTS,
   TASK_LIST_VIEW,
   TASKS_VIEW_COOKIE,
   type WorkspaceQuery,
 } from "./views";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Phones, not tablets: iPads and Android tablets leave out "Mobile". */
+const PHONE_UA = /iPhone|iPod|Android.+Mobile|Mobile.+Firefox|Windows Phone/;
 
 function param(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -109,11 +113,17 @@ export default async function TasksPage({
   const positions = await getChartForPage(org.id);
   const chart = buildViewerChart(positions, user.id);
 
+  // A phone has no Board or Table (PHONE_HIDDEN_LAYOUTS), so a remembered
+  // Board or a shared ?view=table link opens the List on one, without
+  // touching the remembered layout.
+  const phone = PHONE_UA.test((await headers()).get("user-agent") ?? "");
   const ws: WorkspaceQuery = simple
     ? { ...parsed, view: TASK_LIST_VIEW, scope: parseScope(query.scope) ?? "all" }
     : !teamwork && isDestination(parsed.view)
-      ? { ...parsed, view: DEFAULT_TASK_LAYOUT }
-      : parsed;
+      ? { ...parsed, view: phone ? TASK_LIST_VIEW : DEFAULT_TASK_LAYOUT }
+      : phone && (PHONE_HIDDEN_LAYOUTS as readonly string[]).includes(parsed.view)
+        ? { ...parsed, view: TASK_LIST_VIEW }
+        : parsed;
 
   const base = await withOrgTx(org.id, async ({ db }) => {
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });

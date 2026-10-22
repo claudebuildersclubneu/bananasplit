@@ -37,7 +37,22 @@ export default async function FindATimePollPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <BackLink href={`/app/${orgSlug}/calendar/find-a-time`} label="Find a time" />
+      {/* On a phone the poll's actions are one menu, on this row (the title gets the width). */}
+      <div className="flex items-center justify-between gap-2">
+        <BackLink href={`/app/${orgSlug}/calendar/find-a-time`} label="Find a time" />
+        <div className="md:hidden">
+          <AvailabilityPollActions
+            orgId={org.id}
+            orgSlug={orgSlug}
+            pollId={poll.id}
+            title={poll.title}
+            isOpen={isOpen}
+            canDelete={canDelete}
+            scheduled={Boolean(poll.finalizedEventId)}
+            compact
+          />
+        </div>
+      </div>
       <PollResponder
         poll={buildPollView(poll, { kind: "member", userId: user.id }, { memberNames })}
         respondAs="member"

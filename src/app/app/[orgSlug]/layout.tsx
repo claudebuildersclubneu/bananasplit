@@ -59,7 +59,7 @@ async function deepRedirectTarget(error: unknown, orgSlug: string): Promise<stri
 }
 
 /**
- * The page runs under the phone's notch and home indicator, so the tab bar
+ * The page runs under the phone's notch and home indicator, so the menu button
  * can float clear of the indicator (env(safe-area-inset-*) in the shell).
  */
 export const viewport: Viewport = { viewportFit: "cover" };

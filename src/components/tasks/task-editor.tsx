@@ -17,7 +17,6 @@ import { useModKey } from "@/components/command-palette/use-mod-key";
 import { PinToggle } from "@/components/pins/pins-context";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { Segmented } from "@/components/ui/segmented";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toaster";
 import { UserAvatar } from "@/components/user-avatar";
@@ -51,7 +50,6 @@ import {
   VISIBILITY_OPTIONS,
 } from "./task-fields";
 import { TaskMarkdown } from "./task-markdown";
-import { TaskSentence } from "./task-sentence";
 import { TaskTypeChip, TYPE_OPTIONS } from "./task-type";
 import { HashTagHint } from "./tag-menu";
 import { useHashTags } from "./use-hash-tags";
@@ -64,7 +62,7 @@ import { AudienceList } from "./visibility-control";
  * the task drawer design has it: the title and description set straight on
  * the panel, then labelled fields (dropdown wells, and segments for status,
  * priority and who can see it), with Cancel and Create (⌘↵) along the
- * bottom. A new task can also be written as one sentence (Sentence mode).
+ * bottom.
  * Create and edit:
  * title, description with @mentions, status (a reason when Blocked),
  * priority, due date, project, labels, the accountable owner and "also
@@ -118,7 +116,6 @@ export function TaskEditor({
   const hashTags = useHashTags();
   const mod = useModKey();
   const saving = useRef(false);
-  const [view, setView] = useState<"form" | "sentence">("form");
 
   const initialProjectId = task?.projectId ?? defaults?.projectId ?? null;
   const isNew = task === null;
@@ -720,7 +717,7 @@ export function TaskEditor({
         mode === "dialog" ? "h-full" : "bg-background rounded-xl border",
       )}
       onKeyDown={(e) => {
-        // A field that already handled ⌘↵ (the description, Sentence's title) marks it.
+        // A field that already handled ⌘↵ (the description) marks it.
         if (e.defaultPrevented) return;
         if (
           (e.metaKey || e.ctrlKey) &&
@@ -753,17 +750,6 @@ export function TaskEditor({
           {task && isTaskPrivate(task) && <PrivateBadge />}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {isNew && (
-            <Segmented
-              label="Editor style"
-              value={view}
-              onSelect={(v) => setView(v as "form" | "sentence")}
-              options={[
-                { value: "form", label: "Form" },
-                { value: "sentence", label: "Sentence" },
-              ]}
-            />
-          )}
           {task && <PinToggle path={`/tasks/${task.id}`} label={task.title} />}
           {task && mode === "dialog" && (
             <Button asChild variant="ghost" size="icon-sm">
@@ -803,29 +789,7 @@ export function TaskEditor({
         )}
       >
         {notices}
-        {isNew && view === "sentence" ? (
-          <TaskSentence
-            title={title}
-            onTitle={setTitle}
-            ownerId={ownerId}
-            onOwner={setOwnerId}
-            dueDate={dueDate}
-            onDue={setDueDate}
-            projectId={projectId}
-            onProject={setProjectId}
-            priority={priority}
-            onPriority={setPriority}
-            status={status}
-            onStatus={setStatus}
-            visibility={visibility}
-            onVisibility={setVisibility}
-            visibilityLocked={!canSetVisibility}
-            onMore={() => setView("form")}
-            onSubmit={() => void save()}
-          />
-        ) : (
-          form
-        )}
+        {form}
         {error && (
           <p className="text-destructive text-sm" role="alert">
             {error}

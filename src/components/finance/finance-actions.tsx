@@ -1,11 +1,18 @@
 "use client";
 
-import { FileSpreadsheet, ListChecks, Plus, Receipt } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, ListChecks, Plus, Receipt } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { ItemMenu } from "@/components/item-menu";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { TransactionDialog } from "./transaction-dialog";
 
@@ -18,8 +25,9 @@ const CREATE: Record<Create, { label: string; icon: typeof Plus }> = {
 
 /**
  * Finance's header actions, the same on every finance page: one primary
- * button and, for owners and treasurers, a "…" menu with the rest (the
- * other kind of new entry, Import, the setup guide). A treasurer's primary
+ * button and, for owners and treasurers, a menu built into it (as New
+ * task's) with the rest (the other kind of new entry, Import, the setup
+ * guide). A treasurer's primary
  * is Add transaction, or Request a reimbursement on their own
  * reimbursements; everyone else can only ask to be paid back.
  */
@@ -46,30 +54,63 @@ export function FinanceActions({
   const other: Create = primary === "request" ? "transaction" : "request";
   const PrimaryIcon = CREATE[primary].icon;
 
+  const OtherIcon = CREATE[other].icon;
+
   return (
     <>
-      <Button type="button" variant="create" onClick={() => setOpen(primary)}>
-        <PrimaryIcon className="size-4" aria-hidden="true" />
-        {CREATE[primary].label}
-      </Button>
-      {isFinance && (
-        <ItemMenu
-          label="More finance actions"
-          items={[
-            {
-              label: CREATE[other].label,
-              icon: CREATE[other].icon,
-              onSelect: () => setOpen(other),
-            },
-            {
-              label: "Import a spreadsheet",
-              icon: FileSpreadsheet,
-              href: `${base}/import`,
-              separated: true,
-            },
-            { label: "Setup guide", icon: ListChecks, href: `${base}/setup` },
-          ]}
-        />
+      {isFinance ? (
+        // The primary, with the rest in its own menu (as New task's).
+        <div className="flex">
+          <Button
+            type="button"
+            variant="create"
+            className="rounded-r-none pe-3"
+            onClick={() => setOpen(primary)}
+          >
+            <PrimaryIcon className="size-4" aria-hidden="true" />
+            {CREATE[primary].label}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="create"
+                className="border-brand-accent-foreground/20 rounded-l-none border-l ps-2.5 pe-3"
+                aria-label="More finance actions"
+              >
+                <ChevronDown className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuItem onSelect={() => setOpen(primary)}>
+                <PrimaryIcon className="size-4" aria-hidden="true" />
+                {CREATE[primary].label}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpen(other)}>
+                <OtherIcon className="size-4" aria-hidden="true" />
+                {CREATE[other].label}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`${base}/import`}>
+                  <FileSpreadsheet className="size-4" aria-hidden="true" />
+                  Import a spreadsheet
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`${base}/setup`}>
+                  <ListChecks className="size-4" aria-hidden="true" />
+                  Setup guide
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : (
+        <Button type="button" variant="create" onClick={() => setOpen(primary)}>
+          <PrimaryIcon className="size-4" aria-hidden="true" />
+          {CREATE[primary].label}
+        </Button>
       )}
       <TransactionDialog
         orgId={orgId}

@@ -370,68 +370,71 @@ export function NotesNewMenu({
 
   return (
     <>
-      {/* The commonest thing after a new note, one click away (also under New). */}
-      <Button type="button" variant="outline" size="sm" onClick={() => show("upload")}>
-        <Upload className="size-4" aria-hidden="true" />
-        Upload
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button type="button" variant="create" size="sm" disabled={pending}>
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Plus className="size-4" aria-hidden="true" />
-            )}
-            New
-            <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuItem onSelect={() => fromTemplate(null)}>
-            <NotebookPen className="size-4" aria-hidden="true" />
-            New note
-          </DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <LayoutTemplate className="size-4" aria-hidden="true" />
-              Note from a template
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-64">
-              {NOTE_TEMPLATES.map((t) => {
-                const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
-                return (
-                  <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
-                    <Icon className="size-4" aria-hidden="true" />
-                    <span className="flex flex-col">
-                      {t.title}
-                      <span className="text-muted-foreground text-xs">{t.description}</span>
-                    </span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => show("upload")}>
-            <Upload className="size-4" aria-hidden="true" />
-            Upload a file
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => show("word")}>
-            <FileText className="size-4" aria-hidden="true" />
-            Import a Word document
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => show("google")}>
-            <Globe className="size-4" aria-hidden="true" />
-            Import a Google Doc
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => show("folder")}>
-            <FolderPlus className="size-4" aria-hidden="true" />
-            New folder
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* One group on a phone, so the page header keeps Upload beside New, at the top right. */}
+      <div className="contents max-md:flex max-md:items-center max-md:gap-2">
+        {/* The commonest thing after a new note, one click away (also under New). */}
+        <Button type="button" variant="outline" size="sm" onClick={() => show("upload")}>
+          <Upload className="size-4" aria-hidden="true" />
+          Upload
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="create" size="sm" disabled={pending}>
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Plus className="size-4" aria-hidden="true" />
+              )}
+              New
+              <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuItem onSelect={() => fromTemplate(null)}>
+              <NotebookPen className="size-4" aria-hidden="true" />
+              New note
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <LayoutTemplate className="size-4" aria-hidden="true" />
+                Note from a template
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-64">
+                {NOTE_TEMPLATES.map((t) => {
+                  const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
+                  return (
+                    <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
+                      <Icon className="size-4" aria-hidden="true" />
+                      <span className="flex flex-col">
+                        {t.title}
+                        <span className="text-muted-foreground text-xs">{t.description}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => show("upload")}>
+              <Upload className="size-4" aria-hidden="true" />
+              Upload a file
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => show("word")}>
+              <FileText className="size-4" aria-hidden="true" />
+              Import a Word document
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => show("google")}>
+              <Globe className="size-4" aria-hidden="true" />
+              Import a Google Doc
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => show("folder")}>
+              <FolderPlus className="size-4" aria-hidden="true" />
+              New folder
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <Dialog open={open === "folder"} onOpenChange={(o) => setOpen(o ? "folder" : null)}>
         <DialogContent className="sm:max-w-sm">

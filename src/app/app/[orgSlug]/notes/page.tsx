@@ -15,7 +15,7 @@ import { noteVisibleWhere } from "@/server/notes/visibility";
 import { listPins } from "@/server/pins";
 import { planGate } from "@/server/billing/plan-gate";
 
-import { NotesListFilters } from "./notes-list-filters";
+import { NotesFilterChoices, NotesListFilters } from "./notes-list-filters";
 import {
   countDeleted,
   getDeletedNotes,
@@ -186,6 +186,7 @@ export default async function NotesPage({
           }
         }
         filters={<NotesListFilters members={members} />}
+        sheetFilters={<NotesFilterChoices members={members} />}
       />
     </div>
   );

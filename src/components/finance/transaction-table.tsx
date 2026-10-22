@@ -107,6 +107,37 @@ export function TransactionTable({
     router.refresh();
   }
 
+  const menuItems = (t: TransactionWithRelations) => [
+    t.voidedAt &&
+      isFinance && {
+        label: "Restore",
+        icon: ArchiveRestore,
+        onSelect: () => void restore(t),
+      },
+    canDelete(t) && {
+      label: "Delete",
+      icon: Trash2,
+      destructive: true,
+      onSelect: () => void remove(t),
+    },
+  ];
+  const open = (t: TransactionWithRelations) => {
+    setOpenId(t.id);
+    setDialogOpen(true);
+  };
+  const status = (t: TransactionWithRelations) =>
+    isDeletedTransaction(t) ? (
+      <Badge variant="destructive">Deleted</Badge>
+    ) : t.status === "NOT_APPLICABLE" ? null : (
+      <TransactionStatusBadge status={t.status} />
+    );
+  const amount = (t: TransactionWithRelations) => (
+    <>
+      {t.direction === "IN" ? "+" : "−"}
+      {formatCents(t.amountCents)}
+    </>
+  );
+
   if (transactions.length === 0) {
     return (
       <EmptyState icon={ReceiptText} title="No transactions here" description={emptyDescription} />
@@ -115,7 +146,59 @@ export function TransactionTable({
 
   return (
     <>
-      <TableFrame>
+      {/*
+        A phone gets a list, not a seven-column table it can only show two
+        columns of: what and how much on the first line, when, the category
+        and the status under it. A tap opens the transaction, like a row.
+      */}
+      <ul className="bg-card edge rounded-card divide-border/70 divide-y px-1.5 md:hidden">
+        {transactions.map((t) => (
+          <li key={t.id} className={cn("flex items-center gap-1", t.voidedAt && "opacity-50")}>
+            <button
+              type="button"
+              onClick={() => open(t)}
+              className="focus-visible:outline-foreground flex min-h-16 min-w-0 flex-1 flex-col justify-center gap-1 rounded-md px-2.5 py-3 text-left focus-visible:outline-2"
+            >
+              <span className="flex items-baseline gap-3">
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-[15px] font-medium",
+                    t.voidedAt && "line-through",
+                  )}
+                >
+                  {t.description}
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 font-semibold tabular-nums",
+                    t.direction === "IN" && "text-success",
+                  )}
+                >
+                  {amount(t)}
+                </span>
+              </span>
+              <span className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                <span className="tabular-nums">{formatFinanceDate(t.occurredAt)}</span>
+                {t.category && (
+                  <TagChip color={slot.get(t.category.id) ?? "var(--muted-foreground)"}>
+                    {t.category.name}
+                  </TagChip>
+                )}
+                {status(t)}
+                {t.reconciledAt && (
+                  <span className="inline-flex items-center gap-1 text-xs">
+                    <Lock className="size-3.5" aria-hidden="true" />
+                    Locked
+                  </span>
+                )}
+              </span>
+            </button>
+            <ItemMenu label={`Actions for ${t.description}`} items={menuItems(t)} />
+          </li>
+        ))}
+      </ul>
+
+      <TableFrame className="max-md:hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -136,10 +219,7 @@ export function TransactionTable({
                 key={t.id}
                 data-state={dialogOpen && openId === t.id ? "selected" : undefined}
                 className={cn("cursor-pointer", t.voidedAt && "opacity-50")}
-                onClick={() => {
-                  setOpenId(t.id);
-                  setDialogOpen(true);
-                }}
+                onClick={() => open(t)}
               >
                 <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                   {formatFinanceDate(t.occurredAt)}
@@ -189,28 +269,11 @@ export function TransactionTable({
                     t.direction === "IN" && "text-success",
                   )}
                 >
-                  {t.direction === "IN" ? "+" : "−"}
-                  {formatCents(t.amountCents)}
+                  {amount(t)}
                 </TableCell>
                 <TableCell className="w-10 py-1 text-right">
                   {/* Opening it is the row click; the menu holds the rest. */}
-                  <ItemMenu
-                    label={`Actions for ${t.description}`}
-                    items={[
-                      t.voidedAt &&
-                        isFinance && {
-                          label: "Restore",
-                          icon: ArchiveRestore,
-                          onSelect: () => void restore(t),
-                        },
-                      canDelete(t) && {
-                        label: "Delete",
-                        icon: Trash2,
-                        destructive: true,
-                        onSelect: () => void remove(t),
-                      },
-                    ]}
-                  />
+                  <ItemMenu label={`Actions for ${t.description}`} items={menuItems(t)} />
                 </TableCell>
               </TableRow>
             ))}

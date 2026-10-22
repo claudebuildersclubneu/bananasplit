@@ -13,8 +13,8 @@ import { useTasks } from "./tasks-context";
 import type { ProjectOption } from "./types";
 
 /**
- * The project picker's menu (the form's Project field, the sentence's
- * "for … project", the toolbar filter): type to narrow, pick one, or make
+ * The project picker's menu (the form's Project field, the toolbar
+ * filter): type to narrow, pick one, or make
  * one on the spot ("Create project “Spring Gala”") when the club lets you.
  * Archived projects never appear; "Manage projects" opens the list.
  */

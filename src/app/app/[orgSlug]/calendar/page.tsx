@@ -16,6 +16,8 @@ import {
 import { weekWindowFor } from "@/lib/calendar/grid";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { sectionLabel } from "@/lib/nav/sidebar";
+
+import { NewEventButton } from "./new-event-button";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
@@ -137,8 +139,10 @@ export default async function CalendarPage({
         actions={
           <>
             {/* Planning a meeting starts here as often as from the sidebar. */}
+            {/* On a phone: New event at the top right; the rest is in the menu. */}
+            {canManage && <NewEventButton />}
             {spaceIncludes(org, "polls") && (
-              <Button variant="outline" asChild>
+              <Button variant="outline" className="max-md:hidden" asChild>
                 <Link href={`/app/${orgSlug}/calendar/find-a-time/new`}>
                   <CalendarClock aria-hidden="true" />
                   Find a time
@@ -146,7 +150,7 @@ export default async function CalendarPage({
               </Button>
             )}
             {can({ role }, "events.write") && (
-              <Button variant="outline" asChild>
+              <Button variant="outline" className="max-md:hidden" asChild>
                 <Link href={`/app/${orgSlug}/calendar/rsvp`}>
                   <Ticket aria-hidden="true" />
                   RSVPs
@@ -154,7 +158,7 @@ export default async function CalendarPage({
               </Button>
             )}
             {can({ role }, "integrations.view") && spaceIncludes(org, "integrations") && (
-              <Button variant="outline" size="icon" asChild>
+              <Button variant="outline" size="icon" className="max-md:hidden" asChild>
                 <Link
                   href={`/app/${orgSlug}/calendar/sync`}
                   aria-label="Google Calendar sync and website feed"

@@ -201,6 +201,16 @@ org-wide) is the exec-sync agenda.
 
 Keyboard: `1`–`6` switch layout, `/` focuses search, `c` starts a task.
 
+**On a phone** Tasks has no Board or Table (a remembered or linked one
+opens the List there, and the remembered layout is kept for the computer).
+The stat strip is one bar, to scale: overdue, due this week, open for
+later, done this week. Under it, the phone's layouts by name (List, Week,
+Roadmap, Dashboard), then one row: whose work as icons you flip between
+(three with _My team_), **Filters** (a sheet with person, project, tag,
+status and visibility, and a link to all projects), and a search icon that
+opens the search box. **New task** is at the top right; the List's quick
+add is a computer thing.
+
 Deep links other sections use, all unchanged:
 
 - `?view=table&owner={userId}&status=open` — that person's open tasks (the
@@ -227,7 +237,7 @@ due-date edits, and never removing somebody else's ownership.
 **Tasks › Projects** lists the club's projects with their colour, lead,
 status (active, on hold, done), start and target dates and progress (done
 over all, epics left out). A project's own view is the workspace filtered to
-it (`?project=`). Every project picker (the form's field, the sentence, the
+it (`?project=`). Every project picker (the form's field and the
 toolbar's Project pill) can make one on the spot: type a name and pick
 **Create project “…”**. A new project takes the theme's next chart colour
 unless one is picked. Archived projects never appear in pickers; a task
@@ -248,8 +258,8 @@ same switch, and DELETE is owners' and admins'.
 Tags (stored as labels) are typed on the spot: the tag field finds, toggles
 and offers **Create tag “catering”**, which takes the theme's next chart
 colour. Names are unique regardless of case, so typing "Catering" picks
-"catering" instead of making a second. `#tag` in a title (the composer,
-the Sentence title, the List's quick add) tags the task: "Book a
+"catering" instead of making a second. `#tag` in a title (the composer
+and the List's quick add) tags the task: "Book a
 photographer #showcase". Who may make new tags is **Members can create
 tags** on **Settings › Tags** (everyone by default); owners and admins
 rename, recolour, merge (with suggestions for near-duplicates like

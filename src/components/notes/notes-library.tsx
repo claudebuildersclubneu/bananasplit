@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SearchField } from "@/components/ui/search-field";
+import { FilterChoices, FilterSheet, PhoneToolbar } from "@/components/ui/phone-toolbar";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toaster";
 import { familyOf, formatBytes } from "@/lib/files/types";
@@ -168,6 +169,9 @@ const LAYOUTS = [
  * file it), and notes and uploaded files together in one list you can
  * search, filter, sort and see as a grid or a list. Cards show a preview of
  * what's inside and a pin.
+ *
+ * On a phone the folders are a filter instead of a column (PhoneToolbar's
+ * sheet, with the kind, audience, author and sort), and search is an icon.
  */
 export function NotesLibrary({
   orgId,
@@ -180,6 +184,7 @@ export function NotesLibrary({
   totals,
   trash,
   filters,
+  sheetFilters,
 }: {
   orgId: string;
   orgSlug: string;
@@ -193,6 +198,8 @@ export function NotesLibrary({
   /** The "Recently deleted" view's contents (only when it is open). */
   trash: { notes: TrashNote[]; files: TrashFile[] } | null;
   filters: React.ReactNode;
+  /** The same filters for the phone's filter sheet (under the folder). */
+  sheetFilters: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -205,6 +212,7 @@ export function NotesLibrary({
   const [overTrash, setOverTrash] = useState(false);
   const [confirmEl, confirm] = useConfirm();
   const [q, setQ] = useState(params.get("q") ?? "");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const folder = params.get("folder");
   const view = params.get("layout") === "list" ? "list" : "grid";
   const base = `/app/${orgSlug}/notes`;
@@ -705,7 +713,8 @@ export function NotesLibrary({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-      <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+      {/* Not on a phone: there the folder is a filter (the toolbar's sheet). */}
+      <aside className="space-y-4 max-md:hidden lg:sticky lg:top-20 lg:self-start">
         <div className="space-y-0.5">
           {railItem(
             null,
@@ -877,7 +886,86 @@ export function NotesLibrary({
       </aside>
 
       <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <PhoneToolbar
+          leading={
+            <Segmented
+              label="Layout"
+              options={LAYOUTS}
+              value={view}
+              onSelect={(v) => go({ layout: v === "grid" ? null : v })}
+              className="[&>button]:gap-0 [&>button]:px-2"
+            />
+          }
+          filterCount={
+            (folder ? 1 : 0) +
+            ["tab", "visibility", "author"].filter((k) => params.get(k) && params.get(k) !== "all")
+              .length
+          }
+          onFilters={() => setFiltersOpen(true)}
+          searchLabel="Search files"
+          searchActive={Boolean(params.get("q"))}
+          search={
+            <form
+              role="search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                go({ q: q.trim() || null });
+              }}
+            >
+              <SearchField
+                value={q}
+                onValueChange={(v) => {
+                  setQ(v);
+                  if (!v) go({ q: null });
+                }}
+                placeholder="Search files"
+                aria-label="Search files"
+                autoFocus
+              />
+            </form>
+          }
+          onCancelSearch={() => {
+            setQ("");
+            if (params.get("q")) go({ q: null });
+          }}
+        />
+        <FilterSheet
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          title="Filter files"
+          description="The library shows only what matches."
+          canClear={Boolean(
+            folder || ["tab", "visibility", "author", "sort"].some((k) => params.get(k)),
+          )}
+          onClear={() =>
+            go({ folder: null, tab: null, visibility: null, author: null, sort: null })
+          }
+        >
+          <FilterChoices
+            title="Folder"
+            value={folder ?? ""}
+            onPick={(v) => go({ folder: v || null })}
+            options={[
+              { value: "", label: "Everything" },
+              { value: "none", label: "Not in a folder" },
+              ...folders.map((f) => ({
+                value: f.id,
+                label: f.name,
+                color: f.color ? folderDot(f.color) : undefined,
+              })),
+              { value: "trash", label: "Recently deleted" },
+            ]}
+          />
+          {sheetFilters}
+        </FilterSheet>
+        {/* On a phone, which folder you're in (Everything says nothing). */}
+        {(folder || error) && (
+          <div className="space-y-1 md:hidden">
+            {folder && <h2 className="heading truncate text-lg">{heading}</h2>}
+            {error && <p className="text-destructive text-xs">{error}</p>}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 max-md:hidden">
           <h2 className="heading mr-auto flex min-w-0 items-center gap-2 text-lg">
             {currentFolder ? (
               <FolderOpen

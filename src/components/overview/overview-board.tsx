@@ -42,6 +42,7 @@ export function OverviewBoard({
       intro={intro}
       belowIntro={stats}
       notice={notice}
+      hiddenOnPhone={["recent"]}
       onSave={(layout) => saveBoardAction(orgId, "overview", layout)}
     />
   );

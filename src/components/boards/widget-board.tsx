@@ -123,6 +123,10 @@ export type SaveBoard = (layout: BoardWidget[] | null) => Promise<{ ok: boolean;
  * holds Add widget, Reset, Cancel and Done; each widget gets a handle to
  * drag it (arrow keys move it too), its width and height, and a remove x.
  * Only the member's own board changes.
+ *
+ * Not on a phone: there the board is read, not arranged, so Customize is a
+ * computer thing, and `hiddenOnPhone` widgets (the Overview's Recently
+ * visited) are left out.
  */
 export function WidgetBoard({
   types,
@@ -135,6 +139,7 @@ export function WidgetBoard({
   notice,
   headerActions,
   belowIntro,
+  hiddenOnPhone = [],
 }: {
   types: readonly WidgetMeta[];
   initialLayout: BoardWidget[];
@@ -155,6 +160,8 @@ export function WidgetBoard({
   headerActions?: Readonly<Record<string, ReactNode>>;
   /** A full-width line under the title row (the Overview's stat strip). */
   belowIntro?: ReactNode;
+  /** Widget types a phone leaves out. */
+  hiddenOnPhone?: readonly string[];
 }) {
   const router = useRouter();
   const [layout, setLayout] = useState(initialLayout);
@@ -227,6 +234,7 @@ export function WidgetBoard({
           <Button
             type="button"
             variant="outline"
+            className="max-md:hidden"
             disabled={pending}
             onClick={() => setEditing(true)}
           >
@@ -338,6 +346,7 @@ export function WidgetBoard({
                 data-frame={bare ? "bare" : "card"}
                 className={cn(
                   SPAN[w.w] ?? SPAN[1],
+                  hiddenOnPhone.includes(w.type) && "max-md:hidden",
                   "relative flex min-w-0 flex-col transition-[opacity,outline-color]",
                   bare
                     ? "rounded-block"

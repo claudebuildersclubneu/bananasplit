@@ -43,9 +43,12 @@ export interface PollListItem {
   deleteNote?: string;
 }
 
-/** Shown on hover or focus (always on a phone), so the row stays quiet. */
+/**
+ * Shown on hover or focus, so the row stays quiet. Not on a phone at all:
+ * there the "…" menu holds Delete, and there are no pins.
+ */
 const HOVER_ONLY =
-  "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100";
+  "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-md:hidden";
 
 const KINDS: Record<PollKind, { label: string; icon: typeof Vote }> = {
   question: { label: "Question", icon: Vote },
@@ -151,13 +154,13 @@ function PollRow({
   const kind = KINDS[poll.kind];
   const Icon = kind.icon;
   return (
-    <li className="group hover:bg-muted rounded-tile [&+&]:before:border-border/70 relative flex items-center gap-3.5 px-3 py-3 transition-colors hover:before:border-transparent [&+&]:before:absolute [&+&]:before:top-0 [&+&]:before:right-3 [&+&]:before:left-[3.75rem] [&+&]:before:border-t">
-      <IconChip icon={Icon} />
+    <li className="group hover:bg-muted rounded-tile [&+&]:before:border-border/70 relative flex items-center gap-3.5 px-3 py-3 transition-colors hover:before:border-transparent max-md:hover:bg-transparent [&+&]:before:absolute [&+&]:before:top-0 [&+&]:before:right-3 [&+&]:before:left-[3.75rem] [&+&]:before:border-t">
+      <IconChip icon={Icon} className="max-md:hidden" />
       <div className="min-w-0 flex-1 space-y-1.5">
         {/* The link covers the row; the pin and the menu sit above it. */}
         <Link
           href={poll.href}
-          className="focus-visible:after:outline-foreground block truncate text-[15px] font-semibold outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2"
+          className="focus-visible:after:outline-foreground block truncate text-[15px] font-semibold outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 max-md:line-clamp-2 max-md:whitespace-normal"
         >
           {poll.title}
         </Link>
