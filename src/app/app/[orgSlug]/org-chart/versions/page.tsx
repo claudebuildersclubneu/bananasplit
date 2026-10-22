@@ -47,7 +47,7 @@ function statusBadge(v: VersionSummary) {
   return <Badge variant="outline">Archived</Badge>;
 }
 
-/** Every version of the chart (OWNER/ADMIN), newest first, with view, compare and restore. */
+/** Every version of the chart (any member), newest first, with view, compare and restore. */
 export default async function VersionsPage({
   params,
 }: PageProps<"/app/[orgSlug]/org-chart/versions">) {

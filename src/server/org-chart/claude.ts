@@ -103,6 +103,28 @@ export async function getClaudeConfig(orgId: string): Promise<ClaudeConfig | nul
   return { apiKey, ...readClaudeSettings(config) };
 }
 
+/**
+ * Whether the org has a Claude key saved, and the model it is set to: what
+ * an import needs to know before anything is sent. "Saved" reads
+ * secretFingerprint, which is set for every stored secret (secretLast4 is
+ * null for anything shorter than 16 characters). On the service path,
+ * outside any transaction, because OrgIntegration is OWNER/ADMIN under RLS
+ * and any member imports; only the boolean and the model name leave here.
+ */
+export async function getClaudeKeyStatus(orgId: string): Promise<{ saved: boolean; model: string }> {
+  assertNoTx("getClaudeKeyStatus");
+  return withSystemOrgTx(orgId, async ({ db }) => {
+    const row = await db.orgIntegration.findUnique({
+      where: { organizationId_provider: { organizationId: orgId, provider: "CLAUDE" } },
+      select: { secretFingerprint: true, config: true },
+    });
+    return {
+      saved: Boolean(row?.secretFingerprint),
+      model: readClaudeSettings((row?.config as Record<string, unknown> | null) ?? {}).model,
+    };
+  });
+}
+
 /** Non-secret settings from OrgIntegration.config: { model?, fallbacks? }. */
 export function readClaudeSettings(config: Record<string, unknown>): { model: string; fallbacks: boolean } {
   const model = typeof config.model === "string" && MODEL_PATTERN.test(config.model) ? config.model : DEFAULT_MODEL;

@@ -37,9 +37,10 @@ import {
 } from "./positions";
 
 /**
- * Org chart writes and admin reads, all on the caller's app_user transaction
- * (withOrgAction / withOrgTx), so RLS applies: members see only the
- * published version, and only OWNER/ADMIN write (orgchart.write).
+ * Org chart writes and editor reads, all on the caller's app_user
+ * transaction (withOrgAction / withOrgTx), so RLS applies. Every member of
+ * the org edits the chart (orgchart.write): drafts, imports, publishing and
+ * restoring. History is append-only, so any publish can be undone.
  *
  * - Versions are copy-on-version snapshots. Every upload, "Start blank",
  *   "Edit the current chart" and rollback creates a new numbered version.
@@ -49,9 +50,11 @@ import {
  *   draft's positions in one transaction (existing row ids are kept).
  * - Publish validates (no loops, managers inside the version, advisors with
  *   a manager and no reports, linked users still members), archives the
- *   previous version, points the org at the new one, optionally sets
- *   Membership.title, writes the audit log and invalidates the cached chart
- *   after COMMIT (invalidate() queues on ctx.afterCommit).
+ *   previous version, points the org at the new one
+ *   (app.set_active_org_chart: Organization itself is OWNER/ADMIN),
+ *   optionally sets Membership.title (members.setTitle, OWNER/ADMIN),
+ *   writes the audit log and invalidates the cached chart after COMMIT
+ *   (invalidate() queues on ctx.afterCommit).
  */
 
 export const ACTIVE_PARSE_STATUSES = [
@@ -135,19 +138,6 @@ async function activeVersionId(db: Db, organizationId: string): Promise<string |
 // ------------------------------------------------------------------ uploads
 
 /**
- * Whether the org has a Claude key saved (the upload needs one). Read from
- * secretFingerprint, which is set for every stored secret; secretLast4 is
- * null for anything shorter than 16 characters.
- */
-export async function hasClaudeKey(db: Db, organizationId: string): Promise<boolean> {
-  const row = await db.orgIntegration.findUnique({
-    where: { organizationId_provider: { organizationId, provider: "CLAUDE" } },
-    select: { secretFingerprint: true },
-  });
-  return Boolean(row?.secretFingerprint);
-}
-
-/**
  * The DB quota: 20 documents sent to Claude per org per rolling day, one
  * active parse at a time.
  *
@@ -204,7 +194,7 @@ export interface UploadVersionInput {
   builtin: { chart: NormalizedChart; report: ParseReport } | null;
   /** Whether the built-in reading is good enough to be the draft. */
   accepted: boolean;
-  /** Whether the org has a Claude key, checked before the transaction. */
+  /** Whether the org has a Claude key (getClaudeKeyStatus), checked before the transaction. */
   claudeAvailable: boolean;
 }
 
@@ -319,8 +309,10 @@ export async function createUploadVersion(ctx: Ctx, input: UploadVersionInput): 
  * Asks Claude to read the document again: for a FAILED or stuck parse, and
  * for a draft the built-in parser only half understood (so an org that adds
  * a key afterwards can get a better reading without re-uploading).
+ * `claudeKeySaved` comes from getClaudeKeyStatus, read before the
+ * transaction (members cannot read OrgIntegration).
  */
-export async function retryParse(ctx: Ctx, versionId: string): Promise<void> {
+export async function retryParse(ctx: Ctx, versionId: string, claudeKeySaved: boolean): Promise<void> {
   requirePermission(ctx, "orgchart.write");
   const { db, organizationId } = ctx;
   await lockCharts(db, organizationId);
@@ -341,7 +333,7 @@ export async function retryParse(ctx: Ctx, versionId: string): Promise<void> {
   if (version.parseStatus !== OrgChartParseStatus.FAILED && !stuck && !halfRead) {
     throw new OrgChartError("This draft is not waiting for a retry.", 409);
   }
-  if (!(await hasClaudeKey(db, organizationId))) {
+  if (!claudeKeySaved) {
     throw new OrgChartError("Add a Claude API key in Admin panel › Integrations, then retry.", 409);
   }
   await assertUploadAllowed(db, organizationId, versionId);
@@ -677,10 +669,8 @@ async function publishLocked(
       editVersion: { increment: 1 },
     },
   });
-  await db.organization.update({
-    where: { id: organizationId },
-    data: { activeOrgChartVersionId: version.id },
-  });
+  // Organization UPDATE is OWNER/ADMIN; this moves only the chart pointer.
+  await db.$executeRaw`SELECT app.set_active_org_chart(${version.id})`;
   let titled = 0;
   if (options.setTitles) {
     requirePermission(ctx, "members.setTitle");
@@ -797,7 +787,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
   return { ...result, versionId: copyId };
 }
 
-// ------------------------------------------------------------------ reads (admin)
+// ------------------------------------------------------------------ reads (editor)
 
 export interface VersionSummary {
   id: string;
