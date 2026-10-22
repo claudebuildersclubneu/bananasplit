@@ -81,12 +81,13 @@ export default async function ProfilePage({ params }: PageProps<"/app/[orgSlug]/
           </Button>
         </header>
         <p className="text-muted-foreground max-w-prose text-sm">
-          Members of your clubs see your name, picture, pronouns, major, bio and links. Your
-          email is not shown on people pages.
+          Members of your clubs see your name, picture, pronouns, major, bio and links. Your email
+          is not shown on people pages.
         </p>
 
         <nav aria-label="Profile sections" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <ul className="flex min-w-max gap-2 sm:flex-wrap">
+          {/* Wrapping on a phone too, so every section is in view without scrolling. */}
+          <ul className="flex min-w-max gap-2 max-md:min-w-0 max-md:flex-wrap sm:flex-wrap">
             {SECTIONS.map((s) => (
               <li key={s.id}>
                 <ChipLink href={`#${s.id}`}>{s.label}</ChipLink>

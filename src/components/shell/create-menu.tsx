@@ -36,8 +36,9 @@ const ICONS: Record<string, LucideIcon> = {
 /**
  * The + menu: start a task, an event, a note, a poll or a Find a time from
  * any page (createActions in nav-config.ts says which, for this space and
- * viewer). The tool capsule and the phone tab bar's create button both open
- * it; `children` is the trigger, which gets a spinner while a note is made.
+ * viewer). The tool capsule opens it (desktop only: on a phone each page's
+ * own add button does); `children` is the trigger, which gets a spinner while
+ * a note is made.
  */
 export function CreateMenu({
   orgId,

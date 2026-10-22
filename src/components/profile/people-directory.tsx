@@ -18,6 +18,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FilterChoices, FilterSheet, PhoneToolbar } from "@/components/ui/phone-toolbar";
 import { SearchField } from "@/components/ui/search-field";
 import { Segmented, chipClass } from "@/components/ui/segmented";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -88,9 +89,11 @@ export function PeopleDirectory({
 }: PeopleDirectoryProps) {
   const pathname = usePathname();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isPhone = useMediaQuery("(max-width: 767px)");
   const [query, setQuery] = useState<DirectoryQuery>(initial);
   const [results, setResults] = useState<{ q: string; result: PeopleSearchResult } | null>(null);
   const [limit, setLimit] = useState(RENDER_STEP);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sheets, setSheets] = useState<Map<string, PersonSheet>>(
     () => new Map(initialSheet ? [[initialSheet.id, initialSheet]] : []),
   );
@@ -143,9 +146,12 @@ export function PeopleDirectory({
     return localMatch(people, term, teamsByKey);
   }, [term, answered, people, byId, teamsByKey]);
   const filtered = useMemo(() => applyFilters(matched, query), [matched, query]);
+  // A phone in a club with no org chart sorts by name: by team, everyone
+  // would sit under one "Not on the chart".
+  const sort = isPhone && teams.length === 0 && query.sort === "team" ? "name" : query.sort;
   const groups = useMemo(
-    () => groupPeople(filtered, query.sort, teams, { ranked: Boolean(term) }),
-    [filtered, query.sort, teams, term],
+    () => groupPeople(filtered, sort, teams, { ranked: Boolean(term) }),
+    [filtered, sort, teams, term],
   );
   const ordered = useMemo(() => groups.flatMap((g) => g.people), [groups]);
   const rows = useMemo<Row[]>(
@@ -250,7 +256,7 @@ export function PeopleDirectory({
     filtered.length === total && !term && !activeFilters
       ? `${total} ${total === 1 ? "member" : "members"}`
       : `${filtered.length} of ${total} ${total === 1 ? "member" : "members"}`;
-  const letters = query.sort === "name" ? groups.map((g) => g.label) : [];
+  const letters = sort === "name" ? groups.map((g) => g.label) : [];
 
   const jump = (letter: string) => {
     const index = rows.findIndex((r) => r.kind === "header" && r.group.label === letter);
@@ -282,10 +288,103 @@ export function PeopleDirectory({
     <SheetSkeleton />
   );
 
+  const layoutSwitch = (
+    <Segmented
+      label="Layout"
+      value={query.view}
+      onSelect={(view) => update({ view: view as DirectoryQuery["view"] })}
+      options={[
+        { value: "grid", label: "Grid", icon: LayoutGrid, compact: true, title: "Grid" },
+        { value: "list", label: "List", icon: List, compact: true, title: "Dense list" },
+      ]}
+    />
+  );
+
   return (
     <div className={cn("grid items-start gap-[18px]", selectedId && isDesktop && "grid-cols-[minmax(0,1fr)_380px]")}>
       <section aria-label="Members" className="bg-card edge rounded-card min-w-0 p-[18px] sm:p-6">
-        <div className="flex flex-wrap items-center gap-2">
+        {/* A phone: the one list toolbar (as on Tasks and Files), with the sort on its left (grid and list are one and the same there). */}
+        <PhoneToolbar
+          leading={
+            <Segmented
+              label="Sort people"
+              value={sort}
+              onSelect={(v) => update({ sort: v as DirectoryQuery["sort"] })}
+              options={[
+                ...(teams.length > 0 ? [{ value: "team", label: "Team" }] : []),
+                { value: "name", label: "A–Z" },
+                { value: "new", label: "Newest" },
+              ]}
+            />
+          }
+          filterCount={[query.team, query.role, query.year, query.free].filter(Boolean).length}
+          onFilters={() => setFiltersOpen(true)}
+          searchLabel="Search people"
+          searchActive={Boolean(query.q)}
+          search={
+            <SearchField
+              value={query.q}
+              onValueChange={(q) => update({ q: q.slice(0, 80) })}
+              onClear={() => update({ q: "" })}
+              placeholder="Name, title, team or major"
+              aria-label="Search people"
+              maxLength={80}
+              autoComplete="off"
+              autoFocus
+            />
+          }
+          onCancelSearch={() => update({ q: "" })}
+        />
+
+        <FilterSheet
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          title="Filter people"
+          description="The directory shows only the members who match."
+          canClear={activeFilters}
+          onClear={() => update({ team: null, role: null, year: null, free: false })}
+        >
+          <FilterChoices
+            title="Free now"
+            value={query.free ? "free" : ""}
+            onPick={(v) => update({ free: v === "free" })}
+            options={[
+              { value: "", label: "Anyone" },
+              { value: "free", label: `Free now${freeCount > 0 ? ` (${freeCount})` : ""}`, color: "var(--success)" },
+            ]}
+          />
+          {teams.length > 0 && (
+            <FilterChoices
+              title="Team"
+              value={query.team ?? ""}
+              onPick={(v) => update({ team: v || null })}
+              options={[
+                { value: "", label: "All teams" },
+                ...teams.map((t) => ({ value: t.key, label: t.name, color: `var(--chart-${((t.slot - 1) % 5) + 1})` })),
+                ...(people.some((p) => !p.teamKey) ? [{ value: NO_TEAM_KEY, label: "Not on the chart" }] : []),
+              ]}
+            />
+          )}
+          {roles.length > 1 && (
+            <FilterChoices
+              title="Role"
+              value={query.role ?? ""}
+              onPick={(v) => update({ role: (v || null) as DirectoryRole | null })}
+              options={[{ value: "", label: "All roles" }, ...roles.map((r) => ({ value: r, label: ROLE_LABELS[r] }))]}
+            />
+          )}
+          {years.length > 0 && (
+            <FilterChoices
+              title="Year"
+              value={query.year ? String(query.year) : ""}
+              onPick={(v) => update({ year: v ? Number(v) : null })}
+              options={[{ value: "", label: "All years" }, ...years.map((y) => ({ value: String(y), label: `Class of ${y}` }))]}
+            />
+          )}
+
+        </FilterSheet>
+
+        <div className="flex flex-wrap items-center gap-2 max-md:hidden">
           <SearchField
             value={query.q}
             onValueChange={(q) => update({ q: q.slice(0, 80) })}
@@ -306,18 +405,10 @@ export function PeopleDirectory({
               { value: "new", label: "Newest" },
             ]}
           />
-          <Segmented
-            label="Layout"
-            value={query.view}
-            onSelect={(view) => update({ view: view as DirectoryQuery["view"] })}
-            options={[
-              { value: "grid", label: "Grid", icon: LayoutGrid, compact: true, title: "Grid" },
-              { value: "list", label: "List", icon: List, compact: true, title: "Dense list" },
-            ]}
-          />
+          {layoutSwitch}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
+        <div className="mt-3 flex flex-wrap items-center gap-2 max-md:hidden" role="group" aria-label="Filters">
           <button
             type="button"
             aria-pressed={query.free}
@@ -391,10 +482,11 @@ export function PeopleDirectory({
             ) : (
               <PeopleRows
                 rows={visibleRows}
-                view={query.view}
+                view={isPhone ? "grid" : query.view}
                 selectedId={selectedId}
                 viewerId={viewerId}
                 teamsByKey={teamsByKey}
+                hideNoTeam={isPhone && teams.length === 0}
                 onSelect={select}
               />
             )}
@@ -473,12 +565,15 @@ function PeopleRows({
   viewerId,
   teamsByKey,
   onSelect,
+  hideNoTeam = false,
 }: {
   rows: Row[];
   view: DirectoryQuery["view"];
   selectedId: string | null;
   viewerId: string;
   teamsByKey: ReadonlyMap<string, DirectoryTeam>;
+  /** A phone, in a club with no org chart: no "Not on the chart" on every card. */
+  hideNoTeam?: boolean;
   onSelect: (id: string) => void;
 }) {
   // Split the flat rows back into runs under each header.
@@ -503,7 +598,7 @@ function PeopleRows({
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2.5">
               {people.map((p) => (
                 <li key={p.id} className="min-w-0">
-                  <PersonCard person={p} team={teamName(p, teamsByKey)} selected={p.id === selectedId} isSelf={p.id === viewerId} onSelect={onSelect} />
+                  <PersonCard person={p} team={hideNoTeam ? "" : teamName(p, teamsByKey)} selected={p.id === selectedId} isSelf={p.id === viewerId} onSelect={onSelect} />
                 </li>
               ))}
             </ul>

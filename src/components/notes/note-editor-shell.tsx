@@ -229,6 +229,7 @@ export function NoteEditorShell({
   const [preview, setPreview] = useState<PreviewVersion | null>(null);
   const [suggesting, setSuggestingMode] = useState(false);
   const wide = useSyncExternalStore(subscribeWide, isWide, () => true);
+  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
 
   const session = useNoteCollab({ orgId, noteId: note.id, initial: collab });
   // The collaborative editor, once joined (it stays, read-only, if the
@@ -753,6 +754,8 @@ export function NoteEditorShell({
             size="icon-sm"
             aria-label="Version history"
             title="Version history"
+            // A phone: in the "…" menu, so the note's tools fit one row.
+            className="max-md:hidden"
             aria-pressed={showRail && railTab === "history"}
             onClick={() =>
               showRail && railTab === "history" ? setRailOpen(false) : openRail("history")
@@ -802,6 +805,12 @@ export function NoteEditorShell({
                 onSelect: () => void download("docx"),
               },
               { label: "Download Markdown", icon: Download, onSelect: () => void download("md") },
+              phone && {
+                label: "Version history",
+                icon: History,
+                onSelect: () => openRail("history"),
+                separated: true,
+              },
               { label: "Copy link", icon: Link2, onSelect: copyLink, separated: true },
               canMakeTasks && {
                 label: "Make tasks from this note",
@@ -951,18 +960,38 @@ export function NoteEditorShell({
                       saveSettings({ icon: next });
                     }}
                   />
-                  <Input
-                    value={title}
-                    disabled={!canType}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      queueSave({ title: e.target.value });
-                    }}
-                    placeholder="Untitled note"
-                    aria-label="Title"
-                    // Set like the page's title: no box, the display face, not faded when read-only.
-                    className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 text-[2rem] shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
-                  />
+                  {/* A phone: the title wraps onto more lines instead of running off the edge. */}
+                  {phone ? (
+                    <textarea
+                      value={title}
+                      disabled={!canType}
+                      rows={1}
+                      onChange={(e) => {
+                        const next = e.target.value.replace(/\n/g, " ");
+                        setTitle(next);
+                        queueSave({ title: next });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.preventDefault();
+                      }}
+                      placeholder="Untitled note"
+                      aria-label="Title"
+                      className="page-title placeholder:text-muted-foreground [field-sizing:content] w-full resize-none bg-transparent text-[2rem] outline-none disabled:cursor-default"
+                    />
+                  ) : (
+                    <Input
+                      value={title}
+                      disabled={!canType}
+                      onChange={(e) => {
+                        setTitle(e.target.value);
+                        queueSave({ title: e.target.value });
+                      }}
+                      placeholder="Untitled note"
+                      aria-label="Title"
+                      // Set like the page's title: no box, the display face, not faded when read-only.
+                      className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 text-[2rem] shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
+                    />
+                  )}
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
                     <span>
                       Edited{" "}
@@ -1228,12 +1257,25 @@ function SaveIndicator({
 }
 
 const WIDE = "(min-width: 1024px)";
+/** Below md: the phone's layout of the note's tools. */
+const PHONE = "(max-width: 767px)";
 
 function subscribeWide(onChange: () => void) {
   if (typeof window.matchMedia !== "function") return () => undefined;
   const query = window.matchMedia(WIDE);
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
+}
+
+function subscribePhone(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function isPhone() {
+  return typeof window.matchMedia === "function" && window.matchMedia(PHONE).matches;
 }
 
 function isWide() {

@@ -7,18 +7,17 @@ import { CommandPalette } from "@/components/command-palette/command-palette";
 import { PinsProvider } from "@/components/pins/pins-context";
 import { GlassRefraction } from "@/components/shell/glass-refraction";
 import { KeyboardShortcuts } from "@/components/shell/keyboard-shortcuts";
+import { NavMenu } from "@/components/shell/nav-menu";
 import { createActions, type NavSection } from "@/components/shell/nav-config";
 import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { VisitTracker } from "@/components/shell/pin-button";
 import { SectionGate } from "@/components/shell/section-gate";
-import { SidebarModeProvider, type SidebarState } from "@/components/shell/sidebar-mode-context";
+import { type SidebarState } from "@/components/shell/sidebar-mode-context";
 import { SidebarNav, type SidebarPin } from "@/components/shell/sidebar-nav";
-import { SidebarBody, SidebarPanel } from "@/components/shell/sidebar-panel";
+import { SidebarPanel } from "@/components/shell/sidebar-panel";
 import { SpaceList } from "@/components/shell/space-list";
-import { TabBar } from "@/components/shell/tab-bar";
 import { ToolCapsule } from "@/components/shell/tool-capsule";
 import type { OrgSummary, ShellUser } from "@/components/shell/types";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/toaster";
 import type { Role } from "@/generated/prisma/enums";
 import { serializeSidebarCookie, type SidebarMode } from "@/lib/sidebar-mode";
@@ -32,10 +31,14 @@ import { cn } from "@/lib/utils";
  *   server renders the right one;
  * - the tool capsule (tool-capsule.tsx) at the top right, in place of the
  *   old top bar;
- * - below md, the tab bar (tab-bar.tsx), whose More opens the sidebar in a
- *   sheet;
+ * - below md, the menu button at the left of the tool capsule
+ *   (nav-menu.tsx), which opens the phone's full-screen menu;
  * - the corona (globals.css) drifting behind the top of the page, and the
  *   glass's refraction filter, mounted once.
+ *
+ * Below md, <main> clips sideways overflow: one wide row must never let
+ * the whole page slide (and the phone zoom out). Wide content scrolls in
+ * its own container instead.
  *
  * `--shell-top` and `--shell-bottom` are the room the floating chrome takes
  * at the top and bottom, for pages with sticky bars of their own.
@@ -94,7 +97,6 @@ export function AppShell({
   banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
   const [mode, setMode] = useState<SidebarState>(sidebarMode);
   // Each opening is a new session (a fresh palette: empty box, no stale results).
   const [command, setCommand] = useState({ open: false, session: 0 });
@@ -164,7 +166,7 @@ export function AppShell({
       <div
         className={cn(
           "corona isolate grid min-h-svh grid-cols-1",
-          "[--shell-bottom:calc(env(safe-area-inset-bottom)+5.5rem)] [--shell-top:4.25rem] md:[--shell-bottom:0px] md:[--shell-top:4.5rem]",
+          "[--shell-bottom:calc(env(safe-area-inset-bottom)+1rem)] [--shell-top:4.25rem] md:[--shell-bottom:0px] md:[--shell-top:4.5rem]",
           "motion-reduce:transition-none md:transition-[grid-template-columns] md:duration-500 md:ease-(--ease-ink)",
           mode === "docked"
             ? "md:grid-cols-[248px_minmax(0,1fr)]"
@@ -185,6 +187,7 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-col">
           <ToolCapsule
+            menuButton={<NavMenu sections={sections} clubMenu={clubMenu} />}
             orgId={orgId}
             orgSlug={orgSlug}
             user={user}
@@ -193,44 +196,16 @@ export function AppShell({
           />
           <main
             id="main-content"
-            className="reveal-page relative isolate min-w-0 flex-1 py-4 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] md:p-6"
+            className="reveal-page relative isolate min-w-0 flex-1 py-4 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] max-md:overflow-x-clip md:p-6"
           >
             {banner}
             <SectionGate orgSlug={orgSlug} sectionPaths={sectionPaths} isAdmin={isAdmin}>
               {children}
             </SectionGate>
           </main>
-          {/* Room under the last of the page for the phone's tab bar. */}
+          {/* Room under the last of the page, clear of the home indicator. */}
           <div aria-hidden="true" className="h-(--shell-bottom) shrink-0 md:hidden" />
         </div>
-
-        <TabBar
-          orgId={orgId}
-          orgSlug={orgSlug}
-          sections={sections}
-          createActions={creatable}
-          moreOpen={moreOpen}
-          onMore={() => setMoreOpen(true)}
-        />
-        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetContent
-            side="left"
-            className="bg-sidebar text-sidebar-foreground flex w-[300px] flex-col gap-0 p-3.5 pt-4 md:hidden"
-          >
-            <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SheetDescription className="sr-only">
-              Every section, your pins, and your clubs.
-            </SheetDescription>
-            <SidebarModeProvider value={{ mode: "docked" }}>
-              <SidebarBody
-                clubMenu={<div className="pr-9">{clubMenu}</div>}
-                onNavigate={() => setMoreOpen(false)}
-              >
-                {nav(() => setMoreOpen(false))}
-              </SidebarBody>
-            </SidebarModeProvider>
-          </SheetContent>
-        </Sheet>
 
         <VisitTracker orgId={orgId} />
         <KeyboardShortcuts

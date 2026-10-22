@@ -376,56 +376,70 @@ export function NotesNewMenu({
 
   return (
     <>
-      {/* New note, with every other way to add something under its chevron. */}
-      <CreateSplitButton
-        label="New note"
-        pending={pending}
-        onClick={() => fromTemplate(null)}
-        menuLabel="More ways to add notes and files"
-      >
-        <DropdownMenuItem onSelect={() => fromTemplate(null)}>
-          <NotebookPen className="size-4" aria-hidden="true" />
-          New note
-        </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <LayoutTemplate className="size-4" aria-hidden="true" />
-            Note from a template
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-64">
-            {NOTE_TEMPLATES.map((t) => {
-              const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
-              return (
-                <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
-                  <Icon className="size-4" aria-hidden="true" />
-                  <span className="flex flex-col">
-                    {t.title}
-                    <span className="text-muted-foreground text-xs">{t.description}</span>
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => show("upload")}>
+      {/* One group on a phone, so the page header keeps Upload beside New note, at the top right. */}
+      <div className="contents max-md:flex max-md:items-center max-md:gap-2">
+        {/* A phone: Upload one tap away, left of New note (the computer has it under the chevron). */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="md:hidden"
+          onClick={() => show("upload")}
+        >
           <Upload className="size-4" aria-hidden="true" />
-          Upload a file
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => show("word")}>
-          <FileText className="size-4" aria-hidden="true" />
-          Import a Word document
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => show("google")}>
-          <Globe className="size-4" aria-hidden="true" />
-          Import a Google Doc
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => show("folder")}>
-          <FolderPlus className="size-4" aria-hidden="true" />
-          New folder
-        </DropdownMenuItem>
-      </CreateSplitButton>
+          Upload
+        </Button>
+        {/* New note, with every other way to add something under its chevron. */}
+        <CreateSplitButton
+          label="New note"
+          pending={pending}
+          onClick={() => fromTemplate(null)}
+          menuLabel="More ways to add notes and files"
+        >
+          <DropdownMenuItem onSelect={() => fromTemplate(null)}>
+            <NotebookPen className="size-4" aria-hidden="true" />
+            New note
+          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <LayoutTemplate className="size-4" aria-hidden="true" />
+              Note from a template
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64">
+              {NOTE_TEMPLATES.map((t) => {
+                const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
+                return (
+                  <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
+                    <Icon className="size-4" aria-hidden="true" />
+                    <span className="flex flex-col">
+                      {t.title}
+                      <span className="text-muted-foreground text-xs">{t.description}</span>
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => show("upload")}>
+            <Upload className="size-4" aria-hidden="true" />
+            Upload a file
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("word")}>
+            <FileText className="size-4" aria-hidden="true" />
+            Import a Word document
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("google")}>
+            <Globe className="size-4" aria-hidden="true" />
+            Import a Google Doc
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => show("folder")}>
+            <FolderPlus className="size-4" aria-hidden="true" />
+            New folder
+          </DropdownMenuItem>
+        </CreateSplitButton>
+      </div>
 
       <Dialog open={open === "folder"} onOpenChange={(o) => setOpen(o ? "folder" : null)}>
         <DialogContent className="sm:max-w-sm">

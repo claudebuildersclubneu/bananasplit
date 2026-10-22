@@ -1,11 +1,20 @@
 "use client";
 
-import { Building2, LayoutGrid, Lock, type LucideIcon } from "lucide-react";
+import { Building2, Check, LayoutGrid, Lock, Menu, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { chipClass } from "@/components/ui/segmented";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { chipClass, segmentedItem, segmentedTrack } from "@/components/ui/segmented";
 import { cn } from "@/lib/utils";
 
 import { SETTINGS_ICONS } from "./settings-icons";
@@ -60,7 +69,8 @@ function NavRow({
 /**
  * Admin panel navigation: a grouped list in a card beside the page on wide
  * screens (the open page a filled pill), a scrolling strip of pills on a
- * phone.
+ * tablet, and on a phone the open page with a menu button beside it that
+ * drops down every page under its group (as Finance's tabs do there).
  */
 export function SettingsSubnav({
   items,
@@ -76,10 +86,81 @@ export function SettingsSubnav({
   const overview = `/app/${orgSlug}/settings`;
   const onOverview = pathname === overview;
 
+  const activeItem = items.find((item) => isSettingsItemActive(item, pathname));
+  const CurrentIcon = onOverview
+    ? LayoutGrid
+    : activeItem
+      ? (SETTINGS_ICONS[activeItem.icon] ?? Building2)
+      : LayoutGrid;
+  const currentLabel = onOverview
+    ? personal
+      ? "Settings"
+      : "Overview"
+    : (activeItem?.label ?? (personal ? "Settings" : "Admin panel"));
+
   return (
     <nav aria-label="Admin panel">
-      {/* Phone and tablet: one scrolling row of pills, the open page filled. */}
-      <div className="-mx-4 [scrollbar-width:none] overflow-x-auto px-4 pb-1 lg:hidden">
+      {/* Phone: the open page, and a menu of the rest. */}
+      <div className="flex items-center gap-2 md:hidden">
+        <span className={cn(segmentedTrack, "min-w-0 flex-1")}>
+          <span className={cn(segmentedItem(true), "w-full min-w-0 justify-center")}>
+            <CurrentIcon aria-hidden="true" />
+            <span className="truncate">{currentLabel}</span>
+          </span>
+        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              aria-label="Admin panel: other pages"
+            >
+              <Menu className="size-[18px]" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-[70svh] w-64 overflow-y-auto">
+            <DropdownMenuItem asChild>
+              <Link href={overview} aria-current={onOverview ? "page" : undefined}>
+                <LayoutGrid className="size-4" aria-hidden="true" />
+                {personal ? "Settings" : "Overview"}
+                {onOverview && <Check className="ms-auto size-4" aria-hidden="true" />}
+              </Link>
+            </DropdownMenuItem>
+            {SETTINGS_GROUPS.map((group) => {
+              const groupItems = items.filter((i) => i.group === group);
+              if (groupItems.length === 0) return null;
+              return (
+                <div key={group}>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+                    {group}
+                  </DropdownMenuLabel>
+                  {groupItems.map((item) => {
+                    const active = isSettingsItemActive(item, pathname);
+                    const Icon = SETTINGS_ICONS[item.icon] ?? Building2;
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link href={item.href} aria-current={active ? "page" : undefined}>
+                          <Icon className="size-4" aria-hidden="true" />
+                          {item.label}
+                          {item.locked && (
+                            <Lock className="ms-auto size-3.5 opacity-60" aria-hidden="true" />
+                          )}
+                          {active && <Check className="ms-auto size-4" aria-hidden="true" />}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Tablet: one scrolling row of pills, the open page filled. */}
+      <div className="-mx-4 [scrollbar-width:none] overflow-x-auto px-4 pb-1 max-md:hidden lg:hidden">
         <ul className="flex min-w-max gap-2">
           <li>
             <Link

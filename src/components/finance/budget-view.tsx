@@ -231,7 +231,7 @@ export function BudgetView({
                 Set how much each category may spend. Type a number and click away to save.
               </p>
             </div>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-5 max-md:w-full max-md:gap-4">
               {totals.budget > 0 && (
                 <Gauge
                   value={(totals.spent / totals.budget) * 100}
@@ -240,20 +240,24 @@ export function BudgetView({
                   className="[&_b]:text-[22px]"
                 />
               )}
-              <dl className="flex gap-6 text-right">
+              <dl className="flex gap-6 text-right max-md:min-w-0 max-md:flex-1 max-md:justify-between max-md:gap-3">
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Budgeted</dt>
-                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.budget)}</dd>
+                  <dd className="numeral mt-1 text-[22px] max-md:text-lg">
+                    {formatDollars(totals.budget)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Spent</dt>
-                  <dd className="numeral mt-1 text-[22px]">{formatDollars(totals.spent)}</dd>
+                  <dd className="numeral mt-1 text-[22px] max-md:text-lg">
+                    {formatDollars(totals.spent)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground text-[13px]">Left</dt>
                   <dd
                     className={cn(
-                      "numeral mt-1 text-[22px]",
+                      "numeral mt-1 text-[22px] max-md:text-lg",
                       totals.budget - totals.spent < 0 && "text-destructive",
                     )}
                   >

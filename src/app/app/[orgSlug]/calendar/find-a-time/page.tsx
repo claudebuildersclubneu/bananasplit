@@ -118,8 +118,9 @@ export default async function FindATimePage({
         </div>
       )}
 
+      {/* Not on a phone: the empty state and Offer times say it there. */}
       {items.length > 0 && (
-        <p className="text-muted-foreground text-[13px]">
+        <p className="text-muted-foreground text-[13px] max-md:hidden">
           {about} Each poll deletes itself {FIND_A_TIME_KEEP_DAYS} days after its last date.
         </p>
       )}

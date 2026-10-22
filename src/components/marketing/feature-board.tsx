@@ -240,7 +240,7 @@ export function FeatureBoard() {
         </span>
       </div>
 
-      <div className="flex flex-col gap-4 max-sm:-mx-6 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-6 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-6 max-sm:pb-1">
+      <div className="flex flex-col gap-4 max-sm:-mx-6 max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-px-6 max-sm:[scrollbar-width:none] max-sm:flex-row max-sm:items-start max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-6 max-sm:pb-1">
         <div className={ROW}>
           <OverviewTile />
           <CalendarTile />

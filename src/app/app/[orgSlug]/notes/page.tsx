@@ -20,7 +20,7 @@ import { planGate } from "@/server/billing/plan-gate";
 import { canManageStorage, readStorageUsed } from "@/server/storage/quota";
 import { storageBreakdown } from "@/server/storage/usage";
 
-import { NotesListFilters } from "./notes-list-filters";
+import { NotesFilterChoices, NotesListFilters } from "./notes-list-filters";
 import {
   countDeleted,
   getDeletedNotes,
@@ -227,6 +227,7 @@ export default async function NotesPage({
           }
         }
         filters={<NotesListFilters members={members} personal={personal} />}
+        sheetFilters={<NotesFilterChoices members={members} personal={personal} />}
         personal={personal}
       />
     </div>
