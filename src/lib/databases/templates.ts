@@ -24,6 +24,8 @@ export interface DatabaseTemplate {
   fields: TemplateField[];
   /** Empty rows it starts with (a spreadsheet's grid to type into). */
   rows?: number;
+  /** Offered in a Personal space too (the rest are for running a club). */
+  personal?: boolean;
 }
 
 export const DATABASE_TEMPLATES: readonly DatabaseTemplate[] = [
@@ -37,6 +39,7 @@ export const DATABASE_TEMPLATES: readonly DatabaseTemplate[] = [
       { name: "Name", type: "TEXT" },
       { name: "Notes", type: "LONG_TEXT" },
     ],
+    personal: true,
   },
   {
     id: "spreadsheet",
@@ -47,6 +50,7 @@ export const DATABASE_TEMPLATES: readonly DatabaseTemplate[] = [
     icon: "Sheet",
     fields: ["A", "B", "C", "D", "E", "F"].map((name) => ({ name, type: "TEXT" as const })),
     rows: 20,
+    personal: true,
   },
   {
     id: "roster",

@@ -9,10 +9,11 @@ plan from a9b3141 and the old free /rsvp pages.
 - **Personal**: every account has one, free forever. It is an Organization
   with `kind = PERSONAL`, `personalOwnerId` = the user, exactly one member
   (the owner). It holds personal tasks, a personal calendar, availability
-  polls (When2meet-style), RSVP event pages (Luma-style), and (Moonstone,
-  2026-10-19) notes and files. No members, invitations, roles, people, org
-  chart, finance, databases. It is on **Personal Free** (`FREE`) or
-  **Personal Plus** (`PERSONAL_PLUS`, $4 a month or $36 a year: themes,
+  polls (When2meet-style), RSVP event pages (Luma-style), (Moonstone,
+  2026-10-19) notes and files, and the databases its owner makes (see "Files
+  and Databases in Personal" below). No members, invitations, roles,
+  people, org chart, finance or reports. It is on **Personal Free** (`FREE`)
+  or **Personal Plus** (`PERSONAL_PLUS`, $4 a month or $36 a year: themes,
   calendar sync, AI imports, more storage); its owner switches in Settings ›
   Plan and storage.
 - **Club**: a shared space (`kind = CLUB`). Anyone can start one. A new club
@@ -98,7 +99,8 @@ dashboard ("Finish your profile" card).
 
 - The page uses the full width, like a club's Overview, and every block is
   the same card (icon, title, a link to its page), so both columns' headings
-  line up. Shortcuts to Tasks, Calendar, Find a time and RSVPs sit on the
+  line up. Shortcuts to Tasks, Calendar, Files, Databases, Find a time and
+  RSVPs sit on the
   same muted track as the Tasks layouts.
 - Your clubs (one row each: name, logo, role, next meeting, open tasks,
   unread), then Join a club (a code, right there) or Start a club.
@@ -118,7 +120,8 @@ switches (and is remembered). The menu at the top of the sidebar lists the
 same, then Join a club / Start a club. Home (`/app`) opens the last space
 used, else Personal.
 
-Personal's sidebar: Home, Tasks, Calendar, Find a time, RSVPs. A club's
+Personal's sidebar: Home, Tasks, Calendar, Files, Databases, Find a time,
+RSVPs. A club's
 default sidebar puts RSVPs right under Calendar and Find a time under Club,
 right after Polls; a club that saved its own sidebar before they existed
 gets them next to those sections too (wherever it moved them), hidden if it
@@ -156,3 +159,25 @@ responses, options and votes; a poll's scheduled event comes along. Tasks
 move with subtasks, comments, activity and reminders; labels are matched in
 the club by name or made there. (Projects became epics, which move like
 any top-level task.)
+
+## Files and Databases in Personal
+
+Files and Databases are on both Personal plans (`files` and `databases` are
+FREE in `src/lib/billing/features.ts`), with only what makes sense for one
+person:
+
+- **Files**: notes, uploads and folders are always private to the owner.
+  Nothing asks who can see a note or upload (the New menu and the drop zone
+  make them private), there's no Share button, no "who can see it" or
+  "added by" filter, and no lock or "shared" marks. "Make tasks from this
+  note" needs AI, so it shows on Personal Plus and not on Personal Free.
+- **Databases**: only the ones the owner makes (the Blank and Spreadsheet
+  templates, or an imported CSV/TSV/XLSX). Every space still gets the
+  built-in Sessions, Attendance, Signups, Ballots and People definitions at
+  creation (`app.ensure_org_defaults`), but a Personal space never lists
+  them: `LISTED_DEFINITIONS` (`src/server/databases/types.ts`) filters the
+  index, opening one by URL (404), search and pin search. No data source
+  (Personal Plus's data connection is for calendar sync), no Reports tab,
+  and the settings dialog doesn't ask who can see or edit it.
+- **Into a club**: Send to a club copies a note or file. Moving a Personal
+  database into a club isn't built yet.

@@ -30,9 +30,17 @@ const club: SpaceInfo = { kind: "CLUB", plan: "CLUB", trialEndsAt: null };
 const society: SpaceInfo = { kind: "CLUB", plan: "SOCIETY", trialEndsAt: null };
 
 describe("spaceIncludes", () => {
-  it("gives both Personal plans tasks (every view), the calendar and RSVP pages, polls, notes and files, and settings", () => {
+  it("gives both Personal plans tasks (every view), the calendar and RSVP pages, polls, notes and files, databases, and settings", () => {
     for (const space of [personal, plus]) {
-      for (const f of ["rsvp", "tasks", "taskViews", "polls", "admin", "files"] as const) {
+      for (const f of [
+        "rsvp",
+        "tasks",
+        "taskViews",
+        "polls",
+        "admin",
+        "files",
+        "databases",
+      ] as const) {
         expect(spaceIncludes(space, f, NOW)).toBe(true);
       }
     }
@@ -54,7 +62,6 @@ describe("spaceIncludes", () => {
       "labels",
       "people",
       "finance",
-      "databases",
       "reports",
       "integrations",
       "sidebar",

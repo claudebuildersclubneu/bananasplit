@@ -8,6 +8,7 @@ import { FILE_ICONS, FILE_LABELS } from "@/components/notes/file-card";
 import { DocumentPreview, FileActions } from "@/components/notes/file-preview";
 import { Badge } from "@/components/ui/badge";
 import { can } from "@/lib/auth/permissions";
+import { isPersonalSpace } from "@/lib/billing/space";
 import { familyOf, formatBytes } from "@/lib/files/types";
 import { getOrgContextBySlug } from "@/server/db/context";
 import { docxToHtml, FileRejectedError, readNoteFile } from "@/server/notes/files";
@@ -95,17 +96,20 @@ export default async function NoteFilePage({
               <span>
                 {row.uploadedBy.name ?? "A member"}, {format(row.createdAt, "MMM d, yyyy")}
               </span>
-              <Badge
-                variant={row.visibility === "PRIVATE" ? "outline" : "secondary"}
-                className="gap-1"
-              >
-                {row.visibility === "PRIVATE" ? (
-                  <Lock className="size-3" aria-hidden="true" />
-                ) : (
-                  <Users className="size-3" aria-hidden="true" />
-                )}
-                {row.visibility === "PRIVATE" ? "Only you" : "Everyone in the club"}
-              </Badge>
+              {/* In Personal everything is its owner's alone. */}
+              {!isPersonalSpace(org) && (
+                <Badge
+                  variant={row.visibility === "PRIVATE" ? "outline" : "secondary"}
+                  className="gap-1"
+                >
+                  {row.visibility === "PRIVATE" ? (
+                    <Lock className="size-3" aria-hidden="true" />
+                  ) : (
+                    <Users className="size-3" aria-hidden="true" />
+                  )}
+                  {row.visibility === "PRIVATE" ? "Only you" : "Everyone in the club"}
+                </Badge>
+              )}
             </p>
           </div>
         </div>

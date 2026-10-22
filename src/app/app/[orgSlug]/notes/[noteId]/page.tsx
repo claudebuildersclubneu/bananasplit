@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { NoteEditorShell } from "@/components/notes/note-editor-shell";
 import { handleAuthErrorInPage } from "@/lib/auth/handle-auth-error";
+import { isPersonalSpace, spaceIncludes } from "@/lib/billing/space";
 import { collabConfig } from "@/lib/collab/config";
 import { noteHistoryWindowDays } from "@/lib/notes/history";
 import { canEditNote, canShareNote, generalAccessOf, toNoteAccess } from "@/lib/notes/access";
@@ -87,6 +88,8 @@ export default async function NoteDetailPage({
       canEdit={canEdit}
       events={events}
       collab={collab}
+      personal={isPersonalSpace(org)}
+      canMakeTasks={!isPersonalSpace(org) || spaceIncludes(org, "ai")}
       sharing={{
         canShare: canShareNote(actor, access),
         isAuthor: access.authorId === user.id,

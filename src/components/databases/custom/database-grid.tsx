@@ -198,6 +198,7 @@ export function DatabaseGrid({
   members,
   trash,
   timezone,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
@@ -206,6 +207,8 @@ export function DatabaseGrid({
   trash: boolean;
   /** The club's time zone, for when rows were deleted (the same on the server and in the browser). */
   timezone: string;
+  /** A Personal space: settings don't ask who can see or edit it. */
+  personal?: boolean;
 }) {
   const [confirmEl, confirm] = useConfirm();
   const [fields, setFields] = useState(database.fields);
@@ -973,6 +976,7 @@ export function DatabaseGrid({
           database={database}
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
+          personal={personal}
         />
       )}
     </div>
