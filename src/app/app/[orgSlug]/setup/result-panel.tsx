@@ -328,7 +328,8 @@ function CalendarResult({
       </dl>
       <p className="text-muted-foreground text-sm">
         From now on, a session you create here appears on that calendar within a minute. The portal
-        only ever touches events it created itself.
+        only changes the events it mirrors, and reads other events only if you run the import from
+        the public calendar.
       </p>
       <PanelSection title="Now worth opening">
         <ul className="grid gap-2 sm:grid-cols-2">

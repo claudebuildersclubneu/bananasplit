@@ -181,8 +181,11 @@ same poll, while it is open. The RLS cases are `P-QPOLL-01`..`06` in
 1. **Settings > Integrations > Google Calendar > Connect**, signed in to
    Google as the account that owns the club's public calendar (for CBC: the
    club Gmail). Only owners and admins can connect or disconnect.
-2. Pick the **public calendar** (where public events go). Optionally pick a
-   separate **internal calendar** for board-only events; without one,
+2. Pick the **public calendar** (where public events go, and the only one
+   the import reads). Until one is picked, or with *Don't mirror public
+   events*, public events are not on Google and there is nothing to import:
+   the portal never falls back to the account's primary calendar. Optionally
+   pick a separate **internal calendar** for board-only events; without one,
    internal events are simply not on Google. The internal calendar can never
    be the public one.
 3. Open **Calendar > Sync and website feed** and run the **import** (next
@@ -210,8 +213,9 @@ Calendar > Sync and website feed > **Import existing Google events** (the
 same card is on Settings > Integrations > Google Calendar while Google is
 connected):
 
-1. **Dry run** reads the public Google calendar (six months back to about a
-   year ahead) and reports *N linked, M new, K ambiguous*, with sample
+1. **Dry run** reads the public Google calendar you picked, and no other
+   (six months back to about a year ahead; with no public calendar picked
+   the import is refused), and reports *N linked, M new, K ambiguous*, with sample
    titles. Nothing is written.
 2. **Apply import** writes it:
    - an event the suite already has (created here, or synced from the
