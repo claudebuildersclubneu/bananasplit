@@ -4,12 +4,9 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarX2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Globe,
-  ImageUp,
-  Plus,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -18,12 +15,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { moveEvent } from "@/app/app/[orgSlug]/calendar/actions";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Segmented } from "@/components/ui/segmented";
 import {
   Select,
@@ -52,6 +43,7 @@ import { anchorFor, EventPeek, type PeekAnchor } from "./event-peek";
 import type { EventFormEvent } from "./event-form-dialog";
 import type { CalendarItem } from "./item";
 import { KIND_META, KIND_ORDER, kindStyle } from "./kinds";
+import { CALENDAR_CREATE_EVENT, type CalendarCreateDetail } from "./new-event-button";
 import { longDate, MonthGrid, monthLabel } from "./month-grid";
 import type { CalendarMember } from "./member-picker";
 import { WeekGrid } from "./week-grid";
@@ -249,6 +241,19 @@ export function EventCalendar({
     setDialog({ mode: "create", start, allDay });
   }
 
+  // The page header's New event (new-event-button.tsx) asks for a dialog.
+  useEffect(() => {
+    if (!canManage) return;
+    const onAsk = (e: Event) => {
+      const from = (e as CustomEvent<CalendarCreateDetail>).detail?.from;
+      setPeek(null);
+      if (from === "screenshot") setShotOpen(true);
+      else setDialog({ mode: "create", start: null, allDay: false });
+    };
+    window.addEventListener(CALENDAR_CREATE_EVENT, onAsk);
+    return () => window.removeEventListener(CALENDAR_CREATE_EVENT, onAsk);
+  }, [canManage]);
+
   /** A day cell's "+": most club events are evenings, so 6pm that day. */
   function addOn(dayKey: string) {
     const at = new Date(`${dayKey}T18:00:00`);
@@ -403,11 +408,13 @@ export function EventCalendar({
         </div>
 
         {/*
-          On a phone this is the view switcher alone, spanning the width,
-          its names centred: the arrows step back and forth, New event is
-          in the page header, and Today is a computer thing.
+          Today and the view switcher sit at the right, where New event used
+          to be (it's in the page header now, beside Google Calendar sync).
+          On a phone it is the switcher alone, spanning the width, its names
+          centred: the arrows step back and forth, and Today is a computer
+          thing.
         */}
-        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 md:ml-auto md:w-auto">
           <Button
             variant="outline"
             className="max-md:hidden"
@@ -424,51 +431,6 @@ export function EventCalendar({
             onSelect={(v) => setView(v as CalendarView)}
             options={VIEW_LABELS.map(({ view, label }) => ({ value: view, label }))}
           />
-
-          {canManage && (
-            // The one create action: New event, with "From a screenshot"
-            // folded into its menu. One glow for the pair, not one each.
-            // Not on a phone: there New event is in the page header, at
-            // the top right (NewEventButton).
-            <div className="glow-halo ml-auto flex rounded-full max-md:hidden md:ml-0">
-              <Button
-                variant="create"
-                className="rounded-r-none"
-                style={{ boxShadow: "none" }}
-                onClick={() => openCreate(null)}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                New event
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="create"
-                    className="border-brand-accent-foreground/15 rounded-l-none border-l pr-3 pl-2.5"
-                    style={{ boxShadow: "none" }}
-                    aria-label="More ways to add events"
-                  >
-                    <ChevronDown className="size-4" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
-                  <DropdownMenuItem onSelect={() => openCreate(null)}>
-                    <Plus className="size-4" aria-hidden="true" />
-                    New event
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setShotOpen(true)}>
-                    <ImageUp className="size-4" aria-hidden="true" />
-                    <span className="flex flex-col">
-                      From a screenshot
-                      <span className="text-muted-foreground text-xs">
-                        An invite, an email or a flyer
-                      </span>
-                    </span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
         </div>
       </div>
 

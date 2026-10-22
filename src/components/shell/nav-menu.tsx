@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Menu, Settings, X } from "lucide-react";
+import { FileText, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -27,13 +27,10 @@ import { cn } from "@/lib/utils";
 export function NavMenu({
   sections,
   clubMenu,
-  admin,
 }: {
   sections: readonly NavSection[];
-  /** The club menu (OrgSwitcher), as the sidebar shows it. */
+  /** The club menu (OrgSwitcher), as the sidebar shows it; it has the Admin panel. */
   clubMenu: ReactNode;
-  /** The Admin panel (owners and admins), at the foot of the list. */
-  admin?: { href: string; label: string };
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -112,17 +109,6 @@ export function NavMenu({
                 </div>
               );
             })}
-            {admin && (
-              <div className="border-t pt-4">
-                <Row
-                  href={admin.href}
-                  icon={Settings}
-                  label={admin.label}
-                  current={pathname.startsWith(admin.href) ? "true" : undefined}
-                  onNavigate={close}
-                />
-              </div>
-            )}
           </nav>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

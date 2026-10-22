@@ -139,6 +139,7 @@ export function WidgetBoard({
   notice,
   headerActions,
   belowIntro,
+  footer,
   hiddenOnPhone = [],
 }: {
   types: readonly WidgetMeta[];
@@ -160,6 +161,8 @@ export function WidgetBoard({
   headerActions?: Readonly<Record<string, ReactNode>>;
   /** A full-width line under the title row (the Overview's stat strip). */
   belowIntro?: ReactNode;
+  /** Below the widgets (the Overview's setup prompt, so Up next stays first). */
+  footer?: ReactNode;
   /** Widget types a phone leaves out. */
   hiddenOnPhone?: readonly string[];
 }) {
@@ -518,6 +521,7 @@ export function WidgetBoard({
           )}
         </DialogContent>
       </Dialog>
+      {footer}
     </div>
   );
 }

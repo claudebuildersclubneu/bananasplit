@@ -2,6 +2,7 @@ import { CircleCheck } from "lucide-react";
 
 import { dueLabel } from "@/lib/overview/format";
 import { dueDateKey } from "@/lib/tasks/dates";
+import { epicColor, epicOf } from "@/lib/tasks/epic";
 import type { TaskExtras } from "@/server/overview/queries";
 import type { MyOpenTask } from "@/server/tasks/queries";
 
@@ -35,14 +36,19 @@ export function MyTasksCard({
   }
   const rows: TaskRowData[] = tasks.map((task) => {
     const extra = extras.get(task.id);
+    const epic = epicOf({ ...task, type: "TASK" });
     return {
       id: task.id,
       title: task.title,
       href: `/app/${orgSlug}/tasks/${task.id}`,
       status: task.status,
       private: task.visibility === "PRIVATE",
-      project: task.project ? { name: task.project.name, color: extra?.projectColor ?? null } : null,
-      context: task.parentTask ? `Subtask of ${task.parentTask.title}` : null,
+      epic:
+        epic && epic.id !== task.parentTask?.id
+          ? { name: epic.title, color: epicColor(epic) }
+          : null,
+      // The epic or story it sits in (an epic shows as its chip when it's further up).
+      context: task.parentTask ? `Part of ${task.parentTask.title}` : null,
       due: task.dueDate ? dueLabel(dueDateKey(task.dueDate), todayKey) : null,
       high: extra?.priority === "HIGH",
     };

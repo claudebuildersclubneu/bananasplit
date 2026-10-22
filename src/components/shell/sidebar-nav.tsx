@@ -15,7 +15,6 @@ import {
   NotebookText,
   Pin,
   Plus,
-  ShieldCheck,
   Ticket,
   Users,
   Wallet,
@@ -338,23 +337,19 @@ export function SidebarNav({
   orgId,
   pins = [],
   spaces,
-  admin,
   onNavigate,
 }: {
   sections: NavSection[];
   orgId: string;
   pins?: SidebarPin[];
-  /** Personal and the clubs (SpaceList), under the pins; folded away on the rail. */
+  /** Personal and the clubs (SpaceList), at the foot; folded away on the rail. */
   spaces?: React.ReactNode;
-  /** The Admin panel (owners and admins), so it's one click away, not only in the club menu. */
-  admin?: { href: string; label: string };
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
   const search = useSearchParams().toString();
-  const { rail, chrome } = useSidebarMode();
+  const { rail } = useSidebarMode();
   const all = sections.flatMap((s) => s.items);
-  const adminActive = admin ? pathname.startsWith(admin.href) : false;
 
   return (
     <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col">
@@ -379,23 +374,6 @@ export function SidebarNav({
             ))}
           </div>
         ))}
-        {admin && (
-          <div className="mt-2 flex flex-col">
-            <Link
-              href={admin.href}
-              onClick={onNavigate}
-              aria-current={adminActive ? "true" : undefined}
-              className={sidebarItemClass({ active: adminActive, rail, chrome })}
-            >
-              <ShieldCheck
-                className="size-5 shrink-0"
-                strokeWidth={ICON_STROKE}
-                aria-hidden="true"
-              />
-              <span className={cn("truncate", fadeLabel(rail))}>{admin.label}</span>
-            </Link>
-          </div>
-        )}
         <PinnedList
           pins={pins}
           orgId={orgId}
@@ -403,12 +381,14 @@ export function SidebarNav({
           search={search}
           onNavigate={onNavigate}
         />
-        {spaces && (
-          <Fold open={!rail} className="mt-1">
-            {spaces}
-          </Fold>
-        )}
       </div>
+      {/* Personal and the clubs: at the foot of the sidebar, never pushed
+          under the pins (they scroll on their own when there are many). */}
+      {spaces && (
+        <Fold open={!rail} className="border-border/60 mt-1 shrink-0 border-t pt-2">
+          <div className="max-h-[40vh] overflow-y-auto">{spaces}</div>
+        </Fold>
+      )}
     </nav>
   );
 }

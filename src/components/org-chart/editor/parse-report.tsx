@@ -6,7 +6,7 @@ import type { ParseMethod, ParseReport, ParseShape } from "@/lib/org-chart/types
 
 /**
  * Where this draft came from and what was understood, shown above the
- * editor so an admin knows what to check. Nothing here changes the draft;
+ * editor so whoever is editing knows what to check. Nothing here changes the draft;
  * the rule that nothing publishes without a human review is unchanged.
  */
 

@@ -16,6 +16,7 @@ import {
   MessageSquare,
   PanelLeft,
   PanelRightClose,
+  PanelTop,
   PencilLine,
   RotateCcw,
   Trash2,
@@ -61,6 +62,7 @@ import {
   type CommentDraft,
 } from "@/components/notes/workspace/comments-panel";
 import { HistoryPanel, type PreviewVersion } from "@/components/notes/workspace/history-panel";
+import { HeaderFooterDialog } from "@/components/notes/workspace/header-footer-dialog";
 import { IconPicker } from "@/components/notes/workspace/icon-picker";
 import { NotesTree, type TreePage } from "@/components/notes/workspace/notes-tree";
 import { SuggestionsPanel } from "@/components/notes/workspace/suggestions-panel";
@@ -72,6 +74,7 @@ import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toaster";
+import { bandFooter, bandHeader } from "@/lib/notes/paper";
 import { noteSchemaExtensions } from "@/lib/notes/schema-extensions";
 import { NOTE_TRASH_DAYS } from "@/lib/notes/trash";
 import { cn } from "@/lib/utils";
@@ -103,6 +106,9 @@ export interface NoteWorkspace {
   parentId: string | null;
   layout: Layout;
   paperSize: Paper;
+  /** Document mode's header and footer text (null: the default). */
+  headerText: string | null;
+  footerText: string | null;
   updatedAt: string;
   updatedByName: string | null;
   /** ?comment= in the link from a notification. */
@@ -134,6 +140,13 @@ export interface NoteEditorShellProps {
    */
   collab?: NoteCollabSession | null;
   workspace?: NoteWorkspace;
+  /** A Personal space: the note is its owner's alone, so there's no Share button. */
+  personal?: boolean;
+  /**
+   * Offer "Make tasks from this note" (an AI import): clubs, and Personal
+   * Plus, which has AI; Personal Free doesn't.
+   */
+  canMakeTasks?: boolean;
 }
 
 const EMPTY_WORKSPACE: NoteWorkspace = {
@@ -147,6 +160,8 @@ const EMPTY_WORKSPACE: NoteWorkspace = {
   parentId: null,
   layout: "PAGE",
   paperSize: "LETTER",
+  headerText: null,
+  footerText: null,
   updatedAt: new Date(0).toISOString(),
   updatedByName: null,
   focusCommentId: null,
@@ -175,12 +190,19 @@ export function NoteEditorShell({
   sharing,
   collab = null,
   workspace = EMPTY_WORKSPACE,
+  personal = false,
+  canMakeTasks = true,
 }: NoteEditorShellProps) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
   const [eventId, setEventId] = useState(note.eventId);
   const [layout, setLayout] = useState<Layout>(workspace.layout);
   const [paperSize, setPaperSize] = useState<Paper>(workspace.paperSize);
+  const [bands, setBands] = useState({
+    headerText: workspace.headerText,
+    footerText: workspace.footerText,
+  });
+  const [bandsOpen, setBandsOpen] = useState(false);
   const [icon, setIcon] = useState<string | null>(workspace.icon);
   const versionRef = useRef(note.version);
   const contentRef = useRef({ json: note.contentJson, text: note.contentText });
@@ -336,7 +358,13 @@ export function NoteEditorShell({
   }
 
   // ---- Page settings ------------------------------------------------------------
-  function saveSettings(patch: { icon?: string | null; layout?: Layout; paperSize?: Paper }) {
+  function saveSettings(patch: {
+    icon?: string | null;
+    layout?: Layout;
+    paperSize?: Paper;
+    headerText?: string | null;
+    footerText?: string | null;
+  }) {
     void updateNoteSettings(orgId, note.id, patch).then((r) => {
       if (r.error) toast({ title: r.error, tone: "error" });
       else router.refresh();
@@ -502,6 +530,8 @@ export function NoteEditorShell({
       },
       title,
       orgName: workspace.orgName,
+      headerText: bands.headerText,
+      footerText: bands.footerText,
     }),
     [
       orgId,
@@ -513,6 +543,7 @@ export function NoteEditorShell({
       workspace.pages,
       title,
       workspace.orgName,
+      bands,
     ],
   );
 
@@ -689,13 +720,15 @@ export function NoteEditorShell({
           ) : (
             <Badge variant="secondary">View only</Badge>
           )}
-          <ShareNoteDialog
-            orgId={orgId}
-            orgSlug={orgSlug}
-            noteId={note.id}
-            title={title}
-            sharing={sharing}
-          />
+          {!personal && (
+            <ShareNoteDialog
+              orgId={orgId}
+              orgSlug={orgSlug}
+              noteId={note.id}
+              title={title}
+              sharing={sharing}
+            />
+          )}
           <Button
             type="button"
             variant="outline"
@@ -754,6 +787,12 @@ export function NoteEditorShell({
                     saveSettings({ paperSize: next });
                   },
                 },
+              canEdit &&
+                isDocument && {
+                  label: "Header and footer…",
+                  icon: PanelTop,
+                  onSelect: () => setBandsOpen(true),
+                },
               {
                 label: "Download PDF",
                 icon: Download,
@@ -773,7 +812,7 @@ export function NoteEditorShell({
                 separated: true,
               },
               { label: "Copy link", icon: Link2, onSelect: copyLink, separated: true },
-              {
+              canMakeTasks && {
                 label: "Make tasks from this note",
                 icon: ListChecks,
                 onSelect: () =>
@@ -901,104 +940,117 @@ export function NoteEditorShell({
             />
           ) : (
             <>
-              <header className={cn("space-y-2", isDocument && "mx-auto max-w-[816px]")}>
-                <IconPicker
-                  icon={icon}
-                  disabled={!canType}
-                  onChange={(next) => {
-                    setIcon(next);
-                    saveSettings({ icon: next });
-                  }}
-                />
-                {/* A phone: the title wraps onto more lines instead of running off the edge. */}
-                {phone ? (
-                  <textarea
-                    value={title}
+              <div
+                className={cn(
+                  "space-y-4",
+                  // Page mode writes on a sheet of its own, like a card in
+                  // Files; Document mode's paper is the sheet.
+                  !isDocument &&
+                    "bg-card text-card-foreground edge rounded-card px-5 py-7 sm:px-12 sm:py-10",
+                )}
+              >
+                <header
+                  className={cn("group/note-head space-y-2", isDocument && "mx-auto max-w-[816px]")}
+                >
+                  <IconPicker
+                    icon={icon}
                     disabled={!canType}
-                    rows={1}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/\n/g, " ");
-                      setTitle(next);
-                      queueSave({ title: next });
+                    onChange={(next) => {
+                      setIcon(next);
+                      saveSettings({ icon: next });
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.preventDefault();
+                  />
+                  {/* A phone: the title wraps onto more lines instead of running off the edge. */}
+                  {phone ? (
+                    <textarea
+                      value={title}
+                      disabled={!canType}
+                      rows={1}
+                      onChange={(e) => {
+                        const next = e.target.value.replace(/\n/g, " ");
+                        setTitle(next);
+                        queueSave({ title: next });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.preventDefault();
+                      }}
+                      placeholder="Untitled note"
+                      aria-label="Title"
+                      className="page-title placeholder:text-muted-foreground [field-sizing:content] w-full resize-none bg-transparent text-[2rem] outline-none disabled:cursor-default"
+                    />
+                  ) : (
+                    <Input
+                      value={title}
+                      disabled={!canType}
+                      onChange={(e) => {
+                        setTitle(e.target.value);
+                        queueSave({ title: e.target.value });
+                      }}
+                      placeholder="Untitled note"
+                      aria-label="Title"
+                      // Set like the page's title: no box, the display face, not faded when read-only.
+                      className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 text-[2rem] shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 md:text-[2.5rem] dark:bg-transparent"
+                    />
+                  )}
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                    <span>
+                      Edited{" "}
+                      {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true })}
+                      {workspace.updatedByName ? ` by ${workspace.updatedByName}` : ""}
+                    </span>
+                    <EventLinkPicker
+                      events={events}
+                      value={eventId}
+                      disabled={!canType}
+                      onChange={(id) => {
+                        setEventId(id);
+                        queueSave({ eventId: id });
+                      }}
+                    />
+                  </div>
+                </header>
+
+                {live ? (
+                  <NoteEditor
+                    // A new session (another Y.Doc) needs a new editor bound to it.
+                    key={live.doc.guid}
+                    collaboration={{ doc: live.doc, provider: live.provider, user: live.user }}
+                    editable={canType}
+                    layout={layout}
+                    paperSize={paperSize}
+                    place={place}
+                    canComment
+                    onComment={startComment}
+                    onEditor={onEditor}
+                    onClickThread={(id) => {
+                      setActiveThread(id);
+                      openRail("comments");
                     }}
-                    placeholder="Untitled note"
-                    aria-label="Title"
-                    className="page-title placeholder:text-muted-foreground [field-sizing:content] w-full resize-none bg-transparent text-[2rem] outline-none disabled:cursor-default"
+                    onCreateSubpage={createSubpage}
                   />
                 ) : (
-                  <Input
-                    value={title}
-                    disabled={!canType}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      queueSave({ title: e.target.value });
+                  <NoteEditor
+                    key={`autosave-${restored?.n ?? 0}`}
+                    content={restored?.json ?? note.contentJson}
+                    editable={canType}
+                    layout={layout}
+                    paperSize={paperSize}
+                    place={place}
+                    canComment
+                    onComment={startComment}
+                    onEditor={onEditor}
+                    onClickThread={(id) => {
+                      setActiveThread(id);
+                      openRail("comments");
                     }}
-                    placeholder="Untitled note"
-                    aria-label="Title"
-                    // Set like the page's title: no box, the display face, not faded when read-only.
-                    className="page-title h-auto min-w-0 border-none bg-transparent px-0 py-0 text-[2rem] shadow-none focus-visible:shadow-none focus-visible:ring-0 disabled:cursor-default disabled:bg-transparent disabled:opacity-100 max-md:hidden md:text-[2.5rem] dark:bg-transparent"
+                    onCreateSubpage={createSubpage}
+                    onChange={(json, text) => {
+                      contentRef.current = { json, text };
+                      queueSave({});
+                    }}
                   />
                 )}
-                <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-                  <span>
-                    Edited {formatDistanceToNow(new Date(workspace.updatedAt), { addSuffix: true })}
-                    {workspace.updatedByName ? ` by ${workspace.updatedByName}` : ""}
-                  </span>
-                  <EventLinkPicker
-                    events={events}
-                    value={eventId}
-                    disabled={!canType}
-                    onChange={(id) => {
-                      setEventId(id);
-                      queueSave({ eventId: id });
-                    }}
-                  />
-                </div>
-              </header>
-
-              {live ? (
-                <NoteEditor
-                  // A new session (another Y.Doc) needs a new editor bound to it.
-                  key={live.doc.guid}
-                  collaboration={{ doc: live.doc, provider: live.provider, user: live.user }}
-                  editable={canType}
-                  layout={layout}
-                  paperSize={paperSize}
-                  place={place}
-                  canComment
-                  onComment={startComment}
-                  onEditor={onEditor}
-                  onClickThread={(id) => {
-                    setActiveThread(id);
-                    openRail("comments");
-                  }}
-                  onCreateSubpage={createSubpage}
-                />
-              ) : (
-                <NoteEditor
-                  key={`autosave-${restored?.n ?? 0}`}
-                  content={restored?.json ?? note.contentJson}
-                  editable={canType}
-                  layout={layout}
-                  paperSize={paperSize}
-                  place={place}
-                  canComment
-                  onComment={startComment}
-                  onEditor={onEditor}
-                  onClickThread={(id) => {
-                    setActiveThread(id);
-                    openRail("comments");
-                  }}
-                  onCreateSubpage={createSubpage}
-                  onChange={(json, text) => {
-                    contentRef.current = { json, text };
-                    queueSave({});
-                  }}
-                />
-              )}
+              </div>
 
               {(subpages.length > 0 || workspace.backlinks.length > 0) && (
                 <footer
@@ -1049,6 +1101,21 @@ export function NoteEditorShell({
         </SheetContent>
       </Sheet>
       {confirmEl}
+      {bandsOpen && (
+        <HeaderFooterDialog
+          headerText={bands.headerText}
+          footerText={bands.footerText}
+          defaults={{
+            header: bandHeader({ title, orgName: workspace.orgName }),
+            footer: bandFooter({ title }),
+          }}
+          onSave={(next) => {
+            setBands(next);
+            saveSettings(next);
+          }}
+          onClose={() => setBandsOpen(false)}
+        />
+      )}
       {importText !== null && (
         <ActionItemsImport
           orgId={orgId}

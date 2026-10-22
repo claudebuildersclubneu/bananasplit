@@ -10,8 +10,8 @@ org and jumps to it, and does a few things without leaving the keyboard.
 | Pages and settings | Name, the org's own section names, and other words people use ("kanban", "dark mode", "pay me back") | The page |
 | Notes | Title and body, by full text: "quart" finds "quarterly" | The note, with the passage that matched |
 | Files and folders | Name, the file's text excerpt, its folder | The file, or the folder on Notes |
-| Tasks | Title, description, project, label, owner | The task |
-| Projects and labels | Name, description | The task board or table, filtered |
+| Tasks | Title, description, the epic or story it's in, tag, owner | The task |
+| Epics and tags | Epic title and description, tag name | The List filtered to the epic, or the table to the tag |
 | Events | Title, description, location, host | The event |
 | Polls | Title or question, description, the answer options | The poll |
 | People | Name, this org's title, major, pronouns; email for owners and admins | Their profile |

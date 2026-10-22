@@ -97,3 +97,55 @@ describe("chartTeams", () => {
     expect(chartTeams(chart).teams.map((t) => t.slot)).toEqual([1, 2, 3, 4, 5, 1, 2]);
   });
 });
+
+describe("named teams", () => {
+  const pos = (id: string, reportsToId: string | null, title: string, teamId: string | null = null) => ({
+    id,
+    reportsToId,
+    isAdvisor: false,
+    rank: id,
+    title,
+    userId: `u-${id}`,
+    teamId,
+  });
+
+  it("puts a direct report of the president on their own team, not Leadership", () => {
+    const named = [{ id: "fin", name: "Finance" }];
+    const { teams, teamOfUser } = chartTeams(
+      [pos("a", null, "President"), pos("b", "a", "Head of Finance", "fin"), pos("c", "a", "Secretary")],
+      named,
+    );
+    expect(teams.map((t) => t.name)).toEqual(["Leadership", "Finance"]);
+    expect(teamOfUser.get("u-b")).toBe("fin");
+    expect(teamOfUser.get("u-c")).toBe("leadership");
+  });
+
+  it("gives a position with no team its manager's", () => {
+    const named = [{ id: "ops", name: "Operations" }];
+    const { teamOfPosition } = chartTeams(
+      [pos("a", null, "President"), pos("b", "a", "VP Ops", "ops"), pos("c", "b", "Logistics")],
+      named,
+    );
+    expect(teamOfPosition.get("c")).toBe("ops");
+  });
+
+  it("keeps the shape's teams for branches with no named team", () => {
+    const named = [{ id: "fin", name: "Finance" }];
+    const { teams, teamOfPosition } = chartTeams(
+      [
+        pos("a", null, "President"),
+        pos("b", "a", "VP Growth"),
+        pos("c", "b", "Social lead"),
+        pos("d", "a", "Head of Finance", "fin"),
+      ],
+      named,
+    );
+    expect(teams.map((t) => t.name)).toEqual(["Leadership", "Growth", "Finance"]);
+    expect(teamOfPosition.get("c")).toBe("b");
+  });
+
+  it("derives teams from the chart's shape until one is named", () => {
+    const { teams } = chartTeams([pos("a", null, "President"), pos("b", "a", "Head of Finance")], []);
+    expect(teams.map((t) => t.name)).toEqual(["Leadership"]);
+  });
+});

@@ -15,8 +15,7 @@ test("notes: nested pages, slash menu, Document mode, comments and history", asy
   await page.waitForURL(/\/app\//);
 
   await page.goto("/app/robotics-club/notes");
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New note" }).click();
+  await page.getByRole("button", { name: "New note", exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[a-z0-9]+$/);
   const parent = `E2E showcase ${uniqueSuffix()}`;
   await page.getByPlaceholder("Untitled note").fill(parent);

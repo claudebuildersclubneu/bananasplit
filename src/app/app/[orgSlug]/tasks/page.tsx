@@ -1,4 +1,4 @@
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -18,7 +18,6 @@ import {
   updateWeekStartKey,
   updateWeekStartOfKey,
 } from "@/lib/tasks/dates";
-import { creationRights } from "@/lib/tasks/projects";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
 import { buildViewerChart, getChartForPage } from "@/server/tasks/assignment-policy";
@@ -29,7 +28,7 @@ import {
   getAgendaTasks,
   getBoardTasks,
   getOrgLabels,
-  getOrgProjects,
+  getOrgParents,
   getRoadmapEpics,
   getTableTasks,
   getTaskStats,
@@ -59,7 +58,6 @@ import {
   parseWorkspaceQuery,
   PHONE_HIDDEN_LAYOUTS,
   TASK_LIST_VIEW,
-  TASKS_VIEW_COOKIE,
   type WorkspaceQuery,
 } from "./views";
 
@@ -96,10 +94,9 @@ export default async function TasksPage({
     redirect(`/app/${orgSlug}/calendar`);
   }
 
-  const cookieStore = await cookies();
-  const parsed = parseWorkspaceQuery(query, cookieStore.get(TASKS_VIEW_COOKIE)?.value);
-  // The Free plan has the List only: any other ?view= (or a remembered
-  // layout) opens the List too, so a typed URL doesn't reach the others.
+  const parsed = parseWorkspaceQuery(query);
+  // The Free plan has the List only: any other ?view= opens the List too,
+  // so a typed URL doesn't reach the others.
   const simple = !spaceIncludes(org, "taskViews");
   // The weekly update is work between people: a Personal space has every
   // layout but not the update.
@@ -128,8 +125,8 @@ export default async function TasksPage({
   const base = await withOrgTx(org.id, async ({ db }) => {
     const me = await db.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
     const labels = await getOrgLabels(db, org.id);
-    const projects = await getOrgProjects(db, org.id);
-    return { tz: effectiveTimezone(me, org), labels, projects };
+    const parents = await getOrgParents(db, org.id);
+    return { tz: effectiveTimezone(me, org), labels, parents };
   });
   const todayKey = localDateKey(now, base.tz);
   const today = fromDateKey(todayKey);
@@ -156,7 +153,7 @@ export default async function TasksPage({
   const peopleIds =
     ws.scope === "mine" ? [user.id] : ws.scope === "team" ? [user.id, ...chart.subtree] : undefined;
   const filters: TaskFilters = {
-    projectId: ws.projectId,
+    epicId: ws.epicId,
     status: ws.status,
     ownerId: ws.ownerId,
     assigneeId: ws.assigneeId,
@@ -212,8 +209,7 @@ export default async function TasksPage({
       viewer={{ userId: user.id, name: user.name, isAdmin, chart }}
       members={members}
       labels={base.labels}
-      projects={base.projects}
-      can={creationRights(isAdmin, settings)}
+      parents={base.parents}
     >
       <WorkspaceProvider query={ws} hasReports={chart.subtree.length > 0} simple={simple}>
         <WorkspaceHeader

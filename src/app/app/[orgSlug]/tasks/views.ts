@@ -40,13 +40,14 @@ import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
  *   ?view=team                           the board
  */
 
+/** In the switcher's order: where things stand first, then the board it opens on. */
 export const TASK_LAYOUTS = [
+  { value: "dashboard", label: "Dashboard", hint: "Where things stand" },
   { value: "board", label: "Board", hint: "Move work along" },
   { value: "week", label: "Week", hint: "What is due, by when" },
   { value: "list", label: "List", hint: "Grouped by epic" },
   { value: "table", label: "Table", hint: "Filter and bulk-edit" },
   { value: "roadmap", label: "Roadmap", hint: "Epics on a timeline" },
-  { value: "dashboard", label: "Dashboard", hint: "Where things stand" },
 ] as const;
 
 export type TaskLayout = (typeof TASK_LAYOUTS)[number]["value"];
@@ -78,9 +79,10 @@ export const TASK_SCOPES = [
 
 export type TaskScope = (typeof TASK_SCOPES)[number]["value"];
 
-export const TASKS_VIEW_COOKIE = "cbc-tasks-view";
-
-/** The board is the first-visit default: the club's work, moving along. */
+/**
+ * Tasks always opens on the board (the club's work, moving along), whatever
+ * layout was last picked: only an explicit ?view= opens another.
+ */
 export const DEFAULT_TASK_LAYOUT: TaskLayout = "board";
 
 export function isLayout(value: unknown): value is TaskLayout {
@@ -93,7 +95,7 @@ export function isDestination(value: unknown): value is TaskDestination {
 
 /**
  * `view=mine` is the old name for "the week, just my work"; the retired
- * team layout, the retired request queue (?view=intake) and a remembered
+ * team layout, the retired request queue (?view=intake) and the old
  * calendar one open the board. A requested ?view=calendar is sent to the
  * Calendar by the page before this runs.
  */
@@ -112,7 +114,8 @@ export function parseScope(value: unknown): TaskScope | null {
 export interface WorkspaceQuery {
   view: TaskView;
   scope: TaskScope;
-  projectId?: string;
+  /** One epic's work (?epic=; the old ?project= links land here too: a project's epic kept its id). */
+  epicId?: string;
   status?: TaskStatus | "open";
   ownerId?: string;
   assigneeId?: string;
@@ -133,10 +136,9 @@ type Query = Record<string, string | string[] | undefined>;
 
 export function parseWorkspaceQuery(
   query: Query,
-  rememberedView: string | undefined,
 ): WorkspaceQuery {
   const raw = str(query.view);
-  const view = parseTaskView(raw) ?? parseTaskView(rememberedView) ?? DEFAULT_TASK_LAYOUT;
+  const view = parseTaskView(raw) ?? DEFAULT_TASK_LAYOUT;
   const ownerId = str(query.owner);
   const assigneeId = str(query.assignee);
   const statusParam = str(query.status);
@@ -161,7 +163,7 @@ export function parseWorkspaceQuery(
   return {
     view,
     scope,
-    projectId: str(query.project),
+    epicId: str(query.epic) ?? str(query.project),
     status,
     ownerId,
     assigneeId,
@@ -175,7 +177,7 @@ export function parseWorkspaceQuery(
   };
 }
 
-/** How many toolbar filters (beyond the scope and the project) are on. */
+/** How many toolbar filters (beyond the scope and the epic) are on. */
 export function activeFilterCount(q: WorkspaceQuery): number {
   return [
     q.status,
@@ -199,7 +201,7 @@ export function workspaceHref(
   const p = new URLSearchParams();
   p.set("view", q.view);
   if (q.scope && q.scope !== "all") p.set("scope", q.scope);
-  if (q.projectId) p.set("project", q.projectId);
+  if (q.epicId) p.set("epic", q.epicId);
   if (q.status) p.set("status", q.status);
   if (q.ownerId) p.set("owner", q.ownerId);
   if (q.assigneeId) p.set("assignee", q.assigneeId);

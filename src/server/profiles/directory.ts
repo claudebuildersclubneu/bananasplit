@@ -1,6 +1,6 @@
 import { Prisma, type Role } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/permissions";
-import { chartTeams, type ChartTeams } from "@/lib/org-chart/teams";
+import { chartTeams, parseNamedTeams, type ChartTeams } from "@/lib/org-chart/teams";
 import { parseStoredLinks, type ProfileLink } from "@/lib/profile/links";
 import { effectiveTimezone } from "@/lib/profile/timezone";
 import { parseQuery } from "@/lib/search/text";
@@ -18,7 +18,9 @@ import { termTrigrams } from "./trigrams";
  * Every read runs in the viewer's withOrgTx (app_user, RLS): a non-member
  * is refused before anything is read, the Membership join keeps former
  * members and other orgs' users out, and busy hours come only through
- * app.member_busy_hours (the org's setting, admins, the person). Emails
+ * app.member_busy_hours (the org's setting, admins, the person), with
+ * app.member_availability_shared saying whether there is anything to see
+ * (a member who never filled it in is not "free now"). Emails
  * are selected only when the viewer may see them (the person themselves,
  * owners and admins, or everyone when Privacy > "Members see each other's
  * emails" is on), exactly as Settings > Members decides.
@@ -49,7 +51,7 @@ export interface DirectoryPerson {
   joinedAt: string;
   /** The chart team (ChartTeam.key), or null when not on the published chart. */
   teamKey: string | null;
-  /** null when the viewer may not see their busy hours. */
+  /** null when the viewer may not see their busy hours, or they never shared any. */
   freeNow: boolean | null;
 }
 
@@ -114,11 +116,22 @@ export async function loadChartForPeople(db: Db, organizationId: string): Promis
           isAdvisor: true,
           isOpen: true,
           rank: true,
+          teamId: true,
           user: { select: userPublicSelect },
         },
       })
     : [];
-  return { positions, teams: chartTeams(positions) };
+  const named = versionId
+    ? parseNamedTeams(
+        (
+          await db.orgChartVersion.findFirst({
+            where: { id: versionId, organizationId },
+            select: { teams: true },
+          })
+        )?.teams,
+      )
+    : [];
+  return { positions, teams: chartTeams(positions, named) };
 }
 
 function teamNamesByUser(teams: ChartTeams): Map<string, string> {
@@ -149,11 +162,14 @@ export async function loadDirectory(
         },
       },
     });
-    const busyRows = await db.$queryRaw<{ id: string; busy: string[] | null }[]>`
-      SELECT m."userId" AS id, app.member_busy_hours(m."userId") AS busy
+    const busyRows = await db.$queryRaw<
+      { id: string; busy: string[] | null; shared: boolean | null }[]
+    >`
+      SELECT m."userId" AS id, app.member_busy_hours(m."userId") AS busy,
+             app.member_availability_shared(m."userId") AS shared
         FROM "Membership" m
        WHERE m."organizationId" = ${organizationId}`;
-    const busy = new Map(busyRows.map((r) => [r.id, r.busy]));
+    const busy = new Map(busyRows.map((r) => [r.id, r]));
     const chart = await loadChartForPeople(db, organizationId);
     const people: DirectoryPerson[] = rows.map(({ user, role, title, joinedAt }) => {
       const { timezone, ...rest } = user;
@@ -163,7 +179,11 @@ export async function loadDirectory(
         title,
         joinedAt: joinedAt.toISOString(),
         teamKey: chart.teams.teamOfUser.get(user.id) ?? null,
-        freeNow: isFreeNow(busy.get(user.id) ?? null, effectiveTimezone({ timezone }, { timezone: orgTimezone }), now),
+        freeNow: isFreeNow(
+          busy.get(user.id) ?? { busy: null, shared: null },
+          effectiveTimezone({ timezone }, { timezone: orgTimezone }),
+          now,
+        ),
       };
     });
     const used = new Set(people.map((p) => p.teamKey));
@@ -305,6 +325,8 @@ export interface PersonSheet {
   email: string | null;
   /** null when the viewer may not see their busy hours. */
   busy: string[] | null;
+  /** Whether they ever shared their availability (null when the viewer may not see it). */
+  availabilityShared: boolean | null;
   freeNow: boolean | null;
   /** Their effective time zone (busy hours are in it). */
   timezone: string;
@@ -369,8 +391,11 @@ export async function getPersonSheet(
     });
     if (!membership) return null;
     const { user } = membership;
-    const busyRows = await db.$queryRaw<{ busy: string[] | null }[]>`SELECT app.member_busy_hours(${userId}) AS busy`;
+    const busyRows = await db.$queryRaw<{ busy: string[] | null; shared: boolean | null }[]>`
+      SELECT app.member_busy_hours(${userId}) AS busy,
+             app.member_availability_shared(${userId}) AS shared`;
     const busy = busyRows[0]?.busy ?? null;
+    const availabilityShared = busyRows[0]?.shared ?? null;
     const timezone = effectiveTimezone({ timezone: user.timezone }, { timezone: orgTimezone });
 
     const chart = await loadChartForPeople(db, organizationId);
@@ -415,7 +440,8 @@ export async function getPersonSheet(
       joinedAt: membership.joinedAt.toISOString(),
       email: withEmail && "email" in user && typeof user.email === "string" ? user.email : null,
       busy,
-      freeNow: isFreeNow(busy, timezone, now),
+      availabilityShared,
+      freeNow: isFreeNow({ busy, shared: availabilityShared }, timezone, now),
       timezone,
       team: team ? { key: team.key, name: team.name, slot: team.slot } : null,
       positions: mine.map((p) => ({ key: p.key, title: p.title, isAdvisor: p.isAdvisor })),

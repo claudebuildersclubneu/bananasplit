@@ -100,7 +100,8 @@ function previewOf(sheet: SheetData): SheetPreview {
  * bring in a spreadsheet (an Excel workbook, CSV or TSV) and get a database
  * with a field per column. The file is read here first, for a preview and,
  * for a workbook with several tabs, the choice of which one. Either way it's
- * stored in Bananasplit: nothing to connect or host.
+ * stored in Bananasplit: nothing to connect or host. Personal gets only the
+ * templates that aren't about running a club.
  */
 export function NewDatabaseDialog({
   orgId,
@@ -108,12 +109,15 @@ export function NewDatabaseDialog({
   trigger,
   defaultMode = "template",
   defaultTemplateId = "blank",
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
   trigger?: React.ReactNode;
   defaultMode?: "template" | "import";
   defaultTemplateId?: string;
+  /** A Personal space: its owner's alone, and no club templates. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -127,7 +131,8 @@ export function NewDatabaseDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
-  const template = DATABASE_TEMPLATES.find((t) => t.id === templateId) ?? DATABASE_TEMPLATES[0]!;
+  const templates = personal ? DATABASE_TEMPLATES.filter((t) => t.personal) : DATABASE_TEMPLATES;
+  const template = templates.find((t) => t.id === templateId) ?? templates[0]!;
   const sheet = sheets?.find((s) => s.name === sheetName) ?? sheets?.[0] ?? null;
 
   /** Reads the chosen file for the preview; the server reads it again to import. */
@@ -230,8 +235,9 @@ export function NewDatabaseDialog({
         <DialogHeader>
           <DialogTitle>New database</DialogTitle>
           <DialogDescription>
-            Stored in Bananasplit and saved as you type. Only your club can see it, and you choose
-            which members.
+            {personal
+              ? "Stored in Bananasplit and saved as you type. Only you can see it."
+              : "Stored in Bananasplit and saved as you type. Only your club can see it, and you choose which members."}
           </DialogDescription>
         </DialogHeader>
 
@@ -247,7 +253,7 @@ export function NewDatabaseDialog({
 
         {mode === "template" ? (
           <div className="grid gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="Template">
-            {DATABASE_TEMPLATES.map((t) => {
+            {templates.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] ?? Table2;
               const active = t.id === templateId;
               return (

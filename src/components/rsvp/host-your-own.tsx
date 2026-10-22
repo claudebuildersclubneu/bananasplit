@@ -8,23 +8,26 @@ import { cn } from "@/lib/utils";
 /**
  * The bottom of every public RSVP page: guests who liked it can make pages
  * like it for their own club. RSVP pages come with every club, the Free plan
- * included, so the one way in is signing up. Always ink on the page,
- * whatever background the host chose, and Bananasplit's own yellow (it is
- * Bananasplit's invitation, not the club's) even on a themed club's page.
+ * included, so the one way in is signing up. A chrome-coloured card lit by
+ * Bananasplit's own banana glow (it is Bananasplit's invitation, not the
+ * club's) even on a themed club's page.
  */
 export function HostYourOwn() {
   return (
     <aside
       aria-label="Make RSVP pages for your club"
-      className="mx-auto w-full max-w-[1000px] px-5 pb-10 sm:px-8"
+      className="mx-auto w-full max-w-[1120px] px-4 pb-10 sm:px-10"
       style={accentScaleStyle(BRAND_ACCENT_SCALE)}
     >
-      <div className="bg-chrome text-chrome-foreground rounded-block relative overflow-hidden px-6 py-7 sm:px-9 sm:py-8">
-        <div className="relative grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-          <div className="flex flex-col gap-2">
-            <p className="text-glow m-0 text-[14px] font-semibold">Hosting something?</p>
-            <h2 className="font-heading m-0 text-[clamp(24px,3.4vw,32px)] leading-[1.08] tracking-[-0.02em]">
-              Make a page like this one.
+      <div className="bg-chrome text-chrome-foreground rounded-card shadow-e2 relative isolate overflow-hidden px-6 py-8 sm:px-10 sm:py-10">
+        <div
+          aria-hidden="true"
+          className="absolute -top-1/2 -left-[10%] -z-10 h-[160%] w-[70%] bg-[radial-gradient(closest-side,color-mix(in_oklab,var(--color-banana)_28%,transparent),transparent)]"
+        />
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="flex flex-col gap-2.5">
+            <h2 className="font-heading m-0 text-[clamp(26px,3.4vw,36px)] leading-[1.04] font-[640] tracking-[-0.03em] text-balance">
+              Hosting something? Make a page like this one.
             </h2>
             <p className="text-chrome-foreground/70 m-0 max-w-[520px] text-[15px] leading-[1.55]">
               Sign-ups, QR check-in, invite links and a bring list come with every club on
@@ -38,7 +41,7 @@ export function HostYourOwn() {
               "bg-chrome-foreground text-chrome hover:bg-chrome-foreground/90 hover:text-chrome justify-between gap-4",
             )}
           >
-            Make RSVP pages for your club, free
+            Make RSVP pages, free
             <ArrowRight />
           </Link>
         </div>

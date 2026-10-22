@@ -19,7 +19,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary-hover",
         create:
-          "bg-brand-accent text-brand-accent-foreground glow-halo hover:bg-[color-mix(in_oklab,var(--brand-accent)_88%,var(--background))]",
+          "bg-create text-create-foreground glow-halo hover:bg-[color-mix(in_oklab,var(--create)_92%,var(--foreground))]",
         outline:
           "border-input bg-transparent hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { parseNamedTeams, type NamedTeam } from "@/lib/org-chart/teams";
 import { z } from "zod";
 
 import {
@@ -36,9 +37,10 @@ import {
 } from "./positions";
 
 /**
- * Org chart writes and admin reads, all on the caller's app_user transaction
- * (withOrgAction / withOrgTx), so RLS applies: members see only the
- * published version, and only OWNER/ADMIN write (orgchart.write).
+ * Org chart writes and editor reads, all on the caller's app_user
+ * transaction (withOrgAction / withOrgTx), so RLS applies. Every member of
+ * the org edits the chart (orgchart.write): drafts, imports, publishing and
+ * restoring. History is append-only, so any publish can be undone.
  *
  * - Versions are copy-on-version snapshots. Every upload, "Start blank",
  *   "Edit the current chart" and rollback creates a new numbered version.
@@ -48,9 +50,11 @@ import {
  *   draft's positions in one transaction (existing row ids are kept).
  * - Publish validates (no loops, managers inside the version, advisors with
  *   a manager and no reports, linked users still members), archives the
- *   previous version, points the org at the new one, optionally sets
- *   Membership.title, writes the audit log and invalidates the cached chart
- *   after COMMIT (invalidate() queues on ctx.afterCommit).
+ *   previous version, points the org at the new one
+ *   (app.set_active_org_chart: Organization itself is OWNER/ADMIN),
+ *   optionally sets Membership.title (members.setTitle, OWNER/ADMIN),
+ *   writes the audit log and invalidates the cached chart after COMMIT
+ *   (invalidate() queues on ctx.afterCommit).
  */
 
 export const ACTIVE_PARSE_STATUSES = [
@@ -134,19 +138,6 @@ async function activeVersionId(db: Db, organizationId: string): Promise<string |
 // ------------------------------------------------------------------ uploads
 
 /**
- * Whether the org has a Claude key saved (the upload needs one). Read from
- * secretFingerprint, which is set for every stored secret; secretLast4 is
- * null for anything shorter than 16 characters.
- */
-export async function hasClaudeKey(db: Db, organizationId: string): Promise<boolean> {
-  const row = await db.orgIntegration.findUnique({
-    where: { organizationId_provider: { organizationId, provider: "CLAUDE" } },
-    select: { secretFingerprint: true },
-  });
-  return Boolean(row?.secretFingerprint);
-}
-
-/**
  * The DB quota: 20 documents sent to Claude per org per rolling day, one
  * active parse at a time.
  *
@@ -203,7 +194,7 @@ export interface UploadVersionInput {
   builtin: { chart: NormalizedChart; report: ParseReport } | null;
   /** Whether the built-in reading is good enough to be the draft. */
   accepted: boolean;
-  /** Whether the org has a Claude key, checked before the transaction. */
+  /** Whether the org has a Claude key (getClaudeKeyStatus), checked before the transaction. */
   claudeAvailable: boolean;
 }
 
@@ -318,8 +309,10 @@ export async function createUploadVersion(ctx: Ctx, input: UploadVersionInput): 
  * Asks Claude to read the document again: for a FAILED or stuck parse, and
  * for a draft the built-in parser only half understood (so an org that adds
  * a key afterwards can get a better reading without re-uploading).
+ * `claudeKeySaved` comes from getClaudeKeyStatus, read before the
+ * transaction (members cannot read OrgIntegration).
  */
-export async function retryParse(ctx: Ctx, versionId: string): Promise<void> {
+export async function retryParse(ctx: Ctx, versionId: string, claudeKeySaved: boolean): Promise<void> {
   requirePermission(ctx, "orgchart.write");
   const { db, organizationId } = ctx;
   await lockCharts(db, organizationId);
@@ -340,7 +333,7 @@ export async function retryParse(ctx: Ctx, versionId: string): Promise<void> {
   if (version.parseStatus !== OrgChartParseStatus.FAILED && !stuck && !halfRead) {
     throw new OrgChartError("This draft is not waiting for a retry.", 409);
   }
-  if (!(await hasClaudeKey(db, organizationId))) {
+  if (!claudeKeySaved) {
     throw new OrgChartError("Add a Claude API key in Admin panel › Integrations, then retry.", 409);
   }
   await assertUploadAllowed(db, organizationId, versionId);
@@ -383,13 +376,15 @@ export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
   let writes: PositionWrite[] = [];
   let openItems: Prisma.InputJsonValue = [];
   let warnings: Prisma.InputJsonValue = [];
+  let teams: Prisma.InputJsonValue = [];
   if (from === "current") {
     if (!active) throw new OrgChartError("There is no published chart to edit yet. Start a blank draft instead.", 409);
     const source = await db.orgChartVersion.findFirst({
       where: { id: active, organizationId },
-      select: { openItems: true, positions: { select: positionSelect } },
+      select: { openItems: true, teams: true, positions: { select: positionSelect } },
     });
     if (!source) throw new OrgChartError("The published chart could not be loaded.", 404);
+    teams = source.teams as Prisma.InputJsonValue;
     const members = await memberIndex(db, organizationId);
     writes = rowsToWrites(source.positions, { memberIds: members.ids, userNames: members.names });
     openItems = source.openItems as Prisma.InputJsonValue;
@@ -435,6 +430,7 @@ export async function startDraft(ctx: Ctx, from: DraftSource): Promise<string> {
       parseMethod: from === "starter" ? OrgChartParseMethod.TEMPLATE : OrgChartParseMethod.MANUAL,
       openItems,
       warnings,
+      teams,
       createdById: ctx.userId,
     },
   });
@@ -463,9 +459,14 @@ export const SaveDraftSchema = z.object({
         responsibilities: z.array(z.string().max(2000)).max(100),
         decidesAlone: z.array(z.string().max(2000)).max(100),
         rank: z.string().max(200),
+        teamId: z.string().min(1).max(40).nullable().optional(),
       }),
     )
     .max(LIMITS.positions),
+  teams: z
+    .array(z.object({ id: z.string().min(1).max(40), name: z.string().trim().min(1).max(60) }))
+    .max(40)
+    .optional(),
   openItems: z.array(z.object({ who: z.string().max(1000), question: z.string().max(2000) })).max(100),
 });
 
@@ -496,6 +497,7 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
     data: {
       editVersion: { increment: 1 },
       openItems: normalizeOpenItems(input.openItems) as unknown as Prisma.InputJsonValue,
+      ...(input.teams ? { teams: input.teams as unknown as Prisma.InputJsonValue } : {}),
     },
   });
   if (bumped.count !== 1) {
@@ -523,6 +525,20 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
   const existingById = new Map(existing.map((e) => [e.id, e]));
   const members = await memberIndex(db, organizationId);
   const clientIds = new Set(input.positions.map((p) => p.id));
+
+  // A position can only be on a team the draft names.
+  const teamIds = new Set(
+    (
+      input.teams ??
+      ((
+        await db.orgChartVersion.findFirst({
+          where: { id: input.versionId, organizationId },
+          select: { teams: true },
+        })
+      )?.teams as { id: string }[] | undefined) ??
+      []
+    ).map((t) => t.id),
+  );
 
   const takenKeys = new Set<string>();
   for (const p of input.positions) {
@@ -558,6 +574,7 @@ export async function saveDraft(ctx: Ctx, raw: unknown): Promise<SaveDraftResult
       decidesAlone: cleanBullets(p.decidesAlone, LIMITS.bullets, LIMITS.bullet),
       sourceQuote: row?.sourceQuote ?? [],
       rank: RANK.test(p.rank) ? p.rank : null,
+      teamId: p.teamId && teamIds.has(p.teamId) ? p.teamId : null,
     };
   });
 
@@ -652,10 +669,8 @@ async function publishLocked(
       editVersion: { increment: 1 },
     },
   });
-  await db.organization.update({
-    where: { id: organizationId },
-    data: { activeOrgChartVersionId: version.id },
-  });
+  // Organization UPDATE is OWNER/ADMIN; this moves only the chart pointer.
+  await db.$executeRaw`SELECT app.set_active_org_chart(${version.id})`;
   let titled = 0;
   if (options.setTitles) {
     requirePermission(ctx, "members.setTitle");
@@ -726,6 +741,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
       number: true,
       status: true,
       openItems: true,
+      teams: true,
       positions: { select: positionSelect, orderBy: [{ rank: "asc" }, { id: "asc" }] },
     },
   });
@@ -750,6 +766,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
       source: OrgChartSource.ROLLBACK,
       basedOnVersionId: source.id,
       openItems: source.openItems as Prisma.InputJsonValue,
+      teams: source.teams as Prisma.InputJsonValue,
       createdById: ctx.userId,
     },
   });
@@ -770,7 +787,7 @@ export async function rollbackToVersion(ctx: Ctx, versionId: string): Promise<Pu
   return { ...result, versionId: copyId };
 }
 
-// ------------------------------------------------------------------ reads (admin)
+// ------------------------------------------------------------------ reads (editor)
 
 export interface VersionSummary {
   id: string;
@@ -858,6 +875,8 @@ export interface VersionDetail {
     openItems: OpenItem[];
     warnings: ChartWarning[];
     isActive: boolean;
+    /** The teams this version names (src/lib/org-chart/teams.ts). */
+    teams: NamedTeam[];
   };
   positions: (PositionRow & { user: UserPublic | null })[];
 }
@@ -886,6 +905,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
       publishedAt: true,
       openItems: true,
       warnings: true,
+      teams: true,
       positions: {
         select: { ...positionSelect, user: { select: userPublicSelect } },
         orderBy: [{ rank: "asc" }, { id: "asc" }],
@@ -894,7 +914,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
   });
   if (!row) return null;
   const active = await activeVersionId(db, organizationId);
-  const { positions, openItems, warnings, parseReport, parseUsage, ...version } = row;
+  const { positions, openItems, warnings, parseReport, parseUsage, teams, ...version } = row;
   const usage = (parseUsage ?? null) as { costUsd?: number | null } | null;
   return {
     version: {
@@ -904,6 +924,7 @@ export async function loadVersion(ctx: Ctx, versionId: string): Promise<VersionD
       parseReport: parseReport && typeof parseReport === "object" ? (parseReport as unknown as ParseReport) : null,
       parseCostUsd: typeof usage?.costUsd === "number" ? usage.costUsd : null,
       isActive: row.id === active,
+      teams: parseNamedTeams(teams),
     },
     positions,
   };

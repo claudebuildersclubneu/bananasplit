@@ -31,7 +31,7 @@ export type SearchKind =
   | "folder"
   | "file"
   | "task"
-  | "project"
+  | "epic"
   | "label"
   | "event"
   | "poll"
@@ -67,7 +67,7 @@ export const GROUP_LABELS: Record<SearchGroupId, string> = {
   folders: "Folders",
   files: "Files",
   tasks: "Tasks",
-  projects: "Projects and labels",
+  projects: "Epics and tags",
   events: "Events",
   polls: "Polls",
   people: "People",

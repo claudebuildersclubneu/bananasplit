@@ -6,8 +6,10 @@ import { useState, useTransition } from "react";
 
 import { createTask } from "@/app/app/[orgSlug]/tasks/actions";
 import { EmptyState } from "@/components/empty-state";
+import { ClearCompletedButton } from "@/components/tasks/clear-completed";
 import { TASK_PANEL } from "@/components/tasks/layout-ui";
 import { HashTagHint } from "@/components/tasks/tag-menu";
+import { EpicDot } from "@/components/tasks/epic-menu";
 import { TaskRow } from "@/components/tasks/task-row";
 import { ProgressBar, TaskTypeChip } from "@/components/tasks/task-type";
 import { useTasks, useWorkspace } from "@/components/tasks/tasks-context";
@@ -16,10 +18,10 @@ import { useHashTags } from "@/components/tasks/use-hash-tags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { rollUp } from "@/lib/tasks/hierarchy";
-import { projectColor } from "@/lib/tasks/project-color";
+import { epicColor } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 
-type Ref = { id: string; title: string };
+type Ref = { id: string; title: string; color?: string | null };
 
 interface StoryGroup {
   story: Ref;
@@ -65,11 +67,11 @@ function groupByEpic(tasks: TaskItem[]): EpicGroup[] {
     const parent = t.parentTask;
     const grand = parent?.parentTask ?? null;
     if (t.type === "EPIC") {
-      groupFor({ id: t.id, title: t.title }, i).item = t;
+      groupFor({ id: t.id, title: t.title, color: t.color }, i).item = t;
       return;
     }
     const epic = parent?.type === "EPIC" ? parent : grand?.type === "EPIC" ? grand : null;
-    const g = groupFor(epic ? { id: epic.id, title: epic.title } : null, i);
+    const g = groupFor(epic ? { id: epic.id, title: epic.title, color: epic.color } : null, i);
     if (t.type === "STORY") {
       storyIn(g, { id: t.id, title: t.title }).item = t;
     } else if (parent?.type === "STORY") {
@@ -168,19 +170,23 @@ export function ListView({
 
       {completed.length > 0 && (
         <section>
-          <button
-            type="button"
-            onClick={() => setShowDone((v) => !v)}
-            aria-expanded={showDone}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full py-1 text-sm font-medium transition-colors"
-          >
-            <ChevronRight
-              className={cn("size-4 transition-transform duration-150", showDone && "rotate-90")}
-              aria-hidden="true"
-            />
-            Done in the last 7 days
-            <Badge variant="secondary">{completed.length}</Badge>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDone((v) => !v)}
+              aria-expanded={showDone}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full py-1 text-sm font-medium transition-colors"
+            >
+              <ChevronRight
+                className={cn("size-4 transition-transform duration-150", showDone && "rotate-90")}
+                aria-hidden="true"
+              />
+              Done in the last 7 days
+              <Badge variant="secondary">{completed.length}</Badge>
+            </button>
+            <span className="flex-1" />
+            <ClearCompletedButton tasks={completed} />
+          </div>
           {showDone && (
             <ul className={cn("mt-2", TASK_PANEL)}>
               {completed.map((task) => (
@@ -199,7 +205,7 @@ function EpicSection({ group, showOwner }: { group: EpicGroup; showOwner: boolea
   const epic = group.epic;
   const item = group.item;
   const progress = item ? rollUp(item.subtasks) : null;
-  const color = projectColor(item?.project ?? null);
+  const color = epic ? epicColor({ id: epic.id, color: item?.color ?? epic.color ?? null }) : null;
   const count =
     group.tasks.length + [...group.stories.values()].reduce((n, s) => n + 1 + s.tasks.length, 0);
 
@@ -208,7 +214,7 @@ function EpicSection({ group, showOwner }: { group: EpicGroup; showOwner: boolea
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 px-1">
         {epic ? (
           <>
-            <TaskTypeChip type="EPIC" />
+            <EpicDot epic={{ id: epic.id, color: item?.color ?? epic.color ?? null }} />
             <button
               type="button"
               onClick={() => (item ? showTask(item) : openTask(epic.id))}
@@ -220,7 +226,7 @@ function EpicSection({ group, showOwner }: { group: EpicGroup; showOwner: boolea
               <ProgressBar
                 done={progress.done}
                 total={progress.total}
-                color={item?.project ? color : "var(--chart-4)"}
+                color={color ?? "var(--chart-4)"}
                 className="w-36"
               />
             )}
@@ -232,7 +238,6 @@ function EpicSection({ group, showOwner }: { group: EpicGroup; showOwner: boolea
                 newTask({
                   parentTaskId: epic.id,
                   parentType: "EPIC",
-                  projectId: item?.projectId ?? null,
                   visibility: item?.visibility,
                 })
               }
@@ -254,7 +259,13 @@ function EpicSection({ group, showOwner }: { group: EpicGroup; showOwner: boolea
             <StoryRows key={s.story.id} group={s} showOwner={showOwner} nested={Boolean(epic)} />
           ))}
           {group.tasks.map((t) => (
-            <TaskRow key={t.id} task={t} showOwner={showOwner} showParent={false} />
+            <TaskRow
+              key={t.id}
+              task={t}
+              showOwner={showOwner}
+              showParent={false}
+              showEpic={false}
+            />
           ))}
         </ul>
       )}
@@ -275,7 +286,7 @@ function StoryRows({
   return (
     <>
       {group.item ? (
-        <TaskRow task={group.item} showOwner={showOwner} showParent={false} />
+        <TaskRow task={group.item} showOwner={showOwner} showParent={false} showEpic={false} />
       ) : (
         <li className="rounded-field relative flex items-center gap-3 px-3 py-2.5">
           <TaskTypeChip type="STORY" iconOnly />
@@ -289,13 +300,20 @@ function StoryRows({
         </li>
       )}
       {group.tasks.map((t) => (
-        <TaskRow key={t.id} task={t} showOwner={showOwner} showParent={false} depth={1} />
+        <TaskRow
+          key={t.id}
+          task={t}
+          showOwner={showOwner}
+          showParent={false}
+          showEpic={false}
+          depth={1}
+        />
       ))}
     </>
   );
 }
 
-/** "Add a task… #tag": a title (with #tags) into the current project. */
+/** "Add a task… #tag": a title (with #tags), into the epic in view. */
 function QuickAdd() {
   const { org, viewer, announce } = useTasks();
   const ws = useWorkspace();
@@ -312,7 +330,7 @@ function QuickAdd() {
       const result = await createTask(org.id, {
         title: resolved.title,
         labelIds: resolved.labelIds,
-        projectId: ws.query.projectId ?? null,
+        parentTaskId: ws.query.epicId ?? null,
         ownerId: viewer.userId,
       });
       if (result.error) {

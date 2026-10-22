@@ -59,10 +59,7 @@ test("a handed-down task emails a deep link that survives sign-in", async ({ pag
   await page.getByLabel("Title", { exact: true }).fill(title);
   await page.getByLabel("Owner", { exact: true }).click();
   await page.getByRole("option", { name: /Alex Green/ }).click();
-  // The due date menu reads a typed date (here YYYY-MM-DD) on Enter.
-  await page.getByLabel("Due date", { exact: true }).click();
-  await page.getByLabel("Type a date").fill(inDays(14));
-  await page.getByLabel("Type a date").press("Enter");
+  await page.getByLabel("Due", { exact: true }).fill(inDays(14));
   await page.getByRole("button", { name: "Create task" }).click();
   // (The owner popover is also a role=dialog while it animates out.)
   await expect(page.getByRole("dialog", { name: "New task" })).toBeHidden({ timeout: 20_000 });

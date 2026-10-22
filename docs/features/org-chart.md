@@ -1,9 +1,10 @@
 # Org Chart: setup
 
 The **Org Chart** section shows who holds each role, who they report to,
-what they own and what they can decide alone. Owners and admins build it by
-importing a document, by starting from the club template, or by hand; they
-review everything and publish. Every member can browse the published chart.
+what they own and what they can decide alone. Any member can build or change
+it, by importing a document, by starting from the club template, or by hand,
+then review everything and publish. Every version is kept, so any publish can
+be undone from **Versions**. Every member can browse the published chart.
 
 **You do not need a Claude API key.** The portal reads org-chart documents
 itself, for nothing. A key is only a backup for a document it cannot make
@@ -136,9 +137,10 @@ Below that, the editor lists every position in an outline:
 ### 4. Publish
 
 **Review and publish** saves, checks everything again on the server and
-publishes. Tick **Also set each linked member's title** to copy each
-member's position title into their workspace title. The org-chart position
-never changes anyone's permission role.
+publishes. Owners and admins can also tick **Also set each linked member's
+title** to copy each member's position title into their workspace title
+(members don't see the option). The org-chart position never changes
+anyone's permission role.
 
 ### 5. Add a Claude API key (optional)
 
@@ -195,7 +197,7 @@ who have left since show as placeholders in the restored chart.
 - A document sent to Anthropic travels under your org's API key, as data:
   the request has no tools and instructions inside the document are ignored.
   Member emails are never sent; matching happens in the portal.
-- The original upload is stored privately and only owners and admins can
+- The original upload is stored privately and only members of the club can
   download it from the draft page.
 - An org may send 20 documents a day to Claude, one at a time. Documents the
   portal reads itself are not limited.
@@ -205,13 +207,14 @@ who have left since show as placeholders in the restored chart.
 | Piece | Where |
 |---|---|
 | Pages | `src/app/app/[orgSlug]/org-chart/` (chart, `import`, `drafts/[versionId]`, `versions`, `versions/[versionId]`) and `actions.ts` |
-| Upload route | `POST /api/orgs/[orgId]/org-chart/imports`; the original is served to admins by `GET .../imports/[versionId]/source` |
+| Upload route | `POST /api/orgs/[orgId]/org-chart/imports`; the original is served to the club's members by `GET .../imports/[versionId]/source` |
 | **Built-in parser** | `src/server/org-chart/parse/` - `index.ts` (the shape readers, assembly and the confidence score), `document.ts` (line model and segmentation), `fields.ts` (labels, role lines, lists), `diagram.ts` (the ASCII grid reader) |
 | Parse job (Claude) | `claude-parse` in `src/server/jobs/registry.ts` (heavy; runs only from `/api/cron/jobs` or its kick) -> `src/server/org-chart/parse-job.ts` |
 | Claude call | `src/server/org-chart/claude.ts` (`parseWithClaude`, `claudeConnectionTest` for Settings); models, prices and per-model request rules in `src/lib/org-chart/models.ts` |
 | Extraction | `src/server/org-chart/extract.ts` (sniffing, DOCX zip-bomb guards, PDF page cap) |
 | Starter structure | `src/lib/org-chart/starter.ts` |
 | Services | `src/server/org-chart/service.ts` (upload, drafts, publish, rollback, reads); `queries.ts` (cached published chart, `getReportingSubtree`) |
+| Who edits | `orgchart.write` is every role (`src/lib/auth/permissions.ts`). RLS lets every member write versions and positions in their own org (`20261019150000_org_chart_member_edits`); publishing moves `Organization.activeOrgChartVersionId` through `app.set_active_org_chart`, since Organization UPDATE stays owner/admin. Setting titles on publish is `members.setTitle` |
 | Pure logic | `src/lib/org-chart/` (schema, normalize, match, validate, layout, diff, draft operations, `outline.ts` for the typed chart, `teams.ts`, `export.ts`) and `__fixtures__/` |
 | UI | `src/components/org-chart/` (canvas, list, side panel, editor, `editor/outline-editor.tsx`, `editor/title-sync.tsx`, `export-chart.ts`, `editor/parse-report.tsx`) |
 
@@ -250,7 +253,7 @@ prose scores 0. Those figures are asserted in
 
 `OrgChartVersion` records the outcome: `parseMethod`
 (`BUILTIN | CLAUDE | TEMPLATE | MANUAL`), `parseConfidence`, and
-`parseReport` (the counts, notes and unplaced lines the admin sees).
+`parseReport` (the counts, notes and unplaced lines the editor sees).
 `parseUsage.costUsd` holds what a Claude parse cost.
 
 ### Local development

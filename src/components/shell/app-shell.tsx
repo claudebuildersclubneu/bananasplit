@@ -102,13 +102,6 @@ export function AppShell({
   const [command, setCommand] = useState({ open: false, session: 0 });
   const setCommandOpen = (open: boolean) =>
     setCommand((c) => (open === c.open ? c : { open, session: open ? c.session + 1 : c.session }));
-  // A Personal space's settings are just settings; a club's are its Admin panel.
-  const admin = isAdmin
-    ? {
-        href: `/app/${orgSlug}/settings`,
-        label: sections[0]?.id === "personal" ? "Settings" : "Admin panel",
-      }
-    : undefined;
   const shortcutLinks = useMemo(
     () => sections.flatMap((s) => s.items).filter((i) => !i.locked),
     [sections],
@@ -152,7 +145,6 @@ export function AppShell({
       sections={sections}
       orgId={orgId}
       pins={pins}
-      admin={admin}
       onNavigate={onNavigate}
       spaces={<SpaceList orgs={orgs} activeSlug={orgSlug} user={user} onNavigate={onNavigate} />}
     />
@@ -195,7 +187,7 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-col">
           <ToolCapsule
-            menuButton={<NavMenu sections={sections} clubMenu={clubMenu} admin={admin} />}
+            menuButton={<NavMenu sections={sections} clubMenu={clubMenu} />}
             orgId={orgId}
             orgSlug={orgSlug}
             user={user}

@@ -40,6 +40,8 @@ export interface PositionWrite {
   sourceQuote: string[];
   /** Sibling order; assigned in list order per manager when missing. */
   rank?: string | null;
+  /** The team it's on (an id from the version's teams). */
+  teamId?: string | null;
 }
 
 /** Fills missing ranks: each manager's reports in list order. */
@@ -87,6 +89,7 @@ export async function insertPositions(
       decidesAlone: p.decidesAlone,
       sourceQuote: p.sourceQuote,
       rank: ranks.get(p.ref) as string,
+      teamId: p.teamId ?? null,
     })),
   });
 
@@ -163,6 +166,7 @@ export const positionSelect = {
   decidesAlone: true,
   sourceQuote: true,
   rank: true,
+  teamId: true,
 } satisfies Prisma.OrgChartPositionSelect;
 
 export type PositionRow = Prisma.OrgChartPositionGetPayload<{ select: typeof positionSelect }>;
@@ -193,6 +197,7 @@ export function rowsToWrites(
       decidesAlone: r.decidesAlone,
       sourceQuote: r.sourceQuote,
       rank: r.rank,
+      teamId: r.teamId,
     };
   });
 }

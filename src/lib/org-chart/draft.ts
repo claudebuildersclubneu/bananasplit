@@ -29,6 +29,8 @@ export interface DraftPosition {
   decidesAlone: string[];
   sourceQuote: string[];
   rank: string;
+  /** The team it's on (an id from the draft's teams); none: its manager's. */
+  teamId?: string | null;
 }
 
 export type DropZone = "before" | "after" | "inside";

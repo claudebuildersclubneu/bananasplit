@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { NotFoundError } from "@/lib/auth/errors";
+import { isPersonalSpace } from "@/lib/billing/space";
 import { parseDbViewParams } from "@/lib/databases/href";
 import {
   listPolls,
@@ -166,6 +167,7 @@ export default async function DatabaseViewPage({
         members={members}
         trash={trash}
         timezone={organization.timezone}
+        personal={isPersonalSpace(organization)}
       />
     );
   }

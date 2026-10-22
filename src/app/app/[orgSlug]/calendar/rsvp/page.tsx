@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, Ticket } from "lucide-react";
+import { ArrowUpRight, Plus, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TickMeter } from "@/components/ui/meters";
 import { shortDayAt } from "@/components/calendar/day-label";
+import { KIND_META } from "@/components/calendar/kinds";
+import type { EventKind } from "@/generated/prisma/enums";
 import { can } from "@/lib/auth/permissions";
 import { safeTimeZone } from "@/lib/calendar/dates";
 import { newRsvpEventHref } from "@/lib/calendar/range";
@@ -30,6 +32,7 @@ interface PageRow {
   rsvpSlug: string | null;
   rsvpCapacity: number | null;
   rsvpCover: unknown;
+  kind: EventKind;
 }
 
 /**
@@ -72,6 +75,7 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
           rsvpSlug: true,
           rsvpCapacity: true,
           rsvpCover: true,
+          kind: true,
         },
       });
       // Head counts are the hosts' view.
@@ -124,69 +128,107 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
     .filter(Boolean)
     .join(" · ");
 
-  const pageList = (items: PageRow[]) => (
-    <ul className="bg-card text-card-foreground ring-foreground/6 edge rounded-card p-2 ring-1">
-      {items.map((e) => {
-        const going = countOf(e.id, "GOING");
-        const waiting = countOf(e.id, "WAITLIST");
-        const mine = ticketFor.get(e.id);
-        const href = canManage
-          ? `/app/${orgSlug}/calendar/${e.id}/rsvp`
-          : e.rsvpSlug
-            ? `/e/${e.rsvpSlug}`
-            : `/app/${orgSlug}/calendar/${e.id}`;
-        return (
-          <li key={e.id} className={ROW}>
-            <Link
-              href={href}
-              className="hover:bg-muted rounded-tile focus-glow flex items-center gap-4 p-2.5 transition-colors"
-            >
-              <Cover title={e.title} cover={e.rsvpCover} />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-[15px] font-semibold">{e.title}</span>
-                  {!e.rsvpEnabled && <Badge variant="secondary">Off</Badge>}
-                </span>
-                <span className="text-muted-foreground mt-0.5 block truncate text-[13px]">
-                  {listWhen(e.startsAt, e.endsAt, timeZone, e.allDay)}
-                </span>
+  const hrefOf = (e: PageRow) =>
+    canManage
+      ? `/app/${orgSlug}/calendar/${e.id}/rsvp`
+      : e.rsvpSlug
+        ? `/e/${e.rsvpSlug}`
+        : `/app/${orgSlug}/calendar/${e.id}`;
+
+  // What each card says on the right: the head count for hosts, your own
+  // status for everyone else.
+  const statusOf = (e: PageRow) => {
+    const going = countOf(e.id, "GOING");
+    const waiting = countOf(e.id, "WAITLIST");
+    const mine = ticketFor.get(e.id);
+    if (canManage) {
+      return (
+        <span className="flex min-w-0 flex-col gap-1.5 text-sm tabular-nums">
+          <span>
+            <span className="font-semibold">{going}</span>
+            <span className="text-muted-foreground">
+              {e.rsvpCapacity ? ` of ${e.rsvpCapacity}` : ""} going
+              {waiting > 0 ? ` · ${waiting} waitlisted` : ""}
+            </span>
+          </span>
+          {e.rsvpCapacity && e.rsvpCapacity <= 60 ? (
+            <TickMeter
+              total={e.rsvpCapacity}
+              filled={going}
+              height={8}
+              color="var(--success)"
+              label={`${going} of ${e.rsvpCapacity} spots taken`}
+              className="w-full max-w-40"
+            />
+          ) : null}
+        </span>
+      );
+    }
+    return mine ? (
+      <Badge variant={mine.status === "WAITLIST" ? "accent" : "success"}>
+        {mine.status === "WAITLIST" ? "On the waitlist" : "You're going"}
+      </Badge>
+    ) : (
+      <Badge variant="outline">RSVP</Badge>
+    );
+  };
+
+  const card = (e: PageRow, featured = false) => (
+    <li key={e.id} className={cn(featured && "sm:col-span-2")}>
+      <Link
+        href={hrefOf(e)}
+        className={cn(
+          "group bg-card text-card-foreground edge rounded-card focus-glow hover:shadow-e2 flex h-full overflow-hidden transition-[transform,box-shadow] duration-200 ease-(--ease-ink) hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          featured ? "flex-col sm:flex-row" : "flex-col",
+        )}
+      >
+        <Cover
+          title={e.title}
+          cover={e.rsvpCover}
+          kind={e.kind}
+          startsAt={e.startsAt}
+          timeZone={timeZone}
+          className={
+            featured ? "aspect-[16/10] sm:aspect-auto sm:min-h-56 sm:w-1/2" : "aspect-[16/9]"
+          }
+        />
+        <span className={cn("flex min-w-0 flex-1 flex-col gap-3", featured ? "p-6" : "p-4.5")}>
+          <span className="space-y-1">
+            {featured && <span className="eyebrow block">Next up</span>}
+            <span className="flex items-start gap-2">
+              <span
+                className={cn(
+                  "min-w-0 font-semibold break-words",
+                  featured ? "display-title text-2xl" : "line-clamp-2 text-[15px]",
+                )}
+              >
+                {e.title}
               </span>
-              {canManage ? (
-                <span className="flex flex-col items-end gap-1.5 text-sm tabular-nums">
-                  <span>
-                    <span className="font-semibold">{going}</span>
-                    <span className="text-muted-foreground">
-                      {e.rsvpCapacity ? ` of ${e.rsvpCapacity}` : ""} going
-                    </span>
-                  </span>
-                  {e.rsvpCapacity && e.rsvpCapacity <= 60 ? (
-                    <TickMeter
-                      total={e.rsvpCapacity}
-                      filled={going}
-                      height={8}
-                      color="var(--success)"
-                      label={`${going} of ${e.rsvpCapacity} spots taken`}
-                      className="w-24"
-                    />
-                  ) : null}
-                  {waiting > 0 && (
-                    <span className="text-muted-foreground text-xs">{waiting} waitlisted</span>
-                  )}
-                </span>
-              ) : mine ? (
-                <Badge variant={mine.status === "WAITLIST" ? "accent" : "success"}>
-                  {mine.status === "WAITLIST" ? "On the waitlist" : "You're going"}
-                </Badge>
-              ) : (
-                <Badge variant="outline">RSVP</Badge>
-              )}
-              <ChevronRight className="text-muted-foreground size-4 flex-none" aria-hidden="true" />
-            </Link>
-          </li>
-        );
-      })}
+              {!e.rsvpEnabled && <Badge variant="secondary">Off</Badge>}
+            </span>
+            <span className="text-muted-foreground block text-[13px]">
+              {KIND_META[e.kind].label} · {listWhen(e.startsAt, e.endsAt, timeZone, e.allDay)}
+            </span>
+          </span>
+          <span className="mt-auto flex items-end justify-between gap-3">
+            {statusOf(e)}
+            <ArrowUpRight
+              className="text-muted-foreground group-hover:text-foreground size-4 flex-none transition-colors"
+              aria-hidden="true"
+            />
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+
+  /** A grid of event cards, like Files; the first upcoming one is the wide "Next up". */
+  const pageList = (items: PageRow[], feature = false) => (
+    <ul className="grid gap-4.5 sm:grid-cols-2 xl:grid-cols-3">
+      {items.map((e, i) => card(e, feature && i === 0 && items.length > 1))}
     </ul>
   );
+  const coverOf = new Map(events.map((e) => [e.id, e.rsvpCover]));
 
   return (
     <div className="space-y-7.5">
@@ -209,7 +251,7 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
           <h2 id="tickets-heading" className="heading flex items-center gap-2 text-[17px]">
             Your tickets <Badge variant="secondary">{tickets.length}</Badge>
           </h2>
-          <TicketList tickets={tickets} showHost={personal} />
+          <TicketList tickets={tickets} showHost={personal} covers={coverOf} />
         </section>
       )}
 
@@ -242,7 +284,7 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
                 {personal ? "Your event pages" : "Event pages"}
                 <Badge variant="secondary">{upcoming.length}</Badge>
               </h2>
-              {pageList(upcoming)}
+              {pageList(upcoming, true)}
             </section>
           )}
           {past.length > 0 && (
@@ -262,66 +304,129 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
           <h2 id="open-heading" className="heading flex items-center gap-2 text-[17px]">
             Taking RSVPs <Badge variant="secondary">{upcoming.length}</Badge>
           </h2>
-          {pageList(upcoming)}
+          {pageList(upcoming, true)}
         </section>
       )}
     </div>
   );
 }
 
-/** A list row: a soft tile on hover, a hairline to the next one, inset past the cover. */
-const ROW =
-  "relative [&+&]:before:absolute [&+&]:before:top-0 [&+&]:before:right-2.5 [&+&]:before:left-[5.25rem] [&+&]:before:border-t [&+&]:before:border-border/70";
-
 /** "Today, 6:00 – 7:00 PM EDT", "Wed, Oct 14, ...": the day as the app says it. */
 function listWhen(start: Date, end: Date, timeZone: string, allDay: boolean): string {
   return `${shortDayAt(start, timeZone)}, ${timeLine(start, end, timeZone, allDay)}`;
 }
 
-function Cover({ title, cover: stored }: { title: string; cover: unknown }) {
+const MONTH = (timeZone: string) => new Intl.DateTimeFormat("en-US", { month: "short", timeZone });
+const DAY = (timeZone: string) => new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone });
+
+/**
+ * The event's picture (its RSVP cover), with a calendar-leaf date on it.
+ * Without a cover: the event's first letter on a tint of its kind's colour
+ * (the calendar's), with a faint ticket behind it.
+ */
+function Cover({
+  title,
+  cover: stored,
+  kind,
+  startsAt,
+  timeZone,
+  className,
+}: {
+  title: string;
+  cover: unknown;
+  kind?: EventKind;
+  startsAt: Date;
+  timeZone: string;
+  className?: string;
+}) {
   const cover = rsvpCover(stored);
-  return cover ? (
-    // eslint-disable-next-line @next/next/no-img-element -- a stored WebP variant
-    <img src={cover.s480} alt="" className="rounded-tile size-14 flex-none object-cover" />
-  ) : (
-    <span className="bg-tint-accent text-tint-accent-foreground font-heading rounded-tile grid size-14 flex-none place-items-center text-xl">
-      {title.trim()[0]?.toUpperCase() ?? "B"}
+  const token = kind ? KIND_META[kind].token : "--primary";
+  return (
+    <span
+      className={cn("relative block overflow-hidden", className)}
+      style={{ background: `color-mix(in oklab, var(${token}) 26%, var(--card))` }}
+    >
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a stored WebP variant
+        <img
+          src={cover.s960}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        />
+      ) : (
+        <span aria-hidden="true" className="absolute inset-0 grid place-items-center">
+          <Ticket className="absolute size-32 -rotate-12 opacity-[0.08]" strokeWidth={1.25} />
+          <span className="font-heading text-foreground/80 relative text-5xl">
+            {title.trim()[0]?.toUpperCase() ?? "B"}
+          </span>
+        </span>
+      )}
+      <span className="bg-card text-card-foreground rounded-tile shadow-e1 absolute top-3 left-3 flex w-12 flex-col items-center py-1.5 leading-none">
+        <span className="text-muted-foreground text-[11px] font-semibold uppercase">
+          {MONTH(timeZone).format(startsAt)}
+        </span>
+        <span className="numeral mt-0.5 text-lg">{DAY(timeZone).format(startsAt)}</span>
+      </span>
     </span>
   );
 }
 
-function TicketList({ tickets, showHost }: { tickets: RegistrationRow[]; showHost: boolean }) {
+/** Your tickets: a card each, the event's picture beside it like a stub. */
+function TicketList({
+  tickets,
+  showHost,
+  covers,
+}: {
+  tickets: RegistrationRow[];
+  showHost: boolean;
+  covers: Map<string, unknown>;
+}) {
   return (
-    <ul className="bg-card text-card-foreground ring-foreground/6 edge rounded-card p-2 ring-1">
-      {tickets.map((r) => (
-        <li key={r.registrationId} className={cn(ROW, "flex items-center gap-4 p-2.5")}>
-          <span className="bg-tint-success text-tint-success-foreground grid size-10 flex-none place-items-center rounded-full">
-            <Ticket className="size-5" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <Link
-              href={`/e/${r.rsvpSlug}`}
-              className="block truncate text-[15px] font-semibold underline-offset-4 hover:underline"
-            >
-              {r.title}
-            </Link>
-            <span className="text-muted-foreground mt-0.5 block truncate text-[13px]">
-              {listWhen(r.startsAt, r.endsAt, safeTimeZone(r.spaceTimezone), r.allDay)}
-              {showHost && r.spaceKind === "CLUB" ? ` · ${r.spaceName}` : ""}
+    <ul className="grid gap-4.5 sm:grid-cols-2 xl:grid-cols-3">
+      {tickets.map((r) => {
+        const zone = safeTimeZone(r.spaceTimezone);
+        return (
+          <li
+            key={r.registrationId}
+            className="bg-card text-card-foreground edge rounded-card flex overflow-hidden"
+          >
+            <Cover
+              title={r.title}
+              cover={covers.get(r.eventId)}
+              startsAt={r.startsAt}
+              timeZone={zone}
+              className="w-28 flex-none"
+            />
+            <span className="border-border flex min-w-0 flex-1 flex-col gap-3 border-l border-dashed p-4">
+              <span className="min-w-0">
+                <Link
+                  href={`/e/${r.rsvpSlug}`}
+                  className="line-clamp-2 text-[15px] font-semibold underline-offset-4 hover:underline"
+                >
+                  {r.title}
+                </Link>
+                <span className="text-muted-foreground mt-0.5 block text-[13px]">
+                  {listWhen(r.startsAt, r.endsAt, zone, r.allDay)}
+                  {showHost && r.spaceKind === "CLUB" ? ` · ${r.spaceName}` : ""}
+                </span>
+              </span>
+              <span className="mt-auto">
+                {r.status === "WAITLIST" ? (
+                  <Badge variant="accent">On the waitlist</Badge>
+                ) : (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/e/${r.rsvpSlug}/t/${r.ticketCode}`}>
+                      <Ticket aria-hidden="true" />
+                      Show ticket
+                    </Link>
+                  </Button>
+                )}
+              </span>
             </span>
-          </span>
-          {r.status === "WAITLIST" ? (
-            <Badge variant="accent">On the waitlist</Badge>
-          ) : (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/e/${r.rsvpSlug}/t/${r.ticketCode}`}>
-                <Ticket aria-hidden="true" />
-                Ticket
-              </Link>
-            </Button>
-          )}
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }

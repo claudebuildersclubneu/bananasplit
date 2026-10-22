@@ -2087,6 +2087,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "list_org_creation_codes",
         "lock_org",
         "log_org_deletion",
+        // Whether a member shared their availability at all, under
+        // member_busy_hours's rule (it calls it); never what they shared.
+        "member_availability_shared",
         "member_busy_hours",
         "member_org_id",
         "member_role",
@@ -2129,6 +2132,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "secret_delete",
         "secret_read",
         "secret_write",
+        // Publishing the org chart: moves Organization.activeOrgChartVersionId
+        // (and nothing else) to a PUBLISHED version of the caller's member org.
+        "set_active_org_chart",
         "set_ics_token_hash",
         "slug_available",
         // Moonstone: the nightly counter repair (service path, its org only).
@@ -2249,6 +2255,14 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "NoteVersion:UPDATE",
         "Notification:INSERT",
         "Notification:UPDATE",
+        // Every member edits the org chart (org_chart_member_edits): versions
+        // pin createdById, positions are deleted only from a DRAFT, and there
+        // is no version DELETE.
+        "OrgChartPosition:DELETE",
+        "OrgChartPosition:INSERT",
+        "OrgChartPosition:UPDATE",
+        "OrgChartVersion:INSERT",
+        "OrgChartVersion:UPDATE",
         "OrgFile:INSERT",
         "Pin:DELETE",
         "Pin:INSERT",
@@ -2262,7 +2276,6 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
         "PollSlot:UPDATE",
         "PollVote:DELETE",
         "PollVote:INSERT",
-        "Project:UPDATE",
         "RecentVisit:DELETE",
         "RecentVisit:INSERT",
         "RecentVisit:UPDATE",
@@ -2380,6 +2393,8 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       log_org_deletion: "s",
       // Phase 3
       assert_org_active_chart: "",
+      // Any member publishes the org chart (member path only).
+      set_active_org_chart: "u",
       // Phase 4a
       term_of: "us",
       event_defaults: "",
@@ -2438,6 +2453,9 @@ runSuite("rls-tests", async ({ clients, tcase, record }) => {
       note_comment_guard: "",
       // The nightly job's counter repair (service path, its org context only).
       storage_reconcile: "s",
+      // Moonstone gaps: "Free now" asks whether availability was shared at
+      // all (member path only).
+      member_availability_shared: "u",
     };
     await tcase(
       "T27f",

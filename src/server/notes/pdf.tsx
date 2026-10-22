@@ -16,7 +16,7 @@ import {
 } from "@react-pdf/renderer";
 import { format } from "date-fns";
 
-import { paperPt } from "@/lib/notes/paper";
+import { bandFooter, bandHeader, paperPt } from "@/lib/notes/paper";
 
 /**
  * A note as a PDF: the ProseMirror document the TipTap editor saves
@@ -33,8 +33,9 @@ import { paperPt } from "@/lib/notes/paper";
  * glyph and becomes "?" rather than garbage.
  *
  * Document mode prints as it shows (src/lib/notes/paper.ts): the note's
- * paper (Letter or A4), one-inch margins, the title and club in the header
- * band and the page number in the footer band, and a page break block
+ * paper (Letter or A4), one-inch margins, the header band (the note's header
+ * text, else the title and club) and the footer band (its footer text, else
+ * the title, and the page number), and a page break block
  * starts a new page. Page mode notes print on the same paper.
  */
 
@@ -49,6 +50,9 @@ export interface NotePdfInput {
   event: { title: string; startsAt: Date } | null;
   /** Note.paperSize: LETTER (the default) or A4. */
   paperSize?: string | null;
+  /** Note.headerText / footerText: the bands' own text (NULL: title and club / title). */
+  headerText?: string | null;
+  footerText?: string | null;
 }
 
 type Style = Styles[string];
@@ -565,7 +569,7 @@ function NoteDocument({ note }: { note: NotePdfInput }) {
           fixed
           style={[styles.band, { top: paper.band, left: paper.margin, right: paper.margin }]}
         >
-          {toWinAnsi(`${title} · ${note.orgName}`)}
+          {toWinAnsi(bandHeader({ title, orgName: note.orgName, headerText: note.headerText }))}
         </Text>
         <View style={styles.header}>
           <Text style={styles.org}>{toWinAnsi(note.orgName)}</Text>
@@ -597,7 +601,9 @@ function NoteDocument({ note }: { note: NotePdfInput }) {
           ]}
           fixed
         >
-          <Text style={styles.footerTitle}>{toWinAnsi(title)}</Text>
+          <Text style={styles.footerTitle}>
+            {toWinAnsi(bandFooter({ title, footerText: note.footerText }))}
+          </Text>
           <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>

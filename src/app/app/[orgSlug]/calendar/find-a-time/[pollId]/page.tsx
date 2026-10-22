@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BackLink } from "@/components/back-link";
 import { PollResponder } from "@/components/calendar/poll-responder";
+import { PollResultsHero } from "@/components/polls/poll-results-hero";
 import { can } from "@/lib/auth/permissions";
 import { buildPollView } from "@/lib/polls/poll-view";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
@@ -35,8 +36,10 @@ export default async function FindATimePollPage({
   const canDelete = poll.createdById === user.id || canFinalize;
   const isOpen = !poll.finalizedEventId && !(poll.closesAt && poll.closesAt < new Date());
 
+  const view = buildPollView(poll, { kind: "member", userId: user.id }, { memberNames });
+
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-6">
       {/* On a phone the poll's actions are one menu, on this row (the title gets the width). */}
       <div className="flex items-center justify-between gap-2">
         <BackLink href={`/app/${orgSlug}/calendar/find-a-time`} label="Find a time" />
@@ -53,8 +56,10 @@ export default async function FindATimePollPage({
           />
         </div>
       </div>
+      {/* The answer first: the best times and who can make them. */}
+      <PollResultsHero poll={view} />
       <PollResponder
-        poll={buildPollView(poll, { kind: "member", userId: user.id }, { memberNames })}
+        poll={view}
         respondAs="member"
         orgId={org.id}
         orgSlug={orgSlug}

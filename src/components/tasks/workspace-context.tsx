@@ -4,7 +4,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo } from "react";
 
 import {
-  TASKS_VIEW_COOKIE,
   TASK_LAYOUTS,
   TASK_SCOPES,
   activeFilterCount,
@@ -46,7 +45,7 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 const PARAM: Partial<Record<keyof WorkspaceQuery, string>> = {
   view: "view",
   scope: "scope",
-  projectId: "project",
+  epicId: "epic",
   status: "status",
   ownerId: "owner",
   assigneeId: "assignee",
@@ -107,7 +106,6 @@ export function WorkspaceProvider({
       filterCount: activeFilterCount(query),
       hrefWith: (next) => write(next),
       setView: (view) => {
-        document.cookie = `${TASKS_VIEW_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
         router.push(write({ view }));
       },
       setScope: (scope) => {

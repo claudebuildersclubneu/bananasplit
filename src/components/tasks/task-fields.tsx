@@ -20,14 +20,14 @@ import { TaskPriority, TaskStatus, TaskVisibility } from "@/generated/prisma/enu
 import { relationFor } from "@/lib/tasks/assignment";
 import { addDaysToKey, weekdayOfKey } from "@/lib/tasks/dates";
 import { parseDueText, quickDues } from "@/lib/tasks/due-text";
-import { projectColor } from "@/lib/tasks/project-color";
+import { epicColor } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 
 import { STATUS_LABEL, STATUS_TOKEN } from "./layout-ui";
-import { ProjectDot, ProjectMenu } from "./project-menu";
+import { EpicDot, ParentMenu } from "./epic-menu";
 import { TagMenu } from "./tag-menu";
 import { useTasks } from "./tasks-context";
-import type { LabelOption, MemberOption, ProjectOption } from "./types";
+import type { LabelOption, MemberOption } from "./types";
 
 /**
  * The task form's controls, drawn as the task drawer design has them: a
@@ -573,10 +573,12 @@ export const longDue = (key: string) => longFmt.format(asDate(key));
 export function DueMenu({
   value,
   onPick,
+  clearLabel = "No due date",
 }: {
   value: string;
   /** "" clears the date. */
   onPick: (key: string) => void;
+  clearLabel?: string;
 }) {
   const { org } = useTasks();
   const today = org.todayKey;
@@ -658,7 +660,7 @@ export function DueMenu({
         className={cn(menuItemClass(), "text-muted-foreground")}
         onClick={() => onPick("")}
       >
-        No due date
+        {clearLabel}
       </button>
       <div className="bg-border mx-1 my-1.5 h-px" />
       <div className="flex items-center justify-between px-1.5 pb-1.5">
@@ -727,11 +729,16 @@ export function DueField({
   value,
   onChange,
   disabled,
+  label = "Due date",
+  emptyLabel = "No due date",
 }: {
   id?: string;
   value: string;
   onChange: (key: string) => void;
   disabled?: boolean;
+  /** The same picker for another date (the start date). */
+  label?: string;
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -741,17 +748,18 @@ export function DueField({
           id={id}
           type="button"
           disabled={disabled}
-          aria-label="Due date"
+          aria-label={label}
           className={wellClass(open, !value)}
         >
           <Calendar className="text-muted-foreground size-[15px] shrink-0" aria-hidden="true" />
-          <span className="truncate">{value ? shortDue(value) : "No due date"}</span>
+          <span className="truncate">{value ? shortDue(value) : emptyLabel}</span>
           <UpDown />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={MENU}>
         <DueMenu
           value={value}
+          clearLabel={emptyLabel}
           onPick={(k) => {
             onChange(k);
             setOpen(false);
@@ -762,33 +770,43 @@ export function DueField({
   );
 }
 
-/* --------------------------------------------------------------- projects */
+/* ------------------------------------------------------------------ epics */
 
-export { projectColor };
+export { epicColor };
 
 /**
- * The Project field. `current` is the task's project as it was loaded: an
- * archived one isn't offered in the menu, but the task still shows where it
- * is filed until somebody moves it.
+ * "Part of": the epic (or, for a task, the story) it sits in. `current` is
+ * its parent as loaded, shown even when the pickers' list doesn't carry it
+ * (a private story, say). Changing it moves the task (updateTask checks
+ * the hierarchy again).
  */
-export function ProjectField({
+export function PartOfField({
   id,
   value,
   onChange,
+  types,
   disabled,
   current,
+  excludeId,
 }: {
   id?: string;
   value: string | null;
   onChange: (id: string | null) => void;
+  types: readonly ("EPIC" | "STORY")[];
   disabled?: boolean;
-  current?: { id: string; name: string; color?: string | null } | null;
+  current?: { id: string; title: string; type: string; color?: string | null } | null;
+  excludeId?: string;
 }) {
-  const { projectById } = useTasks();
+  const { parentById } = useTasks();
   const [open, setOpen] = useState(false);
-  const project: Pick<ProjectOption, "id" | "name" | "color"> | undefined = value
-    ? (projectById.get(value) ?? (current?.id === value ? { color: null, ...current } : undefined))
+  const picked = value
+    ? (parentById.get(value) ?? (current?.id === value ? current : undefined))
     : undefined;
+  const storyEpicId =
+    picked && picked.type === "STORY" && "parentTaskId" in picked
+      ? (picked.parentTaskId as string | null)
+      : null;
+  const epic = storyEpicId ? parentById.get(storyEpicId) : undefined;
   const pick = (next: string | null) => {
     onChange(next);
     setOpen(false);
@@ -800,19 +818,37 @@ export function ProjectField({
           id={id}
           type="button"
           disabled={disabled}
-          aria-label="Project"
-          className={wellClass(open, !project)}
+          aria-label="Part of"
+          className={wellClass(open, !picked)}
         >
-          <ProjectDot project={project ?? null} />
-          <span className="truncate">{project?.name ?? "No project"}</span>
-          {project && !projectById.has(project.id) && (
-            <span className="text-muted-foreground text-xs font-normal">Archived</span>
+          {picked?.type === "STORY" ? (
+            <EpicDot epic={epic ?? null} />
+          ) : (
+            <EpicDot epic={picked ?? null} />
           )}
+          <span className="truncate">
+            {picked ? (
+              <>
+                {epic && <span className="text-muted-foreground font-normal">{epic.title} / </span>}
+                {picked.title}
+              </>
+            ) : types.includes("STORY") ? (
+              "Not in an epic or story"
+            ) : (
+              "Not in an epic"
+            )}
+          </span>
           <UpDown />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className={MENU}>
-        <ProjectMenu value={value} onPick={pick} />
+        <ParentMenu
+          value={value}
+          onPick={pick}
+          types={types}
+          excludeId={excludeId}
+          noneLabel={types.includes("STORY") ? "Not in an epic or story" : "Not in an epic"}
+        />
       </PopoverContent>
     </Popover>
   );

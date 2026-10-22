@@ -3,16 +3,18 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { PollList } from "@/components/polls/poll-list";
+import { FindATimeCards, type FindATimeCard } from "@/components/polls/find-a-time-cards";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
 import { sectionLabel } from "@/lib/nav/sidebar";
+import { safeTimeZone } from "@/lib/calendar/dates";
 import { FIND_A_TIME_KEEP_DAYS } from "@/lib/polls/expiry";
+import { responsesLite, summarizePoll } from "@/lib/polls/poll-summary";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { planGate } from "@/server/billing/plan-gate";
 
-import { availabilityItem, availabilityOpen } from "../polls/poll-items";
-import { getOrgPolls } from "../queries";
+import { availabilityItem, availabilityOpen, dateSpan } from "../polls/poll-items";
+import { getOrgPolls, getPollResults } from "../queries";
 
 /**
  * Find a time: the space's availability polls (When2meet-style), newest
@@ -30,17 +32,38 @@ export default async function FindATimePage({
 
   const { organization: org, user, role, settings } = await getOrgContextBySlug(orgSlug);
   const personal = org.kind === "PERSONAL";
-  const { polls, questionCount } = await withOrgTx(org.id, async ({ db }) => ({
-    polls: await getOrgPolls(db, org.id),
-    questionCount: personal ? await db.poll.count({ where: { organizationId: org.id } }) : 0,
-  }));
+  const { polls, results, questionCount } = await withOrgTx(org.id, async ({ db }) => {
+    const polls = await getOrgPolls(db, org.id);
+    return {
+      polls,
+      results: await getPollResults(
+        db,
+        org.id,
+        polls.map((p) => p.id),
+      ),
+      questionCount: personal ? await db.poll.count({ where: { organizationId: org.id } }) : 0,
+    };
+  });
   const now = new Date();
   const isAdmin = can({ role }, "events.write");
   const base = `/app/${orgSlug}`;
-  const items = polls.map((p) => ({
-    open: availabilityOpen(p, now),
-    item: availabilityItem(p, base, now, p.createdById === user.id || isAdmin),
-  }));
+  // Each poll as a card: its results summed up on the server (the rows hold
+  // user ids), in the poll's own zone.
+  const items = polls.map((p) => {
+    const zone = safeTimeZone(p.timezone);
+    const rows = results.get(p.id) ?? { slots: [], responses: [] };
+    const card: FindATimeCard = {
+      item: availabilityItem(p, base, now, p.createdById === user.id || isAdmin),
+      summary: summarizePoll(rows.slots, responsesLite(rows.responses), p.durationMinutes, zone),
+      timeZone: zone,
+      durationMinutes: p.durationMinutes,
+      span: dateSpan(p),
+      firstDay: p.firstSlotAt,
+    };
+    return { open: availabilityOpen(p, now), card };
+  });
+  const openCards = items.filter((p) => p.open).map((p) => p.card);
+  const closedCards = items.filter((p) => !p.open).map((p) => p.card);
 
   const about = personal
     ? "Offer some days and hours and share the link: anyone marks when they're free, no account needed, and you pick the time."
@@ -56,7 +79,7 @@ export default async function FindATimePage({
         description={
           items.length === 0
             ? about
-            : `${openPolls.length} open · ${answered === 1 ? "1 answer" : `${answered} answers`} so far`
+            : `${openPolls.length} open, ${answered === 1 ? "1 answer" : `${answered} answers`} so far`
         }
         actions={
           <Button variant="create" asChild>
@@ -75,11 +98,24 @@ export default async function FindATimePage({
           description="Press Offer times: choose the days, the hours and how long the meeting is, then send the link. You'll see the best times as answers come in."
         />
       ) : (
-        <PollList
-          orgId={org.id}
-          open={items.filter((p) => p.open).map((p) => p.item)}
-          closed={items.filter((p) => !p.open).map((p) => p.item)}
-        />
+        <div className="space-y-7.5">
+          {openCards.length > 0 && (
+            <section aria-labelledby="fat-open" className="space-y-4">
+              <h2 id="fat-open" className="heading text-[17px]">
+                Taking answers
+              </h2>
+              <FindATimeCards cards={openCards} feature />
+            </section>
+          )}
+          {closedCards.length > 0 && (
+            <section aria-labelledby="fat-closed" className="space-y-4">
+              <h2 id="fat-closed" className="heading text-[17px]">
+                Closed and scheduled
+              </h2>
+              <FindATimeCards cards={closedCards} />
+            </section>
+          )}
+        </div>
       )}
 
       {/* Not on a phone: the empty state and Offer times say it there. */}

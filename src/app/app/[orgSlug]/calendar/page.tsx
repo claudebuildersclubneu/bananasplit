@@ -2,6 +2,7 @@ import { CalendarClock, CalendarSync, Ticket } from "lucide-react";
 import Link from "next/link";
 
 import { EventCalendar, type CalendarItem } from "@/components/calendar/event-calendar";
+import { NewEventButton } from "@/components/calendar/new-event-button";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/auth/permissions";
@@ -17,7 +18,6 @@ import { weekWindowFor } from "@/lib/calendar/grid";
 import { parseCalendarRange } from "@/lib/calendar/range";
 import { sectionLabel } from "@/lib/nav/sidebar";
 
-import { NewEventButton } from "./new-event-button";
 import { dueDateKey, fromDateKey } from "@/lib/tasks/dates";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { getOrgMembersForPicker } from "@/server/members";
@@ -139,8 +139,7 @@ export default async function CalendarPage({
         actions={
           <>
             {/* Planning a meeting starts here as often as from the sidebar. */}
-            {/* On a phone: New event at the top right; the rest is in the menu. */}
-            {canManage && <NewEventButton />}
+            {/* On a phone New event (last here) moves to the top right; the rest is in the menu. */}
             {spaceIncludes(org, "polls") && (
               <Button variant="outline" className="max-md:hidden" asChild>
                 <Link href={`/app/${orgSlug}/calendar/find-a-time/new`}>
@@ -168,6 +167,7 @@ export default async function CalendarPage({
                 </Link>
               </Button>
             )}
+            {canManage && <NewEventButton />}
           </>
         }
       />

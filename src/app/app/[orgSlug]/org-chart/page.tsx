@@ -70,12 +70,14 @@ export default async function OrgChartPage({
     responsibilities: p.responsibilities,
     decidesAlone: p.decidesAlone,
     rank: p.rank,
+    teamId: p.teamId,
   }));
+  const namedTeams = chart?.teams ?? [];
 
   const hrefFor = (key: string) =>
     `${base}?${mode === "list" ? "view=list&" : ""}position=${encodeURIComponent(key)}`;
 
-  const teamCount = chartTeams(nodes).teams.length;
+  const teamCount = chartTeams(nodes, namedTeams).teams.length;
   const openCount = nodes.filter((n) => n.isOpen).length;
   const published =
     chart &&
@@ -121,6 +123,7 @@ export default async function OrgChartPage({
             orgSlug={orgSlug}
             orgName={organization.name}
             nodes={nodes}
+            teams={namedTeams}
             mode={mode}
             canEdit={canEdit}
             draftHref={draftHref}
@@ -133,7 +136,7 @@ export default async function OrgChartPage({
           description={
             canEdit
               ? "Import your org chart document (Word, Google Doc export, Markdown, text or PDF) and review it before publishing, start from the club template, or build it by hand."
-              : `${organization.name}'s reporting lines, roles and responsibilities will appear here once an admin publishes the chart.`
+              : `${organization.name}'s reporting lines, roles and responsibilities will appear here once the chart is published.`
           }
           action={
             canEdit ? (

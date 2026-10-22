@@ -48,6 +48,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { TaskStatus } from "@/generated/prisma/enums";
 import { canEditTask } from "@/lib/tasks/access";
 import { relationFor } from "@/lib/tasks/assignment";
+import { epicOf } from "@/lib/tasks/epic";
 import { cn } from "@/lib/utils";
 
 import { bulkAssign, bulkDelete, bulkUpdateStatus, restoreTask } from "../actions";
@@ -89,7 +90,7 @@ const COLUMN_KEYS = [
   "owner",
   "involved",
   "creator",
-  "project",
+  "epic",
   "labels",
   "priority",
   "dueDate",
@@ -99,7 +100,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   owner: "Owner",
   involved: "Also involved",
   creator: "Creator",
-  project: "Project",
+  epic: "Epic",
   labels: "Tags",
   priority: "Priority",
   dueDate: "Due date",
@@ -132,7 +133,7 @@ export function TaskTable({
     owner: true,
     involved: false,
     creator: false,
-    project: true,
+    epic: true,
     labels: true,
     priority: true,
     dueDate: true,
@@ -360,7 +361,7 @@ export function TaskTable({
                 />
               )}
               {visible.labels && <TableHead>Tags</TableHead>}
-              {visible.project && <TableHead>Project</TableHead>}
+              {visible.epic && <TableHead>Epic</TableHead>}
               {visible.creator && <TableHead>Creator</TableHead>}
             </TableRow>
           </TableHeader>
@@ -502,7 +503,7 @@ export function TaskTable({
                         </div>
                       </TableCell>
                     )}
-                    {visible.project && <TableCell>{task.project?.name ?? "–"}</TableCell>}
+                    {visible.epic && <TableCell>{epicOf(task)?.title ?? "–"}</TableCell>}
                     {visible.creator && (
                       <TableCell>
                         <span className="flex items-center gap-1.5">

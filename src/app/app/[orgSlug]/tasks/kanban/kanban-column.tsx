@@ -4,6 +4,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 
+import { ClearCompletedButton } from "@/components/tasks/clear-completed";
 import { STATUS_TOKEN } from "@/components/tasks/layout-ui";
 import type { TaskItem } from "@/components/tasks/types";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,8 @@ export function KanbanColumn({
 
   return (
     <section
+      // The whole column, header included, takes a drop.
+      ref={setNodeRef}
       aria-label={`${title}, ${tasks.length} task${tasks.length === 1 ? "" : "s"}`}
       className={cn(
         "group/col bg-muted/65 rounded-block flex w-[17rem] shrink-0 flex-col gap-2.5 p-2.5 transition-colors duration-150 lg:w-auto lg:min-w-0 lg:flex-1",
@@ -66,6 +69,7 @@ export function KanbanColumn({
             {tasks.length}
           </Badge>
           <span className="flex-1" />
+          {status === "COMPLETED" && <ClearCompletedButton tasks={tasks} />}
           {status !== "COMPLETED" && (
             <button
               type="button"
@@ -79,11 +83,7 @@ export function KanbanColumn({
         </div>
       )}
 
-      <div
-        ref={setNodeRef}
-        data-testid={`kanban-column-${id}`}
-        className="flex min-h-24 flex-1 flex-col gap-2.5"
-      >
+      <div data-testid={`kanban-column-${id}`} className="flex min-h-24 flex-1 flex-col gap-2.5">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <SortableTaskCard

@@ -15,7 +15,13 @@ import {
   type BuiltQuery,
 } from "./query-builder";
 import { hasSource } from "./sources";
-import { tierOf, type DatabaseSource, type Tier, type ViewContext } from "./types";
+import {
+  LISTED_DEFINITIONS,
+  tierOf,
+  type DatabaseSource,
+  type Tier,
+  type ViewContext,
+} from "./types";
 
 /**
  * Database pages: which databases the viewer may see, and one page of one
@@ -77,7 +83,7 @@ function isListed(memberVisibility: MemberVisibility, tier: Tier, visible: boole
   return true;
 }
 
-/** The databases the viewer may open, in sidebar order. */
+/** The databases the viewer may open, in sidebar order (Personal: only its own). */
 export async function listDatabases(
   db: TxClient,
   organizationId: string,
@@ -86,7 +92,7 @@ export async function listDatabases(
   const tier = tierOf(role);
   if (!tier) return [];
   const defs = await db.databaseDefinition.findMany({
-    where: { organizationId, archivedAt: null },
+    where: { organizationId, archivedAt: null, ...LISTED_DEFINITIONS },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
   const out: DatabaseSummary[] = [];

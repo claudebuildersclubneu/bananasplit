@@ -289,3 +289,46 @@ export async function getPollMemberNames(
   });
   return new Map(members.map((m) => [m.user.id, m.user.name ?? ""]));
 }
+
+/**
+ * Every slot and answer of these find-a-time polls, for their cards (the
+ * best time and the heat picture, src/lib/polls/poll-summary.ts). Two
+ * reads for the whole list. Holds user ids and guest key hashes: summarize
+ * it on the server, never hand it to a client component.
+ */
+export async function getPollResults(db: TxClient, organizationId: string, pollIds: string[]) {
+  if (pollIds.length === 0) return new Map<string, PollResultRows>();
+  // One after another: a transaction has one connection.
+  const slots = await db.pollSlot.findMany({
+    where: { organizationId, pollId: { in: pollIds } },
+    select: { id: true, pollId: true, startsAt: true, endsAt: true },
+    orderBy: { startsAt: "asc" },
+  });
+  const responses = await db.pollResponse.findMany({
+    where: { organizationId, pollId: { in: pollIds } },
+    select: {
+      pollId: true,
+      slotId: true,
+      userId: true,
+      guestName: true,
+      guestKeyHash: true,
+      availability: true,
+    },
+  });
+  const out = new Map<string, PollResultRows>();
+  for (const id of pollIds) out.set(id, { slots: [], responses: [] });
+  for (const s of slots) out.get(s.pollId)?.slots.push(s);
+  for (const r of responses) out.get(r.pollId)?.responses.push(r);
+  return out;
+}
+
+export interface PollResultRows {
+  slots: { id: string; startsAt: Date; endsAt: Date }[];
+  responses: {
+    slotId: string;
+    userId: string | null;
+    guestName: string | null;
+    guestKeyHash: string | null;
+    availability: "YES" | "NO" | "IF_NEEDED";
+  }[];
+}

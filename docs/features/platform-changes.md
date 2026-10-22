@@ -21,8 +21,10 @@ What changed for every club, where it lives, and what it needs. Stacked on
 
 ## Navigation, Overview, pins
 
-- The sidebar is three short groups (your work, Club, Data) with Settings at
-  the bottom. People is in it; Reports moved into Databases.
+- The sidebar is three short groups (your work, Club, Data), then Pinned;
+  Personal and your clubs sit at its foot, apart from the pins (they scroll
+  on their own when there are many). The Admin panel is in the club menu,
+  not the sidebar. People is in the Club group; Reports moved into Databases.
 - The pin button in the top bar pins any page, note, task, file, database or
   person. Pins show in the sidebar and on the Overview. `Pin` rows are the
   member's own (RLS on user and org); labels are looked up live under RLS,
@@ -34,6 +36,13 @@ What changed for every club, where it lives, and what it needs. Stacked on
   roles.
 - Owners and admins of a new club see a getting-started checklist worked out
   from the org's data.
+- The default Overview (`src/lib/overview/widgets.ts`) leads with **Up
+  next** straight under the greeting, then rows that fill the four columns:
+  My tasks beside My week at a glance, Open polls beside the next RSVP
+  event, This week, Weekly pulse, then Recently visited beside Pinned. The
+  stat strip is the "My week at a glance" widget, and a new club's setup
+  prompt sits under the widgets. `20261020120000_overview_reset_tags_open`
+  reset every saved Overview to this default (anyone can customize again).
 
 ## Themes and pictures
 

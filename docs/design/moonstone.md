@@ -73,7 +73,7 @@ destructive | link`; sizes `default (40) | sm (32) | icon (40) | icon-sm
   `variant="outline" size="icon-sm"` (••• and ↗ in card headers).
 - `ui/badge`: chips: `default | secondary (counts) | accent | success | info
 | destructive | outline`.
-- `ui/chip`: `TagChip` (tag/project colour mixed into the card; optional
+- `ui/chip`: `TagChip` (tag/epic colour mixed into the card; optional
   remove button) and `StatusDot` (dot + word, never a dot alone).
 - `ui/block-card`: `BlockCard tone="quiet|alert|answer|goal"` with kicker,
   title, subtitle, figure, figureLabel, aside (avatar stack), action, href.
@@ -97,7 +97,7 @@ destructive | link`; sizes `default (40) | sm (32) | icon (40) | icon-sm
   spacer, then controls in this order: Segmented, ••• (`ItemMenu`/outline
   icon button), ↗ (open the full page).
 - **Task rows:** 22px circle checkbox (fills `bg-block-goal` on done),
-  title, meta row (TagChip project, due label), priority chip on the right
+  title, meta row (TagChip epic, due label), priority chip on the right
   (Urgent = `destructive` + flag icon, High = `accent`, Normal = nothing).
 - **Toasts:** `toast({ title: "Done: Creative brief draft", tone: "success",
 action: { label: "Undo", run } })`. Verb first.
@@ -118,8 +118,8 @@ is a `max-md:` (or `md:hidden`) class, so the desktop is untouched.
 - **Navigation:** a menu button at the left of the tool capsule
   (`shell/nav-menu.tsx`) opens a full-screen menu: the club (its menu
   switches clubs) at the top, then every section under the sidebar's
-  headings, one roomy row each, the current page lit, and the Admin panel at
-  the foot. No pins, no tab bar, nothing floating over the page.
+  headings, one roomy row each, the current page lit (the Admin panel is in
+  the club menu). No pins, no tab bar, nothing floating over the page.
 - **The add button is always at the top right,** beside the title, on
   every page: `PageHeader` moves its `variant="create"` action (or the
   group it sits in) there, and the other actions go under the summary.

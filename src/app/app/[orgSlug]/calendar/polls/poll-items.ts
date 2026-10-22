@@ -103,7 +103,7 @@ export function availabilityItem(
 }
 
 /** "Sep 29 – Oct 3" in the poll's own zone, the days it offers. */
-function dateSpan(poll: AvailabilityRow): string | null {
+export function dateSpan(poll: AvailabilityRow): string | null {
   if (!poll.firstSlotAt || !poll.lastSlotEndsAt) return null;
   const fmt = new Intl.DateTimeFormat("en-US", {
     month: "short",

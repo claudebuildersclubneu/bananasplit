@@ -168,7 +168,8 @@ const LAYOUTS = [
  * The Files library: folders down the side (drag a note or file onto one to
  * file it), and notes and uploaded files together in one list you can
  * search, filter, sort and see as a grid or a list. Cards show a preview of
- * what's inside and a pin.
+ * what's inside and a pin. In Personal everything is its owner's alone, so
+ * cards don't mark who can see them.
  *
  * On a phone the folders are a filter instead of a column (PhoneToolbar's
  * sheet, with the kind, audience, author and sort), and search is an icon.
@@ -185,6 +186,7 @@ export function NotesLibrary({
   trash,
   filters,
   sheetFilters,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
@@ -200,6 +202,8 @@ export function NotesLibrary({
   filters: React.ReactNode;
   /** The same filters for the phone's filter sheet (under the folder). */
   sheetFilters: React.ReactNode;
+  /** A Personal space: no sharing, so no lock or "shared" marks. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -439,7 +443,7 @@ export function NotesLibrary({
               <NotebookText className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
             )}
             <p className="flex min-w-0 items-center gap-1.5 pe-16 text-sm font-medium">
-              {n.visibility === "PRIVATE" ? (
+              {personal ? null : n.visibility === "PRIVATE" ? (
                 n.sharedWithMe || n.shareCount > 0 ? (
                   <Users
                     className="text-muted-foreground size-3 shrink-0"
@@ -466,7 +470,7 @@ export function NotesLibrary({
                 {view === "list" ? "Note · " : ""}
                 {n.authorName}, {formatDistanceToNow(n.updatedAt, { addSuffix: true })}
               </span>
-              {(n.sharedWithMe || n.shareCount > 0 || n.memberCanEdit) && (
+              {!personal && (n.sharedWithMe || n.shareCount > 0 || n.memberCanEdit) && (
                 <span className="truncate">
                   {n.sharedWithMe
                     ? "Shared with you"
@@ -560,7 +564,7 @@ export function NotesLibrary({
               <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
             )}
             <p className="flex min-w-0 items-center gap-1.5 pe-16 text-sm font-medium">
-              {f.visibility === "PRIVATE" && (
+              {!personal && f.visibility === "PRIVATE" && (
                 <Lock className="text-muted-foreground size-3 shrink-0" aria-label="Only you" />
               )}
               <span className="truncate">{f.name}</span>
@@ -734,7 +738,11 @@ export function NotesLibrary({
         <div className="space-y-0.5">
           <p
             className="eyebrow text-muted-foreground px-2.5 pb-1"
-            title="Folders are shared with the club; private notes stay private inside them."
+            title={
+              personal
+                ? undefined
+                : "Folders are shared with the club; private notes stay private inside them."
+            }
           >
             Folders
           </p>

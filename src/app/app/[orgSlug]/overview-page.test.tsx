@@ -51,8 +51,12 @@ const db = {
   membership: { findMany: vi.fn(), count: vi.fn() },
   budgetPeriod: { count: vi.fn() },
   note: { count: vi.fn() },
+  databaseDefinition: { count: vi.fn() },
 };
 
+vi.mock("@/app/app/[orgSlug]/getting-started-actions", () => ({
+  setStartedStepSkipped: vi.fn(),
+}));
 vi.mock("@/server/db/context", () => ({
   getOrgContextBySlug: mocks.getOrgContextBySlug,
   withOrgTx: (_orgId: string, fn: (ctx: { db: typeof db }) => unknown) =>
@@ -60,6 +64,8 @@ vi.mock("@/server/db/context", () => ({
 }));
 vi.mock("@/server/tasks/queries", () => ({
   getMyOpenTasks: mocks.getMyOpenTasks,
+  // The phone's open-tasks bar (the same numbers as Tasks' stat strip).
+  getTaskStats: async () => ({ open: 0, dueThisWeek: 0, overdue: 0, doneThisWeek: 0 }),
   taskFilterWhere: () => ({}),
 }));
 vi.mock("@/app/app/[orgSlug]/calendar/queries", () => ({
@@ -192,11 +198,11 @@ describe("org overview", () => {
   it("builds the member's own board, and offers every widget but the admin ones", async () => {
     mocks.loadSavedBoard.mockResolvedValue([
       { id: "week", type: "week", w: 4, h: null },
-      { id: "task-stats", type: "task-stats", w: 1, h: 240 },
+      { id: "polls", type: "polls", w: 1, h: 240 },
     ]);
     const html = await render();
     expect(html).toContain("This week");
-    expect(html).toContain("My week at a glance");
+    expect(html).toContain("Open polls");
     expect(html).toContain("height:240px");
     // Not on this member's board.
     expect(html).not.toContain(">Meetings<");
@@ -216,7 +222,6 @@ describe("org overview", () => {
           visibility: "ORG",
           dueDate: new Date("2026-10-01T00:00:00Z"),
           blockedReason: null,
-          project: { name: "Fall kickoff" },
           parentTask: null,
         },
         {
@@ -226,8 +231,13 @@ describe("org overview", () => {
           visibility: "PRIVATE",
           dueDate: new Date("2026-10-05T00:00:00Z"),
           blockedReason: "Waiting on the budget",
-          project: null,
-          parentTask: { title: "Fall kickoff logistics" },
+          parentTask: {
+            id: "s_1",
+            title: "Fall kickoff logistics",
+            type: "STORY",
+            color: null,
+            parentTask: { id: "e_1", title: "Fall kickoff", type: "EPIC", color: null },
+          },
         },
       ],
     });
@@ -243,7 +253,7 @@ describe("org overview", () => {
     expect(html).toContain("1 overdue");
     expect(html).toContain("Overdue · Thu, Oct 1");
     expect(html).toContain("Blocked");
-    expect(html).toContain("Subtask of Fall kickoff logistics");
+    expect(html).toContain("Part of Fall kickoff logistics");
     expect(html).toContain('aria-label="Private task"');
     expect(html).toContain("View all 8");
   });
@@ -323,7 +333,9 @@ describe("org overview", () => {
         where: expect.objectContaining({ organizationId: "org_cbc", closedAt: null }),
       }),
     );
-    expect(html.indexOf("Pizza or tacos?")).toBeLessThan(html.indexOf("Exec sync time"));
+    // In the polls widget (Up next above it lists them by urgency instead).
+    const widget = html.slice(html.lastIndexOf("Open polls"));
+    expect(widget.indexOf("Pizza or tacos?")).toBeLessThan(widget.indexOf("Exec sync time"));
     expect(html).toContain('href="/app/cbc/calendar/polls/qp_1"');
     expect(html).toContain('href="/app/cbc/calendar/find-a-time/ap_1"');
     expect(html).toContain("Question · Open");
@@ -347,22 +359,57 @@ describe("org overview", () => {
 describe("the Moonstone Overview", () => {
   it("greets in the display face with the date and club on a plain line", async () => {
     const html = await render();
-    expect(html).toContain("Monday, October 5 · Claude Builders Club");
+    expect(html).toContain("Monday, October 5, Claude Builders Club");
     expect(html).not.toContain('class="eyebrow');
   });
 
-  it("puts the week at a glance in the header, with the next meeting's time", async () => {
+  it("heads every board with the stat strip, then Up next", async () => {
     mocks.getUpcomingEvents.mockImplementation(
       async (_db: unknown, _org: string, _now: Date, _n: number, only?: string) =>
-        only === "meetings" ? [meeting] : [],
+        only === "meetings"
+          ? []
+          : [meeting, { ...meeting, id: "e_far", startsAt: new Date("2026-11-30T02:00:00Z") }],
     );
     db.task.count.mockResolvedValue(0);
+    // Even a saved board that never had them.
+    mocks.loadSavedBoard.mockResolvedValue([{ id: "polls", type: "polls", w: 1, h: null }]);
     const html = await render();
-    expect(html).toContain("Open tasks");
+    expect(html).toContain("Due this week");
     expect(html).toContain("All clear");
-    // 7pm in Los Angeles, the same day.
-    expect(html).toContain("7:00 PM");
-    expect(html).toContain("Officer meeting, today");
+    expect(html).toContain("Coming up in 14 days");
+    expect(html).not.toContain("Open tasks");
+    expect(html.indexOf("Due this week")).toBeLessThan(html.indexOf('id="up-next-heading"'));
+    expect(html.indexOf('id="up-next-heading"')).toBeLessThan(html.indexOf("Open polls"));
+  });
+
+  it("shows owners the club's first steps until each is done or checked off", async () => {
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: { ...org, logo: null },
+      role: "OWNER",
+      settings: { startedSkipped: ["database"] },
+    });
+    db.budgetPeriod.count.mockResolvedValue(0);
+    db.databaseDefinition.count.mockResolvedValue(0);
+    const html = await render();
+    expect(html).toContain("Get your club started");
+    expect(html).toContain("Set up your budgets");
+    expect(html).toContain("Create a task or an epic");
+    expect(html).not.toContain("sections");
+    expect(html).toContain("Checked off as not needed.");
+
+    // Everything done or checked off: the card is gone.
+    db.membership.count.mockResolvedValue(5);
+    db.event.count.mockResolvedValue(2);
+    db.task.count.mockResolvedValue(3);
+    db.budgetPeriod.count.mockResolvedValue(1);
+    mocks.getOrgContextBySlug.mockResolvedValue({
+      user: viewer,
+      organization: { ...org, logo: { key: "k" } },
+      role: "OWNER",
+      settings: { startedSkipped: ["database"] },
+    });
+    expect(await render()).not.toContain("Get your club started");
   });
 
   it("starts a new board with Up next and the Weekly pulse", async () => {
@@ -372,11 +419,13 @@ describe("the Moonstone Overview", () => {
     );
     mocks.getViewerRsvps.mockResolvedValue(new Map([["e_meet", "PENDING"]]));
     const html = await render();
-    expect(html).toContain('aria-label="Up next"');
+    expect(html).toContain('id="up-next-heading"');
     expect(html).toContain('aria-label="Weekly pulse"');
     // The RSVP waiting on the viewer is an answer block.
     expect(html).toContain("Your RSVP · Today · 7:00 PM");
-    expect(html.indexOf('aria-label="Up next"')).toBeLessThan(html.indexOf('aria-label="My tasks"'));
+    expect(html.indexOf('id="up-next-heading"')).toBeLessThan(
+      html.indexOf('aria-label="My tasks"'),
+    );
     expect(html).toContain("The first pulse goes out Fri, Oct 9 at 5:00 PM.");
   });
 
@@ -391,7 +440,14 @@ describe("the Moonstone Overview", () => {
         range: { from: "2026-09-26", to: "2026-10-02" },
         doneCount: 9,
         byProject: [{ projectId: "p", name: "Fall Showcase", color: null, done: 9, open: 2 }],
-        events: [{ eventId: "e", title: "General meeting", startsAt: "2026-09-30T22:00:00Z", checkIns: 32 }],
+        events: [
+          {
+            eventId: "e",
+            title: "General meeting",
+            startsAt: "2026-09-30T22:00:00Z",
+            checkIns: 32,
+          },
+        ],
         newMembers: [],
         pollResults: [],
         nextWeek: [],
@@ -405,7 +461,7 @@ describe("the Moonstone Overview", () => {
     expect(html).toContain("tasks done last week");
     expect(html).toContain("32 at the General meeting");
     expect(html).toContain('href="/app/cbc/pulse/2026-09-26"');
-    // A saved board isn't given the new widgets.
-    expect(html).not.toContain('aria-label="Up next"');
+    // Up next heads every board, saved or not.
+    expect(html).toContain('id="up-next-heading"');
   });
 });

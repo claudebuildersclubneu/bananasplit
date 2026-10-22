@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { can } from "@/lib/auth/permissions";
+import { isPersonalSpace, spaceIncludes } from "@/lib/billing/space";
 import { sectionLabel } from "@/lib/nav/sidebar";
 import { fmtDateTime } from "@/server/databases/format";
 import { listDatabases } from "@/server/databases/views";
@@ -96,7 +97,11 @@ const VISIBILITY_COPY: Record<string, string> = {
   HIDDEN: "Hidden from members",
 };
 
-/** The Databases index: the databases this viewer may open (Settings > Privacy decides). */
+/**
+ * The Databases index: the databases this viewer may open (Settings > Privacy
+ * decides). In Personal, only the ones its owner makes: no built-in club
+ * data, data source or reports.
+ */
 export default async function DatabasesPage({
   params,
   searchParams,
@@ -106,9 +111,16 @@ export default async function DatabasesPage({
   if (planLock) return planLock;
   const sp = await searchParams;
   const { organization, role, user, settings } = await getOrgContextBySlug(orgSlug);
+  const personal = isPersonalSpace(organization);
   const isAdmin = can({ role }, "databases.write");
-  const canConnect = can({ role }, "integrations.write");
-  const showReports = Boolean(reportTier(role)) && can({ role }, "reports.view");
+  // A data source fills a club's built-in databases; Personal Plus's data
+  // connection is for calendar sync.
+  const connections = !personal && spaceIncludes(organization, "integrations");
+  const canConnect = connections && can({ role }, "integrations.write");
+  const showReports =
+    spaceIncludes(organization, "reports") &&
+    Boolean(reportTier(role)) &&
+    can({ role }, "reports.view");
 
   const { databases, counts, sync, dataStep, pinned } = await withOrgTx(
     organization.id,
@@ -142,7 +154,7 @@ export default async function DatabasesPage({
           });
         }
       }
-      const sync = isAdmin ? await loadSyncStatus(db, organization.id) : null;
+      const sync = isAdmin && connections ? await loadSyncStatus(db, organization.id) : null;
       const setup = canConnect ? await loadSetupState(db, organization.id) : null;
       const data = setup?.steps.find((s) => s.step.id === "data") ?? null;
       const dataStep: SetupStepView | null = data
@@ -174,6 +186,21 @@ export default async function DatabasesPage({
   const needsSetup = withData.length === 0 && custom.length === 0 && !connected && !showAll;
   const importable = databases.filter((d) => d.kind === "ATTENDANCE" || d.kind === "SIGNUPS");
 
+  // Where each database's rows come from: the website's Supabase for the
+  // streams a connected sync fills, Bananasplit for everything else. Only
+  // admins can read the connection, so only they see the tag.
+  const SYNCED_KIND: Record<string, string> = {
+    checkins: "ATTENDANCE",
+    signups: "SIGNUPS",
+    sessions: "SESSIONS",
+    ballots: "BALLOTS",
+  };
+  const syncedKinds = new Set(
+    connected && sync ? sync.streams.map((st) => SYNCED_KIND[st.stream]).filter(Boolean) : [],
+  );
+  const sourceOf = (d: (typeof databases)[number]) =>
+    syncedKinds.has(d.kind) ? "Supabase" : "Bananasplit";
+
   const unitOf = (d: (typeof databases)[number], n: number) => {
     const unit = d.kind === "BALLOTS" ? "polls" : d.kind === "PEOPLE" ? "people" : "rows";
     return n === 1 ? (unit === "people" ? "person" : unit.replace(/s$/, "")) : unit;
@@ -203,12 +230,26 @@ export default async function DatabasesPage({
         >
           <span className="flex items-start justify-between gap-2">
             <IconChip icon={Icon} className={cn(muted && "text-muted-foreground")} />
-            {d.memberVisibility !== "MEMBERS" && (
-              <Badge variant="secondary">
-                <Lock aria-hidden="true" />
-                {VISIBILITY_COPY[d.memberVisibility]}
-              </Badge>
-            )}
+            <span className="flex flex-wrap justify-end gap-1.5">
+              {d.memberVisibility !== "MEMBERS" && (
+                <Badge variant="secondary">
+                  <Lock aria-hidden="true" />
+                  {VISIBILITY_COPY[d.memberVisibility]}
+                </Badge>
+              )}
+              {isAdmin && !personal && (
+                <Badge variant="secondary" title={`Stored in ${sourceOf(d)}`}>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      sourceOf(d) === "Supabase" ? "bg-success" : "bg-glow",
+                    )}
+                  />
+                  {sourceOf(d)}
+                </Badge>
+              )}
+            </span>
           </span>
           <span className="heading mt-4 text-[17px]">{d.name}</span>
           <span className="text-muted-foreground mt-1 line-clamp-2 text-sm">
@@ -257,11 +298,15 @@ export default async function DatabasesPage({
       <PageHeader
         title={sectionLabel(settings?.sidebar, "databases")}
         description={summary}
-        actions={isAdmin && <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} />}
+        actions={
+          isAdmin && (
+            <NewDatabaseDialog orgId={organization.id} orgSlug={orgSlug} personal={personal} />
+          )
+        }
         tabs={<DatabasesTabs orgSlug={orgSlug} showReports={showReports} />}
       />
 
-      {databases.length === 0 ? (
+      {databases.length === 0 && !personal ? (
         <EmptyState
           icon={Database}
           title="No databases are visible to you"
@@ -277,12 +322,21 @@ export default async function DatabasesPage({
         <section aria-labelledby="db-setup" className="space-y-4.5">
           <div className="space-y-1.5">
             <h2 id="db-setup" className="heading text-[17px]">
-              Add your club&apos;s data
+              {personal ? "Make your first database" : <>Add your club&apos;s data</>}
             </h2>
             <p className="text-muted-foreground flex items-start gap-2 text-sm">
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              Everything is stored in Bananasplit and saved as you type: there&apos;s no database to
-              set up, and no other club can see your data.
+              {personal ? (
+                <>
+                  Everything is stored in Bananasplit and saved as you type: there&apos;s no
+                  database to set up, and only you can see them.
+                </>
+              ) : (
+                <>
+                  Everything is stored in Bananasplit and saved as you type: there&apos;s no
+                  database to set up, and no other club can see your data.
+                </>
+              )}
             </p>
           </div>
 
@@ -294,13 +348,15 @@ export default async function DatabasesPage({
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <p className="font-semibold">Make a database</p>
                     <p className="text-muted-foreground text-sm">
-                      A member roster, equipment, merch orders, sponsors: start from a template or
-                      from scratch, with the fields you choose.
+                      {personal
+                        ? "A reading list, your classes, job applications, anything you keep track of: start blank and add the fields you choose."
+                        : "A member roster, equipment, merch orders, sponsors: start from a template or from scratch, with the fields you choose."}
                     </p>
                   </div>
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     trigger={
                       <Button variant="outline">
                         <Plus aria-hidden="true" />
@@ -321,6 +377,7 @@ export default async function DatabasesPage({
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     defaultTemplateId="spreadsheet"
                     trigger={
                       <Button variant="outline">
@@ -359,6 +416,7 @@ export default async function DatabasesPage({
                   <NewDatabaseDialog
                     orgId={organization.id}
                     orgSlug={orgSlug}
+                    personal={personal}
                     defaultMode="import"
                     trigger={
                       <Button variant="outline">
@@ -368,41 +426,46 @@ export default async function DatabasesPage({
                     }
                   />
                 </li>
-                <li className={setupRow}>
-                  <IconChip icon={CalendarDays} />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-semibold">Start from the calendar</p>
-                    <p className="text-muted-foreground text-sm">
-                      No website? Every event you add to the calendar becomes a session here, ready
-                      for check-ins.
-                    </p>
-                  </div>
-                  <Button asChild variant="outline">
-                    <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
-                  </Button>
-                </li>
-                <li className={setupRow}>
-                  <IconChip icon={Globe} />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-semibold">
-                      Already have a club website database?{" "}
-                      <span className="text-muted-foreground font-normal">Optional</span>
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      If your site keeps check-ins, sign-ups and votes in Supabase, connect it and
-                      they sync in. You don&apos;t need one to use Databases.
-                    </p>
-                  </div>
-                  <Button asChild variant={connecting ? "secondary" : "ghost"}>
-                    <Link
-                      href={`/app/${orgSlug}/databases?connect=1#connect`}
-                      scroll={false}
-                      aria-current={connecting ? "step" : undefined}
-                    >
-                      Connect
-                    </Link>
-                  </Button>
-                </li>
+                {/* A club's built-in data: sessions from its calendar, and its website's. */}
+                {!personal && (
+                  <>
+                    <li className={setupRow}>
+                      <IconChip icon={CalendarDays} />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="font-semibold">Start from the calendar</p>
+                        <p className="text-muted-foreground text-sm">
+                          No website? Every event you add to the calendar becomes a session here,
+                          ready for check-ins.
+                        </p>
+                      </div>
+                      <Button asChild variant="outline">
+                        <Link href={`/app/${orgSlug}/calendar`}>Open the calendar</Link>
+                      </Button>
+                    </li>
+                    <li className={setupRow}>
+                      <IconChip icon={Globe} />
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="font-semibold">
+                          Already have a club website database?{" "}
+                          <span className="text-muted-foreground font-normal">Optional</span>
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                          If your site keeps check-ins, sign-ups and votes in Supabase, connect it
+                          and they sync in. You don&apos;t need one to use Databases.
+                        </p>
+                      </div>
+                      <Button asChild variant={connecting ? "secondary" : "ghost"}>
+                        <Link
+                          href={`/app/${orgSlug}/databases?connect=1#connect`}
+                          scroll={false}
+                          aria-current={connecting ? "step" : undefined}
+                        >
+                          Connect
+                        </Link>
+                      </Button>
+                    </li>
+                  </>
+                )}
               </ul>
             </CardContent>
           </Card>
@@ -421,93 +484,89 @@ export default async function DatabasesPage({
               </CardContent>
             </Card>
           )}
-          {connecting && !dataStep && (
+          {connecting && !dataStep && !personal && (
             <p className="text-muted-foreground text-sm">
               Only owners and admins can connect a data source.
             </p>
           )}
 
-          <p className="text-muted-foreground text-sm">
-            <Link href={`/app/${orgSlug}/databases?all=1`} className="underline underline-offset-2">
-              Show the empty databases anyway
-            </Link>
-          </p>
+          {!personal && (
+            <p className="text-muted-foreground text-sm">
+              <Link
+                href={`/app/${orgSlug}/databases?all=1`}
+                className="underline underline-offset-2"
+              >
+                Show the empty databases anyway
+              </Link>
+            </p>
+          )}
         </section>
       ) : (
         <>
-          {(custom.length > 0 || isAdmin) && (
-            <section aria-labelledby="db-own" className="space-y-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id="db-own" className="heading text-[17px]">
-                  Your databases
-                </h2>
-                <span className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
-                  <ShieldCheck className="size-3.5" aria-hidden="true" />
-                  Saved as you type. Only your club can see them.
-                </span>
-              </div>
-              <ul className={GRID}>
-                {custom.map((d) => card(d))}
-                {isAdmin && (
-                  <li>
-                    <NewDatabaseDialog
-                      orgId={organization.id}
-                      orgSlug={orgSlug}
-                      trigger={
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground border-border rounded-card focus-visible:outline-foreground flex h-full min-h-44 w-full flex-col items-start justify-center gap-3 border-[1.5px] border-dashed p-6 text-left transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
-                        >
-                          <span className="border-input grid size-9 place-items-center rounded-full border-[1.5px] border-dashed">
-                            <Plus className="size-[18px]" aria-hidden="true" />
+          {/*
+            One list: the club's own databases and the built-in ones together,
+            each tagged with where its rows live (Bananasplit or the website's
+            Supabase). Empty built-ins fold away under the list.
+          */}
+          <section aria-labelledby="db-all" className="space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="db-all" className="sr-only">
+                Databases
+              </h2>
+              <span className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
+                <ShieldCheck className="size-3.5" aria-hidden="true" />
+                Saved as you type. Only {personal ? "you" : "your club"} can see them.
+              </span>
+            </div>
+            <ul className={GRID}>
+              {custom.map((d) => card(d))}
+              {withData.map((d) => card(d))}
+              {isAdmin && (
+                <li>
+                  <NewDatabaseDialog
+                    orgId={organization.id}
+                    orgSlug={orgSlug}
+                    personal={personal}
+                    trigger={
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:bg-muted/40 hover:text-foreground border-border rounded-card focus-visible:outline-foreground flex h-full min-h-44 w-full flex-col items-start justify-center gap-3 border-[1.5px] border-dashed p-6 text-left transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
+                      >
+                        <span className="border-input grid size-9 place-items-center rounded-full border-[1.5px] border-dashed">
+                          <Plus className="size-[18px]" aria-hidden="true" />
+                        </span>
+                        <span className="space-y-1">
+                          <span className="text-foreground heading block text-[15px]">
+                            New database
                           </span>
-                          <span className="space-y-1">
-                            <span className="text-foreground heading block text-[15px]">
-                              New database
-                            </span>
-                            <span className="flex items-center gap-1.5 text-[13px]">
-                              <FileSpreadsheet className="size-3.5" aria-hidden="true" />
-                              From a template or a spreadsheet
-                            </span>
+                          <span className="flex items-center gap-1.5 text-[13px]">
+                            <FileSpreadsheet className="size-3.5" aria-hidden="true" />
+                            From a template or a spreadsheet
                           </span>
-                        </button>
-                      }
-                    />
-                  </li>
-                )}
-              </ul>
-            </section>
-          )}
-          {(withData.length > 0 || empty.length > 0) && (
-            <section aria-labelledby="db-built-in" className="space-y-4">
-              {custom.length > 0 || isAdmin ? (
-                <h2 id="db-built-in" className="heading text-[17px]">
-                  Built in
-                </h2>
-              ) : (
-                <h2 id="db-built-in" className="sr-only">
-                  Built in
-                </h2>
+                        </span>
+                      </button>
+                    }
+                  />
+                </li>
               )}
-              {withData.length > 0 && <ul className={GRID}>{withData.map((d) => card(d))}</ul>}
-              {empty.length > 0 &&
-                (withData.length === 0 || showAll ? (
-                  <ul className={GRID}>{empty.map((d) => card(d, true))}</ul>
-                ) : (
-                  <details className="group">
-                    <summary className="text-muted-foreground hover:text-foreground bg-muted/60 rounded-tile focus-visible:outline-foreground flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm outline-none focus-visible:outline-2 [&::-webkit-details-marker]:hidden">
-                      <ChevronRight
-                        className="size-4 transition-transform group-open:rotate-90"
-                        aria-hidden="true"
-                      />
-                      {empty.length} empty database{empty.length === 1 ? "" : "s"}:{" "}
-                      {empty.map((d) => d.name).join(", ")}
-                    </summary>
-                    <ul className={cn(GRID, "pt-4.5")}>{empty.map((d) => card(d, true))}</ul>
-                  </details>
-                ))}
-            </section>
-          )}
+            </ul>
+            {empty.length > 0 &&
+              (withData.length === 0 || showAll ? (
+                <ul className={GRID}>{empty.map((d) => card(d, true))}</ul>
+              ) : (
+                <details className="group">
+                  <summary className="text-muted-foreground hover:text-foreground bg-muted/60 rounded-tile focus-visible:outline-foreground flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm outline-none focus-visible:outline-2 [&::-webkit-details-marker]:hidden">
+                    <ChevronRight
+                      className="size-4 transition-transform group-open:rotate-90"
+                      aria-hidden="true"
+                    />
+                    {empty.length} empty database{empty.length === 1 ? "" : "s"}:{" "}
+                    {empty.map((d) => d.name).join(", ")}
+                  </summary>
+                  <ul className={cn(GRID, "pt-4.5")}>{empty.map((d) => card(d, true))}</ul>
+                </details>
+              ))}
+          </section>
         </>
       )}
 

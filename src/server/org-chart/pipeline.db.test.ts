@@ -253,10 +253,11 @@ describe.skipIf(!seeded)("org chart pipeline against the local database (seeded 
     expect(crossSite.body.error).toBe("Forbidden.");
   });
 
-  it("a MEMBER cannot upload; an unsupported file is refused before anything is stored", async () => {
+  it("a MEMBER uploads too; an unsupported file is refused before anything is stored", async () => {
     sessionUser.current = s.kristine;
     const member = await track(await uploadRequest(s.cbcId, "cbc.md", read("cbc-fall-2026.md"), "text/markdown"));
-    expect(member.status).toBe(403);
+    expect(member.status).toBe(201);
+    await discard(member.body.versionId!);
     sessionUser.current = s.jackson;
     const rtf = await track(await uploadRequest(s.cbcId, "cbc.rtf", Buffer.from("{\\rtf1 hi}"), "application/rtf"));
     expect(rtf.status).toBe(415);
@@ -403,12 +404,12 @@ describe.skipIf(!seeded)("org chart pipeline against the local database (seeded 
     expect(after?.version.editVersion).toBe(before?.version.editVersion);
   });
 
-  it("members cannot read the draft", async () => {
+  it("members read the draft too", async () => {
     sessionUser.current = s.kristine;
-    expect(await withOrgTx(s.cbcId, (ctx) => loadVersion(ctx, firstDraft))).toBeNull();
+    expect((await withOrgTx(s.cbcId, (ctx) => loadVersion(ctx, firstDraft)))?.version.status).toBe("DRAFT");
   });
 
-  it("the admin confirms matches, edits and publishes; the cache is invalidated after commit", async () => {
+  it("the admin confirms matches and edits, a member publishes; the cache is invalidated after commit", async () => {
     const draft = (await withOrgTx(s.cbcId, (ctx) => loadVersion(ctx, firstDraft)))!;
     const input: SaveDraftInput = {
       versionId: firstDraft,
@@ -436,10 +437,13 @@ describe.skipIf(!seeded)("org chart pipeline against the local database (seeded 
     const stale = await withOrgAction((ctx) => saveDraft(ctx, input))(s.cbcId);
     expect(stale).toMatchObject({ ok: false, conflict: true });
 
-    // A MEMBER cannot publish.
+    // Any member publishes, but only OWNER/ADMIN set members' titles while
+    // doing it, and that refusal rolls the whole publish back.
     sessionUser.current = s.kristine;
-    await expect(withOrgAction((ctx) => publishDraft(ctx, firstDraft))(s.cbcId)).rejects.toThrow();
-    sessionUser.current = s.jackson;
+    await expect(
+      withOrgAction((ctx) => publishDraft(ctx, firstDraft, { setTitles: true }))(s.cbcId),
+    ).rejects.toThrow();
+    expect((await withOrgTx(s.cbcId, (ctx) => loadVersion(ctx, firstDraft)))?.version.status).toBe("DRAFT");
 
     const seen: string[] = [];
     const update = vi.spyOn(nextCache, "updateTag").mockImplementation((tag) => void seen.push(tag));
@@ -447,6 +451,7 @@ describe.skipIf(!seeded)("org chart pipeline against the local database (seeded 
     const published = await withOrgAction((ctx) => publishDraft(ctx, firstDraft))(s.cbcId);
     update.mockRestore();
     revalidate.mockRestore();
+    sessionUser.current = s.jackson;
     expect(published).toEqual({ ok: true, number: draft.version.number });
     expect(seen).toEqual([tags.orgChart(s.cbcId)]);
 
