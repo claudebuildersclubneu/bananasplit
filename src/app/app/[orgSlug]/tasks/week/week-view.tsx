@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CalendarX2, ChevronRight, TriangleAlert } from "lucide-react";
+import { Ban, CalendarX2, ChevronRight, TriangleAlert } from "@/components/icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 

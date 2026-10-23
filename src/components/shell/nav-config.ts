@@ -16,7 +16,7 @@ export interface NavLink {
   label: string;
   /** The page, sometimes with a query (Personal's Notes and Files share /notes). */
   href: string;
-  /** lucide icon name. */
+  /** Icon name (@/components/icons). */
   icon: string;
   /** Other pages that belong to this link (People's org chart). */
   also?: string[];
@@ -193,7 +193,7 @@ export type CreateActionId = "task" | "event" | "note" | "poll" | "find-a-time";
 export interface CreateAction {
   id: CreateActionId;
   label: string;
-  /** lucide icon name. */
+  /** Icon name (@/components/icons). */
   icon: string;
   /** Where it starts; none for a note, which the menu creates and then opens. */
   href?: string;

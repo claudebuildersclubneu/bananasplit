@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, ChevronDown, LayoutGrid, List, Search, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, LayoutGrid, List, Search, X } from "@/components/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";

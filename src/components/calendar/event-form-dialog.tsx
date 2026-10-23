@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Globe, Ticket, TriangleAlert } from "lucide-react";
+import { ChevronDown, Globe, Ticket, TriangleAlert } from "@/components/icons";
 import { useParams, useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 

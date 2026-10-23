@@ -19,7 +19,7 @@ import {
   Globe,
   Rows3,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Children, useCallback, useEffect, useRef, useState, useTransition } from "react";

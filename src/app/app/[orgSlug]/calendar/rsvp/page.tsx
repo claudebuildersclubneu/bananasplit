@@ -1,4 +1,4 @@
-import { ArrowUpRight, Plus, Ticket } from "lucide-react";
+import { ArrowUpRight, Plus, Ticket } from "@/components/icons";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
