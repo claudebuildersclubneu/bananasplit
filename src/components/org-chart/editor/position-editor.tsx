@@ -23,7 +23,7 @@ import { MemberPicker, type EditorMember } from "./member-picker";
  * suggestion, or keep a placeholder name), reporting line (the keyboard and
  * touch alternative to dragging), advisor and open-hire toggles, and the
  * responsibilities and decides-alone bullets. Source quotes from the parse
- * are shown read-only so the admin can check them.
+ * are shown read-only so whoever is editing can check them.
  */
 
 const NOBODY = "__none__";

@@ -105,9 +105,11 @@ fallback model.
 ### Google Calendar
 
 Press **Connect Google Calendar** and sign in with the Google account that owns your club's
-calendars (for CBC, the club Gmail). The portal asks only to manage the events it creates and
-to list your calendars. Then choose the calendar for public events and, optionally, one for
-internal events. **Test and refresh calendars** checks the connection. **Import existing
+calendars (for CBC, the club Gmail). The portal asks to manage events on the calendars the
+account owns and to list your calendars. It adds and changes only the events it mirrors, and
+reads other events only when you run the import, on the public calendar. Then choose the
+calendar for public events (until you do, or with *Don't mirror public events*, nothing public
+is mirrored or imported) and, optionally, one for internal events. **Test and refresh calendars** checks the connection. **Import existing
 Google events** is the same card as on Calendar > Sync: **Dry run** previews bringing the
 events already on Google in, the card shows its numbers once the job has run, and **Apply
 import** writes it (see calendar.md). **Disconnect** stops mirroring and revokes the access
@@ -175,15 +177,15 @@ listed in the organization switcher and on `/onboarding`). Its URL is never reus
 
 **Who may create organizations.** Platform admins (verified addresses in
 `PLATFORM_ADMIN_EMAILS`) always may. For everyone else `PLATFORM_ORG_CREATION_ENABLED` is the
-master switch (default `false` in production, `true` on previews and locally); when on,
+master switch (default `true` everywhere; set `false` to stop new clubs); when on,
 `ORG_CREATION_MODE` decides:
 
-- `admins` (production default): platform admins only.
+- `open` (the default): any verified user; in production one new organization per user per
+  30 days and 20 per day platform-wide.
 - `invite`: anyone with a single-use **org-creation code**. Platform admins issue codes at
   `/app/platform/org-codes` (shown once, stored hashed, valid 14 days). Codes can't be issued
   while the switch is off.
-- `open` (default off production): any verified user; in production one new organization
-  per user per 30 days and 20 per day platform-wide.
+- `admins`: platform admins only.
 
 Every mode keeps a limit of 3 new organizations per user per day, and every creator must have
 a verified email.

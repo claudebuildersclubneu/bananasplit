@@ -1,5 +1,6 @@
 import { describePath, type PinKind } from "@/lib/pins/pages";
 import { pollHref } from "@/lib/polls/paths";
+import { LISTED_DEFINITIONS } from "@/server/databases/types";
 import type { TxClient } from "@/server/db/context";
 import { noteVisibleWhere } from "@/server/notes/visibility";
 
@@ -189,7 +190,12 @@ export async function searchPinnables(
   });
 
   const databases = await db.databaseDefinition.findMany({
-    where: { organizationId: orgId, archivedAt: null, ...(contains ? { name: contains } : {}) },
+    where: {
+      organizationId: orgId,
+      archivedAt: null,
+      ...LISTED_DEFINITIONS,
+      ...(contains ? { name: contains } : {}),
+    },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: { key: true, name: true },
     take: 10,

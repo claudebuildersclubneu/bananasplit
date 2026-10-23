@@ -127,7 +127,7 @@ export function SidebarEditor({
 
   return (
     <div className="grid gap-7.5 xl:grid-cols-[minmax(0,1fr)_15rem]">
-      <div className="space-y-4.5">
+      <div className="space-y-4.5 max-md:min-w-0">
         {groups.map((group) => (
           <Card
             key={group.id}

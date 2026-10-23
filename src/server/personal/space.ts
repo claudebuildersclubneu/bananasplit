@@ -11,9 +11,9 @@ import { newOrgId } from "@/server/settings/org-creation";
  * Personal spaces (docs/features/personal-and-clubs.md). Every account has
  * one: an Organization of kind PERSONAL, plan FREE, owned by the user
  * (personalOwnerId, unique) and with them as its only member. It holds their
- * own tasks, calendar, availability polls and RSVP pages, so those work
- * exactly as in a club (row security, jobs, public links). The database
- * refuses a second member, an invitation or a join code
+ * own tasks, calendar, availability polls, RSVP pages, files and databases,
+ * so those work exactly as in a club (row security, jobs, public links).
+ * The database refuses a second member, an invitation or a join code
  * (app.personal_space_guard), and kind never changes.
  *
  * Made by ensurePersonalSpace when the quick profile (onboarding step 1) is

@@ -57,7 +57,7 @@ const ChartCanvas = dynamic(() => import("../chart-canvas"), {
 });
 
 /**
- * The draft editor (ADMIN+). Parsing is never trusted blindly: every
+ * The draft editor (any member). Parsing is never trusted blindly: every
  * position can be renamed, re-linked, moved (drag and drop in the outline,
  * or the Reports to picker and move buttons), toggled advisor or open hire,
  * and its bullets edited, with a live checklist and a read-only preview of
@@ -83,7 +83,10 @@ export interface DraftEditorProps {
   members: EditorMember[];
   /** OWNER/ADMIN may invite (the "invite" link on unknown names). */
   canInvite?: boolean;
-  /** May set members' titles (title sync). */
+  /**
+   * May set members' titles (members.setTitle, OWNER/ADMIN): title sync, and
+   * the "set each linked member's title" option on publish.
+   */
   canSetTitles?: boolean;
 }
 
@@ -299,7 +302,10 @@ export function DraftEditor({
       await settled();
       const current = dirty ? await save() : editVersionRef.current;
       if (current === null) return;
-      const result = await publishDraftAction(orgId, version.id, { setTitles, expectedEditVersion: current });
+      const result = await publishDraftAction(orgId, version.id, {
+        setTitles: canSetTitles && setTitles,
+        expectedEditVersion: current,
+      });
       if (!result.ok) {
         const detail = "issues" in result && result.issues?.length ? ` ${result.issues.map((i) => i.message).join(" ")}` : "";
         setStatus({ tone: "error", text: `${result.error}${detail}` });
@@ -625,12 +631,14 @@ export function DraftEditor({
                   ))}
                 </ul>
               )}
-              <div className="flex items-start gap-2">
-                <Checkbox id="set-titles" checked={setTitles} onCheckedChange={(v) => setSetTitles(v === true)} />
-                <Label htmlFor="set-titles" className="leading-snug font-normal">
-                  Also set each linked member&apos;s title in this workspace from their position
-                </Label>
-              </div>
+              {canSetTitles && (
+                <div className="flex items-start gap-2">
+                  <Checkbox id="set-titles" checked={setTitles} onCheckedChange={(v) => setSetTitles(v === true)} />
+                  <Label htmlFor="set-titles" className="leading-snug font-normal">
+                    Also set each linked member&apos;s title in this workspace from their position
+                  </Label>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

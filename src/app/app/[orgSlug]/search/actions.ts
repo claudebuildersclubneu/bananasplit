@@ -31,6 +31,7 @@ export const searchWorkspaceAction = withOrgAction(
       where: { id: ctx.organizationId },
       select: {
         slug: true,
+        kind: true,
         timezone: true,
         activeOrgChartVersionId: true,
         settings: { select: { sidebar: true } },
@@ -60,6 +61,7 @@ export const searchWorkspaceAction = withOrgAction(
         zones: { viewer: viewerZone, org: orgZone },
         hiddenSections,
         orgChartVersionId: org.activeOrgChartVersionId,
+        personal: org.kind === "PERSONAL",
       },
       { query, scope },
     );

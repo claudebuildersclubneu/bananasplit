@@ -140,6 +140,17 @@ search and export:
 real roles and policies, and `pnpm test:rls` covers the new tables and
 functions.
 
+### In Personal
+
+A Personal space has Databases too, with only the databases its owner
+makes: New database offers the Blank and Spreadsheet templates (the others
+are about running a club), and Import a spreadsheet works as in a club. The
+built-in databases below exist for every space but are never listed in
+Personal (`LISTED_DEFINITIONS` in `src/server/databases/types.ts`: the
+index, opening one by URL, search and pin search). There's no data source
+or Reports tab, and the settings dialog keeps only the name, description
+and archiving. See `docs/features/personal-and-clubs.md`.
+
 ## The built-in databases
 
 Everyone in the org can browse the club's activity here: the sessions, who

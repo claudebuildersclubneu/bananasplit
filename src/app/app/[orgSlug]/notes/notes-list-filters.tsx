@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterChoices } from "@/components/ui/phone-toolbar";
 
 /** `tab` keeps its old name so existing links (`?tab=files`) still land on uploads. */
 const KINDS = [
@@ -42,12 +43,14 @@ const AUDIENCES = [
 /**
  * Files › the library's filter and order: one Filter menu (what kind, who
  * can see it, who added it) and a sort. Both live in the URL, so a filtered
- * view can be linked and pinned.
+ * view can be linked and pinned. Personal has one person, so only the kind.
  */
 export function NotesListFilters({
   members,
+  personal = false,
 }: {
   members: { userId: string; name: string | null; email: string }[];
+  personal?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -96,41 +99,45 @@ export function NotesListFilters({
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Who can see it</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={visibility}
-            onValueChange={(v) => setParams({ visibility: v })}
-          >
-            {AUDIENCES.map(([value, label]) => (
-              <DropdownMenuRadioItem key={value} value={value} onSelect={keepOpen}>
-                {label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <UserRound className="size-4" aria-hidden="true" />
-              Added by
-              <span className="text-muted-foreground ms-auto max-w-28 truncate text-xs">
-                {authorMember ? (authorMember.name ?? authorMember.email) : "Anyone"}
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+          {!personal && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Who can see it</DropdownMenuLabel>
               <DropdownMenuRadioGroup
-                value={author}
-                onValueChange={(v) => setParams({ author: v })}
+                value={visibility}
+                onValueChange={(v) => setParams({ visibility: v })}
               >
-                <DropdownMenuRadioItem value="all">Anyone</DropdownMenuRadioItem>
-                {members.map((m) => (
-                  <DropdownMenuRadioItem key={m.userId} value={m.userId}>
-                    {m.name ?? m.email}
+                {AUDIENCES.map(([value, label]) => (
+                  <DropdownMenuRadioItem key={value} value={value} onSelect={keepOpen}>
+                    {label}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <UserRound className="size-4" aria-hidden="true" />
+                  Added by
+                  <span className="text-muted-foreground ms-auto max-w-28 truncate text-xs">
+                    {authorMember ? (authorMember.name ?? authorMember.email) : "Anyone"}
+                  </span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+                  <DropdownMenuRadioGroup
+                    value={author}
+                    onValueChange={(v) => setParams({ author: v })}
+                  >
+                    <DropdownMenuRadioItem value="all">Anyone</DropdownMenuRadioItem>
+                    {members.map((m) => (
+                      <DropdownMenuRadioItem key={m.userId} value={m.userId}>
+                        {m.name ?? m.email}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </>
+          )}
           {active > 0 && (
             <>
               <DropdownMenuSeparator />
@@ -156,6 +163,73 @@ export function NotesListFilters({
           <SelectItem value="title">Title A–Z</SelectItem>
         </SelectContent>
       </Select>
+    </>
+  );
+}
+
+const SORTS = [
+  ["edited", "Recently edited"],
+  ["created", "Newest"],
+  ["title", "Title A–Z"],
+] as const;
+
+/**
+ * The same filters and order for the phone's filter sheet (the library adds
+ * the folder): each one a named row of chips.
+ */
+export function NotesFilterChoices({
+  members,
+  personal = false,
+}: {
+  members: { userId: string; name: string | null; email: string }[];
+  /** A Personal space: everything is yours alone, so no "who can see it". */
+  personal?: boolean;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function setParam(key: string, value: string, fallback: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value !== fallback) params.set(key, value);
+    else params.delete(key);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
+  return (
+    <>
+      <FilterChoices
+        title="Show"
+        value={searchParams.get("tab") ?? "all"}
+        onPick={(v) => setParam("tab", v, "all")}
+        options={KINDS.map(([value, label]) => ({ value, label }))}
+      />
+      {!personal && (
+        <FilterChoices
+          title="Who can see it"
+          value={searchParams.get("visibility") ?? "all"}
+          onPick={(v) => setParam("visibility", v, "all")}
+          options={AUDIENCES.map(([value, label]) => ({ value, label }))}
+        />
+      )}
+      {members.length > 1 && (
+        <FilterChoices
+          title="Added by"
+          value={searchParams.get("author") ?? "all"}
+          onPick={(v) => setParam("author", v, "all")}
+          options={[
+            { value: "all", label: "Anyone" },
+            ...members.map((m) => ({ value: m.userId, label: m.name ?? m.email })),
+          ]}
+        />
+      )}
+      <FilterChoices
+        title="Sort by"
+        value={searchParams.get("sort") ?? "edited"}
+        onPick={(v) => setParam("sort", v, "edited")}
+        options={SORTS.map(([value, label]) => ({ value, label }))}
+      />
     </>
   );
 }

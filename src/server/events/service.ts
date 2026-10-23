@@ -16,6 +16,7 @@ import { writeOrgAuditLog } from "@/server/audit";
 import { invalidate } from "@/server/cache/invalidate";
 import { publicEvents, reports } from "@/server/cache/tags";
 import type { TxClient, TxKind } from "@/server/db/context";
+import { parseGoogleConfig } from "@/server/google-calendar/config";
 import { enqueueJob } from "@/server/jobs/enqueue";
 import {
   notifyEventCancelled,
@@ -268,7 +269,7 @@ async function checkHost(
 }
 
 interface Integrations {
-  google: { connected: boolean; hasInternalCalendar: boolean };
+  google: { connected: boolean; hasPublicCalendar: boolean; hasInternalCalendar: boolean };
   buildHook: boolean;
 }
 
@@ -284,11 +285,14 @@ async function loadIntegrations(ctx: EventServiceContext): Promise<Integrations>
     select: { provider: true, config: true },
   });
   const google = rows.find((r) => r.provider === IntegrationProvider.GOOGLE_CALENDAR);
-  const internal = (google?.config as { internalCalendarId?: unknown } | null)?.internalCalendarId;
+  // The same reading of the config as the gcal job's, so the two agree on
+  // which events have a calendar.
+  const calendars = parseGoogleConfig(google?.config);
   return {
     google: {
       connected: Boolean(google),
-      hasInternalCalendar: typeof internal === "string" && internal.length > 0,
+      hasPublicCalendar: calendars.publicCalendarId !== null,
+      hasInternalCalendar: calendars.internalCalendarId !== null,
     },
     buildHook: rows.some((r) => r.provider === IntegrationProvider.NETLIFY_BUILD_HOOK),
   };
@@ -303,7 +307,9 @@ function needsGoogleSync(
   if (!integrations.google.connected) return false;
   if (before?.googleEventId) return true; // update, move or delete an existing mirror
   if (after.deleted) return false;
-  return after.visibility === EventVisibility.PUBLIC || integrations.google.hasInternalCalendar;
+  return after.visibility === EventVisibility.PUBLIC
+    ? integrations.google.hasPublicCalendar
+    : integrations.google.hasInternalCalendar;
 }
 
 async function afterSave(

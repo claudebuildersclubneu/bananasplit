@@ -21,7 +21,7 @@ import { getPersonalSpace } from "./space";
  * club"): the Personal items a club's creator can move into a club they run,
  * and the move itself. The move is app.move_personal_items
  * (20261013190000_move_personal_items, with notes, folders and uploads since
- * 20261021120000_move_personal_files), one transaction as app_user: the
+ * 20261023120000_move_personal_files), one transaction as app_user: the
  * database checks that the Personal space is the caller's and that they own
  * or run the club, then moves each item with every row under it, keeping
  * ids, so public links, tickets and poll responses keep working. Uploads'

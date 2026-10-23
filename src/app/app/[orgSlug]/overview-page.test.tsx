@@ -64,6 +64,8 @@ vi.mock("@/server/db/context", () => ({
 }));
 vi.mock("@/server/tasks/queries", () => ({
   getMyOpenTasks: mocks.getMyOpenTasks,
+  // The phone's open-tasks bar (the same numbers as Tasks' stat strip).
+  getTaskStats: async () => ({ open: 0, dueThisWeek: 0, overdue: 0, doneThisWeek: 0 }),
   taskFilterWhere: () => ({}),
 }));
 vi.mock("@/app/app/[orgSlug]/calendar/queries", () => ({

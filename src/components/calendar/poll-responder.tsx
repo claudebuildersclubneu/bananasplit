@@ -36,7 +36,7 @@ import type { PollAnswer, PollView } from "@/lib/polls/poll-view";
 import { cn } from "@/lib/utils";
 
 import { useViewerTimeZone } from "./hooks";
-import { intervalLabel, momentLabel, timeZoneDisplayName } from "./poll-format";
+import { intervalLabel, momentLabel, momentDayLabel, timeZoneDisplayName } from "./poll-format";
 import { PollGridFrame } from "./poll-grid";
 import {
   buildPollGrid,
@@ -427,14 +427,22 @@ export function PollResponder({
               {poll.description}
             </p>
           )}
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+          {/* One line on a phone: the close date without its time, "60 min". */}
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs max-md:flex-nowrap max-md:gap-x-2.5 max-md:whitespace-nowrap">
             <PollStatusBadge tone={isFinalized ? "scheduled" : isClosed ? "closed" : "open"}>
               {isFinalized ? "Scheduled" : isClosed ? "Closed" : "Open"}
             </PollStatusBadge>
-            {!isClosed && poll.closesAt && <span>Closes {momentLabel(poll.closesAt, zone)}</span>}
+            {!isClosed && poll.closesAt && (
+              <span>
+                Closes <span className="max-md:hidden">{momentLabel(poll.closesAt, zone)}</span>
+                <span className="md:hidden">{momentDayLabel(poll.closesAt, zone)}</span>
+              </span>
+            )}
             <span className="inline-flex items-center gap-1">
               <Clock aria-hidden className="size-3.5" />
-              {poll.durationMinutes}-minute meeting
+              {poll.durationMinutes}
+              <span className="max-md:hidden">-minute meeting</span>
+              <span className="md:hidden"> min</span>
             </span>
             <span className="inline-flex items-center gap-1 tabular-nums">
               <Users aria-hidden className="size-3.5" />
@@ -442,7 +450,12 @@ export function PollResponder({
             </span>
           </div>
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-1.5">{actions}</div>}
+        {/* Not on a phone: there the page puts them on the back link's row, so the title has the width. */}
+        {actions && (
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-md:hidden">
+            {actions}
+          </div>
+        )}
       </div>
 
       {/* --------------------------------------------------------------- notices */}

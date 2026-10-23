@@ -63,9 +63,10 @@ export const PERMISSIONS = {
   "workspace.bootstrap": OWNER,
   // Calendar and sessions: the event service is ADMIN+.
   "events.write": ADMINS,
-  // Org chart
+  // Org chart: every member edits it (drafts, imports, publish, restore).
+  // Setting members' workspace titles on publish is still members.setTitle.
   "orgchart.view": ALL,
-  "orgchart.write": ADMINS,
+  "orgchart.write": ALL,
   // Databases and reports
   "databases.view": ALL,
   "databases.write": ADMINS,

@@ -133,7 +133,8 @@ function FolderSelect({
  * Files › New: a blank note or one from a template, an uploaded file, a
  * Word document or Google Doc turned into a note (with a preview first, so
  * you see what came across before it's made), or a folder. Everything lands
- * in the folder you're looking at unless you pick another.
+ * in the folder you're looking at unless you pick another. In Personal
+ * there's no one to share with, so nothing asks who can see it: it's yours.
  */
 export function NotesNewMenu({
   orgId,
@@ -141,6 +142,7 @@ export function NotesNewMenu({
   folders,
   currentFolderId,
   maxFileBytes,
+  personal = false,
 }: {
   orgId: string;
   orgSlug: string;
@@ -148,6 +150,8 @@ export function NotesNewMenu({
   currentFolderId: string | null;
   /** The plan's largest file (PLAN_LIMITS), for the upload dialog's copy. */
   maxFileBytes?: number;
+  /** A Personal space: everything is private to its owner. */
+  personal?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<Dialogs>(null);
@@ -155,7 +159,7 @@ export function NotesNewMenu({
   const [error, setError] = useState<string | null>(null);
   const [googleUrl, setGoogleUrl] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [visibility, setVisibility] = useState<Visibility>("ORGANIZATION");
+  const [visibility, setVisibility] = useState<Visibility>(personal ? "PRIVATE" : "ORGANIZATION");
   const [folderId, setFolderId] = useState<string | null>(currentFolderId);
   const [keepOriginal, setKeepOriginal] = useState(true);
   const [pending, start] = useTransition();
@@ -325,10 +329,12 @@ export function NotesNewMenu({
           />
         </label>
         <FolderSelect folders={folders} value={folderId} onChange={setFolderId} />
-        <div className="grid gap-1">
-          <span className="text-muted-foreground text-xs font-medium">Who can see it</span>
-          <VisibilityPicker value={visibility} onChange={setVisibility} />
-        </div>
+        {!personal && (
+          <div className="grid gap-1">
+            <span className="text-muted-foreground text-xs font-medium">Who can see it</span>
+            <VisibilityPicker value={visibility} onChange={setVisibility} />
+          </div>
+        )}
         {draft.file && (
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -370,64 +376,79 @@ export function NotesNewMenu({
 
   return (
     <>
-      {/* New note, with every other way to add something under its chevron. */}
-      <CreateSplitButton
-        label="New note"
-        pending={pending}
-        onClick={() => fromTemplate(null)}
-        menuLabel="More ways to add notes and files"
-      >
-        <DropdownMenuItem onSelect={() => fromTemplate(null)}>
-          <NotebookPen className="size-4" aria-hidden="true" />
-          New note
-        </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <LayoutTemplate className="size-4" aria-hidden="true" />
-            Note from a template
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-64">
-            {NOTE_TEMPLATES.map((t) => {
-              const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
-              return (
-                <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
-                  <Icon className="size-4" aria-hidden="true" />
-                  <span className="flex flex-col">
-                    {t.title}
-                    <span className="text-muted-foreground text-xs">{t.description}</span>
-                  </span>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => show("upload")}>
+      {/* One group on a phone, so the page header keeps Upload beside New note, at the top right. */}
+      <div className="contents max-md:flex max-md:items-center max-md:gap-2">
+        {/* A phone: Upload one tap away, left of New note (the computer has it under the chevron). */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="md:hidden"
+          onClick={() => show("upload")}
+        >
           <Upload className="size-4" aria-hidden="true" />
-          Upload a file
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => show("word")}>
-          <FileText className="size-4" aria-hidden="true" />
-          Import a Word document
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => show("google")}>
-          <Globe className="size-4" aria-hidden="true" />
-          Import a Google Doc
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => show("folder")}>
-          <FolderPlus className="size-4" aria-hidden="true" />
-          New folder
-        </DropdownMenuItem>
-      </CreateSplitButton>
+          Upload
+        </Button>
+        {/* New note, with every other way to add something under its chevron. */}
+        <CreateSplitButton
+          label="New note"
+          pending={pending}
+          onClick={() => fromTemplate(null)}
+          menuLabel="More ways to add notes and files"
+        >
+          <DropdownMenuItem onSelect={() => fromTemplate(null)}>
+            <NotebookPen className="size-4" aria-hidden="true" />
+            New note
+          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <LayoutTemplate className="size-4" aria-hidden="true" />
+              Note from a template
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64">
+              {NOTE_TEMPLATES.map((t) => {
+                const Icon = TEMPLATE_ICONS[t.icon] ?? FileText;
+                return (
+                  <DropdownMenuItem key={t.id} onSelect={() => fromTemplate(t.id)}>
+                    <Icon className="size-4" aria-hidden="true" />
+                    <span className="flex flex-col">
+                      {t.title}
+                      <span className="text-muted-foreground text-xs">{t.description}</span>
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => show("upload")}>
+            <Upload className="size-4" aria-hidden="true" />
+            Upload a file
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("word")}>
+            <FileText className="size-4" aria-hidden="true" />
+            Import a Word document
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => show("google")}>
+            <Globe className="size-4" aria-hidden="true" />
+            Import a Google Doc
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => show("folder")}>
+            <FolderPlus className="size-4" aria-hidden="true" />
+            New folder
+          </DropdownMenuItem>
+        </CreateSplitButton>
+      </div>
 
       <Dialog open={open === "folder"} onOpenChange={(o) => setOpen(o ? "folder" : null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>New folder</DialogTitle>
             <DialogDescription>
-              Folders are shared with the club; private notes stay private inside them. Drag notes
-              and files onto a folder to file them.
+              {personal
+                ? "Drag notes and files onto a folder to file them."
+                : "Folders are shared with the club; private notes stay private inside them. Drag notes and files onto a folder to file them."}
             </DialogDescription>
           </DialogHeader>
           <NewFolderForm
@@ -552,7 +573,7 @@ export function NotesNewMenu({
               here in the app.
             </DialogDescription>
           </DialogHeader>
-          <VisibilityPicker value={visibility} onChange={setVisibility} />
+          {!personal && <VisibilityPicker value={visibility} onChange={setVisibility} />}
           <FolderSelect folders={folders} value={folderId} onChange={setFolderId} />
           <button
             type="button"

@@ -94,6 +94,8 @@ export function SyncPanel({
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const google = status.google;
   const usable = google && (google.status === "CONNECTED" || google.status === "ERROR");
+  // The import reads only the public calendar; with none chosen it has no source.
+  const importable = Boolean(usable && google.publicCalendarId);
   const imp = google?.import ?? null;
   const show = (section: SyncPanelSection) => sections.includes(section);
 
@@ -172,7 +174,9 @@ export function SyncPanel({
               <>
                 <dl className="grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1">
                   <dt className="text-muted-foreground">Public calendar</dt>
-                  <dd className="truncate">{google.publicCalendarId}</dd>
+                  <dd className="truncate">
+                    {google.publicCalendarId ?? "None: public events stay off Google"}
+                  </dd>
                   <dt className="text-muted-foreground">Internal calendar</dt>
                   <dd className="truncate">
                     {google.internalCalendarId ?? "None: internal events stay off Google"}
@@ -239,6 +243,19 @@ export function SyncPanel({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
+            {!google.publicCalendarId && (
+              <p className="text-muted-foreground">
+                No public events calendar is chosen, so there is nothing to import from. Choose one
+                in{" "}
+                <Link
+                  className="underline"
+                  href={`/app/${orgSlug}/settings/integrations/google-calendar`}
+                >
+                  Admin panel › Integrations › Google Calendar
+                </Link>
+                .
+              </p>
+            )}
             {imp?.ranAt ? (
               <div className="space-y-1">
                 <p>
@@ -275,7 +292,7 @@ export function SyncPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isPending || !usable}
+                  disabled={isPending || !importable}
                   onClick={() =>
                     run(
                       () => importGoogleEvents(orgId, "dry-run"),
@@ -288,7 +305,7 @@ export function SyncPanel({
                 <Button
                   type="button"
                   disabled={
-                    isPending || !usable || imp?.mode !== "dry-run" || imp.status === "failed"
+                    isPending || !importable || imp?.mode !== "dry-run" || imp.status === "failed"
                   }
                   onClick={() =>
                     run(

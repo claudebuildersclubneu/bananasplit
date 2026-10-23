@@ -20,10 +20,13 @@ import {
   Rows3,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Children, useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { PHONE_HIDDEN_LAYOUTS, type TaskLayout } from "@/app/app/[orgSlug]/tasks/views";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/user-avatar";
@@ -35,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FilterChoices, FilterSheet, PhoneToolbar } from "@/components/ui/phone-toolbar";
 import { SearchField } from "@/components/ui/search-field";
 import { chipClass, Segmented } from "@/components/ui/segmented";
 import { TaskStatus, TaskVisibility } from "@/generated/prisma/enums";
@@ -54,9 +58,13 @@ import { useTasks, useWorkspace } from "./tasks-context";
  * means a filtered view is a link you can paste into Slack, and going back
  * really goes back.
  *
- * Layout icons carry labels on desktop and shrink to icons on a phone; the
- * filters collapse behind one button with a count so the bar never wraps
- * into a wall of selects. Every control is the same height (h-7).
+ * Layout icons carry labels on desktop; the filters collapse behind one
+ * button with a count so the bar never wraps into a wall of selects. Every
+ * control is the same height (h-7).
+ *
+ * A phone gets its own one-row bar (MobileToolbar): whose work, the layout
+ * picker, Filters (a sheet with every filter, each with its name) and
+ * search, since six layout icons in a row meant nothing there.
  */
 
 const LAYOUT_ICONS = {
@@ -100,7 +108,11 @@ export function WorkspaceToolbar() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <MobileToolbar
+        onCommitSearch={commitSearch}
+        clearAll={() => router.push(`/app/${org.slug}/tasks?view=${ws.query.view}`)}
+      />
+      <div className="flex flex-wrap items-center gap-2 max-md:hidden">
         {/* Layout: three shapes of the same question (none on the Free plan). */}
         {ws.layouts.length > 0 && (
           <Segmented
@@ -232,6 +244,174 @@ export function WorkspaceToolbar() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The toolbar below md, the phone's one list toolbar (PhoneToolbar, as on
+ * Files and People): whose work as icons you flip between (Mine, My team,
+ * Everyone; their names are on them for screen readers and show from sm
+ * up), the layout picker, Filters (a FilterSheet: person, epic, tag,
+ * status, visibility, each under its name, with a count on the button),
+ * and a search icon that opens the search box over the row.
+ *
+ * The layouts are the ones a phone has (not the Board or Table: the page
+ * and the effect below see to it).
+ *
+ * The sheet's contents mount only while it is open, so its person filter
+ * doesn't add a second `p` shortcut behind the desktop one.
+ */
+function MobileToolbar({
+  onCommitSearch,
+  clearAll,
+}: {
+  onCommitSearch: (value: string) => void;
+  clearAll: () => void;
+}) {
+  const { members, labels, org } = useTasks();
+  const ws = useWorkspace();
+  const router = useRouter();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const pinnedPerson = ws.query.ownerId ?? ws.query.assigneeId;
+  const count = ws.filterCount + (ws.query.epicId ? 1 : 0);
+
+  // A phone the page didn't recognise (a narrow desktop window, say) still
+  // leaves the Board and Table. replace, and no cookie: the desktop keeps
+  // its layout.
+  const { view } = ws.query;
+  const { hrefWith } = ws;
+  useEffect(() => {
+    if (!(PHONE_HIDDEN_LAYOUTS as readonly string[]).includes(view)) return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    router.replace(hrefWith({ view: "list" }), { scroll: false });
+  }, [view, hrefWith, router]);
+  // The List first: it is a phone's main layout.
+  const layouts = ws.layouts
+    .filter((l) => !PHONE_HIDDEN_LAYOUTS.includes(l.value))
+    .sort((a, b) => Number(b.value === "list") - Number(a.value === "list"));
+  const current = layouts.find((l) => l.value === ws.query.view);
+
+  return (
+    <>
+      <PhoneToolbar
+        middle={
+          layouts.length > 1 && (
+            // The layouts a phone has, named, filling the room up to Filters.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full min-w-0 justify-between gap-1 rounded-full px-3"
+                  aria-label={`Layout: ${current?.label ?? "List"}`}
+                >
+                  <span className="truncate">{current?.label ?? "List"}</span>
+                  <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-60">
+                <DropdownMenuLabel>Show tasks as</DropdownMenuLabel>
+                {layouts.map((l) => {
+                  const Icon = LAYOUT_ICONS[l.value];
+                  return (
+                    <DropdownMenuItem
+                      key={l.value}
+                      onSelect={() => ws.setView(l.value as TaskLayout)}
+                      className="min-h-12 gap-3"
+                    >
+                      <Icon className="size-4" aria-hidden="true" />
+                      <span className="flex flex-col">
+                        <span className="font-medium">{l.label}</span>
+                        <span className="text-muted-foreground text-xs">{l.hint}</span>
+                      </span>
+                      {l.value === ws.query.view && (
+                        <Check className="ms-auto size-4" aria-hidden="true" />
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        }
+        leading={
+          <Segmented
+            label="Whose tasks"
+            value={pinnedPerson ? "" : ws.query.scope}
+            onSelect={(v) => ws.setScope(v as (typeof ws.scopes)[number]["value"])}
+            options={ws.scopes.map((scope) => ({
+              value: scope.value,
+              label: scope.label,
+              icon: SCOPE_ICONS[scope.value],
+              compact: true,
+              title: scope.label,
+            }))}
+            className="[&>button]:px-2.5"
+          />
+        }
+        filterCount={count}
+        onFilters={() => setFiltersOpen(true)}
+        searchLabel="Search tasks"
+        searchActive={Boolean(ws.query.q)}
+        search={
+          <TaskSearch
+            key={ws.query.q ?? ""}
+            initial={ws.query.q ?? ""}
+            onCommit={onCommitSearch}
+            className="w-full"
+            hint=""
+            autoFocus
+          />
+        }
+        onCancelSearch={() => {
+          if (ws.query.q) onCommitSearch("");
+        }}
+      />
+
+      <FilterSheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filter tasks"
+        description="The list shows only the tasks that match."
+        canClear={count > 0}
+        onClear={clearAll}
+      >
+        <div className="flex flex-wrap gap-2">
+          {members.length > 1 && <PersonFilter />}
+          <EpicFilter />
+          {labels.length > 0 && <TagFilter />}
+        </div>
+        {/* The header's Epics button, which a phone's header has no room for. */}
+        <Link
+          href={`/app/${org.slug}/tasks/epics`}
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline"
+        >
+          <Layers className="size-4" aria-hidden="true" />
+          See all epics
+        </Link>
+        <FilterChoices
+          title="Status"
+          value={ws.query.status ?? ""}
+          onPick={(v) =>
+            ws.setFilters({ status: (v || undefined) as TaskStatus | "open" | undefined })
+          }
+          options={[
+            { value: "", label: "Any" },
+            { value: "open", label: "Open" },
+            ...Object.values(TaskStatus).map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+          ]}
+        />
+        <FilterChoices
+          title="Visibility"
+          value={ws.query.visibility ?? ""}
+          onPick={(v) => ws.setFilters({ visibility: (v || undefined) as TaskVisibility })}
+          options={[
+            { value: "", label: "Everything I can see" },
+            { value: TaskVisibility.PRIVATE, label: "Private only" },
+            { value: TaskVisibility.ORG, label: "Open to the club" },
+          ]}
+        />
+      </FilterSheet>
+    </>
   );
 }
 
@@ -478,10 +658,17 @@ function TaskSearch({
   initial,
   onCommit,
   inputRef,
+  className = "sm:max-w-56",
+  hint = "/",
+  autoFocus,
 }: {
   initial: string;
   onCommit: (value: string) => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  className?: string;
+  /** The keyboard hint (none on a phone). */
+  hint?: string;
+  autoFocus?: boolean;
 }) {
   const [draft, setDraft] = useState(initial);
   return (
@@ -490,10 +677,11 @@ function TaskSearch({
       value={draft}
       onValueChange={setDraft}
       onClear={() => onCommit("")}
-      hint="/"
+      hint={hint}
+      autoFocus={autoFocus}
       placeholder="Search tasks"
       aria-label="Search tasks by title"
-      className="sm:max-w-56"
+      className={className}
       onKeyDown={(e) => {
         if (e.key === "Enter") onCommit(draft.trim());
         if (e.key === "Escape") {

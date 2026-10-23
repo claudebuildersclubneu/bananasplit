@@ -6,7 +6,7 @@ import { crossedWarning, gateUpload, warnStorage, type StorageRow } from "@/serv
 
 /**
  * The Files half of moving Personal items into a club
- * (app.move_personal_items, 20261021120000_move_personal_files). Notes keep
+ * (app.move_personal_items, 20261023120000_move_personal_files). Notes keep
  * their rows, but an upload's bytes are stored under its space's id
  * (files/{orgId}/...), and a note's images link to them by that id
  * (/api/orgs/{orgId}/files/{fileId}) in its body and in its live document.

@@ -10,14 +10,15 @@ import type { OrgKind, OrgPlan } from "@/generated/prisma/enums";
  *
  *   FREE           Personal Free: every account's own space. RSVP pages,
  *                  tasks (every view, for one person), the calendar,
- *                  availability polls, notes and files, and its own
- *                  settings.
+ *                  availability polls, notes and files, databases it makes
+ *                  itself, and its own settings.
  *   PERSONAL_PLUS  Personal Plus: Personal Free plus themes, calendar sync
  *                  (data connections, for Google Calendar) and AI imports,
  *                  with more storage, bigger files and longer note history.
  *   CLUB           Team: the club workspace. The overview, weekly updates,
  *                  labels, notes and files, people and the org chart,
- *                  finance, databases and reports, and data connections.
+ *                  finance, databases (with the built-in ones) and
+ *                  reports, and data connections.
  *   SOCIETY        Team Advanced: everything, plus themes, AI,
  *                  sponsorships, website sync and the audit log. A club's
  *                  30-day trial (TRIAL) is Team Advanced, limits included.
@@ -56,6 +57,12 @@ export const PLAN_FEATURES = {
   admin: "FREE",
   /** Live notes, documents and uploads (both Personal plans, and every club). */
   files: "FREE",
+  /**
+   * Databases and spreadsheets with CSV import. A club also gets the built-in
+   * ones (sessions, attendance, sign-ups, votes, people); Personal only the
+   * ones it makes (LISTED_DEFINITIONS, src/server/databases/types.ts).
+   */
+  databases: "FREE",
 
   /** The Overview board of widgets (Personal has its own home). */
   overview: "CLUB",
@@ -67,8 +74,6 @@ export const PLAN_FEATURES = {
   people: "CLUB",
   /** The finance board, budget, transactions and reimbursements. */
   finance: "CLUB",
-  /** Databases with CSV import (attendance, sign-ups, votes). */
-  databases: "CLUB",
   /** Reports over the club's databases. */
   reports: "CLUB",
   /** Data connections: Google Calendar sync, an email sender, a data source, guided setup. */

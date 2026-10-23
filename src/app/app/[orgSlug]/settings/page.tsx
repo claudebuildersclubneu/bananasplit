@@ -68,7 +68,8 @@ export default async function SettingsPage({ params }: PageProps<"/app/[orgSlug]
       </header>
 
       {can({ role }, "integrations.write") && spaceIncludes(organization, "integrations") && (
-        <Card className="flex-row flex-wrap items-center gap-4 px-6">
+        // Not on a phone: connecting tools is desk work.
+        <Card className="flex-row flex-wrap items-center gap-4 px-6 max-md:hidden">
           <SettingsIconChip icon="Plug" size="md" />
           <div className="min-w-0 flex-1 basis-64">
             <p className="heading text-[15px]">Connect tools</p>

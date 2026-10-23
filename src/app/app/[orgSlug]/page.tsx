@@ -41,7 +41,14 @@ import { timeWord } from "@/lib/overview/format";
 import { startedProgress } from "@/lib/overview/getting-started";
 import { overviewWidgetsFor, resolveOverview } from "@/lib/overview/widgets";
 import { DEFAULT_PULSE_DAY, DEFAULT_PULSE_HOUR } from "@/lib/pulse/settings";
-import { addDaysToKey, effectiveTimezone, fromDateKey, localDateKey } from "@/lib/tasks/dates";
+import {
+  addDaysToKey,
+  effectiveTimezone,
+  fromDateKey,
+  localDateKey,
+  mondayOfKey,
+  zonedInstant,
+} from "@/lib/tasks/dates";
 import { loadSavedBoard } from "@/server/boards";
 import { getOrgContextBySlug, withOrgTx } from "@/server/db/context";
 import { listNoteFiles } from "@/server/notes/files";
@@ -65,7 +72,7 @@ import {
 import { upcomingPulseSend } from "@/server/pulse/schedule";
 import { loadPersonalHome } from "@/server/personal/home";
 import { loadSetupState } from "@/server/setup/progress";
-import { getMyOpenTasks, taskFilterWhere } from "@/server/tasks/queries";
+import { getMyOpenTasks, getTaskStats, taskFilterWhere } from "@/server/tasks/queries";
 
 const MY_TASKS_LIMIT = 8;
 /** "Coming up in 14 days" in the stat strip. */
@@ -145,6 +152,17 @@ export default async function OrgOverviewPage({
         db,
         org.id,
         myTasks.tasks.map((t) => t.id),
+      ),
+      // Tasks' own stat strip numbers (no filters), for the phone's bar.
+      taskBar: await getTaskStats(
+        db,
+        org.id,
+        {},
+        {
+          today,
+          weekEnd: fromDateKey(addDaysToKey(mondayOfKey(dayKey), 6)),
+          weekStart: zonedInstant(mondayOfKey(dayKey), 0, tz),
+        },
       ),
       stats: {
         // Due today through the sixth day from now: "this week".
@@ -264,6 +282,8 @@ export default async function OrgOverviewPage({
       overdue={data.stats.overdue}
       upcoming={data.weekEvents.filter((e) => e.startsAt < upcomingUntil).length}
       upcomingDays={UPCOMING_DAYS}
+      taskBar={data.taskBar}
+      tasksHref={`${base}/tasks`}
     />
   );
 
@@ -516,7 +536,12 @@ export default async function OrgOverviewPage({
                   </CardHeader>
                 </Card>
               )}
-              {data.setup ? <SetupPrompt orgSlug={orgSlug} state={data.setup} /> : null}
+              {/* Not on a phone: connecting tools is desk work. */}
+              {data.setup ? (
+                <div className="max-md:hidden">
+                  <SetupPrompt orgSlug={orgSlug} state={data.setup} />
+                </div>
+              ) : null}
             </>
           ) : null
         }

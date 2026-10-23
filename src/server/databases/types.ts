@@ -1,5 +1,5 @@
 import type { ColumnConfig, RowView } from "@/components/databases/column-config";
-import type { DatabaseKind, Role } from "@/generated/prisma/client";
+import type { DatabaseKind, Prisma, Role } from "@/generated/prisma/client";
 import type { TxClient } from "@/server/db/context";
 
 import type { QuerySpec } from "./query-builder";
@@ -13,6 +13,17 @@ export function tierOf(role: Role | null | undefined): Tier | null {
   if (role === "ADMIN") return "ADMIN";
   return "MEMBER";
 }
+
+/**
+ * The databases a space lists. Every space has the built-in ones (made with
+ * it: app.ensure_org_defaults), but they read a club's own sessions,
+ * check-ins, sign-ups, votes and members, so a Personal space lists only
+ * the databases its owner makes (CUSTOM). Spread into a DatabaseDefinition
+ * query's where; it only sets NOT, so it can sit beside AND and OR filters.
+ */
+export const LISTED_DEFINITIONS = {
+  NOT: { kind: { not: "CUSTOM" }, organization: { kind: "PERSONAL" } },
+} satisfies Prisma.DatabaseDefinitionWhereInput;
 
 /** Everything a source needs to query and render one view. */
 export interface ViewContext {

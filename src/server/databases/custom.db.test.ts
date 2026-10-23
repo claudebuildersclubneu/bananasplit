@@ -43,16 +43,20 @@ import {
   updateField,
   type Actor,
 } from "./custom";
-import { listDatabases } from "./views";
+import { NotFoundError } from "@/lib/auth/errors";
+
+import { getDatabase, listDatabases } from "./views";
 
 const tag = randomBytes(4).toString("hex");
 const orgA = `c_dbtest_a_${tag}`;
 const orgB = `c_dbtest_b_${tag}`;
+const personalOrg = `c_dbtest_p_${tag}`;
 
 type U = { id: string; email: string; name: string };
 let ownerA: U;
 let memberA: U;
 let ownerB: U;
+let personalOwner: U;
 let reachable = true;
 
 async function makeUser(local: string): Promise<U> {
@@ -81,10 +85,20 @@ beforeAll(async () => {
     ownerA = await makeUser("db-owner-a");
     memberA = await makeUser("db-member-a");
     ownerB = await makeUser("db-owner-b");
+    personalOwner = await makeUser("db-personal");
     await ownerDb.organization.createMany({
       data: [
         { id: orgA, name: "DB Test A", slug: `db-test-a-${tag}`, timezone: "UTC" },
         { id: orgB, name: "DB Test B", slug: `db-test-b-${tag}`, timezone: "UTC" },
+        {
+          id: personalOrg,
+          name: "DB Test Personal",
+          slug: `db-test-p-${tag}`,
+          timezone: "UTC",
+          kind: "PERSONAL",
+          plan: "FREE",
+          personalOwnerId: personalOwner.id,
+        },
       ],
     });
     await ownerDb.membership.createMany({
@@ -92,6 +106,7 @@ beforeAll(async () => {
         { organizationId: orgA, userId: ownerA.id, role: "OWNER" },
         { organizationId: orgA, userId: memberA.id, role: "MEMBER" },
         { organizationId: orgB, userId: ownerB.id, role: "OWNER" },
+        { organizationId: personalOrg, userId: personalOwner.id, role: "OWNER" },
       ],
     });
   } catch {
@@ -101,9 +116,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (reachable) {
-    await ownerDb.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } });
+    await ownerDb.organization.deleteMany({ where: { id: { in: [orgA, orgB, personalOrg] } } });
     await ownerDb.user.deleteMany({
-      where: { id: { in: [ownerA, memberA, ownerB].filter(Boolean).map((u) => u.id) } },
+      where: {
+        id: { in: [ownerA, memberA, ownerB, personalOwner].filter(Boolean).map((u) => u.id) },
+      },
     });
   }
   await disconnectAll();
@@ -326,6 +343,38 @@ describe("club-made databases against the local database", () => {
         data: { organizationId: orgA, databaseId: sessions.id, values: {} },
       }),
     ).rejects.toThrow(/not a club-made database/);
+  });
+
+  it("lists only the databases a Personal space makes, never the built-ins it was made with", async () => {
+    if (!reachable) return;
+    // Every space gets the built-ins at creation (app.ensure_org_defaults)...
+    const builtIns = await ownerDb.databaseDefinition.count({
+      where: { organizationId: personalOrg, kind: { not: "CUSTOM" } },
+    });
+    expect(builtIns).toBeGreaterThan(0);
+    // ...but Personal doesn't list them, or open one by its key.
+    expect(
+      await as(personalOwner, personalOrg, (a) => listDatabases(a.db, personalOrg, a.role)),
+    ).toEqual([]);
+    await expect(
+      as(personalOwner, personalOrg, (a) => getDatabase(a.db, personalOrg, a.role, "sessions")),
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    const { key } = await as(personalOwner, personalOrg, (a) =>
+      createDatabase(a, { name: `Reading list ${tag}`, templateId: "spreadsheet" }),
+    );
+    const listed = await as(personalOwner, personalOrg, (a) =>
+      listDatabases(a.db, personalOrg, a.role),
+    );
+    expect(listed.map((d) => [d.key, d.kind])).toEqual([[key, "CUSTOM"]]);
+    expect(listed[0]!.canEdit).toBe(true);
+
+    // A club still lists its built-ins, and nobody else opens the Personal space.
+    const club = await as(ownerA, orgA, (a) => listDatabases(a.db, orgA, a.role));
+    expect(club.some((d) => d.kind === "SESSIONS")).toBe(true);
+    await expect(
+      as(ownerA, personalOrg, (a) => listDatabases(a.db, personalOrg, a.role)),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("converts values when a field's type changes, and deleting a field clears its values", async () => {

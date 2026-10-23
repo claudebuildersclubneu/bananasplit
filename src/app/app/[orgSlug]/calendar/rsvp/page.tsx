@@ -110,7 +110,7 @@ export default async function RsvpsPage({ params }: PageProps<"/app/[orgSlug]/ca
       <Button variant={variant} asChild>
         <Link href={newRsvpEventHref(orgSlug)}>
           <Plus aria-hidden="true" />
-          New event with RSVPs
+          New event
         </Link>
       </Button>
     ) : null;

@@ -113,7 +113,10 @@ describe("event service", () => {
 
   it("a PUBLIC event with Google and a build hook enqueues gcal and a delayed site rebuild", async () => {
     const { ctx, saved } = makeCtx({
-      integrations: [{ provider: "GOOGLE_CALENDAR", config: {} }, { provider: "NETLIFY_BUILD_HOOK" }],
+      integrations: [
+        { provider: "GOOGLE_CALENDAR", config: { publicCalendarId: "cal_pub" } },
+        { provider: "NETLIFY_BUILD_HOOK" },
+      ],
     });
     const { tags: touched } = await createEvent(ctx, { ...base, visibility: "PUBLIC", kind: "WORKSHOP" });
     expect(saved[0]).toMatchObject({ googleSyncState: "PENDING" });
@@ -133,6 +136,20 @@ describe("event service", () => {
     });
     await createEvent(internal.ctx, base);
     expect(enqueueJob).toHaveBeenCalledWith(internal.ctx.db, expect.objectContaining({ kind: "gcal" }));
+  });
+
+  it("a PUBLIC event is mirrored only when a public calendar is configured (never a default one)", async () => {
+    // Just connected, or "Don't mirror public events": publicCalendarId is null.
+    for (const config of [{}, { publicCalendarId: null, internalCalendarId: "cal_int" }]) {
+      const { ctx, saved } = makeCtx({
+        integrations: [{ provider: "GOOGLE_CALENDAR", config }, { provider: "NETLIFY_BUILD_HOOK" }],
+      });
+      await createEvent(ctx, { ...base, visibility: "PUBLIC", kind: "WORKSHOP" });
+      expect(saved[0]).toMatchObject({ googleSyncState: "NOT_APPLICABLE" });
+      // The website still rebuilds; only Google is left out.
+      expect(enqueueJob.mock.calls.map((c) => c[1].kind)).toEqual(["site-rebuild"]);
+      enqueueJob.mockClear();
+    }
   });
 
   it("validates times, links, the RSVP URL and the host", async () => {

@@ -20,8 +20,10 @@ import { cn } from "@/lib/utils";
  * It floats: its row is sticky and lets clicks through everywhere but the
  * pill, and it takes the same room at the top the old bar did, so every
  * page's title and actions sit below it. On a phone it spans the width with
- * search, notifications and you; the tab bar has the create button, and the
- * user menu has the theme.
+ * the menu (every section and the club, full screen), search,
+ * notifications and you;
+ * each page's add button is at its top right, and the user menu has the
+ * theme.
  */
 export function ToolCapsule({
   orgId,
@@ -29,12 +31,15 @@ export function ToolCapsule({
   user,
   createActions,
   onSearch,
+  menuButton,
 }: {
   orgId: string;
   orgSlug: string;
   user: UserMenuUser;
   createActions: readonly CreateAction[];
   onSearch: () => void;
+  /** The phone's menu button (NavMenu), first in the capsule. */
+  menuButton?: React.ReactNode;
 }) {
   const mod = useModKey();
   return (
@@ -44,6 +49,7 @@ export function ToolCapsule({
         aria-label="Tools"
         className="glass-light pointer-events-auto flex max-w-full min-w-0 flex-1 items-center gap-0.5 rounded-full p-1 md:flex-none"
       >
+        {menuButton}
         <button
           type="button"
           onClick={onSearch}

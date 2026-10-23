@@ -136,7 +136,7 @@ export default async function OrgChartPage({
           description={
             canEdit
               ? "Import your org chart document (Word, Google Doc export, Markdown, text or PDF) and review it before publishing, start from the club template, or build it by hand."
-              : `${organization.name}'s reporting lines, roles and responsibilities will appear here once an admin publishes the chart.`
+              : `${organization.name}'s reporting lines, roles and responsibilities will appear here once the chart is published.`
           }
           action={
             canEdit ? (

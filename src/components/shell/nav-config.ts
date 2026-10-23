@@ -7,7 +7,7 @@ import { NEW_TASK_PARAM } from "@/lib/shortcuts";
  * The sidebar's links for one space: a club's sections (in the club's
  * order, under its headings, with its names; Admin panel > Sidebar) as
  * plain data the client sidebar can take, or a Personal space's fixed few.
- * The phone's tab bar and the create menu are worked out from the same
+ * The create menu is worked out from the same
  * links, so they only offer what the space has.
  */
 
@@ -38,10 +38,10 @@ export interface NavSection {
 /**
  * A Personal space's sidebar: Home (the Personal dashboard), Tasks,
  * Calendar, Files (notes and uploads together, the one library at /notes),
- * Find a time (availability polls anyone answers from a link) and RSVPs (its
- * event pages and your tickets). No question polls: only members vote on
- * those, and Personal has one. Not arrangeable: there is no team to arrange
- * it for.
+ * Databases (only the ones you make), Find a time (availability polls anyone
+ * answers from a link) and RSVPs (its event pages and your tickets). No
+ * question polls: only members vote on those, and Personal has one. Not
+ * arrangeable: there is no team to arrange it for.
  */
 export const PERSONAL_NAV: readonly {
   id: string;
@@ -57,6 +57,7 @@ export const PERSONAL_NAV: readonly {
   { id: "calendar", label: "Calendar", icon: "CalendarDays", path: "/calendar", exact: false },
   // Notes and uploads together, as in a club: one library at /notes.
   { id: "notes", label: "Files", icon: "FolderOpen", path: "/notes", exact: false },
+  { id: "databases", label: "Databases", icon: "Database", path: "/databases", exact: false },
   {
     id: "find-a-time",
     label: "Find a time",
@@ -187,21 +188,6 @@ export function isExactPage(href: string, pathname: string, search: string = "")
   return true;
 }
 
-/**
- * The phone tab bar's links: the space's home (Overview in a club, Home in
- * Personal), Tasks and Calendar, each only when the space shows it and its
- * plan has it. Everything else is under More.
- */
-export function tabBarLinks(sections: readonly NavSection[]): {
-  home?: NavLink;
-  tasks?: NavLink;
-  calendar?: NavLink;
-} {
-  const links = sections.flatMap((s) => s.items).filter((l) => !l.locked);
-  const find = (...ids: string[]) => links.find((l) => ids.includes(l.id));
-  return { home: find("overview", "home"), tasks: find("tasks"), calendar: find("calendar") };
-}
-
 export type CreateActionId = "task" | "event" | "note" | "poll" | "find-a-time";
 
 export interface CreateAction {
@@ -214,7 +200,7 @@ export interface CreateAction {
 }
 
 /**
- * The + menu (the tool capsule's, and the phone tab bar's create button):
+ * The + menu (the tool capsule's):
  * what the viewer can start in this space, from the sections it shows.
  *
  * - New task: Tasks with ?new=1, which starts one there (as `c` does).
