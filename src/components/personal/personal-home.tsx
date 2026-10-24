@@ -14,8 +14,8 @@ import {
   UserRound,
   Users,
   Vote,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/components/icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -176,7 +176,7 @@ function SectionTitle({
   action,
 }: {
   id: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   children: ReactNode;
   action?: ReactNode;
 }) {
@@ -203,7 +203,7 @@ function HomeCard({
   children,
 }: {
   id: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   title: ReactNode;
   action?: ReactNode;
   children: ReactNode;

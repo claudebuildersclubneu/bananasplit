@@ -37,7 +37,7 @@ export type GroupId = (typeof GROUP_IDS)[number];
 export interface SectionDef {
   id: SectionId;
   label: string;
-  /** lucide icon name, resolved in the sidebar. */
+  /** Icon name (@/components/icons), resolved in the sidebar. */
   icon: string;
   /** Path under /app/{slug}. */
   path: string;

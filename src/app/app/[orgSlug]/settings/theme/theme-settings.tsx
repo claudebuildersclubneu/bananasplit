@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCircle2, Flag, Palette, Plus, TriangleAlert } from "lucide-react";
+import { Check, CheckCircle2, Flag, Palette, Plus, TriangleAlert } from "@/components/icons";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

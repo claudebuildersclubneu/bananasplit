@@ -20,7 +20,7 @@ import {
   Pencil,
   Trash2,
   Users,
-} from "lucide-react";
+} from "@/components/icons";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
